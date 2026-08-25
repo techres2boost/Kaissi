@@ -78,17 +78,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Aucun `server.url` dans la configuration Capacitor
+      - name: Aucun server.url dans la configuration Capacitor
         run: |
           if grep -nE '^\s*(server\s*:|url\s*:)' apps/pos/capacitor.config.ts; then
-            echo "::error::Un bloc `server` a été introduit dans capacitor.config.ts."
-            echo "Le POS doit être EMPAQUETÉ : charger une URL distante le rend"
-            echo "inutilisable hors ligne. Voir CLAUDE.md, règle « POS empaqueté »."
+            echo '::error::Un bloc server a ete introduit dans capacitor.config.ts. Le POS doit rester EMPAQUETE : charger une URL distante le rend inutilisable hors ligne. Voir CLAUDE.md.' 
             exit 1
           fi
           echo "OK — le POS reste empaqueté."
 
-      - name: Aucune colonne monétaire sans suffixe `_millimes`
+      - name: Aucune colonne monetaire sans suffixe _millimes
         run: |
           # Toute colonne dont le nom évoque un montant DOIT porter le suffixe.
           fautes=$(grep -rnE '^\s+[a-z_]*(price|amount|total|cost|subtotal|discount|tax|float|variance|counted|expected|duty)[a-z_]*\s+(bigint|integer|numeric)' \
@@ -113,7 +111,7 @@ jobs:
           fi
           echo "OK — aucun flottant dans le schéma."
 
-      - name: `order_events` et `audit_events` restent en insertion seule
+      - name: Journaux order_events et audit_events en insertion seule
         run: |
           for table in order_events audit_events; do
             if ! grep -q "revoke update, delete, truncate on kaissi.$table" supabase/migrations/*.sql; then
