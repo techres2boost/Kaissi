@@ -77,9 +77,9 @@ comment on function kaissi.uuid_v7() is
 -- Contexte de sécurité
 -- ───────────────────────────────────────────────────────────────────────────
 -- Deux sources possibles, dans cet ordre :
---   1. les revendications du JWT (`request.jwt.claims`) — chemin PostgREST ;
---   2. les variables de session `kaissi.*` — chemin de l'API de sync, posées
---      par `set_config('kaissi.device_id', ..., true)` en début de transaction.
+--   1. les variables de session `kaissi.*` — chemin de l'API de sync, posées
+--      par `set_config('kaissi.device_id', ..., true)` en début de transaction ;
+--   2. les revendications du JWT (`request.jwt.claims`) — chemin PostgREST.
 
 create or replace function kaissi.revendication(cle text)
 returns text
