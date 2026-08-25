@@ -1,0 +1,42 @@
+# Dépendances
+node_modules/
+.pnpm-store/
+
+# Constructions
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+.turbo/
+
+# Capacitor / Android
+# Le projet natif EST versionné : dès la Phase 1, il accueillera les plugins
+# d'impression (socket TCP 9100, Bluetooth SPP). Le régénérer à chaque fois
+# ferait perdre ce code natif. Seuls les artefacts de build sont ignorés.
+apps/pos/android/app/build/
+apps/pos/android/build/
+apps/pos/android/.gradle/
+apps/pos/android/app/src/main/assets/public/
+apps/pos/android/app/src/main/assets/capacitor.config.json
+apps/pos/android/app/src/main/assets/capacitor.plugins.json
+apps/pos/android/capacitor-cordova-android-plugins/
+apps/pos/ios/
+apps/pos/dist/
+*.apk
+*.aab
+*.keystore
+local.properties
+
+# Environnement — jamais de secret dans le dépôt
+.env
+.env.*
+!.env.example
+
+# Outils
+.DS_Store
+coverage/
+*.log
+.vscode/
+.idea/
+supabase/.temp/

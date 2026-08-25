@@ -1,0 +1,137 @@
+name: CI
+
+# La CI de Kaissi vérifie trois choses, dans cet ordre d'importance :
+#   1. les CALCULS MONÉTAIRES de packages/domain sont justes ;
+#   2. tout le monorepo compile ;
+#   3. le bundle du POS ne dépend d'AUCUNE ressource réseau (mode avion).
+#
+# Le point 3 mérite un contrôle automatique : « jamais de server.url » est une
+# règle d'architecture, et une règle qui n'échoue pas en CI est un commentaire.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+
+jobs:
+  domaine:
+    name: Domaine — calculs monétaires
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Tests du domaine (monnaie, TVA, remises, réduction d'événements)
+        run: pnpm --filter @kaissi/domain test
+      - name: Tests du schéma local (migrations, outbox, immuabilité)
+        run: pnpm --filter @kaissi/db-local test
+      - name: Tests du rendu ESC/POS
+        run: pnpm --filter @kaissi/printing test
+
+  types:
+    name: Vérification des types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+
+  mode-avion:
+    name: Mode avion — le bundle POS ne dépend d'aucun réseau
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build du POS + vérification du mode avion
+        run: pnpm --filter @kaissi/pos build
+      - name: Archiver le bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-pos
+          path: apps/pos/dist
+          retention-days: 7
+
+  regles-absolues:
+    name: Règles absolues (argent, UUID, server.url)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Aucun `server.url` dans la configuration Capacitor
+        run: |
+          if grep -nE '^\s*(server\s*:|url\s*:)' apps/pos/capacitor.config.ts; then
+            echo "::error::Un bloc `server` a été introduit dans capacitor.config.ts."
+            echo "Le POS doit être EMPAQUETÉ : charger une URL distante le rend"
+            echo "inutilisable hors ligne. Voir CLAUDE.md, règle « POS empaqueté »."
+            exit 1
+          fi
+          echo "OK — le POS reste empaqueté."
+
+      - name: Aucune colonne monétaire sans suffixe `_millimes`
+        run: |
+          # Toute colonne dont le nom évoque un montant DOIT porter le suffixe.
+          fautes=$(grep -rnE '^\s+[a-z_]*(price|amount|total|cost|subtotal|discount|tax|float|variance|counted|expected|duty)[a-z_]*\s+(bigint|integer|numeric)' \
+            supabase/migrations/*.sql \
+            | grep -v '_millimes' \
+            | grep -v '_bp' \
+            | grep -v 'cost_per_unit' \
+            | grep -v 'numeric(18,6)' || true)
+          if [ -n "$fautes" ]; then
+            echo "::error::Colonne(s) monétaire(s) sans suffixe _millimes :"
+            echo "$fautes"
+            exit 1
+          fi
+          echo "OK — tous les montants sont suffixés _millimes."
+
+      - name: Aucun type flottant pour de l'argent
+        run: |
+          if grep -rniE '\b(real|double precision|float[48]?)\b' supabase/migrations/*.sql; then
+            echo "::error::Un type flottant a été introduit dans le schéma."
+            echo "RÈGLE 1 : aucun flottant pour de l'argent, nulle part."
+            exit 1
+          fi
+          echo "OK — aucun flottant dans le schéma."
+
+      - name: `order_events` et `audit_events` restent en insertion seule
+        run: |
+          for table in order_events audit_events; do
+            if ! grep -q "revoke update, delete, truncate on kaissi.$table" supabase/migrations/*.sql; then
+              echo "::error::Le REVOKE sur kaissi.$table a disparu (RÈGLE 6)."
+              exit 1
+            fi
+            if ! grep -q "${table}_immuable" supabase/migrations/*.sql; then
+              echo "::error::Le déclencheur d'immuabilité de kaissi.$table a disparu."
+              exit 1
+            fi
+          done
+          echo "OK — les deux journaux restent append-only."
+
+      - name: Index unique d'idempotence présent
+        run: |
+          if ! grep -q 'event_id        uuid        primary key' supabase/migrations/0005_sync.sql; then
+            echo "::error::sync_mutations.event_id n'est plus clé primaire (RÈGLE 5)."
+            echo "Sans cet index unique, le double encaissement redevient possible."
+            exit 1
+          fi
+          echo "OK — l'idempotence est garantie."

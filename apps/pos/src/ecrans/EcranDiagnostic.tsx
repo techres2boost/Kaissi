@@ -1,0 +1,173 @@
+/**
+ * Écran Diagnostic.
+ *
+ * Tu ne peux pas envoyer quelqu'un à Sfax pour comprendre pourquoi une
+ * tablette ne démarre pas. Cet écran donne, sur l'appareil, tout ce qu'il
+ * faut pour qualifier un incident au téléphone : mode de stockage, version
+ * de schéma, migrations appliquées, contenu du catalogue, état de l'outbox.
+ *
+ * C'est aussi l'écran qui PROUVE le mode avion : « Réseau : hors ligne » et
+ * « 17 produits lus depuis SQLite » sur la même page.
+ */
+
+import { useEffect, useState } from 'react'
+import type { ContexteApplication } from '../donnees/demarrage.js'
+import type { EtatReseau } from '../donnees/reseau.js'
+
+interface Props {
+  contexte: ContexteApplication
+  reseau: EtatReseau
+}
+
+export function EcranDiagnostic({ contexte, reseau }: Props) {
+  const [etatLocal, setEtatLocal] = useState<Record<string, string | null>>({})
+  const [compteurs, setCompteurs] = useState({ enAttente: 0, rejetes: 0 })
+  const [produits, setProduits] = useState(0)
+
+  useEffect(() => {
+    let vivant = true
+    void (async () => {
+      const [e, c, p] = await Promise.all([
+        contexte.etat.tout(),
+        contexte.journal.enAttente(),
+        contexte.catalogue.nombreProduits(),
+      ])
+      if (!vivant) return
+      setEtatLocal(e)
+      setCompteurs(c)
+      setProduits(p)
+    })()
+    return () => {
+      vivant = false
+    }
+  }, [contexte])
+
+  return (
+    <div className="diagnostic">
+      <section className="bloc">
+        <h2>Mode avion — critère de sortie de la Phase 0</h2>
+        <div className={`verdict ${produits > 0 ? 'ok' : 'ko'}`}>
+          {produits > 0 ? (
+            <>
+              <strong>Réussi.</strong> {produits} produits lus depuis SQLite
+              local, réseau {reseau.connecte ? 'disponible mais non sollicité' : 'INDISPONIBLE'}.
+              Aucune requête n'a été émise au démarrage.
+            </>
+          ) : (
+            <>
+              <strong>Échec.</strong> Le catalogue local est vide : l'écran de
+              caisse ne peut rien afficher.
+            </>
+          )}
+        </div>
+      </section>
+
+      <section className="bloc">
+        <h2>Démarrage</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Étape</th>
+              <th>État</th>
+              <th>Durée</th>
+              <th>Détail</th>
+            </tr>
+          </thead>
+          <tbody>
+            {contexte.etapes.map((e) => (
+              <tr key={e.nom}>
+                <td>{e.nom}</td>
+                <td className={e.statut}>{e.statut === 'ok' ? '✓' : '✗'}</td>
+                <td className="nombre">{e.dureeMs} ms</td>
+                <td className="detail">{e.detail}</td>
+              </tr>
+            ))}
+            <tr className="total">
+              <td>Total</td>
+              <td />
+              <td className="nombre">{contexte.dureeTotaleMs} ms</td>
+              <td />
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section className="bloc">
+        <h2>Stockage</h2>
+        <dl>
+          <dt>Mode</dt>
+          <dd>{contexte.base.mode}</dd>
+          <dt>Persistance</dt>
+          <dd className={contexte.base.persistant ? 'ok' : 'attention'}>
+            {contexte.base.persistant
+              ? 'Oui — les ventes survivent au redémarrage'
+              : 'NON — base en mémoire, développement uniquement'}
+          </dd>
+          <dt>Détail</dt>
+          <dd>{contexte.base.detail}</dd>
+          <dt>Version de schéma</dt>
+          <dd>{contexte.versionSchema}</dd>
+        </dl>
+      </section>
+
+      <section className="bloc">
+        <h2>Migrations locales appliquées</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Version</th>
+              <th>Nom</th>
+              <th>Appliquée le</th>
+              <th>Durée</th>
+            </tr>
+          </thead>
+          <tbody>
+            {contexte.migrations.map((m) => (
+              <tr key={m.version}>
+                <td className="nombre">{m.version}</td>
+                <td>{m.nom}</td>
+                <td className="detail">{m.appliqueA}</td>
+                <td className="nombre">{m.dureeMs} ms</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="bloc">
+        <h2>Synchronisation</h2>
+        <dl>
+          <dt>Réseau</dt>
+          <dd className={reseau.connecte ? 'ok' : 'attention'}>
+            {reseau.connecte ? `En ligne (${reseau.type})` : 'Hors ligne'}
+          </dd>
+          <dt>Opérations en attente</dt>
+          <dd>{compteurs.enAttente}</dd>
+          <dt>Opérations rejetées</dt>
+          <dd className={compteurs.rejetes > 0 ? 'attention' : ''}>
+            {compteurs.rejetes}
+            {compteurs.rejetes > 0 && ' — nécessitent votre attention'}
+          </dd>
+        </dl>
+        <p className="note">
+          Le moteur de synchronisation (push / pull / curseurs) est la Phase 2.
+          En Phase 0, l'outbox se remplit mais rien n'est envoyé : c'est voulu.
+        </p>
+      </section>
+
+      <section className="bloc">
+        <h2>Identité locale</h2>
+        <table>
+          <tbody>
+            {Object.entries(etatLocal).map(([cle, valeur]) => (
+              <tr key={cle}>
+                <td>{cle}</td>
+                <td className="detail mono">{valeur || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    </div>
+  )
+}

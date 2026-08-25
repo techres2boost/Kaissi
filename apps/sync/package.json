@@ -1,0 +1,22 @@
+{
+  "name": "@kaissi/sync",
+  "version": "0.1.0",
+  "private": true,
+  "description": "API de synchronisation Kaissi — Hono sur Node. Push idempotent, pull par curseur.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "node --experimental-strip-types --watch src/index.ts",
+    "build": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@kaissi/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}
