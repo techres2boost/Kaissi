@@ -5,8 +5,21 @@
 > La caisse ne doit **jamais** s'arrêter. Un restaurant qui ne peut pas encaisser
 > désinstalle le logiciel le soir même et le dit à tous ses confrères.
 
-État : **Phase 1 — MVP caisse**. Un terminal encaisse une journée complète,
-entièrement hors ligne. La synchronisation multi-appareils est la Phase 2.
+État : **Phase 2 — synchronisation**. Plusieurs terminaux encaissent en
+parallèle, hors ligne, et se réconcilient sans perdre ni dupliquer une vente.
+
+---
+
+## Documentation
+
+| Document | Pour |
+|---|---|
+| [`docs/fonctionnel.md`](docs/fonctionnel.md) | **Comprendre** chaque module et pourquoi il est ainsi |
+| [`docs/tester.md`](docs/tester.md) | **Tester** — des tests automatiques à la tablette réelle |
+| [`docs/deploiement.md`](docs/deploiement.md) | **Déployer** — Supabase, Railway, Vercel, APK Android |
+| [`docs/tester-mode-avion.md`](docs/tester-mode-avion.md) | Le critère de sortie : démarrer sans réseau |
+| [`docs/architecture.md`](docs/architecture.md) | Les décisions structurantes, en version courte |
+| [`CLAUDE.md`](CLAUDE.md) | Les huit règles absolues du dépôt |
 
 ---
 
@@ -14,23 +27,34 @@ entièrement hors ligne. La synchronisation multi-appareils est la Phase 2.
 
 | Brique | État |
 |---|---|
-| Monorepo pnpm + Turborepo | ✅ |
-| `packages/domain` — monnaie, TVA, remises, événements, permissions, shift, PIN | ✅ 150 tests |
-| Schéma Postgres + RLS + audit chaîné | ✅ 29 tables, appliqué sur Supabase |
+| `packages/domain` — monnaie, TVA, remises, permissions, shift, PIN, audit | ✅ 151 tests |
 | `packages/db-local` — SQLite miroir, migrations, projections, outbox | ✅ 45 tests |
-| `packages/printing` — ESC/POS : ticket client, KOT, rapport de caisse | ✅ 26 tests |
-| **Prise de poste par PIN**, validé hors ligne (Argon2id) | ✅ |
-| **Shift** — fond de caisse, mouvements d'espèces, clôture avec écart | ✅ |
-| **Prise de commande** — tables, variantes, modificateurs, notes | ✅ |
+| `packages/printing` — ESC/POS : ticket, KOT, rapport de caisse | ✅ 26 tests |
+| `apps/sync` — protocole, idempotence, RLS, reprojection serveur | ✅ 35 tests |
+| Schéma Postgres + RLS + audit chaîné | ✅ 32 tables, 0 alerte de sécurité |
+| **Démarrage et vente en mode avion** | ✅ vérifié en CI |
+| **Prise de poste par PIN**, hors ligne (Argon2id) | ✅ |
+| **Shift** — fond, mouvements d'espèces, clôture avec écart | ✅ |
+| **Commande** — tables, variantes, modificateurs, notes | ✅ |
 | **Remises** avec plafond par rôle et escalade manager | ✅ |
-| **Envoi en cuisine** — KOT par station, jamais réimprimé deux fois | ✅ |
-| **Encaissement** — espèces, carte, paiement mixte, monnaie rendue | ✅ |
-| **File d'impression** persistante, retentatives, badge d'échec | ✅ |
-| Plugin natif Android d'impression TCP 9100 | ⚠️ écrit, **pas encore testé sur appareil** |
-| Vérification automatique du mode avion en CI | ✅ |
-| Parcours de caisse complet rejoué en CI dans un navigateur | ✅ |
-| Moteur de synchronisation (push/pull) | ⏳ Phase 2 |
-| Back-office (rapports, catalogue, appairage) | ⏳ Phase 1 bis |
+| **Cuisine** — KOT par station, jamais réimprimé | ✅ |
+| **Encaissement** — espèces, carte, mixte, monnaie rendue | ✅ |
+| **Synchronisation multi-appareils** avec coupures réseau | ✅ banc à 3 appareils |
+| **Appairage** par jeton révocable | ✅ |
+| Plugin natif Android d'impression TCP 9100 | ⚠️ écrit, **jamais testé sur appareil** |
+| Back-office (catalogue, employés, rapports) | ⏳ Phase 1 bis |
+| KDS, stock, CRM | ⏳ Phases 3 à 6 |
+
+### Le jalon de la Phase 2 est tenu
+
+Le dossier d'architecture fixait la règle à l'avance :
+
+> Si, à la fin de la Phase 2, la synchronisation n'est pas fiable en test avec
+> trois appareils et des coupures réseau simulées, on bascule sur PowerSync
+> sans débat.
+
+Le banc passe — aucune vente perdue, aucune dupliquée, totaux identiques au
+millime près. **On garde le moteur maison.**
 
 ---
 
@@ -39,7 +63,7 @@ entièrement hors ligne. La synchronisation multi-appareils est la Phase 2.
 ```bash
 pnpm install
 
-pnpm test            # 221 tests : domaine, schéma local, ESC/POS
+pnpm test            # 257 tests : domaine, schéma local, ESC/POS
 pnpm typecheck       # types de tout le monorepo
 pnpm pos:dev         # POS dans le navigateur → http://localhost:5173
 

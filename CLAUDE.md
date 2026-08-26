@@ -214,6 +214,12 @@ pnpm backoffice:dev             # back-office Next.js
 # Rejoue une journée de service dans un navigateur : prise de poste, shift,
 # commande, envoi cuisine, remise escaladée, encaissement, clôture.
 pnpm --filter @kaissi/pos test:parcours
+
+# Tests de synchronisation — exigent un PostgreSQL local (voir docs/tester.md)
+pnpm --filter @kaissi/sync test
+
+# Appairer un terminal : le jeton n'est affiché QU'UNE FOIS
+node apps/sync/scripts/appairer.mjs --restaurant <uuid> --prefixe P1
 ```
 
 ---
@@ -273,10 +279,34 @@ professionnel.
 
 ---
 
-## Jalon de décision — moteur de synchronisation
+## Jalon de décision — moteur de synchronisation : TENU
 
-Écrit maintenant pour éviter de s'entêter plus tard :
+La règle avait été écrite à l'avance :
 
 > Si, à la fin de la **Phase 2**, la synchronisation n'est pas fiable en test
 > avec **trois appareils** et des coupures réseau simulées, on bascule sur
 > **PowerSync** sans débat.
+
+Le banc (`apps/sync/test/banc-trois-appareils.test.ts`) passe contre un vrai
+PostgreSQL, avec coupures franches et aléatoires : aucune vente perdue,
+aucune dupliquée, totaux identiques au millime. **Le moteur maison est
+conservé.** PowerSync reste la porte de sortie si le passage à l'échelle
+révélait autre chose.
+
+---
+
+## Synchronisation — ce qui ne se contourne pas
+
+- **L'idempotence est consultée AVANT la validation métier.** Un `event_id`
+  déjà connu est un doublon de retentative, pas une opération tardive. Le
+  revalider le ferait rejeter dès que la commande a changé d'état entre
+  l'envoi et la réémission — et l'appareil ne viderait jamais son outbox.
+- **L'outbox ne se vide que sur accusé de réception.** Jamais sur un délai,
+  jamais « au bout de N essais ».
+- **Un rejet ne se réessaie jamais tout seul.** C'est une règle métier, elle
+  remonte au gérant.
+- **Push avant pull.** Si le réseau ne tient que trois secondes, ce sont nos
+  encaissements qui en profitent.
+- **Le service emprunte le rôle `kaissi_device`** et pose son contexte en
+  variables de session : tout passe par RLS. Un défaut de filtrage applicatif
+  ne peut pas provoquer de fuite entre restaurants.

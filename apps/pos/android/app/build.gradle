@@ -1,6 +1,34 @@
 apply plugin: 'com.android.application'
 
+/*
+ * Signature de production.
+ *
+ * Les identifiants vivent dans `keystore.properties`, HORS du dépôt (voir
+ * .gitignore). Sans ce fichier, seul le build de debug fonctionne — ce qui
+ * est exactement ce qu'on veut : une CI ne doit pas pouvoir signer une
+ * version de production.
+ *
+ * ⚠ Perdre le keystore = ne plus jamais pouvoir mettre à jour l'application
+ *   déjà installée sur les tablettes des clients. Sauvegarde-le ailleurs.
+ */
+def fichierSignature = rootProject.file('keystore.properties')
+def signatureDisponible = fichierSignature.exists()
+def proprietesSignature = new Properties()
+if (signatureDisponible) {
+    proprietesSignature.load(new FileInputStream(fichierSignature))
+}
+
 android {
+    signingConfigs {
+        if (signatureDisponible) {
+            release {
+                storeFile file(proprietesSignature['storeFile'])
+                storePassword proprietesSignature['storePassword']
+                keyAlias proprietesSignature['keyAlias']
+                keyPassword proprietesSignature['keyPassword']
+            }
+        }
+    }
     namespace "tn.res2boost.kaissi"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
@@ -18,6 +46,9 @@ android {
     }
     buildTypes {
         release {
+            if (signatureDisponible) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

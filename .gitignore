@@ -27,6 +27,9 @@ apps/pos/dist/
 *.apk
 *.aab
 *.keystore
+*.jks
+keystore.properties
+apps/pos/android/keystore.properties
 local.properties
 
 # Environnement — jamais de secret dans le dépôt

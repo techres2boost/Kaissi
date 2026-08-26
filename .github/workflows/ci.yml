@@ -92,6 +92,46 @@ jobs:
           npx wait-on -t 60000 http://127.0.0.1:5173/
           node apps/pos/tests/parcours-caisse.mjs
 
+  synchronisation:
+    name: Synchronisation — contre un vrai PostgreSQL
+    runs-on: ubuntu-latest
+    # Une base simulée validerait notre idée du SQL, pas le SQL. Or c'est là
+    # que se cachent les erreurs de RLS, de contrainte et d'idempotence.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL_TEST: postgresql://postgres:postgres@127.0.0.1:5433/postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Appliquer le schéma de production tel quel
+        run: |
+          psql -h 127.0.0.1 -p 5433 -U postgres -v ON_ERROR_STOP=1             -f apps/sync/test/amorce-supabase.sql
+          for f in supabase/migrations/*.sql; do
+            echo "→ $(basename "$f")"
+            psql -h 127.0.0.1 -p 5433 -U postgres -v ON_ERROR_STOP=1 -q -f "$f"
+          done
+
+      - name: Tests d'intégration + banc à trois appareils
+        run: pnpm --filter @kaissi/sync test
+
   regles-absolues:
     name: Règles absolues (argent, UUID, server.url)
     runs-on: ubuntu-latest
