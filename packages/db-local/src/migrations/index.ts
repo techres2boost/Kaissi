@@ -18,6 +18,7 @@
  */
 
 import { SQL_001 } from './001_schema_initial.js'
+import { SQL_002 } from './002_phase1_caisse.js'
 
 export interface MigrationLocale {
   readonly version: number
@@ -27,6 +28,7 @@ export interface MigrationLocale {
 
 export const MIGRATIONS: readonly MigrationLocale[] = [
   { version: 1, nom: 'schema_initial', sql: SQL_001 },
+  { version: 2, nom: 'phase1_caisse', sql: SQL_002 },
 ]
 
 /** Version cible : celle de la dernière migration connue de ce binaire. */
@@ -51,4 +53,4 @@ export function verifierRegistre(migrations: readonly MigrationLocale[] = MIGRAT
   })
 }
 
-export { SQL_001 }
+export { SQL_001, SQL_002 }

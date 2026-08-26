@@ -15,6 +15,10 @@ export type CleEtat =
   | 'ticket_prefix'
   | 'ticket_counter'
   | 'last_sync_at'
+  // Ajoutées par la migration locale 002 (Phase 1).
+  | 'employe_courant'
+  | 'shift_courant'
+  | 'derniere_impression_erreur'
 
 export function depotEtat(db: AdaptateurSqlite) {
   return {

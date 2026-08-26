@@ -136,6 +136,23 @@ Pour la minorité de champs réellement conflictuels — numéro de table, statu
 nom du client — dernier-écrivain-gagne arbitré par `(server_seq, device_id)`,
 et l'ancienne valeur reste visible dans le journal.
 
+### L'impression ne bloque jamais la caisse
+
+Un ticket part en **file persistante**, pas directement à l'imprimante. Une
+imprimante éteinte n'empêche pas d'encaisser le client suivant : elle allume
+un badge rouge que le serveur voit. La file survit au redémarrage, réessaie
+seule, et ne supprime **jamais** un travail — un ticket qui disparaît en
+silence est exactement ce qu'il ne faut pas.
+
+Un bon de cuisine n'est jamais réimprimé : `kitchen_sends` retient ce qui est
+déjà parti, sinon la cuisine referait les plats déjà servis.
+
+### Le PIN trace, il ne protège pas
+
+Un PIN à quatre chiffres n'a que 10 000 combinaisons. Il répond à « QUI a
+fait cette action », pas à « qui a le droit d'entrer ». Ce qui protège
+l'argent, c'est le jeton d'appareil révocable, RLS, et le journal d'audit.
+
 ### Le stock n'est jamais autoritaire hors ligne
 
 L'appareil affiche le dernier stock connu, alerte, **mais ne bloque jamais une
@@ -193,6 +210,10 @@ pnpm pos:build                  # build + vérification du mode avion
 pnpm pos:android                # build + sync + lancement sur appareil
 
 pnpm backoffice:dev             # back-office Next.js
+
+# Rejoue une journée de service dans un navigateur : prise de poste, shift,
+# commande, envoi cuisine, remise escaladée, encaissement, clôture.
+pnpm --filter @kaissi/pos test:parcours
 ```
 
 ---

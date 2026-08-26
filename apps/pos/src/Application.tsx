@@ -1,20 +1,26 @@
 /**
- * Coque de l'application : démarrage, navigation, bandeau d'état.
+ * Coque de l'application : démarrage, verrouillage, navigation, bandeau d'état.
+ *
+ * L'enchaînement des écrans suit celui d'une vraie journée :
+ *   verrouillé → prise de poste (PIN) → ouverture de caisse →
+ *   salle → commande → encaissement → … → clôture de caisse
  */
 
 import { useEffect, useState } from 'react'
+import type { Shift } from '@kaissi/domain'
 import { demarrer, type ContexteApplication } from './donnees/demarrage.js'
 import { useEtatReseau } from './donnees/reseau.js'
-import { EcranCaisse } from './ecrans/EcranCaisse.js'
+import { FournisseurApp, useApp } from './etat/contexte.js'
+import { DemandePin } from './composants/DemandePin.js'
+import { EcranSalle } from './ecrans/EcranSalle.js'
+import { EcranCommande } from './ecrans/EcranCommande.js'
+import { EcranPaiement } from './ecrans/EcranPaiement.js'
+import { EcranClotureShift, EcranOuvertureShift } from './ecrans/EcranShift.js'
 import { EcranDiagnostic } from './ecrans/EcranDiagnostic.js'
-
-type Onglet = 'caisse' | 'diagnostic'
 
 export function Application() {
   const [contexte, setContexte] = useState<ContexteApplication | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
-  const [onglet, setOnglet] = useState<Onglet>('caisse')
-  const reseau = useEtatReseau()
 
   useEffect(() => {
     let vivant = true
@@ -52,55 +58,235 @@ export function Application() {
   }
 
   return (
+    <FournisseurApp app={contexte}>
+      <Terminal contexte={contexte} />
+    </FournisseurApp>
+  )
+}
+
+type Vue =
+  | { nom: 'salle' }
+  | { nom: 'commande'; orderId: string }
+  | { nom: 'paiement'; orderId: string }
+  | { nom: 'cloture' }
+  | { nom: 'diagnostic' }
+
+function Terminal({ contexte }: { contexte: ContexteApplication }) {
+  const app = useApp()
+  const { employe, definirEmploye, etatImpression, version } = app
+  const reseau = useEtatReseau()
+
+  const [shift, setShift] = useState<Shift | null | undefined>(undefined)
+  const [vue, setVue] = useState<Vue>({ nom: 'salle' })
+
+  useEffect(() => {
+    let vivant = true
+    void app.app.caisse.shiftOuvert().then((s) => {
+      if (!vivant) return
+      setShift(s)
+      // Le shift courant est repris tel quel après un redémarrage : une
+      // tablette qui plante en plein service ne perd pas sa caisse.
+      void app.app.etat.ecrire('shift_courant', s?.id ?? '')
+    })
+    return () => {
+      vivant = false
+    }
+  }, [app, version])
+
+  // ── Terminal verrouillé ────────────────────────────────────────────────
+  if (!employe) {
+    return (
+      <div className="application">
+        <BandeauSimple reseau={reseau} />
+        <DemandePin
+          titre="Prise de poste"
+          sousTitre="Qui utilise la caisse ?"
+          onValide={definirEmploye}
+        />
+      </div>
+    )
+  }
+
+  if (shift === undefined) {
+    return (
+      <div className="ecran-bloquant">
+        <div className="pastille-chargement" aria-hidden="true" />
+      </div>
+    )
+  }
+
+  // ── Pas de caisse ouverte ──────────────────────────────────────────────
+  if (!shift && vue.nom !== 'diagnostic') {
+    return (
+      <div className="application">
+        <Bandeau
+          reseau={reseau}
+          shift={null}
+          onVerrouiller={() => definirEmploye(null)}
+          onDiagnostic={() => setVue({ nom: 'diagnostic' })}
+          onCloturer={() => setVue({ nom: 'cloture' })}
+          impression={etatImpression}
+        />
+        <main className="contenu">
+          <EcranOuvertureShift onOuvert={() => setVue({ nom: 'salle' })} />
+        </main>
+      </div>
+    )
+  }
+
+  return (
     <div className="application">
-      <header className="bandeau">
-        <div className="bandeau-marque">
-          <span className="logo">Kaissi</span>
-          <span className="etablissement">Snack Lac 1</span>
-        </div>
-
-        <nav className="onglets">
-          <button
-            type="button"
-            className={onglet === 'caisse' ? 'actif' : ''}
-            onClick={() => setOnglet('caisse')}
-          >
-            Caisse
-          </button>
-          <button
-            type="button"
-            className={onglet === 'diagnostic' ? 'actif' : ''}
-            onClick={() => setOnglet('diagnostic')}
-          >
-            Diagnostic
-          </button>
-        </nav>
-
-        {/*
-          L'indicateur réseau INFORME, il ne conditionne rien. Toutes les
-          fonctions de caisse restent identiques hors ligne : c'est le
-          principe même de l'architecture.
-        */}
-        <div
-          className={`etat-reseau ${reseau.connecte ? 'en-ligne' : 'hors-ligne'}`}
-          title={
-            reseau.connecte
-              ? `Connecté (${reseau.type}) — les ventes seront synchronisées`
-              : 'Hors ligne — la caisse fonctionne normalement, la synchronisation reprendra au retour du réseau'
-          }
-        >
-          <span className="point" aria-hidden="true" />
-          {reseau.connecte ? 'En ligne' : 'Hors ligne'}
-        </div>
-      </header>
+      <Bandeau
+        reseau={reseau}
+        shift={shift}
+        onVerrouiller={() => definirEmploye(null)}
+        onDiagnostic={() =>
+          setVue((v) => (v.nom === 'diagnostic' ? { nom: 'salle' } : { nom: 'diagnostic' }))
+        }
+        onCloturer={() => setVue({ nom: 'cloture' })}
+        impression={etatImpression}
+      />
 
       <main className="contenu">
-        {onglet === 'caisse' ? (
-          <EcranCaisse contexte={contexte} />
-        ) : (
+        {vue.nom === 'salle' && (
+          <EcranSalle
+            onOuvrirCommande={(orderId) => setVue({ nom: 'commande', orderId })}
+            onNouvelleCommande={async (tableId) => {
+              const orderId = await app.session.ouvrirCommande(employe, {
+                type: tableId ? 'dine_in' : 'takeaway',
+                tableId,
+              })
+              app.rafraichir()
+              setVue({ nom: 'commande', orderId })
+            }}
+          />
+        )}
+
+        {vue.nom === 'commande' && (
+          <EcranCommande
+            orderId={vue.orderId}
+            onRetour={() => setVue({ nom: 'salle' })}
+            onEncaisser={(orderId) => setVue({ nom: 'paiement', orderId })}
+          />
+        )}
+
+        {vue.nom === 'paiement' && (
+          <EcranPaiement
+            orderId={vue.orderId}
+            onRetour={() => setVue({ nom: 'commande', orderId: vue.orderId })}
+            onTermine={() => setVue({ nom: 'salle' })}
+          />
+        )}
+
+        {vue.nom === 'cloture' && shift && (
+          <EcranClotureShift
+            shift={shift}
+            onFerme={() => {
+              setShift(null)
+              definirEmploye(null)
+              setVue({ nom: 'salle' })
+            }}
+            onAnnuler={() => setVue({ nom: 'salle' })}
+          />
+        )}
+
+        {vue.nom === 'diagnostic' && (
           <EcranDiagnostic contexte={contexte} reseau={reseau} />
         )}
       </main>
     </div>
+  )
+}
+
+// ─── Bandeaux ───────────────────────────────────────────────────────────────
+
+function IndicateurReseau({ reseau }: { reseau: { connecte: boolean; type: string } }) {
+  return (
+    <div
+      className={`etat-reseau ${reseau.connecte ? 'en-ligne' : 'hors-ligne'}`}
+      title={
+        reseau.connecte
+          ? `Connecté (${reseau.type}) — les ventes seront synchronisées`
+          : 'Hors ligne — la caisse fonctionne normalement, la synchronisation reprendra au retour du réseau'
+      }
+    >
+      <span className="point" aria-hidden="true" />
+      {reseau.connecte ? 'En ligne' : 'Hors ligne'}
+    </div>
+  )
+}
+
+function BandeauSimple({ reseau }: { reseau: { connecte: boolean; type: string } }) {
+  const { etablissement } = useApp()
+  return (
+    <header className="bandeau">
+      <div className="bandeau-marque">
+        <span className="logo">Kaissi</span>
+        <span className="etablissement">{etablissement.nom}</span>
+      </div>
+      <div style={{ marginLeft: 'auto' }}>
+        <IndicateurReseau reseau={reseau} />
+      </div>
+    </header>
+  )
+}
+
+function Bandeau({
+  reseau,
+  shift,
+  onVerrouiller,
+  onDiagnostic,
+  onCloturer,
+  impression,
+}: {
+  reseau: { connecte: boolean; type: string }
+  shift: Shift | null
+  onVerrouiller: () => void
+  onDiagnostic: () => void
+  onCloturer: () => void
+  impression: { enAttente: number; echecs: number }
+}) {
+  const { employe, etablissement } = useApp()
+  return (
+    <header className="bandeau">
+      <div className="bandeau-marque">
+        <span className="logo">Kaissi</span>
+        <span className="etablissement">{etablissement.nom}</span>
+      </div>
+
+      <div className="bandeau-actions">
+        {/*
+          Le badge « tickets non imprimés » est visible en permanence : un KOT
+          resté en file, c'est un plat qui n'arrivera jamais en salle.
+        */}
+        {(impression.enAttente > 0 || impression.echecs > 0) && (
+          <span
+            className={`badge-impression ${impression.echecs > 0 ? 'echec' : ''}`}
+            title={
+              impression.echecs > 0
+                ? `${impression.echecs} ticket(s) en échec d'impression`
+                : `${impression.enAttente} ticket(s) en attente`
+            }
+          >
+            {impression.echecs > 0 ? '⚠' : '🖨'}{' '}
+            {impression.echecs > 0 ? impression.echecs : impression.enAttente}
+          </span>
+        )}
+
+        <button type="button" className="lien" onClick={onDiagnostic}>
+          Diagnostic
+        </button>
+        {shift && (
+          <button type="button" className="lien" onClick={onCloturer}>
+            Clôturer
+          </button>
+        )}
+        <button type="button" className="employe" onClick={onVerrouiller}>
+          {employe?.nom ?? '—'}
+          <small>verrouiller</small>
+        </button>
+        <IndicateurReseau reseau={reseau} />
+      </div>
+    </header>
   )
 }

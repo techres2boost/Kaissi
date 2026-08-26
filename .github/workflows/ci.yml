@@ -73,6 +73,25 @@ jobs:
           path: apps/pos/dist
           retention-days: 7
 
+  parcours-caisse:
+    name: Parcours de caisse de bout en bout
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Installer Chromium
+        run: pnpm --filter @kaissi/pos exec playwright install --with-deps chromium
+      - name: Démarrer le POS et rejouer une journée de service
+        run: |
+          pnpm --filter @kaissi/pos exec vite --port 5173 --host 127.0.0.1 &
+          npx wait-on -t 60000 http://127.0.0.1:5173/
+          node apps/pos/tests/parcours-caisse.mjs
+
   regles-absolues:
     name: Règles absolues (argent, UUID, server.url)
     runs-on: ubuntu-latest
@@ -133,3 +152,16 @@ jobs:
             exit 1
           fi
           echo "OK — l'idempotence est garantie."
+
+      - name: Aucun PIN en clair dans le code ou la graine
+        run: |
+          # Un hachage Argon2id est acceptable ; un PIN littéral affecté à
+          # `pin_hash` ne l'est jamais.
+          fautes=$(grep -rnE "pin_hash.*['\"][0-9]{4,8}['\"]" \
+            packages/ apps/ --include='*.ts' --include='*.tsx' || true)
+          if [ -n "$fautes" ]; then
+            echo "::error::PIN en clair détecté :"
+            echo "$fautes"
+            exit 1
+          fi
+          echo "OK — aucun PIN en clair."

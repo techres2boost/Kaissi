@@ -59,6 +59,22 @@ const PRODUITS: readonly [string, string, string, string, string, number, number
 
 const id = (suffixe: string) => `01930000-0000-7000-8000-00000000${suffixe}`
 
+/** Employés de démonstration : suffixe, nom, rôle, code, hachage Argon2id du PIN. */
+const EMPLOYES_DEMO: readonly (readonly [string, string, string, string, string])[] = [
+  [
+    '0700', 'Ahmed Ben Salah', 'gerant', 'AHM',
+    'argon2id$m=8192,t=3,p=1$JTgeDj0ICNrg+OR4I8FMxQ==$F41EUhI2TK+yOduItfO2UL7wb5WNhsjnHO297/vrd0g=',
+  ],
+  [
+    '0701', 'Salma Trabelsi', 'caissier', 'SAL',
+    'argon2id$m=8192,t=3,p=1$mQR6YFgbGBRCFCWJEXArcg==$9EobXd52+moNNOoYrEAJhKUJ+Y3bxnIKD5+b+PjGe5k=',
+  ],
+  [
+    '0702', 'Karim Jelassi', 'serveur', 'KAR',
+    'argon2id$m=8192,t=3,p=1$dIPsUbsZBcAVKeCREBKJ5g==$S5nNIyyVxMxuTgOH7dGLYatgpqu0AvcLHN4GKiF2KME=',
+  ],
+]
+
 /**
  * Installe la graine si — et seulement si — la base est vide.
  * Idempotent : rappeler cette fonction ne double jamais le catalogue.
@@ -228,6 +244,25 @@ export async function installerGraine(db: AdaptateurSqlite): Promise<boolean> {
            (id, organization_id, restaurant_id, name, type, opens_drawer, position, is_active)
          VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
         [id(suffixe), DEMO_ORG, DEMO_RESTO, nom, type, tiroir, pos],
+      )
+    }
+
+    // ── Employés de démonstration ─────────────────────────────────────────
+    // Les hachages sont PRÉCALCULÉS et embarqués : hacher trois PIN avec
+    // Argon2id coûterait une bonne seconde au premier lancement sur une
+    // tablette d'entrée de gamme, pour rien. En production les hachages
+    // arrivent déjà faits par la synchronisation ; l'appareil ne les calcule
+    // jamais lui-même.
+    //
+    // PIN de démonstration — à changer avant toute mise en service réelle :
+    //   Ahmed  1357  gérant     Salma  2468  caissier     Karim  9753  serveur
+    for (const [suffixe, nom, role, code, hachage] of EMPLOYES_DEMO) {
+      await db.executer(
+        `INSERT INTO employees
+           (id, organization_id, restaurant_id, full_name, role, pin_hash,
+            permissions, code, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, '{}', ?, 1)`,
+        [id(suffixe), DEMO_ORG, DEMO_RESTO, nom, role, hachage, code],
       )
     }
 

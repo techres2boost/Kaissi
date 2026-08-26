@@ -7,7 +7,8 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/AppTheme">
+        android:theme="@style/AppTheme"
+        android:largeHeap="true">
 
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
@@ -35,7 +36,20 @@
         </provider>
     </application>
 
-    <!-- Permissions -->
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Permissions
+
+         INTERNET couvre aussi les sockets TCP bruts : c'est elle qui permet
+         d'atteindre l'imprimante de cuisine sur le port 9100 du LAN.
+
+         ACCESS_NETWORK_STATE sert uniquement à AFFICHER l'état du réseau.
+         Aucune fonction de caisse n'en dépend : le POS travaille en local,
+         le réseau ne sert qu'à se réconcilier.
+
+         WAKE_LOCK évite que la tablette s'endorme au milieu d'un service.
+         ═══════════════════════════════════════════════════════════════════ -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 </manifest>

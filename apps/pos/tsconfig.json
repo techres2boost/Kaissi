@@ -17,6 +17,9 @@
       ],
       "@kaissi/db-local": [
         "../../packages/db-local/src/index.ts"
+      ],
+      "@kaissi/printing": [
+        "../../packages/printing/src/index.ts"
       ]
     }
   },

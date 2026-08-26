@@ -188,3 +188,51 @@ de la caisse.
 
 C'est le banc de test qui décide du **jalon PowerSync** : si ce scénario n'est
 pas fiable à la fin de la Phase 2, on bascule sans débat.
+
+---
+
+## 9. Tester l'impression réseau (Phase 1)
+
+Le plugin natif `ImprimanteReseau.java` ouvre un socket TCP vers le port 9100.
+Il est **écrit mais n'a pas encore tourné sur un appareil** : c'est le premier
+point à vérifier sur le terrain.
+
+### 9.1 Sans imprimante
+
+L'application doit encaisser normalement. Les tickets s'accumulent dans la
+file et le bandeau affiche un badge « 🖨 N ». Onglet **Diagnostic** → section
+« File d'impression » → les échecs sont listés avec leur message d'erreur.
+
+C'est le comportement voulu : **une imprimante éteinte ne bloque jamais une
+vente.**
+
+### 9.2 Avec une imprimante réseau
+
+1. brancher l'imprimante en Ethernet sur le même réseau que la tablette ;
+2. relever son adresse IP (bouton d'auto-test de l'imprimante, en général) ;
+3. la renseigner dans `stations.printer_host` — en Phase 1, via la graine ou
+   directement en SQL sur Supabase ;
+4. passer une commande, appuyer sur **Cuisine**.
+
+Le bon doit sortir en moins de deux secondes. Si rien ne sort :
+
+```bash
+# Depuis un poste du même réseau, vérifier que le port répond
+nc -vz 192.168.1.50 9100
+
+# Journal du plugin natif
+adb logcat | grep -i "ImprimanteReseau\|Capacitor/Plugin"
+```
+
+| Symptôme | Cause probable |
+|---|---|
+| « Connexion refusée » | Mauvaise IP, imprimante éteinte, ou port ≠ 9100 |
+| « ne répond pas » | L'imprimante est sur un autre sous-réseau, ou le Wi-Fi de la tablette est isolé (isolation client activée sur la borne) |
+| Le bon sort en caractères illisibles | Jeu de caractères de l'imprimante ≠ CP858 — voir `packages/printing/src/index.ts` |
+| Rien, aucune erreur | Le plugin n'est pas enregistré : vérifier `registerPlugin(ImprimanteReseau.class)` dans `MainActivity.java` |
+
+### 9.3 Tiroir-caisse
+
+Le tiroir est piloté **par l'imprimante**, jamais par un câble séparé. Il doit
+s'ouvrir automatiquement à la clôture d'une commande payée en espèces, et
+rester fermé sur un paiement par carte.

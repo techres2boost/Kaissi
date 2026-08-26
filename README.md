@@ -5,7 +5,8 @@
 > La caisse ne doit **jamais** s'arrêter. Un restaurant qui ne peut pas encaisser
 > désinstalle le logiciel le soir même et le dit à tous ses confrères.
 
-État : **Phase 0 — Fondations**. Le MVP fonctionnel est la Phase 1.
+État : **Phase 1 — MVP caisse**. Un terminal encaisse une journée complète,
+entièrement hors ligne. La synchronisation multi-appareils est la Phase 2.
 
 ---
 
@@ -14,14 +15,22 @@
 | Brique | État |
 |---|---|
 | Monorepo pnpm + Turborepo | ✅ |
-| `packages/domain` — monnaie, TVA, remises, réduction d'événements | ✅ 98 tests |
+| `packages/domain` — monnaie, TVA, remises, événements, permissions, shift, PIN | ✅ 150 tests |
 | Schéma Postgres + RLS + audit chaîné | ✅ 29 tables, appliqué sur Supabase |
-| `packages/db-local` — SQLite miroir + migrations versionnées | ✅ 26 tests |
-| `apps/pos` — coque Capacitor, démarre et affiche le menu **hors ligne** | ✅ |
+| `packages/db-local` — SQLite miroir, migrations, projections, outbox | ✅ 45 tests |
+| `packages/printing` — ESC/POS : ticket client, KOT, rapport de caisse | ✅ 26 tests |
+| **Prise de poste par PIN**, validé hors ligne (Argon2id) | ✅ |
+| **Shift** — fond de caisse, mouvements d'espèces, clôture avec écart | ✅ |
+| **Prise de commande** — tables, variantes, modificateurs, notes | ✅ |
+| **Remises** avec plafond par rôle et escalade manager | ✅ |
+| **Envoi en cuisine** — KOT par station, jamais réimprimé deux fois | ✅ |
+| **Encaissement** — espèces, carte, paiement mixte, monnaie rendue | ✅ |
+| **File d'impression** persistante, retentatives, badge d'échec | ✅ |
+| Plugin natif Android d'impression TCP 9100 | ⚠️ écrit, **pas encore testé sur appareil** |
 | Vérification automatique du mode avion en CI | ✅ |
+| Parcours de caisse complet rejoué en CI dans un navigateur | ✅ |
 | Moteur de synchronisation (push/pull) | ⏳ Phase 2 |
-| Prise de commande complète, encaissement, impression | ⏳ Phase 1 |
-| Back-office (rapports, catalogue, appairage) | ⏳ Phase 1 |
+| Back-office (rapports, catalogue, appairage) | ⏳ Phase 1 bis |
 
 ---
 
@@ -30,13 +39,26 @@
 ```bash
 pnpm install
 
-pnpm test            # 130 tests : domaine, schéma local, ESC/POS
+pnpm test            # 221 tests : domaine, schéma local, ESC/POS
 pnpm typecheck       # types de tout le monorepo
 pnpm pos:dev         # POS dans le navigateur → http://localhost:5173
+
+# Rejoue une journée de service complète dans un vrai navigateur
+pnpm --filter @kaissi/pos test:parcours
 ```
 
 En navigateur, la base est **en mémoire** : tout est perdu au rechargement.
 C'est du confort de développement. Le seul mode de production est l'APK Android.
+
+### Codes PIN de démonstration
+
+| Employé | Rôle | PIN | Plafond de remise |
+|---|---|---|---|
+| Ahmed Ben Salah | gérant | `1357` | sans limite |
+| Salma Trabelsi | caissier | `2468` | 10 % |
+| Karim Jelassi | serveur | `9753` | 5 % |
+
+**À changer avant toute mise en service réelle.**
 
 ---
 

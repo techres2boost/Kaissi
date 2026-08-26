@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import type { TravailImpression } from '@kaissi/db-local'
 import type { ContexteApplication } from '../donnees/demarrage.js'
 import type { EtatReseau } from '../donnees/reseau.js'
 
@@ -23,19 +24,25 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
   const [etatLocal, setEtatLocal] = useState<Record<string, string | null>>({})
   const [compteurs, setCompteurs] = useState({ enAttente: 0, rejetes: 0 })
   const [produits, setProduits] = useState(0)
+  const [impression, setImpression] = useState({ enAttente: 0, echecs: 0 })
+  const [echecs, setEchecs] = useState<TravailImpression[]>([])
 
   useEffect(() => {
     let vivant = true
     void (async () => {
-      const [e, c, p] = await Promise.all([
+      const [e, c, p, i, ech] = await Promise.all([
         contexte.etat.tout(),
         contexte.journal.enAttente(),
         contexte.catalogue.nombreProduits(),
+        contexte.fileImpression.compteurs(),
+        contexte.fileImpression.enEchec(),
       ])
       if (!vivant) return
       setEtatLocal(e)
       setCompteurs(c)
       setProduits(p)
+      setImpression(i)
+      setEchecs(ech)
     })()
     return () => {
       vivant = false
@@ -152,6 +159,46 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
         <p className="note">
           Le moteur de synchronisation (push / pull / curseurs) est la Phase 2.
           En Phase 0, l'outbox se remplit mais rien n'est envoyé : c'est voulu.
+        </p>
+      </section>
+
+      <section className="bloc">
+        <h2>File d'impression</h2>
+        <dl>
+          <dt>En attente</dt>
+          <dd className={impression.enAttente > 0 ? 'attention' : ''}>
+            {impression.enAttente}
+          </dd>
+          <dt>En échec</dt>
+          <dd className={impression.echecs > 0 ? 'attention' : ''}>{impression.echecs}</dd>
+        </dl>
+        {echecs.length > 0 && (
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Imprimante</th>
+                <th>Tentatives</th>
+                <th>Erreur</th>
+              </tr>
+            </thead>
+            <tbody>
+              {echecs.map((t) => (
+                <tr key={t.id}>
+                  <td>{t.kind}</td>
+                  <td className="mono">
+                    {t.hote ?? '—'}:{t.port}
+                  </td>
+                  <td className="nombre">{t.tentatives}</td>
+                  <td className="detail">{t.derniereErreur}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <p className="note">
+          Un ticket en échec n'est jamais supprimé : il reste ici jusqu'à ce
+          qu'un responsable le relance ou l'abandonne explicitement.
         </p>
       </section>
 

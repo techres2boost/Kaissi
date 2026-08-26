@@ -73,3 +73,5 @@ export function ligneAlignee(gauche: string, droite: string, colonnes = 42): str
 export function separateur(colonnes = 42, caractere = '-'): string {
   return caractere.repeat(colonnes)
 }
+
+export * from './rendu.js'
