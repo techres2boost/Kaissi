@@ -15,9 +15,10 @@
 
       • script-src 'self'  → aucun script distant, jamais. C'est ce qui
         interdit structurellement le pattern Stampi (coque + URL distante).
-      • connect-src        → 'self' seulement. En Phase 2, l'URL de l'API de
-        synchronisation sera ajoutée ICI, et elle seule ; localhost reste
-        autorisé pour le développement.
+      • connect-src        → 'self', l'API de synchronisation en HTTPS, et
+        localhost pour le développement. RIEN d'autre : c'est la seule
+        connexion sortante que le POS ait le droit d'ouvrir, et elle n'est
+        jamais sur le chemin d'une vente.
       • font-src / img-src → pas de CDN, pas de Google Fonts : une police
         distante bloquerait le premier rendu hors ligne.
 
@@ -27,7 +28,7 @@
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; base-uri 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' http://localhost:* ws://localhost:*"
+      content="default-src 'self'; base-uri 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https: http://localhost:* http://127.0.0.1:* ws://localhost:*"
     />
     <!-- Favicon en data-URI : embarquée, donc aucune requête au démarrage. -->
     <link

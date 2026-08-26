@@ -26,7 +26,8 @@
     "@capacitor-community/sqlite": "^7.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@kaissi/printing": "workspace:*"
+    "@kaissi/printing": "workspace:*",
+    "@kaissi/sync-client": "workspace:*"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.0.1",

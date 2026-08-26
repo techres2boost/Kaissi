@@ -17,8 +17,11 @@ import {
 import type { ConfigCalcul, Employe, EnteteEtablissement } from '@kaissi/domain'
 import type { EmployeLocal, MethodePaiementLocale, TableLocale } from '@kaissi/db-local'
 import type { ContexteApplication } from '../donnees/demarrage.js'
+import { MoteurSync, transportHttp, type ResumeSync } from '@kaissi/sync-client'
+import { uuidV7 } from '@kaissi/domain'
 import { SessionCaisse, type IdentiteTerminal } from '../donnees/session.js'
 import { ServiceImpression, type EtatImpression } from '../donnees/impression.js'
+import { depotLocalSync } from '../donnees/synchronisation.js'
 
 export interface StationImprimante {
   id: string
@@ -42,6 +45,9 @@ export interface ValeurContexte {
   readonly employe: Employe | null
   readonly definirEmploye: (e: Employe | null) => void
   readonly etatImpression: EtatImpression
+  /** `null` tant que l'appareil n'est pas appairé : pas de jeton, pas de sync. */
+  readonly sync: MoteurSync | null
+  readonly resumeSync: ResumeSync
   /** Force le rechargement des écrans qui lisent des projections. */
   readonly rafraichir: () => void
   readonly version: number
@@ -79,6 +85,17 @@ export function FournisseurApp({ app, children }: Props) {
     echecs: 0,
     enCours: false,
   })
+  const [resumeSync, setResumeSync] = useState<ResumeSync>({
+    etat: 'inactif',
+    enAttente: 0,
+    rejetes: 0,
+    curseurEvenements: 0,
+    curseurCatalogue: 0,
+    derniereSyncA: null,
+    derniereErreur: null,
+    tentatives: 0,
+  })
+  const [appairage, setAppairage] = useState<{ url: string; jeton: string } | null>(null)
 
   const impression = useMemo(() => new ServiceImpression(app.fileImpression), [app])
 
@@ -106,7 +123,15 @@ export function FournisseurApp({ app, children }: Props) {
         'SELECT name FROM restaurants LIMIT 1',
       )
 
+      // Appairage : sans jeton d'appareil, la synchronisation reste éteinte
+      // et la caisse fonctionne en local — c'est le mode Phase 0/1.
+      const [urlSync, jetonSync] = await Promise.all([
+        app.etat.lire('url_sync'),
+        app.etat.lire('jeton_appareil'),
+      ])
+
       if (!vivant) return
+      setAppairage(urlSync && jetonSync ? { url: urlSync, jeton: jetonSync } : null)
       setDonnees({
         identite: {
           organizationId: org ?? '',
@@ -145,6 +170,25 @@ export function FournisseurApp({ app, children }: Props) {
     }
   }, [impression])
 
+  const sync = useMemo(() => {
+    if (!donnees || !appairage) return null
+    return new MoteurSync({
+      transport: transportHttp({ urlBase: appairage.url, jeton: appairage.jeton }),
+      depot: depotLocalSync(app, () => donnees.config),
+      genererId: uuidV7,
+    })
+  }, [app, donnees, appairage])
+
+  useEffect(() => {
+    if (!sync) return
+    const desabonner = sync.abonner(setResumeSync)
+    sync.demarrer()
+    return () => {
+      desabonner()
+      sync.arreter()
+    }
+  }, [sync])
+
   const session = useMemo(
     () =>
       donnees
@@ -182,6 +226,8 @@ export function FournisseurApp({ app, children }: Props) {
     employe,
     definirEmploye: setEmploye,
     etatImpression,
+    sync,
+    resumeSync,
     rafraichir: () => setVersion((v) => v + 1),
     version,
   }

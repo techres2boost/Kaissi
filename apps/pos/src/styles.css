@@ -597,3 +597,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .motif { display: flex; flex-direction: column; gap: 0.4rem; margin: 0.75rem 0; font-size: 0.82rem; color: var(--texte-2); }
 .actions { display: flex; gap: 0.5rem; margin-top: 1rem; }
 .actions > * { flex: 1; }
+
+/* ── Badge de synchronisation (Phase 2) ──────────────────────────────────── */
+.badge-sync {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.4rem 0.7rem; border-radius: 999px;
+  background: rgba(99, 182, 214, 0.15); color: #63b6d6;
+  border: 1px solid rgba(99, 182, 214, 0.4); font-size: 0.8rem; min-height: 40px;
+}
+.badge-sync.alerte {
+  background: rgba(228, 117, 106, 0.15); color: var(--alerte);
+  border-color: rgba(228, 117, 106, 0.45);
+}

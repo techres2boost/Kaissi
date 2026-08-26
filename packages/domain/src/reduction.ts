@@ -105,12 +105,20 @@ export interface EtatCommande {
   readonly exceptions: readonly ExceptionReduction[]
 }
 
-/** État vide, avant tout événement `order.opened`. */
-function etatInitial(orderId: Uuid): EtatCommande {
+/**
+ * État de départ, avant application des événements.
+ *
+ * La tenance vient du PREMIER événement du journal, pas de `order.opened` :
+ * quand deux tablettes travaillent hors ligne, l'ajout de ligne de l'une
+ * peut arriver avant l'ouverture de l'autre. Laisser `organization_id` vide
+ * dans cet intervalle rendrait la commande improjetable — et une commande
+ * improjetable est une vente invisible.
+ */
+function etatInitial(premier: EvenementCommande): EtatCommande {
   return {
-    id: orderId,
-    restaurantId: '',
-    organizationId: '',
+    id: premier.orderId,
+    restaurantId: premier.restaurantId,
+    organizationId: premier.organizationId,
     statut: 'ouverte',
     type: 'dine_in',
     tableId: null,
@@ -149,9 +157,10 @@ export function reduireEvenements(
     throw new Error('Journal vide : impossible de reconstruire une commande.')
   }
   const ordonnes = ordonnerEvenements(dedupliquer(evenements))
-  const orderId = ordonnes[0]!.orderId
+  const premier = ordonnes[0]!
+  const orderId = premier.orderId
 
-  let etat = etatInitial(orderId)
+  let etat = etatInitial(premier)
   const lignes = new Map<Uuid, LigneEtat>()
   const ordreLignes: Uuid[] = []
   const paiements = new Map<Uuid, PaiementEtat>()

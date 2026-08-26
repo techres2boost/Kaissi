@@ -17,6 +17,7 @@ import { EcranCommande } from './ecrans/EcranCommande.js'
 import { EcranPaiement } from './ecrans/EcranPaiement.js'
 import { EcranClotureShift, EcranOuvertureShift } from './ecrans/EcranShift.js'
 import { EcranDiagnostic } from './ecrans/EcranDiagnostic.js'
+import { EcranSync } from './ecrans/EcranSync.js'
 
 export function Application() {
   const [contexte, setContexte] = useState<ContexteApplication | null>(null)
@@ -70,6 +71,7 @@ type Vue =
   | { nom: 'paiement'; orderId: string }
   | { nom: 'cloture' }
   | { nom: 'diagnostic' }
+  | { nom: 'sync' }
 
 function Terminal({ contexte }: { contexte: ContexteApplication }) {
   const app = useApp()
@@ -125,6 +127,7 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
           onVerrouiller={() => definirEmploye(null)}
           onDiagnostic={() => setVue({ nom: 'diagnostic' })}
           onCloturer={() => setVue({ nom: 'cloture' })}
+          onSync={() => setVue({ nom: 'sync' })}
           impression={etatImpression}
         />
         <main className="contenu">
@@ -144,6 +147,9 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
           setVue((v) => (v.nom === 'diagnostic' ? { nom: 'salle' } : { nom: 'diagnostic' }))
         }
         onCloturer={() => setVue({ nom: 'cloture' })}
+        onSync={() =>
+          setVue((v) => (v.nom === 'sync' ? { nom: 'salle' } : { nom: 'sync' }))
+        }
         impression={etatImpression}
       />
 
@@ -193,6 +199,8 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
         {vue.nom === 'diagnostic' && (
           <EcranDiagnostic contexte={contexte} reseau={reseau} />
         )}
+
+        {vue.nom === 'sync' && <EcranSync />}
       </main>
     </div>
   )
@@ -237,6 +245,7 @@ function Bandeau({
   onVerrouiller,
   onDiagnostic,
   onCloturer,
+  onSync,
   impression,
 }: {
   reseau: { connecte: boolean; type: string }
@@ -244,9 +253,10 @@ function Bandeau({
   onVerrouiller: () => void
   onDiagnostic: () => void
   onCloturer: () => void
+  onSync: () => void
   impression: { enAttente: number; echecs: number }
 }) {
-  const { employe, etablissement } = useApp()
+  const { employe, etablissement, resumeSync, sync } = useApp()
   return (
     <header className="bandeau">
       <div className="bandeau-marque">
@@ -271,6 +281,28 @@ function Bandeau({
             {impression.echecs > 0 ? '⚠' : '🖨'}{' '}
             {impression.echecs > 0 ? impression.echecs : impression.enAttente}
           </span>
+        )}
+
+        {/*
+          Badge de synchronisation. Il ne s'affiche que s'il y a quelque
+          chose à dire : un badge permanent devient invisible au bout d'une
+          journée, et c'est justement celui-là qu'on veut voir.
+        */}
+        {(!sync || resumeSync.enAttente > 0 || resumeSync.rejetes > 0 || resumeSync.etat === 'bloque') && (
+          <button
+            type="button"
+            className={`badge-sync ${resumeSync.rejetes > 0 || resumeSync.etat === 'bloque' ? 'alerte' : ''}`}
+            onClick={onSync}
+            title={
+              !sync
+                ? 'Terminal non appairé — la caisse fonctionne en local'
+                : resumeSync.rejetes > 0
+                  ? `${resumeSync.rejetes} opération(s) refusée(s) — votre attention est requise`
+                  : `${resumeSync.enAttente} opération(s) en attente d'envoi`
+            }
+          >
+            {!sync ? '⇅ local' : resumeSync.rejetes > 0 ? `⚠ ${resumeSync.rejetes}` : `⇅ ${resumeSync.enAttente}`}
+          </button>
         )}
 
         <button type="button" className="lien" onClick={onDiagnostic}>

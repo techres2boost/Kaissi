@@ -19,6 +19,9 @@ export type CleEtat =
   | 'employe_courant'
   | 'shift_courant'
   | 'derniere_impression_erreur'
+  // Appairage de l'appareil (Phase 2). Sans elles, la sync reste éteinte.
+  | 'url_sync'
+  | 'jeton_appareil'
 
 export function depotEtat(db: AdaptateurSqlite) {
   return {

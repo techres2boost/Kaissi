@@ -1,116 +1,60 @@
 /**
- * API de synchronisation Kaissi — SQUELETTE de Phase 0.
+ * Point d'entrée de l'API de synchronisation Kaissi.
  *
- * ⚠ Aucune route n'est implémentée ici : le moteur de synchronisation est la
- *   PHASE 2. Ce fichier fige le contrat pour que le POS et le serveur soient
- *   écrits contre la même définition, et pour que le jalon de bascule vers
- *   PowerSync soit décidable sur des critères clairs.
- *
- * Pourquoi un process Node dédié et pas PostgREST ni une Edge Function :
- *   • PostgREST expose des tables ; le push a besoin de validation
- *     transactionnelle, d'idempotence et de repli d'événements ;
- *   • une Edge Function redémarre à froid et ne réutilise pas ses connexions
- *     à la base — la latence du push en pâtirait.
- *
- * Le serveur REVALIDE systématiquement ce que l'appareil envoie : un
- * terminal compromis ne doit rien pouvoir forcer. Les totaux sont recalculés
- * ici avec `@kaissi/domain`, le MÊME code que celui de la tablette.
+ * Ce process ne sert QUE la synchronisation. Il ne rend aucune page, ne
+ * porte aucune logique d'interface, et n'expose aucune clé Supabase : les
+ * appareils s'authentifient avec leur propre jeton.
  */
 
-import type { EvenementCommande } from '@kaissi/domain'
+import { serve } from '@hono/node-server'
+import { DepotPostgres } from './depot-postgres.js'
+import { creerServeur } from './serveur.js'
 
-/** Version du protocole. Le serveur doit supporter N−2. */
-export const VERSION_PROTOCOLE = 1
-export const VERSIONS_SUPPORTEES = [1] as const
+export * from './protocole.js'
+export * from './depot.js'
+export * from './service.js'
+export * from './jeton.js'
+export { DepotPostgres } from './depot-postgres.js'
+export { creerServeur } from './serveur.js'
 
-// ─── POST /sync/push ────────────────────────────────────────────────────────
+/** Démarrage autonome. Ignoré quand le module est importé par un test. */
+export function demarrer(): void {
+  const url = process.env['DATABASE_URL']
+  if (!url) {
+    console.error(
+      "DATABASE_URL est absente. L'API de synchronisation ne peut pas démarrer.\n" +
+        'Voir .env.example et docs/deploiement.md.',
+    )
+    process.exit(1)
+  }
 
-export interface RequetePush {
-  readonly protocolVersion: number
-  readonly deviceId: string
-  readonly batchId: string
-  /** Lot issu de la table `outbox` locale, le plus ancien d'abord. */
-  readonly evenements: readonly EvenementCommande[]
+  const port = Number.parseInt(process.env['SYNC_PORT'] ?? '8787', 10)
+  const origines = (process.env['SYNC_ORIGINES'] ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
+
+  const depot = new DepotPostgres({
+    connectionString: url,
+    ssl: process.env['DATABASE_SSL'] !== 'false',
+  })
+  const app = creerServeur({ depot, origines })
+
+  const serveur = serve({ fetch: app.fetch, port, hostname: '0.0.0.0' })
+  console.log(`API de synchronisation Kaissi — port ${port}`)
+
+  const arreter = (signal: string) => {
+    console.log(`${signal} reçu, arrêt en cours…`)
+    serveur.close(() => {
+      void depot.fermer().finally(() => process.exit(0))
+    })
+  }
+  process.on('SIGTERM', () => arreter('SIGTERM'))
+  process.on('SIGINT', () => arreter('SIGINT'))
 }
 
-export type CodeRejet =
-  | 'commande_close'
-  | 'produit_inconnu'
-  | 'permission_revoquee'
-  | 'appareil_revoque'
-  | 'protocole_non_supporte'
-  | 'charge_invalide'
-
-export interface RejetEvenement {
-  readonly eventId: string
-  readonly code: CodeRejet
-  /** Message destiné au GÉRANT, en français, pas une trace technique. */
-  readonly message: string
-}
-
-export interface ReponsePush {
-  /** Événements insérés ou déjà connus (idempotence) — l'outbox peut se vider. */
-  readonly acceptes: readonly string[]
-  /**
-   * Événements refusés. NOTIFIÉS dans l'interface, jamais avalés en silence :
-   * le gérant doit voir « 2 opérations nécessitent votre attention ».
-   */
-  readonly rejetes: readonly RejetEvenement[]
-  /** Nouveau curseur d'événements après application du lot. */
-  readonly curseurEvenements: number
-}
-
-// ─── GET /sync/pull?depuisCatalogue=&depuisEvenements= ─────────────────────
-
-export interface RequetePull {
-  readonly protocolVersion: number
-  readonly deviceId: string
-  /** Curseur `change_log.seq`. JAMAIS un timestamp (RÈGLE 4). */
-  readonly depuisCatalogue: number
-  /** Curseur `order_events.server_seq`. */
-  readonly depuisEvenements: number
-  /**
-   * Pagination OBLIGATOIRE : un appareil resté trois semaines hors ligne
-   * peut avoir 40 000 événements de retard.
-   */
-  readonly taillePage?: number
-}
-
-export interface ChangementCatalogue {
-  readonly seq: number
-  readonly entite: string
-  readonly entiteId: string
-  readonly operation: 'insert' | 'update' | 'delete'
-  readonly donnees: Record<string, unknown> | null
-}
-
-export interface ReponsePull {
-  readonly catalogue: readonly ChangementCatalogue[]
-  readonly evenements: readonly EvenementCommande[]
-  readonly curseurCatalogue: number
-  readonly curseurEvenements: number
-  /** `true` s'il reste des pages : l'appareil doit rappeler immédiatement. */
-  readonly encore: boolean
-}
-
-/**
- * Contrat que devra respecter l'implémentation de Phase 2.
- * L'écrire maintenant évite qu'appareil et serveur divergent.
- */
-export interface ServiceSync {
-  push(requete: RequetePush): Promise<ReponsePush>
-  pull(requete: RequetePull): Promise<ReponsePull>
-}
-
-/** Un protocole non supporté est refusé explicitement, jamais deviné. */
-export function protocoleSupporte(version: number): boolean {
-  return (VERSIONS_SUPPORTEES as readonly number[]).includes(version)
-}
-
-if (process.env['NODE_ENV'] !== 'test') {
-  console.log(
-    "API de synchronisation Kaissi — squelette de Phase 0.\n" +
-      "Les routes /sync/push et /sync/pull seront implémentées en Phase 2 " +
-      `(protocole v${VERSION_PROTOCOLE}).`,
-  )
+// `import.meta.url` correspond au fichier lancé : on ne démarre le serveur
+// que si ce module EST le point d'entrée, pas quand un test l'importe.
+if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+  demarrer()
 }

@@ -20,6 +20,9 @@
       ],
       "@kaissi/printing": [
         "../../packages/printing/src/index.ts"
+      ],
+      "@kaissi/sync-client": [
+        "../../packages/sync-client/src/index.ts"
       ]
     }
   },

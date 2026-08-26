@@ -295,6 +295,16 @@ describe('robustesse du protocole', () => {
     expect(etat.lignes).toHaveLength(1)
   })
 
+  it('PORTE LA TENANCE même sans événement d’ouverture', () => {
+    // Cas réel : deux tablettes hors ligne, l'ajout de l'une arrive avant
+    // l'ouverture de l'autre. Sans tenance, la commande serait improjetable
+    // — donc invisible — jusqu'à l'arrivée de l'ouverture.
+    const etat = reduireEvenements([ajout('l1', 'Pizza', 14500, 1)])
+    expect(etat.restaurantId).toBe(RESTO)
+    expect(etat.organizationId).toBe(ORG)
+    expect(etat.id).toBe(CMD)
+  })
+
   it('refuse un journal hétérogène', () => {
     const autre = { ...ouverture(), orderId: 'autre-commande' }
     expect(() => reduireEvenements([ouverture(), autre])).toThrow(/hétérogène/)
