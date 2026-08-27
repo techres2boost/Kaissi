@@ -10,6 +10,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useCallback,
   useMemo,
   useState,
   type ReactNode,
@@ -79,6 +80,9 @@ interface DonneesChargees {
 export function FournisseurApp({ app, children }: Props) {
   const [employe, setEmploye] = useState<Employe | null>(null)
   const [version, setVersion] = useState(0)
+  // Stable : une fonction recréée à chaque rendu entre dans les dépendances
+  // des effets qui l'utilisent et les relance pour rien.
+  const rafraichir = useCallback(() => setVersion((v) => v + 1), [])
   const [donnees, setDonnees] = useState<DonneesChargees | null>(null)
   const [etatImpression, setEtatImpression] = useState<EtatImpression>({
     enAttente: 0,
@@ -203,33 +207,59 @@ export function FournisseurApp({ app, children }: Props) {
     [app, donnees, impression],
   )
 
-  if (!donnees || !session) {
+  // MÉMORISÉE, et calculée AVANT le retour anticipé — les crochets ne se
+  // sautent pas.
+  //
+  // Sans cette mémorisation, l'objet était recréé à chaque rendu du
+  // fournisseur. Or la file d'impression pousse son état à intervalle
+  // régulier : chaque tic changeait donc l'identité du contexte, et tout
+  // effet qui en dépend se relançait. Concrètement, le caissier qui
+  // consultait « Boissons » était renvoyé sur « Plats » au bout de quelques
+  // secondes, sans avoir rien touché.
+  const valeur = useMemo<ValeurContexte | null>(
+    () =>
+      donnees && session
+        ? {
+            app,
+            session,
+            impression,
+            identite: donnees.identite,
+            config: donnees.config,
+            etablissement: donnees.etablissement,
+            stations: donnees.stations,
+            tables: donnees.tables,
+            methodesPaiement: donnees.methodesPaiement,
+            employes: donnees.employes,
+            employe,
+            definirEmploye: setEmploye,
+            etatImpression,
+            sync,
+            resumeSync,
+            rafraichir,
+            version,
+          }
+        : null,
+    [
+      app,
+      donnees,
+      session,
+      impression,
+      employe,
+      etatImpression,
+      sync,
+      resumeSync,
+      rafraichir,
+      version,
+    ],
+  )
+
+  if (!valeur) {
     return (
       <div className="ecran-bloquant">
         <div className="pastille-chargement" aria-hidden="true" />
         <p>Chargement du catalogue…</p>
       </div>
     )
-  }
-
-  const valeur: ValeurContexte = {
-    app,
-    session,
-    impression,
-    identite: donnees.identite,
-    config: donnees.config,
-    etablissement: donnees.etablissement,
-    stations: donnees.stations,
-    tables: donnees.tables,
-    methodesPaiement: donnees.methodesPaiement,
-    employes: donnees.employes,
-    employe,
-    definirEmploye: setEmploye,
-    etatImpression,
-    sync,
-    resumeSync,
-    rafraichir: () => setVersion((v) => v + 1),
-    version,
   }
 
   return <Contexte.Provider value={valeur}>{children}</Contexte.Provider>

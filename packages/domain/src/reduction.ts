@@ -124,7 +124,14 @@ function etatInitial(premier: EvenementCommande): EtatCommande {
     tableId: null,
     couverts: null,
     numeroTicket: null,
-    deviceProprietaireId: null,
+    // L'appareil qui a TOUCHÉ la commande en premier, et non celui qui l'a
+    // ouverte : les deux coïncident presque toujours, mais pas quand
+    // « order.opened » est encore en route. Deux tablettes hors ligne sur la
+    // même table peuvent produire une ligne AVANT que l'ouverture n'arrive ;
+    // laisser ce champ nul rendait alors la commande impossible à projeter
+    // côté serveur (orders.device_id est NOT NULL), et la vente devenait
+    // invisible. « order.opened » corrige la valeur dès qu'il arrive.
+    deviceProprietaireId: premier.deviceId,
     ouvertePar: null,
     ouverteA: null,
     envoyeeA: null,

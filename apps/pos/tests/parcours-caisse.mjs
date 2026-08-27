@@ -71,6 +71,27 @@ await etape('ajout d’un Coca (sans option) — 1 clic', async () => {
   await page.waitForSelector('.lignes li:has-text("Coca-Cola")', { timeout: 10000 })
 })
 
+await etape('la catégorie choisie TIENT — elle ne revient pas sur Plats', async () => {
+  // Régression : la file d'impression pousse son état à intervalle régulier.
+  // Chaque tic recréait l'objet de contexte, relançait l'effet de chargement
+  // du catalogue, et remettait la catégorie sur la première. Le caissier
+  // consultait « Boissons » et se retrouvait sur « Plats » sans avoir touché
+  // à rien.
+  const actuelle = () =>
+    page.$eval('.categories button.actif', (b) => b.textContent.trim()).catch(() => null)
+
+  if ((await actuelle()) !== 'Boissons') throw new Error('Boissons n’est pas la catégorie active')
+
+  // Assez long pour couvrir plusieurs tics de la file d'impression.
+  await page.waitForTimeout(6000)
+
+  const apres = await actuelle()
+  if (apres !== 'Boissons') {
+    throw new Error(`la catégorie a basculé toute seule sur « ${apres} »`)
+  }
+  console.log('    toujours sur Boissons après 6 s')
+})
+
 await etape('ajout d’une Pizza avec supplément Fromage', async () => {
   await page.click('.categories button:has-text("Plats")')
   await page.click('.carte-produit:has-text("Pizza Margherita")')

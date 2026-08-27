@@ -10,8 +10,11 @@
 # amorce-supabase.sql se contente d'ajouter les rôles et le schéma « auth »
 # que Supabase fournit et qu'un PostgreSQL nu n'a pas.
 #
-#   ./scripts/postgres-test.sh          démarre et applique le schéma
-#   ./scripts/postgres-test.sh --stop   supprime tout
+#   pnpm db:test        démarre et applique le schéma
+#   pnpm db:test:stop   supprime tout
+#
+# Toujours lancé par « bash » via package.json : PowerShell ne sait pas
+# exécuter un .sh, et répondait « './scripts/...' is not recognized ».
 #
 set -euo pipefail
 
@@ -123,5 +126,5 @@ if [ "$sansrls" != 0 ]; then
 fi
 echo "✓ PostgreSQL prêt sur 127.0.0.1:$PORT — $tables tables, toutes sous RLS"
 echo
-echo "  pnpm --filter @kaissi/sync test     # 35 tests + banc à trois appareils"
-echo "  ./scripts/postgres-test.sh --stop   # pour tout supprimer"
+echo "  pnpm --filter @kaissi/sync test   # tests d'intégration + banc à trois appareils"
+echo "  pnpm db:test:stop                 # pour tout supprimer"

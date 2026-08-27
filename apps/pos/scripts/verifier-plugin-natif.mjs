@@ -25,9 +25,14 @@
 
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { platform, tmpdir } from 'node:os'
+import { delimiter, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { lireClasse } from './lire-bytecode.mjs'
+
+/** Doit correspondre à registerPlugin() dans src/plugins/imprimante.ts. */
+const NOM_PLUGIN = 'ImprimanteReseau'
+const METHODES_ATTENDUES = ['imprimer', 'tester']
 
 const racinePos = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const dossierStubs = join(racinePos, 'scripts', 'stubs-android')
@@ -38,6 +43,28 @@ const constats = []
 
 function echouer(message, detail) {
   echecs.push(detail ? `${message}\n     ${detail}` : message)
+}
+
+/**
+ * Localise un outil du JDK.
+ *
+ * Sous Windows, `javac` s'appelle `javac.exe` et n'est pas toujours dans le
+ * PATH. Chercher d'abord dans JAVA_HOME/bin évite un « spawnSync ENOENT »
+ * incompréhensible, là où le correctif tient en une variable d'environnement.
+ */
+function outilJdk(nom) {
+  const suffixes = platform() === 'win32' ? ['.exe', '.cmd', ''] : ['']
+  const dossiers = []
+  if (process.env['JAVA_HOME']) dossiers.push(join(process.env['JAVA_HOME'], 'bin'))
+  dossiers.push(...(process.env['PATH'] ?? '').split(delimiter).filter(Boolean))
+
+  for (const dossier of dossiers) {
+    for (const suffixe of suffixes) {
+      const chemin = join(dossier, nom + suffixe)
+      if (existsSync(chemin)) return chemin
+    }
+  }
+  return null
 }
 
 /** Liste récursive des fichiers `.java` d'un dossier. */
@@ -125,9 +152,18 @@ const sortie = mkdtempSync(join(tmpdir(), 'kaissi-javac-'))
 let compile = false
 try {
   const sources = [...fichiersJava(dossierStubs), ...fichiersJava(dossierPlugin)]
+  const javac = outilJdk('javac')
+  if (!javac) {
+    echouer(
+      'javac introuvable — un JDK 21 est nécessaire.',
+      "Installer un JDK (Temurin, Zulu…) et renseigner JAVA_HOME, ou l'ajouter au PATH.",
+    )
+  }
+
   try {
+    if (!javac) throw new Error('javac introuvable')
     execFileSync(
-      'javac',
+      javac,
       ['-nowarn', '-Werror', '-Xlint:all,-options', '-d', sortie, ...sources],
       { stdio: 'pipe', encoding: 'utf8' },
     )
@@ -138,38 +174,61 @@ try {
   }
 
   // ── 3. Les annotations survivent dans le bytecode ─────────────────────────
+  //
+  // Capacitor découvre les méthodes par RÉFLEXION : une annotation qui ne
+  // survit pas à la compilation donne un plugin qui se charge mais dont
+  // aucune méthode n'est appelable. La panne n'apparaît qu'à l'exécution, sur
+  // l'appareil, quand le ticket ne sort pas.
+  //
+  // On lit le fichier .class nous-mêmes plutôt que d'appeler `javap` : cet
+  // outil n'est pas toujours exposé (certaines installations Windows n'ont
+  // que `javac`), et le script plantait alors sur un « spawnSync javap
+  // ENOENT » qui ne disait rien de ce qu'il fallait faire.
   if (compile) {
-    const bytecode = execFileSync(
-      'javap',
-      ['-v', '-cp', sortie, 'tn.res2boost.kaissi.ImprimanteReseau'],
-      { stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8' },
+    const classe = lireClasse(
+      readFileSync(join(sortie, 'tn', 'res2boost', 'kaissi', 'ImprimanteReseau.class')),
     )
-    if (!/com\.getcapacitor\.annotation\.CapacitorPlugin\(\s*name="ImprimanteReseau"/.test(bytecode)) {
+
+    const surLaClasse = classe.annotations.find(
+      (a) => a.type === 'Lcom/getcapacitor/annotation/CapacitorPlugin;',
+    )
+    if (!surLaClasse) {
       echouer(
-        'L\'annotation @CapacitorPlugin(name = "ImprimanteReseau") est absente du bytecode.',
+        "L'annotation @CapacitorPlugin est absente du bytecode.",
+        'Sans elle, le pont Capacitor ne trouve pas le plugin.',
+      )
+    } else if (surLaClasse.elements['name'] !== NOM_PLUGIN) {
+      // Comparaison sur la VALEUR de l'annotation, pas sur la présence du mot
+      // quelque part dans le fichier : « ImprimanteReseau » figure de toute
+      // façon dans le nom de la classe, et un contrôle par recherche de
+      // chaîne laissait donc passer un nom renommé.
+      echouer(
+        `@CapacitorPlugin(name = "${surLaClasse.elements['name']}") au lieu de "${NOM_PLUGIN}".`,
         'Le nom doit correspondre EXACTEMENT à registerPlugin() dans src/plugins/imprimante.ts.',
       )
     } else {
-      constats.push('@CapacitorPlugin(name = "ImprimanteReseau") présente à l\'exécution')
+      constats.push(`@CapacitorPlugin(name = "${NOM_PLUGIN}") présente à l'exécution`)
     }
 
-    for (const methode of ['imprimer', 'tester']) {
-      const motif = new RegExp(`public void ${methode}\\(com\\.getcapacitor\\.PluginCall\\)`)
-      if (!motif.test(execFileSync('javap', ['-cp', sortie, 'tn.res2boost.kaissi.ImprimanteReseau'], {
-        stdio: ['ignore', 'pipe', 'ignore'],
-        encoding: 'utf8',
-      }))) {
-        echouer(`La méthode « ${methode} » n'est pas exposée au pont Capacitor.`)
+    const annotees = classe.methodes.filter((m) =>
+      m.annotations.some((a) => a.type === 'Lcom/getcapacitor/PluginMethod;'),
+    )
+    for (const methode of METHODES_ATTENDUES) {
+      const trouvee = annotees.find((m) => m.nom === methode)
+      if (!trouvee) {
+        echouer(
+          `La méthode « ${methode} » ne porte pas @PluginMethod dans le bytecode.`,
+          "Sans cette annotation, Capacitor charge le plugin mais la méthode n'est pas appelable.",
+        )
+      } else if (trouvee.descripteur !== '(Lcom/getcapacitor/PluginCall;)V') {
+        echouer(
+          `« ${methode} » a la signature ${trouvee.descripteur}.`,
+          'Le pont n\'appelle que les méthodes « void methode(PluginCall) ».',
+        )
       }
     }
-    const nbPluginMethod = (bytecode.match(/com\.getcapacitor\.PluginMethod/g) || []).length
-    if (nbPluginMethod < 2) {
-      echouer(
-        `Seules ${nbPluginMethod} méthode(s) portent @PluginMethod dans le bytecode, 2 attendues.`,
-        'Sans cette annotation, Capacitor charge le plugin mais aucune méthode n\'est appelable.',
-      )
-    } else {
-      constats.push('@PluginMethod retenue sur imprimer() et tester()')
+    if (annotees.length === METHODES_ATTENDUES.length) {
+      constats.push(`@PluginMethod retenue sur ${METHODES_ATTENDUES.join('() et ')}()`)
     }
   }
 } finally {

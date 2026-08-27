@@ -62,20 +62,33 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
     setEtat(await session.etatDe(orderId))
   }, [session, orderId])
 
+  // Dépend du CATALOGUE, pas de l'objet de contexte entier : ce dernier change
+  // d'identité à chaque tic de la file d'impression, et l'effet se relancerait
+  // en plein service.
+  const catalogue = app.app.catalogue
+
   useEffect(() => {
     let vivant = true
     void (async () => {
-      const [c, p] = await Promise.all([app.app.catalogue.categories(), app.app.catalogue.produits()])
+      const [c, p] = await Promise.all([catalogue.categories(), catalogue.produits()])
       if (!vivant) return
       setCategories(c)
       setProduits(p)
-      setCategorieActive(c[0]?.id ?? null)
+      // On ne choisit une catégorie par défaut que s'il n'y en a pas déjà une
+      // de VALIDE. Le back-office peut pousser une carte modifiée en plein
+      // service : recharger le catalogue ne doit pas ramener le caissier sur
+      // « Plats » alors qu'il est en train de saisir des boissons.
+      setCategorieActive((actuelle) =>
+        actuelle && c.some((categorie) => categorie.id === actuelle)
+          ? actuelle
+          : (c[0]?.id ?? null),
+      )
       await recharger()
     })()
     return () => {
       vivant = false
     }
-  }, [app, recharger])
+  }, [catalogue, recharger])
 
   const totaux: TotauxCommande | null = useMemo(() => {
     if (!etat) return null

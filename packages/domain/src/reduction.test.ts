@@ -305,6 +305,25 @@ describe('robustesse du protocole', () => {
     expect(etat.id).toBe(CMD)
   })
 
+  it('PORTE L’APPAREIL même sans événement d’ouverture', () => {
+    // Même cause, autre colonne. kaissi.orders.device_id est NOT NULL : un
+    // état sans appareil faisait échouer la reprojection serveur avec un
+    // « violates not-null constraint », et la vente restait invisible côté
+    // serveur jusqu'à l'arrivée de l'ouverture — voire indéfiniment si elle
+    // s'était perdue.
+    const etat = reduireEvenements([ajout('l1', 'Pizza', 14500, 1)])
+    expect(etat.deviceProprietaireId).toBe(APPAREIL_A)
+  })
+
+  it('l’ouverture, quand elle arrive, corrige l’appareil propriétaire', () => {
+    // L'appareil retenu par défaut est celui qui a touché la commande en
+    // premier ; ce n'est qu'un pis-aller. Dès que l'ouverture est là, c'est
+    // elle qui fait foi.
+    const ouvertureAilleurs = { ...ouverture(), deviceId: APPAREIL_B }
+    const etat = reduireEvenements([ouvertureAilleurs, ajout('l1', 'Pizza', 14500, 1)])
+    expect(etat.deviceProprietaireId).toBe(APPAREIL_B)
+  })
+
   it('refuse un journal hétérogène', () => {
     const autre = { ...ouverture(), orderId: 'autre-commande' }
     expect(() => reduireEvenements([ouverture(), autre])).toThrow(/hétérogène/)

@@ -121,10 +121,14 @@ export async function installerGraine(db: AdaptateurSqlite): Promise<boolean> {
     }
 
     for (const [cid, nom, pos, couleur] of [
-      [CAT_PLATS, 'Plats', 1, '#C2410C'],
-      [CAT_SNACKS, 'Snacks', 2, '#B45309'],
-      [CAT_BOISSONS, 'Boissons', 3, '#0E7490'],
-      [CAT_DESSERTS, 'Desserts', 4, '#9333EA'],
+      // Déclinaisons de la palette Res2Boost : quatre valeurs distinctes du
+      // même vert, plus l'or pour les desserts. Les catégories doivent se
+      // distinguer d'un coup d'œil SANS jurer avec la marque — quatre teintes
+      // vives et sans rapport transformaient l'écran en sapin de Noël.
+      [CAT_PLATS, 'Plats', 1, '#7EC694'],
+      [CAT_SNACKS, 'Snacks', 2, '#9BE3AE'],
+      [CAT_BOISSONS, 'Boissons', 3, '#4E9E77'],
+      [CAT_DESSERTS, 'Desserts', 4, '#C9A86B'],
     ] as const) {
       await db.executer(
         `INSERT INTO categories
