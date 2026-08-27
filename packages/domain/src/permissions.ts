@@ -12,7 +12,7 @@
  * caissier qui tente dix fois une remise de 50 % est une information.
  */
 
-import { BASE_POINTS, type PointsDeBase } from './monnaie.js'
+import { BASE_POINTS, formaterPourcentage, type PointsDeBase } from './monnaie.js'
 import type { Uuid } from './types.js'
 
 export type Role = 'admin' | 'gerant' | 'caissier' | 'serveur' | 'cuisine'
@@ -192,8 +192,8 @@ export function autoriserRemise(employe: Employe, tauxBp: PointsDeBase | number)
     accorde: false,
     escaladePossible: true,
     motif:
-      `Remise de ${(tauxBp / 100).toFixed(2)} % supérieure au plafond de ` +
-      `${(plafond / 100).toFixed(2)} % accordé à ${employe.nom}.`,
+      `Remise de ${formaterPourcentage(tauxBp)} % supérieure au plafond de ` +
+      `${formaterPourcentage(plafond)} % accordé à ${employe.nom}.`,
   }
 }
 

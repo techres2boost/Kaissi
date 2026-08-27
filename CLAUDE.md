@@ -201,7 +201,8 @@ en `.d.ts` compilés : leur script `build` n'est donc qu'une vérification de ty
 
 ```bash
 pnpm install                    # installer le monorepo
-pnpm test                       # tous les tests
+pnpm test:rapide                # domaine + schéma local + ESC/POS (aucun prérequis)
+pnpm test                       # tout, synchronisation comprise (exige pnpm db:test)
 pnpm typecheck                  # types de tout le monorepo
 pnpm --filter @kaissi/domain test --watch   # boucle rapide sur les calculs
 
@@ -215,8 +216,12 @@ pnpm backoffice:dev             # back-office Next.js
 # commande, envoi cuisine, remise escaladée, encaissement, clôture.
 pnpm --filter @kaissi/pos test:parcours
 
-# Tests de synchronisation — exigent un PostgreSQL local (voir docs/tester.md)
-pnpm --filter @kaissi/sync test
+# Tests de synchronisation — exigent un vrai PostgreSQL.
+# pnpm db:test le prépare : base jetable + migrations de production telles quelles.
+pnpm db:test && pnpm --filter @kaissi/sync test && pnpm db:test:stop
+
+# Le plugin Java d'impression compile — un JDK suffit, aucun SDK Android
+pnpm verifier:natif
 
 # Appairer un terminal : le jeton n'est affiché QU'UNE FOIS
 node apps/sync/scripts/appairer.mjs --restaurant <uuid> --prefixe P1

@@ -10,12 +10,34 @@ parallèle, hors ligne, et se réconcilient sans perdre ni dupliquer une vente.
 
 ---
 
+## 👉 Par où commencer
+
+**Tu n'as encore rien lancé ?** Va directement à
+**[`docs/decouverte.md`](docs/decouverte.md)**.
+
+C'est un parcours en cinq étapes qui te fait *voir* le produit fonctionner,
+dans un ordre où chaque étape ne demande que ce que la précédente a installé.
+Chaque étape dit la commande, ce que tu dois voir, et ce que ça prouve.
+
+```bash
+pnpm install
+pnpm test:rapide     # étape 1 — 225 tests, aucune installation supplémentaire
+pnpm pos:dev         # étape 2 — le POS dans ton navigateur
+```
+
+Les étapes 1 à 4 se font entièrement sur ton poste : **ni Android, ni Supabase,
+ni imprimante**. L'étape 5 est la tablette réelle en mode avion — le seul test
+qui compte vraiment.
+
+---
+
 ## Documentation
 
 | Document | Pour |
 |---|---|
+| **[`docs/decouverte.md`](docs/decouverte.md)** | **Commencer ici** — voir le produit tourner en cinq étapes |
 | [`docs/fonctionnel.md`](docs/fonctionnel.md) | **Comprendre** chaque module et pourquoi il est ainsi |
-| [`docs/tester.md`](docs/tester.md) | **Tester** — des tests automatiques à la tablette réelle |
+| [`docs/tester.md`](docs/tester.md) | **Tester** en détail — de l'automatique à la tablette |
 | [`docs/deploiement.md`](docs/deploiement.md) | **Déployer** — Supabase, Railway, Vercel, APK Android |
 | [`docs/tester-mode-avion.md`](docs/tester-mode-avion.md) | Le critère de sortie : démarrer sans réseau |
 | [`docs/architecture.md`](docs/architecture.md) | Les décisions structurantes, en version courte |
@@ -23,56 +45,25 @@ parallèle, hors ligne, et se réconcilient sans perdre ni dupliquer une vente.
 
 ---
 
-## Ce qui fonctionne aujourd'hui
+## Commandes
 
-| Brique | État |
-|---|---|
-| `packages/domain` — monnaie, TVA, remises, permissions, shift, PIN, audit | ✅ 151 tests |
-| `packages/db-local` — SQLite miroir, migrations, projections, outbox | ✅ 45 tests |
-| `packages/printing` — ESC/POS : ticket, KOT, rapport de caisse | ✅ 26 tests |
-| `apps/sync` — protocole, idempotence, RLS, reprojection serveur | ✅ 35 tests |
-| Schéma Postgres + RLS + audit chaîné | ✅ 32 tables, 0 alerte de sécurité |
-| **Démarrage et vente en mode avion** | ✅ vérifié en CI |
-| **Prise de poste par PIN**, hors ligne (Argon2id) | ✅ |
-| **Shift** — fond, mouvements d'espèces, clôture avec écart | ✅ |
-| **Commande** — tables, variantes, modificateurs, notes | ✅ |
-| **Remises** avec plafond par rôle et escalade manager | ✅ |
-| **Cuisine** — KOT par station, jamais réimprimé | ✅ |
-| **Encaissement** — espèces, carte, mixte, monnaie rendue | ✅ |
-| **Synchronisation multi-appareils** avec coupures réseau | ✅ banc à 3 appareils |
-| **Appairage** par jeton révocable | ✅ |
-| Plugin natif Android d'impression TCP 9100 | ⚠️ écrit, **jamais testé sur appareil** |
-| Back-office (catalogue, employés, rapports) | ⏳ Phase 1 bis |
-| KDS, stock, CRM | ⏳ Phases 3 à 6 |
+| Commande | Ce qu'elle fait | Prérequis |
+|---|---|---|
+| `pnpm test:rapide` | 225 tests : domaine, schéma local, ESC/POS | aucun |
+| `pnpm pos:dev` | Le POS dans le navigateur (base **en mémoire**) | aucun |
+| `pnpm parcours` | Rejoue une journée de service dans Chromium | `pnpm pos:dev` lancé |
+| `pnpm db:test` | PostgreSQL jetable + schéma de production appliqué | Docker **ou** PostgreSQL |
+| `pnpm test` | **Tout**, synchronisation comprise | `pnpm db:test` d'abord |
+| `pnpm typecheck` | Types de tout le monorepo | aucun |
+| `pnpm verifier:avion` | Le bundle ne dépend d'aucune ressource distante | aucun |
+| `pnpm verifier:natif` | Le plugin Java d'impression compile | JDK 21 |
+| `pnpm pos:android` | Build + installation sur une tablette branchée | Android Studio |
+| `pnpm backoffice:dev` | Le back-office Next.js | aucun |
 
-### Le jalon de la Phase 2 est tenu
-
-Le dossier d'architecture fixait la règle à l'avance :
-
-> Si, à la fin de la Phase 2, la synchronisation n'est pas fiable en test avec
-> trois appareils et des coupures réseau simulées, on bascule sur PowerSync
-> sans débat.
-
-Le banc passe — aucune vente perdue, aucune dupliquée, totaux identiques au
-millime près. **On garde le moteur maison.**
-
----
-
-## Démarrage rapide
-
-```bash
-pnpm install
-
-pnpm test            # 257 tests : domaine, schéma local, ESC/POS
-pnpm typecheck       # types de tout le monorepo
-pnpm pos:dev         # POS dans le navigateur → http://localhost:5173
-
-# Rejoue une journée de service complète dans un vrai navigateur
-pnpm --filter @kaissi/pos test:parcours
-```
-
-En navigateur, la base est **en mémoire** : tout est perdu au rechargement.
-C'est du confort de développement. Le seul mode de production est l'APK Android.
+> `pnpm test` inclut la synchronisation, qui exige un vrai PostgreSQL. Sans
+> base, elle s'arrête sur un message qui dit quoi faire — pas sur trente-cinq
+> échecs identiques. Pour la boucle de développement courante :
+> `pnpm test:rapide`.
 
 ### Codes PIN de démonstration
 
@@ -86,28 +77,57 @@ C'est du confort de développement. Le seul mode de production est l'APK Android
 
 ---
 
-## Tester le mode avion sur un appareil réel
+## Ce qui fonctionne aujourd'hui
 
-C'est le **critère de sortie de la Phase 0**. Voir
-[`docs/tester-mode-avion.md`](docs/tester-mode-avion.md) pour la procédure
-complète. En résumé :
+| Brique | État |
+|---|---|
+| `packages/domain` — monnaie, TVA, remises, permissions, shift, PIN, audit | ✅ 154 tests |
+| `packages/db-local` — SQLite miroir, migrations, projections, outbox | ✅ 45 tests |
+| `packages/printing` — ESC/POS : ticket, KOT, rapport de caisse | ✅ 26 tests |
+| `apps/sync` — protocole, idempotence, RLS, reprojection serveur | ✅ 35 tests |
+| Schéma Postgres + RLS + audit chaîné | ✅ 30 tables, **toutes sous RLS**, 0 alerte de sécurité |
+| **Démarrage et vente en mode avion** | ✅ vérifié en CI |
+| **Prise de poste par PIN**, hors ligne (Argon2id) | ✅ |
+| **Shift** — fond, mouvements d'espèces, clôture avec écart signé | ✅ |
+| **Commande** — tables, variantes, modificateurs, notes | ✅ |
+| **Remises** avec plafond par rôle et escalade manager | ✅ |
+| **Cuisine** — KOT par station, jamais réimprimé | ✅ |
+| **Encaissement** — espèces, carte, mixte, monnaie rendue | ✅ |
+| **Synchronisation multi-appareils** avec coupures réseau | ✅ banc à 3 appareils |
+| **Appairage** par jeton révocable | ✅ |
+| Plugin natif Android d'impression TCP 9100 | ⚠️ compile et vérifié en CI, **jamais testé sur imprimante réelle** |
+| Back-office (catalogue, employés, rapports) | ⏳ Phase 1 bis |
+| KDS, stock, CRM | ⏳ Phases 3 à 6 |
 
-```bash
-# 1. Prérequis : Android Studio + JDK 21, ANDROID_HOME renseigné
-# 2. Construire le bundle et le copier dans le projet natif
-pnpm --filter @kaissi/pos build
-pnpm --filter @kaissi/pos exec cap sync android
+### Le jalon de la Phase 2 est tenu
 
-# 3. Brancher la tablette (débogage USB activé) et installer
-pnpm --filter @kaissi/pos exec cap run android
+Le dossier d'architecture fixait la règle à l'avance :
 
-# 4. ACTIVER LE MODE AVION sur l'appareil
-# 5. Tuer complètement l'application, puis la rouvrir
-#    → elle doit démarrer et afficher les 17 produits du menu
-# 6. Onglet « Diagnostic » → « Mode avion : Réussi »
-```
+> Si, à la fin de la Phase 2, la synchronisation n'est pas fiable en test avec
+> trois appareils et des coupures réseau simulées, on bascule sur PowerSync
+> sans débat.
 
-Si l'application démarre avec l'avion activé, la Phase 0 est validée.
+Le banc passe — aucune vente perdue, aucune dupliquée, totaux identiques au
+millime près. **On garde le moteur maison.** PowerSync reste la porte de sortie
+si le passage à l'échelle révélait autre chose.
+
+---
+
+## Ce que la CI vérifie à chaque commit
+
+Sept jobs, dont quatre sont des **gardes** plutôt que des tests : ils ne
+vérifient pas que le code marche, ils vérifient qu'une règle absolue n'a pas
+été contournée.
+
+| Job | Ce qu'il empêche |
+|---|---|
+| `domaine` | Une régression dans les calculs monétaires |
+| `types` | Qu'un contrat entre paquets se rompe sans que personne ne le voie |
+| `mode-avion` | Qu'une dépendance réseau se glisse dans le bundle du POS |
+| `plugin-natif` | Qu'une faute de signature Java dorme jusqu'au prochain build Gradle |
+| `parcours-caisse` | Qu'une journée de service cesse de tenir debout |
+| `synchronisation` | Une vente perdue ou dupliquée sous coupure réseau |
+| `regles-absolues` | `server.url`, flottant pour de l'argent, colonne monétaire sans `_millimes`, journal devenu modifiable, PIN en clair |
 
 ---
 
@@ -116,16 +136,17 @@ Si l'application démarre avec l'avion activé, la Phase 0 est validée.
 ```
 apps/pos          Terminal de caisse — Vite + React → Capacitor Android
 apps/backoffice   Back-office — Next.js → Vercel
-apps/sync         API de synchronisation — Hono sur Node (Phase 2)
+apps/sync         API de synchronisation — Hono sur Node
 
 packages/domain       ⚑ calculs monétaires et machines d'état. Zéro I/O.
 packages/db-local     schéma SQLite + migrations locales
-packages/sync-client  outbox, curseurs, retentatives (Phase 2)
+packages/sync-client  outbox, curseurs, retentatives
 packages/printing     rendu ESC/POS
 packages/ui           jetons de style partagés
 
 supabase/migrations   schéma Postgres, RLS, fonctions
-docs/                 architecture, procédures de test
+scripts/              outillage local (PostgreSQL jetable)
+docs/                 découverte, fonctionnel, test, déploiement
 ```
 
 ---
@@ -149,5 +170,9 @@ Le schéma est appliqué sur le projet Supabase `POS System`
 (`mzrbpbqpkpbbndtijipw`, région `eu-central-1`, PostgreSQL 17).
 
 Tout vit dans le schéma `kaissi` ; `public` reste vide, donc rien n'est exposé
-par PostgREST sans décision explicite. Les 29 tables ont RLS activée **et**
-forcée, avec 65 politiques.
+par PostgREST sans décision explicite. Les **30 tables** ont RLS activée **et**
+forcée.
+
+Le même schéma s'applique **tel quel** sur un PostgreSQL nu (`pnpm db:test`) :
+c'est ce qui permet aux tests d'intégration d'exercer le SQL de production, et
+non une simulation.

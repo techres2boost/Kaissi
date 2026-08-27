@@ -12,13 +12,19 @@
     "dev": "turbo run dev",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "test:rapide": "turbo run test --filter=@kaissi/domain --filter=@kaissi/db-local --filter=@kaissi/printing",
+    "db:test": "./scripts/postgres-test.sh",
+    "db:test:stop": "./scripts/postgres-test.sh --stop",
     "test:domain": "pnpm --filter @kaissi/domain test",
     "lint": "turbo run lint",
     "pos:dev": "pnpm --filter @kaissi/pos dev",
     "pos:build": "pnpm --filter @kaissi/pos build",
     "pos:android": "pnpm --filter @kaissi/pos android",
     "sync:dev": "pnpm --filter @kaissi/sync dev",
-    "backoffice:dev": "pnpm --filter @kaissi/backoffice dev"
+    "backoffice:dev": "pnpm --filter @kaissi/backoffice dev",
+    "verifier:natif": "pnpm --filter @kaissi/pos verifier:natif",
+    "verifier:avion": "pnpm --filter @kaissi/pos verifier:avion",
+    "parcours": "pnpm --filter @kaissi/pos test:parcours"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

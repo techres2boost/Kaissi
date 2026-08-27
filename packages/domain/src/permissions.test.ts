@@ -83,8 +83,13 @@ describe('plafond de remise', () => {
     expect(refus.accorde).toBe(false)
     if (!refus.accorde) {
       expect(refus.escaladePossible).toBe(true)
-      expect(refus.motif).toMatch(/20.00 %/)
-      expect(refus.motif).toMatch(/5.00 %/)
+      // Le motif est lu par le manager qui autorise : il doit nommer les DEUX
+      // taux, en français — donc virgule décimale et pas de zéros inutiles.
+      expect(refus.motif).toContain('Remise de 20 %')
+      expect(refus.motif).toContain('plafond de 5 %')
+      // Un point ENTRE DEUX CHIFFRES seulement : la phrase se termine bien
+      // par un point, ce n'est pas un séparateur décimal.
+      expect(refus.motif).not.toMatch(/\d\.\d/)
     }
   })
 

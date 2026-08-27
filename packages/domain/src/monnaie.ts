@@ -112,6 +112,23 @@ export function formaterTND(montant: Millimes, options: { symbole?: boolean } = 
   return symbole ? `${corps} TND` : corps
 }
 
+/**
+ * Rend un taux en points de base sous forme de pourcentage lisible.
+ *
+ * Le séparateur décimal est la VIRGULE : « 12.5 % » dans une interface
+ * française passe pour une faute de frappe, et sur un ticket remis au client
+ * cela se voit. Les décimales inutiles sont supprimées — un plafond de 10 %
+ * s'écrit « 10 % », pas « 10,00 % ».
+ *
+ *   1900 → « 19 »      1000 → « 10 »      1250 → « 12,5 »      50 → « 0,5 »
+ */
+export function formaterPourcentage(tauxBp: PointsDeBase | number): string {
+  const pourcent = tauxBp / 100
+  // Deux décimales suffisent : un point de base VAUT 0,01 %, donc aucun taux
+  // représentable ici n'en demande davantage.
+  return pourcent.toFixed(2).replace(/\.?0+$/, '').replace('.', ',')
+}
+
 /** Addition sûre : conserve la marque de type et vérifie le débordement. */
 export function additionner(...montants: Millimes[]): Millimes {
   return millimes(montants.reduce<number>((total, m) => total + m, 0))

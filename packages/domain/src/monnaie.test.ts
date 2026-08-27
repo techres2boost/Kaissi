@@ -6,6 +6,7 @@ import {
   depuisDecimal,
   ErreurMonnaie,
   extraireTaxeIncluse,
+  formaterPourcentage,
   formaterTND,
   millimes,
   multiplier,
@@ -132,6 +133,27 @@ describe('TVA incluse dans le prix', () => {
         const { baseHT, taxe } = extraireTaxeIncluse(millimes(ttc), pointsDeBase(bp))
         expect(baseHT + taxe).toBe(ttc)
       }
+    }
+  })
+})
+
+describe('formaterPourcentage', () => {
+  it('utilise la virgule et supprime les décimales inutiles', () => {
+    expect(formaterPourcentage(1900)).toBe('19')
+    expect(formaterPourcentage(1000)).toBe('10')
+    expect(formaterPourcentage(500)).toBe('5')
+    expect(formaterPourcentage(0)).toBe('0')
+  })
+
+  it('garde les décimales qui portent de l’information', () => {
+    expect(formaterPourcentage(1250)).toBe('12,5')
+    expect(formaterPourcentage(50)).toBe('0,5')
+    expect(formaterPourcentage(1)).toBe('0,01')
+  })
+
+  it('n’écrit jamais un point décimal — l’interface est en français', () => {
+    for (let bp = 0; bp <= 10_000; bp += 7) {
+      expect(formaterPourcentage(bp)).not.toContain('.')
     }
   })
 })

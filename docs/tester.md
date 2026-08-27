@@ -34,17 +34,35 @@ C'est le **jalon de décision de la Phase 2** : si ce test échoue, la règle
 écrite à l'avance dit de basculer sur PowerSync.
 
 ```bash
-# Il lui faut un vrai PostgreSQL. Cluster jetable :
-sudo -u postgres /usr/lib/postgresql/16/bin/initdb -D /tmp/pgkaissi -U postgres --auth=trust
-sudo -u postgres /usr/lib/postgresql/16/bin/pg_ctl -D /tmp/pgkaissi \
-  -o "-p 5433 -c listen_addresses=127.0.0.1" -l /tmp/pg.log start
+# Il lui faut un vrai PostgreSQL. Une commande le prépare entièrement :
+# base jetable (Docker si disponible, sinon cluster local), amorce Supabase,
+# puis les migrations de PRODUCTION appliquées telles quelles.
+pnpm db:test
+
+pnpm --filter @kaissi/sync test
+
+pnpm db:test:stop            # quand tu as fini
+```
+
+Si la base manque, les tests s'arrêtent sur **un** message qui dit quoi faire,
+au lieu de trente-cinq échecs identiques dont la cause réelle est noyée à la
+fin de la sortie.
+
+<details>
+<summary>Le faire à la main, si tu préfères contrôler chaque étape</summary>
+
+```bash
+initdb -D /tmp/pgkaissi -U postgres --auth=trust
+pg_ctl -D /tmp/pgkaissi -o "-p 5433 -c listen_addresses=127.0.0.1" -l /tmp/pg.log start
 
 export PGHOST=127.0.0.1 PGPORT=5433 PGUSER=postgres
 psql -f apps/sync/test/amorce-supabase.sql
 for f in supabase/migrations/*.sql; do psql -v ON_ERROR_STOP=1 -f "$f"; done
-
-pnpm --filter @kaissi/sync test
 ```
+
+Sur Debian/Ubuntu, `initdb` et `pg_ctl` ne sont pas dans le `PATH` : ils sont
+dans `/usr/lib/postgresql/16/bin`.
+</details>
 
 Il rejoue un service entier avec des coupures réseau — dont la pire : le
 serveur écrit, la réponse se perd. Il vérifie trois propriétés dures :
@@ -215,6 +233,7 @@ select * from kaissi.verifie_chaine_audit('01930000-0000-7000-8000-000000000002'
 | Domaine | Calculs monétaires, schéma local, ESC/POS |
 | Types | Tout le monorepo |
 | Mode avion | Build + aucune dépendance réseau dans le bundle |
+| Plugin natif | `ImprimanteReseau.java` compile, annotations Capacitor présentes dans le bytecode |
 | Parcours de caisse | Journée complète dans Chromium |
 | Synchronisation | 35 tests contre un vrai PostgreSQL |
 | Règles absolues | Pas de `server.url`, pas de flottant, `_millimes`, journaux append-only, PIN jamais en clair |
