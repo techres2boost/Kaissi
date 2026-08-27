@@ -256,12 +256,32 @@ function Bandeau({
   onSync: () => void
   impression: { enAttente: number; echecs: number }
 }) {
-  const { employe, etablissement, resumeSync, sync } = useApp()
+  const { employe, etablissement, resumeSync, sync, app } = useApp()
   return (
     <header className="bandeau">
       <div className="bandeau-marque">
         <span className="logo">Kaissi</span>
         <span className="etablissement">{etablissement.nom}</span>
+        {/*
+          Base en mémoire = « pnpm pos:dev » dans un navigateur. Le catalogue
+          vient alors de la graine locale, jamais du serveur : un prix modifié
+          au back-office n'arrive PAS ici, et les ventes disparaissent au
+          rechargement. Le dire à l'écran évite de chercher une panne là où il
+          n'y en a pas — l'information existait, mais enfouie dans Diagnostic.
+        */}
+        {!app.base.persistant && (
+          <span
+            className="etiquette-demo"
+            title={
+              'Base SQLite en mémoire : tout disparaît au rechargement, et le ' +
+              'catalogue vient de la graine locale — les modifications faites au ' +
+              'back-office n’arrivent pas ici. Seule l’application Android ' +
+              'installée se synchronise réellement.'
+            }
+          >
+            démo — mémoire
+          </span>
+        )}
       </div>
 
       <div className="bandeau-actions">

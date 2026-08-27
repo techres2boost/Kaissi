@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react'
 import {
   changerRole,
   changerStatut,
+  embaucher,
   reinitialiserPin,
   type Resultat,
 } from '../app/[restaurant]/employes/actions.js'
@@ -36,9 +37,19 @@ export function ListeEmployes({
   employes: Employe[]
 }) {
   const [cible, setCible] = useState<Employe | null>(null)
+  const [embaucheOuverte, setEmbaucheOuverte] = useState(false)
 
   return (
     <>
+      {modifiable && (
+        <FormulaireEmbauche
+          restaurantId={restaurantId}
+          ouvert={embaucheOuverte}
+          ouvrir={() => setEmbaucheOuverte(true)}
+          fermer={() => setEmbaucheOuverte(false)}
+        />
+      )}
+
       <section className="carte">
         {employes.length === 0 ? (
           <p className="vide">Aucun employé rattaché à cet établissement.</p>
@@ -224,5 +235,109 @@ function Message({ resultat }: { resultat: Resultat | null }) {
     <p className={`message ${resultat.erreur ? 'erreur' : 'succes'}`} role="alert">
       {resultat.erreur ?? resultat.succes}
     </p>
+  )
+}
+
+function FormulaireEmbauche({
+  restaurantId,
+  ouvert,
+  ouvrir,
+  fermer,
+}: {
+  restaurantId: string
+  ouvert: boolean
+  ouvrir: () => void
+  fermer: () => void
+}) {
+  const [resultat, action, enCours] = useActionState(
+    embaucher.bind(null, restaurantId),
+    null as Resultat | null,
+  )
+
+  if (!ouvert) {
+    return (
+      <div style={{ marginBottom: '1.25rem' }}>
+        <Message resultat={resultat} />
+        <button type="button" className="principal" onClick={ouvrir}>
+          Embaucher un employé
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <section className="carte" style={{ borderColor: 'var(--accent)' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline' }}>
+        <h2 style={{ marginBottom: 0 }}>Embaucher un employé</h2>
+        <button type="button" className="discret" style={{ marginLeft: 'auto' }} onClick={fermer}>
+          Annuler
+        </button>
+      </div>
+
+      <form action={action} style={{ marginTop: '1rem' }}>
+        <Message resultat={resultat} />
+
+        <div className="champs deux">
+          <div className="champ">
+            <label htmlFor="nom-embauche">Nom complet</label>
+            <input id="nom-embauche" name="nom" required autoFocus placeholder="Mohamed Ben Ali" />
+          </div>
+          <div className="champ">
+            <label htmlFor="role-embauche">Rôle</label>
+            <select id="role-embauche" name="role" defaultValue="serveur">
+              {ROLES.map((role) => (
+                <option key={role.valeur} value={role.valeur}>
+                  {role.libelle}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="champs deux">
+          <div className="champ">
+            <label htmlFor="pin-embauche">Code PIN</label>
+            <input
+              id="pin-embauche"
+              name="pin"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={8}
+              required
+            />
+          </div>
+          <div className="champ">
+            <label htmlFor="conf-embauche">Confirmer le code</label>
+            <input
+              id="conf-embauche"
+              name="confirmation"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={8}
+              required
+            />
+          </div>
+        </div>
+
+        <div className="champ">
+          <label htmlFor="email-embauche">E-mail (facultatif)</label>
+          <input id="email-embauche" name="email" type="email" placeholder="—" />
+          <p className="indication">
+            Uniquement si cette personne doit un jour ouvrir le back-office. Un serveur en
+            salle n&apos;en a pas besoin&nbsp;: il tape son PIN sur la tablette, il ne se
+            connecte à rien.
+          </p>
+        </div>
+
+        <button type="submit" className="principal" disabled={enCours}>
+          {enCours ? 'Calcul du hachage…' : 'Embaucher'}
+        </button>
+        <p className="indication">
+          Le PIN est haché (Argon2id) avant d&apos;être enregistré. Notez-le maintenant&nbsp;:
+          il ne sera jamais réaffiché. Renseigner un e-mail ne crée <strong>pas</strong> de
+          compte de connexion — cela reste une opération d&apos;administrateur.
+        </p>
+      </form>
+    </section>
   )
 }

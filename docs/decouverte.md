@@ -284,6 +284,7 @@ Si elle démarre avec l'avion activé, la promesse du produit tient.
 
 | Tu veux | Va voir |
 |---|---|
+| Tester Android sans tablette ni imprimante | [`tester-sans-tablette.md`](tester-sans-tablette.md) |
 | Comprendre **pourquoi** chaque module est ainsi | [`fonctionnel.md`](fonctionnel.md) |
 | Les décisions structurantes en version courte | [`architecture.md`](architecture.md) |
 | Toutes les procédures de test, en détail | [`tester.md`](tester.md) |
@@ -299,6 +300,5 @@ Autant le savoir avant une démonstration client :
 | Manque | Conséquence aujourd'hui |
 |---|---|
 | Impression testée sur imprimante réelle | Le code compile et le rendu est testé ; **le papier qui sort ne l'est pas** |
-| Création d'un compte d'employé au back-office | Invitation depuis Supabase, puis rattachement — l'API d'administration exige la clé de service |
 | Variantes et modificateurs au back-office | SQL direct. Les produits simples, eux, s'éditent |
 | KDS, stock, recettes, CRM | Phases 3 à 6 |

@@ -389,16 +389,37 @@ describe('pull — curseur serveur, jamais un horodatage (RÈGLE 4)', () => {
     expect(r.corps.evenements).toHaveLength(5)
     expect(r.corps.encore).toBe(true)
 
-    // Page suivante. On avance AUSSI le curseur de catalogue : `encore`
-    // reste vrai tant qu'une des deux files a du retard, et le jeu de
-    // démonstration a rempli change_log à l'installation.
-    const suite = await appeler(
-      `/sync/pull?protocolVersion=1&depuisEvenements=${r.corps.curseurEvenements}` +
-        `&depuisCatalogue=${r.corps.curseurCatalogue}&taillePage=200`,
-      b.jetonClair,
-    )
-    expect(suite.corps.evenements).toHaveLength(7)
-    expect(suite.corps.encore).toBe(false)
+    // On rattrape ensuite jusqu'au bout, page par page — exactement ce que
+    // fait un terminal resté longtemps hors ligne.
+    //
+    // La boucle est volontaire : `encore` reste vrai tant que L'UNE des deux
+    // files a du retard, et change_log grossit au fil des migrations et des
+    // autres tests. Attendre « tout en une page » liait ce test à un état
+    // global qu'il ne contrôle pas, et le faisait échouer au hasard selon
+    // l'ordre d'exécution des fichiers.
+    let curseurEvenements = r.corps.curseurEvenements as number
+    let curseurCatalogue = r.corps.curseurCatalogue as number
+    let recus = r.corps.evenements.length
+    let pages = 0
+
+    while (pages < 20) {
+      const suite = await appeler(
+        `/sync/pull?protocolVersion=1&depuisEvenements=${curseurEvenements}` +
+          `&depuisCatalogue=${curseurCatalogue}&taillePage=5`,
+        b.jetonClair,
+      )
+      pages += 1
+      recus += suite.corps.evenements.length
+      curseurEvenements = suite.corps.curseurEvenements
+      curseurCatalogue = suite.corps.curseurCatalogue
+      if (!suite.corps.encore) break
+    }
+
+    // Les douze événements des trois commandes, ni un de plus ni un de moins.
+    expect(recus).toBe(12)
+    // Et la pagination TERMINE : sans cela, un terminal en retard bouclerait
+    // indéfiniment sans jamais se déclarer à jour.
+    expect(pages).toBeLessThan(20)
   })
 
   it('signale « encore » tant que le CATALOGUE a du retard', async () => {

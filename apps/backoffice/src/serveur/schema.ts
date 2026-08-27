@@ -68,7 +68,10 @@ export type Restaurant = {
 export type Utilisateur = {
   id: Uuid
   organization_id: Uuid
-  email: string
+  /** Compte Supabase Auth, FACULTATIF : un serveur en salle n'en a pas. */
+  auth_user_id: Uuid | null
+  /** Facultatif depuis la 0017 : inventer un e-mail produirait une donnée fausse. */
+  email: string | null
   full_name: string
   phone: string | null
   /** Hachage Argon2id — jamais le PIN. */

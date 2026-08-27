@@ -58,6 +58,12 @@ export async function nettoyer(): Promise<void> {
     await client.query('delete from kaissi.order_events')
     await client.query('delete from kaissi.orders')
     await client.query('delete from kaissi.devices')
+    // Les tests d'employés et de RLS créent des appartenances, donc des
+    // entrées de journal. Sans ce ménage, change_log grossit à chaque
+    // fichier et finit par déborder la pagination du catalogue — un test
+    // échouait alors selon l'ordre d'exécution, ce qui est le pire des
+    // échecs : il n'apprend rien et on finit par l'ignorer.
+    await client.query("delete from kaissi.change_log where entity_type = 'employees'")
     await client.query('alter table kaissi.order_events enable trigger order_events_immuable')
   } finally {
     await client.end()

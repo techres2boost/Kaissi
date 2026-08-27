@@ -25,12 +25,16 @@ await client.connect()
 type Issue = 'applique' | 'filtre' | 'refuse'
 
 /** Joue une requête dans la peau d'un utilisateur, puis annule tout. */
+const comptes = new Map<string, string>()
+
 async function dansLaPeauDe(acteur: string, sql: string, valeurs: unknown[] = []): Promise<Issue> {
   await client.query('begin')
   try {
     await client.query('select set_config($1, $2, true)', [
       'request.jwt.claims',
-      JSON.stringify({ sub: acteur }),
+      // PostgREST place l'identifiant du COMPTE dans « sub », pas celui de
+      // l'employé. La distinction est tout l'objet de la migration 0017.
+      JSON.stringify({ sub: comptes.get(acteur) ?? acteur }),
     ])
     await client.query('set local role authenticated')
     const resultat = await client.query(sql, valeurs)
@@ -46,13 +50,43 @@ let gerant: string
 let serveur: string
 let admin: string
 
+/**
+ * Un employé QUI OUVRE LE BACK-OFFICE : il a donc un compte d'authentification,
+ * relié par `auth_user_id`. Depuis la migration 0017, ce lien est explicite —
+ * l'identifiant d'employé et celui du compte ne sont plus le même.
+ */
 async function creer(role: string): Promise<string> {
+  const compte = uuidV7()
   const id = uuidV7()
-  await client.query('insert into auth.users (id) values ($1)', [id])
+  await client.query('insert into auth.users (id) values ($1)', [compte])
   await client.query(
-    `insert into kaissi.users (id, organization_id, email, full_name, pin_hash)
-     values ($1, $2, $3, $4, 'HACHE')`,
-    [id, DEMO_ORG, `${id}@rls.tn`, `Test ${role}`],
+    `insert into kaissi.users (id, organization_id, auth_user_id, email, full_name, pin_hash)
+     values ($1, $2, $3, $4, $5, 'HACHE')`,
+    [id, DEMO_ORG, compte, `${id}@rls.tn`, `Test ${role}`],
+  )
+  await client.query(
+    `insert into kaissi.memberships (organization_id, user_id, restaurant_id, role)
+     values ($1, $2, $3, $4)`,
+    [DEMO_ORG, id, DEMO_RESTO, role],
+  )
+  // Les tests jouent le rôle du COMPTE : c'est lui que PostgREST place dans
+  // la revendication « sub ».
+  comptes.set(id, compte)
+  return id
+}
+
+/**
+ * Un serveur EN SALLE : un PIN, pas de mot de passe, pas de compte.
+ *
+ * C'est le cas que le schéma rendait impossible avant la 0017, et qui rendait
+ * le produit invendable : un gérant devait écrire du SQL pour embaucher.
+ */
+async function creerSansCompte(role: string): Promise<string> {
+  const id = uuidV7()
+  await client.query(
+    `insert into kaissi.users (id, organization_id, full_name, pin_hash)
+     values ($1, $2, $3, 'HACHE')`,
+    [id, DEMO_ORG, `Serveur ${role}`],
   )
   await client.query(
     `insert into kaissi.memberships (organization_id, user_id, restaurant_id, role)
@@ -71,8 +105,9 @@ beforeEach(async () => {
 })
 
 afterAll(async () => {
-  await client.query("delete from kaissi.users where email like '%@rls.tn'")
-  await client.query("delete from auth.users where id in (select id from kaissi.users where email like '%@rls.tn')")
+  await client.query(
+    "delete from kaissi.users where email like '%@rls.tn' or full_name like 'Serveur %'",
+  )
   await client.end()
 })
 
@@ -158,6 +193,68 @@ describe('un employé sans encadrement', () => {
 describe('un administrateur', () => {
   it('nomme un administrateur — lui seul le peut', async () => {
     expect(await dansLaPeauDe(admin, ROLE, ['admin', serveur])).toBe('applique')
+  })
+})
+
+describe('embaucher depuis le back-office — sans écrire de SQL', () => {
+  it('un gérant crée un employé qui n’a AUCUN compte de connexion', async () => {
+    // Le cas que le schéma interdisait : kaissi.users.id référençait
+    // auth.users(id), donc tout serveur devait posséder un mot de passe.
+    // Créer ce compte exige l'API d'administration, donc la clé service_role
+    // — que le back-office n'a délibérément pas. Un gérant en était réduit à
+    // écrire du SQL dans le tableau de bord Supabase.
+    const nouveau = uuidV7()
+    expect(
+      await dansLaPeauDe(
+        gerant,
+        `insert into kaissi.users (id, organization_id, full_name, pin_hash)
+         values ($1, $2, 'Nouveau Serveur', 'HACHE')`,
+        [nouveau, DEMO_ORG],
+      ),
+    ).toBe('applique')
+  })
+
+  it('puis lui donne un rôle dans son établissement', async () => {
+    const nouveau = await creerSansCompte('serveur')
+    expect(await dansLaPeauDe(gerant, ROLE, ['caissier', nouveau])).toBe('applique')
+  })
+
+  it('et lui attribue un code PIN', async () => {
+    const nouveau = await creerSansCompte('serveur')
+    expect(await dansLaPeauDe(gerant, PIN, ['NOUVEAU-HACHE', nouveau])).toBe('applique')
+  })
+
+  it('un employé sans compte n’ouvre RIEN — il n’a pas de mot de passe', async () => {
+    const nouveau = await creerSansCompte('serveur')
+    // Aucune entrée dans `comptes` : « sub » vaudra son identifiant d'employé,
+    // qui ne correspond à aucun compte. employe_courant() rend NULL, donc les
+    // politiques ne lui rendent rien. C'est exactement le comportement voulu.
+    expect(
+      await dansLaPeauDe(nouveau, 'select 1 from kaissi.users where id = $1', [gerant]),
+    ).toBe('filtre')
+  })
+
+  it('un gérant ne peut PAS s’offrir un accès au back-office', async () => {
+    // auth_user_id est hors des colonnes qu'il peut écrire : donner l'accès au
+    // back-office reste une décision d'administrateur.
+    const nouveau = await creerSansCompte('serveur')
+    expect(
+      await dansLaPeauDe(gerant, 'update kaissi.users set auth_user_id = $1 where id = $2', [
+        uuidV7(),
+        nouveau,
+      ]),
+    ).toBe('refuse')
+  })
+
+  it('un gérant n’embauche pas dans une AUTRE organisation', async () => {
+    expect(
+      await dansLaPeauDe(
+        gerant,
+        `insert into kaissi.users (id, organization_id, full_name)
+         values ($1, $2, 'Intrus')`,
+        [uuidV7(), uuidV7()],
+      ),
+    ).toBe('refuse')
   })
 })
 

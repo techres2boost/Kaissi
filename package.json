@@ -24,7 +24,8 @@
     "backoffice:dev": "pnpm --filter @kaissi/backoffice dev",
     "verifier:natif": "pnpm --filter @kaissi/pos verifier:natif",
     "verifier:avion": "pnpm --filter @kaissi/pos verifier:avion",
-    "parcours": "pnpm --filter @kaissi/pos test:parcours"
+    "parcours": "pnpm --filter @kaissi/pos test:parcours",
+    "imprimante": "node apps/pos/scripts/imprimante-virtuelle.mjs"
   },
   "devDependencies": {
     "turbo": "^2.3.3",

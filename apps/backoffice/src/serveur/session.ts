@@ -26,7 +26,17 @@ export interface Etablissement {
 }
 
 export interface SessionBackoffice {
-  utilisateurId: string
+  /** Identifiant du COMPTE Supabase Auth. */
+  compteId: string
+  /**
+   * Identifiant de l'EMPLOYÉ correspondant.
+   *
+   * Les deux étaient le même jusqu'à la migration 0017, qui les a séparés
+   * pour qu'un serveur en salle puisse exister sans mot de passe. Les
+   * confondre ferait comparer une commande (`orders.opened_by`, un employé)
+   * à un identifiant de compte : jamais égal, sans erreur visible.
+   */
+  employeId: string | null
   email: string
   nom: string
   etablissements: Etablissement[]
@@ -47,6 +57,14 @@ export async function sessionObligatoire(): Promise<SessionBackoffice> {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) redirect('/connexion')
+
+  // L'employé lié à ce compte. RLS ne rend que les lignes visibles, donc au
+  // pire ce select est vide — jamais celui d'un autre.
+  const { data: moi } = await supabase
+    .from('users')
+    .select('id, full_name')
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
 
   const { data, error } = await supabase
     .from('memberships')
@@ -75,9 +93,14 @@ export async function sessionObligatoire(): Promise<SessionBackoffice> {
   })
 
   return {
-    utilisateurId: user.id,
+    compteId: user.id,
+    employeId: (moi?.id as string | undefined) ?? null,
     email: user.email ?? '',
-    nom: (user.user_metadata?.['full_name'] as string | undefined) ?? user.email ?? '',
+    nom:
+      (moi?.full_name as string | undefined) ||
+      (user.user_metadata?.['full_name'] as string | undefined) ||
+      user.email ||
+      '',
     etablissements: etablissements.sort((a, b) => a.nom.localeCompare(b.nom, 'fr')),
   }
 }

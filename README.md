@@ -41,6 +41,7 @@ mode avion — le seul test qui compte vraiment.
 | [`docs/fonctionnel.md`](docs/fonctionnel.md) | **Comprendre** chaque module et pourquoi il est ainsi |
 | [`docs/tester.md`](docs/tester.md) | **Tester** en détail — de l'automatique à la tablette |
 | [`docs/deploiement.md`](docs/deploiement.md) | **Déployer** — Supabase, Railway, Vercel, APK Android |
+| [`docs/tester-sans-tablette.md`](docs/tester-sans-tablette.md) | **Tester Android et l'impression sans matériel** — émulateur + imprimante virtuelle |
 | [`docs/tester-mode-avion.md`](docs/tester-mode-avion.md) | Le critère de sortie : démarrer sans réseau |
 | [`docs/architecture.md`](docs/architecture.md) | Les décisions structurantes, en version courte |
 | [`CLAUDE.md`](CLAUDE.md) | Les huit règles absolues du dépôt |
@@ -54,6 +55,7 @@ mode avion — le seul test qui compte vraiment.
 | `pnpm test:rapide` | 225 tests : domaine, schéma local, ESC/POS | aucun |
 | `pnpm pos:dev` | Le POS dans le navigateur (base **en mémoire**) | aucun |
 | `pnpm parcours` | Rejoue une journée de service dans Chromium | `pnpm pos:dev` lancé |
+| `pnpm imprimante` | Imprimante ESC/POS virtuelle sur le port 9100 | aucun |
 | `pnpm db:test` | PostgreSQL jetable + schéma de production appliqué | Docker **ou** PostgreSQL |
 | `pnpm test` | **Tout**, synchronisation comprise | `pnpm db:test` d'abord |
 | `pnpm typecheck` | Types de tout le monorepo | aucun |
@@ -102,7 +104,7 @@ mode avion — le seul test qui compte vraiment.
 | **Rapport de journée** — CA, TVA par taux, encaissements, écarts de caisse | ✅ |
 | **Catalogue** — produits, prix, TVA, stations, disponibilité | ✅ |
 | **Employés** — rôles, PIN Argon2id, suspension | ✅ |
-| Création d'un compte d'employé | ⏳ exige l'API d'administration Supabase |
+| **Embauche d'un employé** — nom, rôle, PIN, sans compte de connexion | ✅ |
 | Variantes et modificateurs au back-office | ⏳ Phase 1 bis |
 | KDS, stock, CRM | ⏳ Phases 3 à 6 |
 

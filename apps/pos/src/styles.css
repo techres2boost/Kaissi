@@ -630,3 +630,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background: rgba(228, 117, 106, 0.15); color: var(--alerte);
   border-color: rgba(228, 117, 106, 0.45);
 }
+
+/* Signale sans ambiguïté une base en mémoire : ni persistance, ni
+   synchronisation. Or l'écran, lui, ressemble en tout point à la production. */
+.etiquette-demo {
+  margin-left: 0.6rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  background: rgba(201, 168, 107, 0.16);
+  color: var(--or);
+  border: 1px solid rgba(201, 168, 107, 0.4);
+  cursor: help;
+}
