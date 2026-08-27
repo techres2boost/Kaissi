@@ -56,6 +56,7 @@ mode avion — le seul test qui compte vraiment.
 | `pnpm pos:dev` | Le POS dans le navigateur (base **en mémoire**) | aucun |
 | `pnpm parcours` | Rejoue une journée de service dans Chromium | `pnpm pos:dev` lancé |
 | `pnpm imprimante` | Imprimante ESC/POS virtuelle sur le port 9100 | aucun |
+| `pnpm sync:dev` | L'API de synchronisation, en local | `DATABASE_URL` |
 | `pnpm db:test` | PostgreSQL jetable + schéma de production appliqué | Docker **ou** PostgreSQL |
 | `pnpm test` | **Tout**, synchronisation comprise | `pnpm db:test` d'abord |
 | `pnpm typecheck` | Types de tout le monorepo | aucun |

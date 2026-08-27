@@ -92,7 +92,11 @@ export class MoteurSync {
     tentatives: 0,
   }
 
-  constructor(private readonly options: OptionsMoteur) {}
+  private readonly options: OptionsMoteur
+
+  constructor(options: OptionsMoteur) {
+    this.options = options
+  }
 
   abonner(ecouteur: EcouteurSync): () => void {
     this.ecouteurs.add(ecouteur)

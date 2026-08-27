@@ -132,7 +132,16 @@ function appliquerAuStatut(e: EvenementCommande, statutsDuLot: Map<string, strin
 }
 
 export class ServiceSync {
-  constructor(private readonly depot: DepotSync) {}
+  // Champ explicite plutôt qu'une « parameter property » : le mode
+  // strip-only de Node (celui qui exécute ce service en production) ne
+  // transforme pas « constructor(private …) » en affectation. L'écrire à la
+  // main garde le runtime dans son mode le plus stable, sans flag de
+  // transformation expérimentale.
+  private readonly depot: DepotSync
+
+  constructor(depot: DepotSync) {
+    this.depot = depot
+  }
 
   async push(appareil: AppareilAuthentifie, requete: RequetePush): Promise<ReponsePush> {
     if (!protocoleSupporte(requete.protocolVersion)) {

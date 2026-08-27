@@ -18,6 +18,49 @@ Trois briques à déployer, indépendantes l'une de l'autre :
 
 ---
 
+## Comment les deux applications se parlent
+
+Elles ne se parlent **pas directement**. Elles se retrouvent dans la **base
+Supabase**. C'est le point clé, et la source de la confusion la plus fréquente.
+
+```
+   BACK-OFFICE (Vercel)                          POS (APK Android)
+   Next.js, navigateur                           empaqueté, hors ligne
+        │                                              │
+        │ clé PUBLIQUE + session, via RLS              │ jeton d'appareil
+        │ (lit et écrit le référentiel)                │
+        ▼                                              ▼
+   ┌─────────────────────┐                    ┌──────────────────────┐
+   │  Supabase Postgres  │◄───── SQL ────────►│  API de sync (Railway│
+   │  (schéma kaissi)    │   même base        │  process Node)       │
+   └─────────────────────┘                    └──────────────────────┘
+                                                       ▲
+                                                       │ push / pull HTTP
+                                                       │ (jeton d'appareil)
+                                                  la tablette
+```
+
+Concrètement :
+
+- **Le gérant change un prix** au back-office → écrit dans `kaissi.products` →
+  un déclencheur alimente `change_log` → au prochain **pull**, l'API de sync
+  le transmet à la tablette. Le prix change en salle sans toucher à l'APK.
+- **Le caissier encaisse** sur la tablette → l'APK **push** les
+  `order_events` vers l'API de sync → l'API les projette en `orders` →
+  le back-office les lit dans l'écran **Journée**.
+
+Donc pour que « tout soit connecté », il ne manque qu'une chose : **l'API de
+sync doit être déployée et joignable**, et la tablette **appairée** (§5). La
+base et le back-office se parlent déjà directement.
+
+> **La confusion classique.** `pnpm pos:dev` dans un navigateur n'est relié à
+> RIEN : sa base est en mémoire, son catalogue vient de la graine locale. Une
+> vente n'y remonte jamais au serveur, et un prix modifié au back-office n'y
+> descend jamais. L'écran affiche « démo — mémoire » dans ce cas. Seule **l'APK
+> installée et appairée** participe à la synchronisation.
+
+---
+
 ## 0. Ce dont tu as besoin
 
 | Outil | Version | Vérifier |
@@ -85,36 +128,53 @@ d'architecture tranche : **process Node persistant**.
 
 Railway est le plus simple pour démarrer. Fly.io coûte moins cher à l'échelle.
 
-### 2.1 Railway (recommandé pour commencer)
+### 2.0 D'abord : essaie toute la chaîne SUR TON PC
+
+Avant de payer ou configurer quoi que ce soit, tu peux faire tourner l'API de
+sync **sur ton PC Windows** et la faire atteindre par l'émulateur Android.
+Cela prouve que tout marche, contre ta vraie base Supabase, sans rien déployer.
 
 ```bash
-npm i -g @railway/cli
-railway login
-railway init          # crée le projet
+# 1) L'API de sync, en local, branchée sur Supabase (session pooler, §1)
+#    PowerShell :
+$env:DATABASE_URL="postgresql://postgres.xxx:MOTDEPASSE@aws-0-...pooler.supabase.com:5432/postgres"
+pnpm sync:dev
+#    → « API de synchronisation Kaissi — port 8787 »
+
+# 2) Vérifie dans un autre terminal
+curl http://127.0.0.1:8787/sante        # {"etat":"ok",...}
+
+# 3) Appaire l'émulateur (garde le même DATABASE_URL)
+node apps/sync/scripts/appairer.mjs --restaurant <uuid-resto> --prefixe E1
+#    → note le jeton kdev_… (affiché UNE fois)
 ```
 
-Dans l'interface Railway :
+Sur l'émulateur, l'API de sync de ton PC se joint à l'adresse **`10.0.2.2:8787`**
+(voir docs/tester-sans-tablette.md). Saisis-la avec le jeton dans
+Diagnostic → Appairage.
 
-1. **New → GitHub Repo** → `techres2boost/Kaissi`
-2. **Settings → Root Directory** : laisser vide (monorepo)
-3. **Settings → Build Command** :
-   ```
-   corepack enable && pnpm install --frozen-lockfile
-   ```
-4. **Settings → Start Command** :
-   ```
-   pnpm --filter @kaissi/sync start
-   ```
-5. **Variables** :
+Une fois que ça marche en local, le déploiement ci-dessous ne fait que
+remplacer `10.0.2.2:8787` par une URL publique.
+
+### 2.1 Railway (recommandé pour commencer)
+
+Railway lit le `railway.json` du dépôt : il **construit avec le Dockerfile**
+d'`apps/sync` (Node 22, sonde de santé, utilisateur non-root). Tu n'as donc ni
+build command ni start command à saisir.
+
+1. **New Project → Deploy from GitHub repo** → `techres2boost/Kaissi`
+2. **Variables** (onglet Variables) :
 
    | Nom | Valeur |
    |---|---|
-   | `DATABASE_URL` | la chaîne du §1 |
-   | `SYNC_PORT` | `8787` |
-   | `SYNC_ORIGINES` | l'URL de ton back-office Vercel |
-   | `NODE_ENV` | `production` |
+   | `DATABASE_URL` | la chaîne du §1 (session pooler, port 5432) |
+   | `SYNC_ORIGINES` | l'URL de ton back-office Vercel (pour le CORS) |
 
-6. **Settings → Networking → Generate Domain** → tu obtiens
+   `SYNC_PORT` (8787) est déjà posé par le Dockerfile ; Railway route dessus
+   automatiquement. `DATABASE_SSL` reste à sa valeur par défaut (activé) : le
+   pooler Supabase exige TLS.
+
+3. **Settings → Networking → Generate Domain** → tu obtiens
    `https://kaissi-sync-production.up.railway.app`
 
 Vérifie :
@@ -123,6 +183,13 @@ Vérifie :
 curl https://TON-DOMAINE/sante
 # {"etat":"ok","protocole":1,"horodatage":"…"}
 ```
+
+> **Note sur le runtime.** Le service exécute la SOURCE TypeScript directement
+> (`node --experimental-strip-types`, plus un petit hook qui résout les
+> imports `.js` → `.ts`). Aucune étape de compilation, donc aucun risque que le
+> binaire déployé diverge du code relu. Un test de démarrage
+> (`apps/sync/test/demarrage.test.ts`) lance cette commande exacte en CI : si
+> le conteneur ne peut pas démarrer, le build échoue avant le déploiement.
 
 ### 2.2 Fly.io (alternative)
 

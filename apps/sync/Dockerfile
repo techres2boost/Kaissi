@@ -37,4 +37,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # Jamais root : une faille dans une dépendance ne doit pas donner le conteneur.
 USER node
 
-CMD ["node", "--experimental-strip-types", "apps/sync/src/index.ts"]
+# Le hook « charger-ts.mjs » fait pointer les imports « .js » vers les
+# fichiers « .ts » (convention ESM du dépôt), ce que Node ne fait pas seul.
+CMD ["node", "--experimental-strip-types", "--import", "./apps/sync/scripts/charger-ts.mjs", "apps/sync/src/index.ts"]

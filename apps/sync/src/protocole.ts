@@ -134,12 +134,17 @@ export interface ReponseErreur {
 }
 
 export class ErreurSync extends Error {
-  constructor(
-    readonly code: CodeErreur,
-    message: string,
-    readonly statut = 400,
-  ) {
+  // Champs explicites : le mode strip-only de Node ne transforme pas les
+  // « parameter properties » (constructor(readonly code …)). Les écrire à la
+  // main permet d'exécuter la source telle quelle en production, sans flag
+  // de transformation expérimentale.
+  readonly code: CodeErreur
+  readonly statut: number
+
+  constructor(code: CodeErreur, message: string, statut = 400) {
     super(message)
+    this.code = code
+    this.statut = statut
     this.name = 'ErreurSync'
   }
 }
