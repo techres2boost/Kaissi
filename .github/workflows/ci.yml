@@ -73,6 +73,28 @@ jobs:
           path: apps/pos/dist
           retention-days: 7
 
+  plugin-natif:
+    name: Plugin natif — le code Java d'impression compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: pnpm install --frozen-lockfile
+      # Compile ImprimanteReseau.java sans SDK Android, contre des doublures
+      # elles-memes verifiees face aux sources reelles de Capacitor.
+      # Ce job ne remplace pas un build Gradle : il fait tomber tot les fautes
+      # de signature, qui sinon n'apparaissent que sur un poste equipe.
+      - name: Verification du plugin natif
+        run: pnpm --filter @kaissi/pos verifier:natif
+
   parcours-caisse:
     name: Parcours de caisse de bout en bout
     runs-on: ubuntu-latest

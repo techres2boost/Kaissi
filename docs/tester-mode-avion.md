@@ -236,3 +236,49 @@ adb logcat | grep -i "ImprimanteReseau\|Capacitor/Plugin"
 Le tiroir est piloté **par l'imprimante**, jamais par un câble séparé. Il doit
 s'ouvrir automatiquement à la clôture d'une commande payée en espèces, et
 rester fermé sur un paiement par carte.
+
+---
+
+## 10. Ce qui est vérifié sans SDK Android — et ce qui ne peut pas l'être
+
+Le code natif d'impression est le seul morceau du projet qu'aucun test
+TypeScript n'atteint. Il ne se compile normalement qu'au moment du
+`./gradlew assembleDebug`, donc tard et sur un poste équipé.
+
+Une vérification intermédiaire comble une partie de cet angle mort :
+
+```bash
+pnpm --filter @kaissi/pos verifier:natif
+```
+
+Elle ne demande **qu'un JDK 21** — ni SDK Android, ni Gradle, ni appareil — et
+tourne à chaque PR (job `plugin-natif`). Elle compile `ImprimanteReseau.java`
+et `MainActivity.java` contre les doublures de `apps/pos/scripts/stubs-android/`,
+elles-mêmes relues face aux sources réelles de Capacitor dans `node_modules`
+(voir le `LISEZMOI.md` de ce dossier : sans ce recoupement, une doublure
+périmée ferait passer la vérification sur une API disparue).
+
+### Ce que cette vérification prouve
+
+| Contrôle | Panne qu'il attrape |
+|---|---|
+| Le Java compile, sans avertissement | Faute de frappe, signature erronée, type incompatible |
+| `@CapacitorPlugin(name = "ImprimanteReseau")` présente **dans le bytecode** | Le pont ne trouve pas le plugin — l'impression échoue silencieusement |
+| `@PluginMethod` retenue sur `imprimer()` et `tester()` | Le plugin se charge mais aucune méthode n'est appelable |
+| Le nom est identique côté TypeScript et côté Java | Le `registerPlugin('…')` du web ne correspond à rien de natif |
+| `bridgeBuilder` est initialisé à la déclaration du champ dans `BridgeActivity` | `registerPlugin()` **avant** `super.onCreate()` deviendrait invalide, et le plugin ne serait jamais chargé |
+| La permission `INTERNET` est déclarée au manifeste | Le socket TCP échoue avec « Permission denied » |
+
+Les six contrôles ont été validés à l'envers : chaque défaut a été introduit
+volontairement, et chacun fait échouer la commande.
+
+### Ce qu'elle ne prouve pas
+
+Elle ne remplace **ni** un build Gradle complet (fusion du manifeste,
+ressources, désucrage des lambdas pour `minSdk 23`, R8), **ni** un essai sur
+une imprimante réelle. La chaîne ESC/POS → socket → papier n'a de valeur
+qu'observée sur un vrai ticket : c'est le § 9 de ce document, et il reste à
+faire sur ta machine avec Android Studio et une imprimante thermique.
+
+> Autrement dit : la vérification automatique élimine les fautes bêtes, qui
+> sont les plus fréquentes. Elle ne dit rien du papier qui sort.

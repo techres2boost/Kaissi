@@ -14,6 +14,7 @@
     "android:open": "cap open android",
     "android": "pnpm cap:sync && cap run android",
     "verifier:avion": "node scripts/verifier-mode-avion.mjs",
+    "verifier:natif": "node scripts/verifier-plugin-natif.mjs",
     "test:parcours": "node tests/parcours-caisse.mjs"
   },
   "dependencies": {
