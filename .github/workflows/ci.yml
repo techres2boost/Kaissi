@@ -95,6 +95,26 @@ jobs:
       - name: Verification du plugin natif
         run: pnpm --filter @kaissi/pos verifier:natif
 
+  back-office:
+    name: Back-office — types, tests et build Next.js
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Tests du back-office
+        run: pnpm --filter @kaissi/backoffice test
+      # Le build echoue si un lien pointe vers une page inexistante (routes
+      # typees) ou si une colonne du schema a ete renommee sans mettre a jour
+      # src/serveur/schema.ts. Aucune variable d'environnement n'est requise :
+      # toutes les pages sont rendues a la demande, jamais au build.
+      - name: Build Next.js
+        run: pnpm --filter @kaissi/backoffice build
+
   parcours-caisse:
     name: Parcours de caisse de bout en bout
     runs-on: ubuntu-latest
@@ -214,6 +234,21 @@ jobs:
             exit 1
           fi
           echo "OK — l'idempotence est garantie."
+
+      - name: Aucune cle de service Supabase dans le depot
+        run: |
+          # La cle service_role CONTOURNE RLS : elle ne doit exister nulle part
+          # dans le code, et surtout pas dans le back-office qui tourne sur
+          # Vercel. Seule la cle publique y a sa place.
+          # Le seul fichier autorise a nommer ces cles est celui qui les REFUSE.
+          if grep -rnE 'sb_secret_|service_role_key|SUPABASE_SERVICE_ROLE' \
+               --include='*.ts' --include='*.tsx' --include='*.mjs' \
+               --include='*.json' apps packages 2>/dev/null \
+             | grep -v 'apps/backoffice/src/serveur/supabase.ts'; then
+            echo '::error::Une reference a la cle de service Supabase a ete introduite.'
+            exit 1
+          fi
+          echo "OK — aucune cle de service dans le code."
 
       - name: Aucun PIN en clair dans le code ou la graine
         run: |

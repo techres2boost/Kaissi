@@ -22,7 +22,8 @@ qu'elles évitent.
 8. [`packages/sync-client` — le moteur embarqué](#8-packagessync-client--le-moteur-embarqué)
 9. [Le schéma Postgres](#9-le-schéma-postgres)
 10. [Les scénarios qui comptent](#10-les-scénarios-qui-comptent)
-11. [Ce qui n'existe pas encore](#11-ce-qui-nexiste-pas-encore)
+11. [`apps/backoffice` — l'administration](#11-appsbackoffice--ladministration)
+12. [Ce qui n'existe pas encore](#12-ce-qui-nexiste-pas-encore)
 
 ---
 
@@ -522,14 +523,75 @@ obligatoire, et remontée dans le tableau de bord anti-fraude.
 
 ---
 
-## 11. Ce qui n'existe pas encore
+## 11. `apps/backoffice` — l'administration
+
+Next.js sur Vercel. C'est le seul endroit du produit où les Server Components
+et les Server Actions sont les bienvenus : personne n'encaisse ici, et une
+seconde d'attente n'a pas la même conséquence qu'en plein coup de feu.
+
+### Ce qu'il remplace
+
+Avant lui, modifier un prix ou réinitialiser un code PIN passait par une
+requête SQL dans le tableau de bord Supabase — c'est-à-dire un accès direct à
+la base confié à un restaurateur. Un `update` sans `where` et la carte entière
+changeait de prix.
+
+### Trois écrans
+
+| Écran | Ce qu'il montre | Ce qui compte |
+|---|---|---|
+| **Journée** | Chiffre d'affaires, TVA par taux, encaissements par moyen, écarts de caisse | Les totaux sont additionnés par `@kaissi/domain`, le module de la tablette. Refaire la somme en SQL créerait un second endroit où l'argent se calcule |
+| **Catalogue** | Produits, prix, TVA, station, disponibilité | Un prix saisi passe par `depuisDecimal` : « 24,5 » devient 24500 millimes, jamais 2450 |
+| **Employés** | Rôles, codes PIN, suspensions | Le PIN est haché en Argon2id ici, avec les paramètres de la tablette. Il n'est jamais stocké ni réaffiché en clair |
+
+### La clé publique, et rien d'autre
+
+Le back-office n'utilise **que** la clé publique de Supabase, avec la session
+de l'utilisateur connecté. Toutes ses requêtes passent donc par RLS.
+
+C'est un choix de conception, pas une commodité. Avec la clé `service_role`,
+le cloisonnement entre restaurants reposerait sur la vigilance de chaque
+`where restaurant_id = …` écrit à la main — et un seul oubli rendrait les
+données d'un autre client. Avec la clé publique, un `where` oublié ne rend
+**aucune** ligne. Le pire cas devient une page vide au lieu d'une fuite.
+
+Un contrôle explicite refuse la clé de service au démarrage, dans les deux
+formats qui coexistent (`sb_secret_…` et l'ancien JWT dont la charge utile
+porte `"role":"service_role"`). Coller la mauvaise clé est une erreur de
+copier-coller ordinaire ; autant qu'elle empêche l'application de démarrer.
+
+### La journée commerciale ne commence pas à minuit
+
+Un restaurant qui sert jusqu'à une heure du matin encaisse une partie de sa
+soirée du vendredi **après** minuit. Découper sur le jour calendaire couperait
+ce service en deux : un vendredi amputé, et un samedi qui commence par des
+ventes que le gérant ne reconnaît pas. Pire, le rapprochement avec la clôture
+de caisse — qui suit le shift — ne tomberait jamais juste.
+
+`restaurants.business_day_start` porte l'heure de bascule, par établissement.
+⚠ Sa valeur par défaut (04:00) est un usage courant, pas une règle.
+
+### Ce que le back-office ne fait pas
+
+**Créer un compte.** `kaissi.users.id` référence `auth.users(id)`, et créer un
+compte d'authentification demande l'API d'administration de Supabase — donc la
+clé `service_role`. L'écran Employés explique la marche à suivre plutôt que de
+prétendre le faire.
+
+**Modifier une commande.** Les commandes sont un journal d'événements. Le
+back-office les lit, il ne les réécrit pas.
+
+---
+
+## 12. Ce qui n'existe pas encore
 
 Écrit noir sur blanc pour ne pas le découvrir en démonstration client :
 
 | Manque | Phase | Contournement aujourd'hui |
 |---|---|---|
 | **Impression testée sur appareil** | — | Le plugin est écrit mais n'a jamais tourné sur une vraie imprimante |
-| Back-office (catalogue, employés, rapports) | 1 bis | SQL direct dans Supabase |
+| Création d'un compte d'employé | 1 bis | Invitation depuis Supabase, puis rattachement au back-office |
+| Variantes et modificateurs au back-office | 1 bis | SQL direct — les produits simples, eux, s'éditent |
 | KDS (écran cuisine) | 3 | Impression papier |
 | Transfert / fusion d'addition | 3 | — |
 | Stock, recettes, food cost | 4 | — |

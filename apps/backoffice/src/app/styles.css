@@ -1,0 +1,119 @@
+/* Back-office Kaissi — feuille unique.
+   Pas de framework : la surface est petite, et un back-office consulté sur
+   un ordinateur de bureau dans un restaurant n'a pas besoin de 60 Kio de CSS. */
+
+:root {
+  --fond: #0f1214;
+  --panneau: #171b1f;
+  --panneau-clair: #1e242a;
+  --bordure: #2a3238;
+  --texte: #eceeea;
+  --attenue: #9aa3a8;
+  --accent: #e0a33f;
+  --danger: #e26b5f;
+  --succes: #6cc08a;
+  --rayon: 10px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--fond);
+  color: var(--texte);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.55;
+}
+
+a { color: var(--accent); }
+
+/* ── Structure ─────────────────────────────────────────────────────────── */
+.enveloppe { max-width: 76rem; margin: 0 auto; padding: 1.5rem; }
+
+.barre {
+  display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;
+  padding: 0.85rem 1.5rem;
+  background: var(--panneau);
+  border-bottom: 1px solid var(--bordure);
+}
+.barre .marque { font-weight: 800; color: var(--accent); letter-spacing: -0.02em; }
+.barre nav { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.barre nav a {
+  padding: 0.35rem 0.75rem; border-radius: 999px;
+  color: var(--attenue); text-decoration: none; font-size: 0.9rem;
+}
+.barre nav a:hover { background: var(--panneau-clair); color: var(--texte); }
+.barre nav a[aria-current='page'] { background: var(--accent); color: #1a1408; font-weight: 650; }
+.barre .droite { margin-left: auto; display: flex; align-items: center; gap: 0.75rem; }
+
+h1 { font-size: 1.5rem; letter-spacing: -0.02em; margin: 0 0 0.25rem; }
+h2 { font-size: 1.05rem; margin: 0 0 0.75rem; }
+.sous-titre { color: var(--attenue); margin: 0 0 1.5rem; font-size: 0.92rem; }
+
+.carte {
+  background: var(--panneau);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  padding: 1.15rem;
+  margin-bottom: 1.25rem;
+}
+
+.grille { display: grid; gap: 1.25rem; }
+@media (min-width: 60rem) { .grille.deux { grid-template-columns: 1fr 1fr; } }
+
+/* ── Tableaux ──────────────────────────────────────────────────────────── */
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--bordure); }
+th { color: var(--attenue); font-weight: 600; font-size: 0.8rem; text-transform: uppercase;
+     letter-spacing: 0.04em; }
+tbody tr:last-child td { border-bottom: none; }
+.nombre { text-align: right; font-variant-numeric: tabular-nums; }
+.total-ligne td { font-weight: 800; font-size: 1.05rem; border-top: 2px solid var(--bordure); }
+
+/* ── Formulaires ───────────────────────────────────────────────────────── */
+label { display: block; font-size: 0.82rem; color: var(--attenue); margin-bottom: 0.25rem; }
+input, select, textarea {
+  width: 100%; padding: 0.5rem 0.6rem;
+  background: var(--fond); color: var(--texte);
+  border: 1px solid var(--bordure); border-radius: 8px;
+  font: inherit; font-variant-numeric: tabular-nums;
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.champ { margin-bottom: 0.85rem; }
+.champs { display: grid; gap: 0.85rem; }
+@media (min-width: 40rem) { .champs.deux { grid-template-columns: 1fr 1fr; } }
+.case { display: flex; align-items: center; gap: 0.5rem; }
+.case input { width: auto; }
+.case label { margin: 0; color: var(--texte); font-size: 0.92rem; }
+.indication { font-size: 0.78rem; color: var(--attenue); margin-top: 0.25rem; }
+
+button, .bouton {
+  padding: 0.5rem 0.95rem; border-radius: 8px; border: 1px solid var(--bordure);
+  background: var(--panneau-clair); color: var(--texte);
+  font: inherit; cursor: pointer; text-decoration: none; display: inline-block;
+}
+button:hover { border-color: var(--accent); }
+button.principal { background: var(--accent); color: #1a1408; border-color: var(--accent);
+                   font-weight: 650; }
+button.discret { background: transparent; font-size: 0.85rem; padding: 0.3rem 0.6rem; }
+button.danger { color: var(--danger); }
+
+/* ── Messages ──────────────────────────────────────────────────────────── */
+.message { padding: 0.7rem 0.9rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.92rem; }
+.message.erreur { background: #2a1a19; border: 1px solid var(--danger); color: #f0b5ad; }
+.message.succes { background: #182417; border: 1px solid var(--succes); color: #b6e0c2; }
+.message.avertissement { background: #2a2418; border: 1px solid var(--accent); color: #f0d7a8; }
+
+.etiquette {
+  display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px;
+  font-size: 0.75rem; background: var(--panneau-clair); color: var(--attenue);
+}
+.etiquette.actif { background: #1d2d22; color: var(--succes); }
+.etiquette.inactif { background: #2d2020; color: var(--danger); }
+
+.vide { color: var(--attenue); font-style: italic; padding: 1.5rem 0; text-align: center; }
+
+/* Un écart de caisse se lit d'un coup d'œil, ou il ne sert à rien. */
+.ecart.negatif { color: var(--danger); font-weight: 700; }
+.ecart.positif { color: var(--accent); font-weight: 700; }
+.ecart.nul { color: var(--succes); }

@@ -14,7 +14,8 @@ Chaque étape dit trois choses : **la commande**, **ce que tu dois voir**, et
 | 2 | Le POS dans ton navigateur | 15 min | rien de plus |
 | 3 | Une journée rejouée toute seule | 2 min | Chromium |
 | 4 | La synchronisation multi-appareils | 10 min | Docker **ou** PostgreSQL |
-| 5 | La tablette réelle, en mode avion | 1 h | Android Studio + tablette |
+| 5 | Le back-office | 10 min | un projet Supabase |
+| 6 | La tablette réelle, en mode avion | 1 h | Android Studio + tablette |
 
 Les étapes 1 à 4 se font **entièrement sur ton poste**, sans Android, sans
 Supabase, sans imprimante.
@@ -189,7 +190,77 @@ pnpm db:test:stop
 
 ---
 
-## Étape 5 — La tablette réelle · 1 h
+---
+
+## Étape 5 — Le back-office · 10 min
+
+C'est ce qui remplace les requêtes SQL directes dans Supabase.
+
+```bash
+cp .env.example apps/backoffice/.env.local
+# Renseigner NEXT_PUBLIC_SUPABASE_URL et NEXT_PUBLIC_SUPABASE_ANON_KEY
+#   → Supabase, bouton « Connect » en haut de page, onglet App Frameworks
+pnpm backoffice:dev          # → http://localhost:3000
+```
+
+> **Uniquement la clé publique.** Coller ici la clé `service_role` empêche
+> l'application de démarrer, volontairement : cette clé contourne RLS, et le
+> cloisonnement entre restaurants reposerait alors sur la vigilance de chaque
+> `where` écrit à la main.
+
+### Il te faut un compte
+
+Le back-office n'en crée pas — cela demanderait justement l'API
+d'administration, donc la clé de service. La marche à suivre :
+
+1. Supabase → **Authentication** → **Add user** (e-mail + mot de passe).
+2. Créer les deux lignes qui rattachent ce compte à ton établissement :
+
+```sql
+insert into kaissi.users (id, organization_id, email, full_name)
+values ('<id du compte auth>', '01930000-0000-7000-8000-000000000001',
+        'toi@exemple.tn', 'Ton Nom');
+
+insert into kaissi.memberships (organization_id, user_id, restaurant_id, role)
+values ('01930000-0000-7000-8000-000000000001', '<id du compte auth>',
+        '01930000-0000-7000-8000-000000000002', 'gerant');
+```
+
+Sans la seconde ligne, la connexion réussit mais **aucune donnée n'apparaît**.
+Ce n'est pas une panne : c'est RLS qui fait son travail. Un compte sans
+appartenance n'a accès à rien, et c'est le comportement voulu.
+
+### Ce qu'il faut regarder
+
+| Écran | Essai | Ce que ça montre |
+|---|---|---|
+| **Journée** | Naviguer vers la veille | Une vente encaissée à 00 h 30 apparaît dans la soirée **précédente** — la journée commerciale bascule à 04 h, pas à minuit |
+| **Journée** | Regarder « TVA par taux » | La taxe est arrondie **par taux** puis additionnée, jamais l'inverse |
+| **Journée** | Regarder les écarts de caisse | L'écart est signé : un excédent est aussi anormal qu'un manque |
+| **Catalogue** | Changer un prix, taper `24,5` | Enregistré à 24,500 TND — trois décimales, pas deux |
+| **Catalogue** | Archiver un produit | Il quitte la carte mais reste dans les commandes passées |
+| **Employés** | Réinitialiser un PIN | Haché en Argon2id côté serveur. Il n'est jamais réaffiché : note-le tout de suite |
+
+### La modification n'est pas instantanée
+
+Un prix changé ici part vers les tablettes par le **journal de changements**
+(`change_log`), qu'un déclencheur alimente automatiquement. Une tablette hors
+ligne l'appliquera à sa reconnexion, pas avant. C'est écrit à l'écran, parce
+qu'un gérant qui change un prix et ne le voit pas en salle conclura que rien
+n'a marché.
+
+Pour le vérifier :
+
+```sql
+select entity_type, op, payload->>'name', payload->>'base_price_millimes'
+from kaissi.change_log
+where entity_type = 'products'
+order by seq desc limit 5;
+```
+
+---
+
+## Étape 6 — La tablette réelle · 1 h
 
 C'est **le seul test qui compte vraiment**, et le seul que rien ne remplace.
 
@@ -227,6 +298,7 @@ Autant le savoir avant une démonstration client :
 
 | Manque | Conséquence aujourd'hui |
 |---|---|
-| Back-office (catalogue, employés, rapports) | Modifier un produit ou un employé passe par du SQL direct dans Supabase |
 | Impression testée sur imprimante réelle | Le code compile et le rendu est testé ; **le papier qui sort ne l'est pas** |
+| Création d'un compte d'employé au back-office | Invitation depuis Supabase, puis rattachement — l'API d'administration exige la clé de service |
+| Variantes et modificateurs au back-office | SQL direct. Les produits simples, eux, s'éditent |
 | KDS, stock, recettes, CRM | Phases 3 à 6 |

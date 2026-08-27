@@ -192,6 +192,15 @@ const TABLES_MIROIR: Record<string, { nom: string; colonnes: string[] }> = {
     colonnes: ['id', 'organization_id', 'restaurant_id', 'name', 'type',
                'opens_drawer', 'position', 'is_active', 'archived_at'],
   },
+  // Côté serveur, un employé est la jointure de users et memberships ; le
+  // journal de changements l'envoie déjà aplati à cette forme-là. L'appareil
+  // reçoit le HACHAGE Argon2id du PIN, jamais le PIN : c'est ce qui lui
+  // permet de valider une prise de poste sans réseau.
+  employees: {
+    nom: 'employees',
+    colonnes: ['id', 'organization_id', 'restaurant_id', 'full_name', 'role',
+               'pin_hash', 'permissions', 'is_active', 'archived_at'],
+  },
 }
 
 /** SQLite ne connaît ni booléen ni objet : on convertit à la frontière. */

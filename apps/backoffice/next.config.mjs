@@ -12,9 +12,11 @@ const config = {
   reactStrictMode: true,
   // Les paquets du monorepo sont consommés en SOURCE TypeScript.
   transpilePackages: ['@kaissi/domain'],
-  experimental: {
-    typedRoutes: true,
-  },
+  // Routes typées : un lien vers une page qui n'existe pas casse la
+  // compilation. Les gabarits `/${restaurant}/journee` sont bien vérifiés ;
+  // seule une destination venue de l'extérieur exige un filtrage explicite
+  // (voir `destinationSure` dans app/connexion/actions.ts).
+  typedRoutes: true,
   webpack(configuration) {
     // `@kaissi/domain` importe ses modules avec l'extension `.js`, comme
     // l'exige la résolution ESM de Node. Webpack, lui, doit être averti

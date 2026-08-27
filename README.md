@@ -5,8 +5,10 @@
 > La caisse ne doit **jamais** s'arrêter. Un restaurant qui ne peut pas encaisser
 > désinstalle le logiciel le soir même et le dit à tous ses confrères.
 
-État : **Phase 2 — synchronisation**. Plusieurs terminaux encaissent en
-parallèle, hors ligne, et se réconcilient sans perdre ni dupliquer une vente.
+État : **Phase 2 terminée, back-office en place.** Plusieurs terminaux
+encaissent en parallèle, hors ligne, et se réconcilient sans perdre ni
+dupliquer une vente. Le gérant administre sa carte et ses employés depuis un
+navigateur, sans plus toucher au SQL.
 
 ---
 
@@ -26,8 +28,8 @@ pnpm pos:dev         # étape 2 — le POS dans ton navigateur
 ```
 
 Les étapes 1 à 4 se font entièrement sur ton poste : **ni Android, ni Supabase,
-ni imprimante**. L'étape 5 est la tablette réelle en mode avion — le seul test
-qui compte vraiment.
+ni imprimante**. L'étape 5 est le back-office, l'étape 6 la tablette réelle en
+mode avion — le seul test qui compte vraiment.
 
 ---
 
@@ -58,7 +60,7 @@ qui compte vraiment.
 | `pnpm verifier:avion` | Le bundle ne dépend d'aucune ressource distante | aucun |
 | `pnpm verifier:natif` | Le plugin Java d'impression compile | JDK 21 |
 | `pnpm pos:android` | Build + installation sur une tablette branchée | Android Studio |
-| `pnpm backoffice:dev` | Le back-office Next.js | aucun |
+| `pnpm backoffice:dev` | Le back-office Next.js | un projet Supabase |
 
 > `pnpm test` inclut la synchronisation, qui exige un vrai PostgreSQL. Sans
 > base, elle s'arrête sur un message qui dit quoi faire — pas sur trente-cinq
@@ -84,8 +86,8 @@ qui compte vraiment.
 | `packages/domain` — monnaie, TVA, remises, permissions, shift, PIN, audit | ✅ 154 tests |
 | `packages/db-local` — SQLite miroir, migrations, projections, outbox | ✅ 45 tests |
 | `packages/printing` — ESC/POS : ticket, KOT, rapport de caisse | ✅ 26 tests |
-| `apps/sync` — protocole, idempotence, RLS, reprojection serveur | ✅ 35 tests |
-| Schéma Postgres + RLS + audit chaîné | ✅ 30 tables, **toutes sous RLS**, 0 alerte de sécurité |
+| `apps/sync` — protocole, idempotence, RLS, reprojection serveur | ✅ 57 tests |
+| Schéma Postgres + RLS + audit chaîné | ✅ 30 tables, **toutes sous RLS**, 70 politiques, 0 alerte de sécurité |
 | **Démarrage et vente en mode avion** | ✅ vérifié en CI |
 | **Prise de poste par PIN**, hors ligne (Argon2id) | ✅ |
 | **Shift** — fond, mouvements d'espèces, clôture avec écart signé | ✅ |
@@ -96,7 +98,12 @@ qui compte vraiment.
 | **Synchronisation multi-appareils** avec coupures réseau | ✅ banc à 3 appareils |
 | **Appairage** par jeton révocable | ✅ |
 | Plugin natif Android d'impression TCP 9100 | ⚠️ compile et vérifié en CI, **jamais testé sur imprimante réelle** |
-| Back-office (catalogue, employés, rapports) | ⏳ Phase 1 bis |
+| **Back-office** — journée, catalogue, employés | ✅ 32 tests |
+| **Rapport de journée** — CA, TVA par taux, encaissements, écarts de caisse | ✅ |
+| **Catalogue** — produits, prix, TVA, stations, disponibilité | ✅ |
+| **Employés** — rôles, PIN Argon2id, suspension | ✅ |
+| Création d'un compte d'employé | ⏳ exige l'API d'administration Supabase |
+| Variantes et modificateurs au back-office | ⏳ Phase 1 bis |
 | KDS, stock, CRM | ⏳ Phases 3 à 6 |
 
 ### Le jalon de la Phase 2 est tenu
@@ -115,7 +122,7 @@ si le passage à l'échelle révélait autre chose.
 
 ## Ce que la CI vérifie à chaque commit
 
-Sept jobs, dont quatre sont des **gardes** plutôt que des tests : ils ne
+Huit jobs, dont quatre sont des **gardes** plutôt que des tests : ils ne
 vérifient pas que le code marche, ils vérifient qu'une règle absolue n'a pas
 été contournée.
 
@@ -125,9 +132,10 @@ vérifient pas que le code marche, ils vérifient qu'une règle absolue n'a pas
 | `types` | Qu'un contrat entre paquets se rompe sans que personne ne le voie |
 | `mode-avion` | Qu'une dépendance réseau se glisse dans le bundle du POS |
 | `plugin-natif` | Qu'une faute de signature Java dorme jusqu'au prochain build Gradle |
+| `back-office` | Un lien mort, ou une colonne renommée sans mettre à jour `schema.ts` |
 | `parcours-caisse` | Qu'une journée de service cesse de tenir debout |
 | `synchronisation` | Une vente perdue ou dupliquée sous coupure réseau |
-| `regles-absolues` | `server.url`, flottant pour de l'argent, colonne monétaire sans `_millimes`, journal devenu modifiable, PIN en clair |
+| `regles-absolues` | `server.url`, flottant pour de l'argent, colonne monétaire sans `_millimes`, journal devenu modifiable, PIN en clair, **clé `service_role` dans le code** |
 
 ---
 

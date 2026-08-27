@@ -1,0 +1,226 @@
+/**
+ * Le contrat de base, réduit à ce que le back-office touche.
+ *
+ * Pourquoi écrit à la main plutôt que généré : le générateur de Supabase ne
+ * sort que le schéma `public`, qui est ici volontairement vide — tout vit
+ * dans `kaissi`. Le déclarer explicitement a d'ailleurs une vertu : ce
+ * fichier dit, noir sur blanc, de quelles colonnes le back-office dépend.
+ * Une colonne renommée dans une migration casse la compilation au lieu de
+ * casser la production.
+ *
+ * ⚠ Toute migration qui touche l'une de ces colonnes doit passer ici.
+ */
+
+/** Millimes : entiers. Le type ne peut pas l'imposer, le nom le rappelle. */
+type Millimes = number
+type Uuid = string
+type Horodatage = string
+
+/**
+ * Alias de type et NON `interface` : TypeScript n'accorde d'index implicite
+ * qu'aux alias. Une `interface` ne satisfait donc pas le `Record<string,
+ * unknown>` qu'exige postgrest-js, et toute requête se résout alors en
+ * `never` — sans le moindre message expliquant pourquoi.
+ */
+type Table<Ligne, Relations extends readonly Relation[] = []> = {
+  Row: Ligne
+  Insert: Partial<Ligne>
+  Update: Partial<Ligne>
+  Relationships: Relations
+}
+
+/**
+ * Une clé étrangère, telle que PostgREST la connaît.
+ *
+ * Sans cette déclaration, une requête imbriquée (`users(full_name)`) échoue à
+ * la COMPILATION avec « could not find the relation between … » — ce qui est
+ * en réalité une bonne nouvelle : la même faute passerait sinon inaperçue
+ * jusqu'à l'exécution, où elle rendrait une colonne vide.
+ */
+type Relation = {
+  foreignKeyName: string
+  columns: readonly string[]
+  isOneToOne: boolean
+  referencedRelation: string
+  referencedColumns: readonly string[]
+}
+
+type VersUtilisateur<Nom extends string> = {
+  foreignKeyName: Nom
+  columns: ['user_id']
+  isOneToOne: false
+  referencedRelation: 'users'
+  referencedColumns: ['id']
+}
+
+export type Restaurant = {
+  id: Uuid
+  organization_id: Uuid
+  name: string
+  timezone: string
+  /** Heure locale de bascule de la journée commerciale, « 04:00:00 ». */
+  business_day_start: string
+  service_rate_bp: number
+  stamp_duty_millimes: Millimes
+  status: string
+}
+
+export type Utilisateur = {
+  id: Uuid
+  organization_id: Uuid
+  email: string
+  full_name: string
+  phone: string | null
+  /** Hachage Argon2id — jamais le PIN. */
+  pin_hash: string | null
+  status: string
+  archived_at: Horodatage | null
+  updated_at: Horodatage
+}
+
+export type Appartenance = {
+  id: Uuid
+  organization_id: Uuid
+  user_id: Uuid
+  restaurant_id: Uuid
+  role: string
+  permissions: Record<string, unknown> | null
+  revoked_at: Horodatage | null
+  updated_at: Horodatage
+}
+
+export type Categorie = {
+  id: Uuid
+  organization_id: Uuid
+  restaurant_id: Uuid
+  name: string
+  position: number
+  color: string | null
+  archived_at: Horodatage | null
+}
+
+export type Station = {
+  id: Uuid
+  organization_id: Uuid
+  restaurant_id: Uuid
+  name: string
+  position: number
+  archived_at: Horodatage | null
+}
+
+export type TauxTaxe = {
+  id: Uuid
+  organization_id: Uuid
+  restaurant_id: Uuid
+  name: string
+  /** Points de base entiers : 19 % = 1900. Jamais 0.19. */
+  rate_bp: number
+  is_included: boolean
+  is_default: boolean
+  archived_at: Horodatage | null
+}
+
+export type Produit = {
+  id: Uuid
+  organization_id: Uuid
+  restaurant_id: Uuid
+  category_id: Uuid | null
+  station_id: Uuid | null
+  tax_rate_id: Uuid
+  name: string
+  description: string | null
+  base_price_millimes: Millimes
+  position: number
+  is_available: boolean
+  archived_at: Horodatage | null
+  updated_at: Horodatage
+}
+
+/** Une ligne de la ventilation de TVA, telle qu'imprimée en pied de ticket. */
+export type LigneVentilation = {
+  tauxTaxeId: string
+  nom: string
+  tauxBp: number
+  baseMillimes: Millimes
+  taxeMillimes: Millimes
+}
+
+export type Commande = {
+  id: Uuid
+  restaurant_id: Uuid
+  status: string
+  ticket_number: string | null
+  subtotal_millimes: Millimes
+  discount_millimes: Millimes
+  tax_millimes: Millimes
+  service_millimes: Millimes
+  stamp_duty_millimes: Millimes
+  total_millimes: Millimes
+  tax_breakdown: LigneVentilation[]
+  covers: number | null
+  closed_at: Horodatage | null
+}
+
+export type Paiement = {
+  id: Uuid
+  restaurant_id: Uuid
+  type: string
+  amount_millimes: Millimes
+  voided_at: Horodatage | null
+  created_at: Horodatage
+}
+
+export type Shift = {
+  id: Uuid
+  restaurant_id: Uuid
+  opened_at: Horodatage
+  closed_at: Horodatage | null
+  opening_float_millimes: Millimes
+  counted_millimes: Millimes | null
+  expected_millimes: Millimes | null
+  /** Compté − attendu. PEUT être négatif : c'est tout son intérêt. */
+  variance_millimes: Millimes | null
+  closing_note: string | null
+}
+
+/**
+ * `{ [_ in never]: never }` et non `Record<string, never>` : c'est la forme
+ * que produit le générateur de Supabase, et la seule que ses types
+ * utilitaires savent traverser. Avec `Record`, toute requête se résout en
+ * `never` — sans message expliquant pourquoi.
+ */
+type Aucun = { [_ in never]: never }
+
+export type Database = {
+  __InternalSupabase: { PostgrestVersion: '14.17' }
+  kaissi: {
+    Tables: {
+      restaurants: Table<Restaurant>
+      users: Table<Utilisateur>
+      memberships: Table<
+        Appartenance,
+        [
+          VersUtilisateur<'memberships_user_id_fkey'>,
+          {
+            foreignKeyName: 'memberships_restaurant_id_fkey'
+            columns: ['restaurant_id']
+            isOneToOne: false
+            referencedRelation: 'restaurants'
+            referencedColumns: ['id']
+          },
+        ]
+      >
+      categories: Table<Categorie>
+      stations: Table<Station>
+      tax_rates: Table<TauxTaxe>
+      products: Table<Produit>
+      orders: Table<Commande>
+      payments: Table<Paiement>
+      shifts: Table<Shift, [VersUtilisateur<'shifts_user_id_fkey'>]>
+    }
+    Views: Aucun
+    Functions: Aucun
+    Enums: Aucun
+    CompositeTypes: Aucun
+  }
+}

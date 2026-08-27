@@ -210,7 +210,7 @@ pnpm pos:dev                    # POS dans le navigateur (base EN MÉMOIRE)
 pnpm pos:build                  # build + vérification du mode avion
 pnpm pos:android                # build + sync + lancement sur appareil
 
-pnpm backoffice:dev             # back-office Next.js
+pnpm backoffice:dev             # back-office Next.js (exige .env.local)
 
 # Rejoue une journée de service dans un navigateur : prise de poste, shift,
 # commande, envoi cuisine, remise escaladée, encaissement, clôture.
@@ -226,6 +226,34 @@ pnpm verifier:natif
 # Appairer un terminal : le jeton n'est affiché QU'UNE FOIS
 node apps/sync/scripts/appairer.mjs --restaurant <uuid> --prefixe P1
 ```
+
+---
+
+## Back-office — la clé publique, et rien d'autre
+
+`apps/backoffice` n'utilise **que** la clé publique de Supabase, avec la session
+de l'utilisateur connecté. Toutes ses requêtes passent donc par RLS.
+
+Ce n'est pas une commodité. Avec `service_role`, le cloisonnement entre
+restaurants reposerait sur la vigilance de chaque `where restaurant_id = …`
+écrit à la main, et un seul oubli rendrait les données d'un autre client. Avec
+la clé publique, un `where` oublié ne rend **aucune** ligne : le pire cas est
+une page vide, pas une fuite. Un contrôle au démarrage refuse la clé de
+service, et une garde de CI l'interdit dans tout le dépôt.
+
+Deux conséquences pratiques :
+
+- Le schéma `kaissi` est exposé à PostgREST (migration 0012). C'est la
+  « décision explicite » que le socle appelait ; `public` reste vide, et
+  `anon` n'a **aucun privilège**.
+- Une migration qui renomme une colonne utilisée par le back-office doit
+  passer par `apps/backoffice/src/serveur/schema.ts`, écrit à la main. Le
+  générateur de types de Supabase ne sort que `public`, qui est vide ici. Ce
+  fichier dit noir sur blanc de quelles colonnes le back-office dépend — et
+  une colonne renommée casse la compilation au lieu de casser la production.
+
+Server Components et Server Actions y sont les bienvenus : personne n'encaisse
+dans un back-office. Sur le chemin de la caisse, ils restent interdits.
 
 ---
 
