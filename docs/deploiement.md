@@ -135,19 +135,29 @@ sync **sur ton PC Windows** et la faire atteindre par l'émulateur Android.
 Cela prouve que tout marche, contre ta vraie base Supabase, sans rien déployer.
 
 ```bash
-# 1) L'API de sync, en local, branchée sur Supabase (session pooler, §1)
-#    PowerShell :
-$env:DATABASE_URL="postgresql://postgres.xxx:MOTDEPASSE@aws-0-...pooler.supabase.com:5432/postgres"
-pnpm sync:dev
-#    → « API de synchronisation Kaissi — port 8787 »
+# 1) Crée apps/sync/.env à partir du modèle, et mets-y ta chaîne Supabase :
+cp apps/sync/.env.example apps/sync/.env
+#    puis édite DATABASE_URL dedans (session pooler, port 5432, §1).
+#    Ce fichier n'est JAMAIS commité (il est dans .gitignore).
 
-# 2) Vérifie dans un autre terminal
+# 2) Lance l'API de sync. Elle lit .env toute seule — pas de variable à
+#    reposer dans chaque terminal.
+pnpm sync:dev
+#    → « API de synchronisation Kaissi — port 8787 » (et ça RESTE affiché)
+
+# 3) Vérifie dans un AUTRE terminal
 curl http://127.0.0.1:8787/sante        # {"etat":"ok",...}
 
-# 3) Appaire l'émulateur (garde le même DATABASE_URL)
+# 4) Appaire l'émulateur (le script lit le même .env)
 node apps/sync/scripts/appairer.mjs --restaurant <uuid-resto> --prefixe E1
 #    → note le jeton kdev_… (affiché UNE fois)
 ```
+
+> **« Ça bouge pas » ?** Si `pnpm sync:dev` affiche « Waiting for file changes
+> before restarting… » et rien d'autre, c'est que le process a QUITTÉ : il
+> manque `DATABASE_URL`. Avec le fichier `.env` ci-dessus, ce cas disparaît —
+> et quand ça marche, tu vois « API de synchronisation Kaissi — port 8787 »
+> qui RESTE à l'écran (le serveur tourne, ne le ferme pas).
 
 Sur l'émulateur, l'API de sync de ton PC se joint à l'adresse **`10.0.2.2:8787`**
 (voir docs/tester-sans-tablette.md). Saisis-la avec le jeton dans

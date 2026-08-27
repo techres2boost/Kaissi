@@ -33,6 +33,7 @@ it('démarre avec la commande de production et répond à /sante', async () => {
   serveur = spawn(
     'node',
     [
+      '--env-file-if-exists=.env',
       '--experimental-strip-types',
       '--import',
       './scripts/charger-ts.mjs',

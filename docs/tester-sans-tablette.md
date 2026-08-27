@@ -25,40 +25,59 @@ projet** : l'application démarre-t-elle en mode avion ?
 
 ---
 
-## 1. Installer Android Studio · 30 min
+## 1. Installer Android Studio · 30 min (Windows)
 
-[developer.android.com/studio](https://developer.android.com/studio) — le
-téléchargement fait environ 1 Go, l'installation en occupe ~8 Go.
+> **Oui, ton PC Windows suffit.** L'émulateur Android est une vraie tablette
+> Android qui tourne dans une fenêtre sur ton PC. Aucun appareil physique n'est
+> nécessaire pour tout tester (sauf le papier de l'imprimante).
 
-À l'installation, garde les cases par défaut : **Android SDK**, **SDK
-Platform-Tools** et **Android Virtual Device**.
+**Android Studio « Quail 3 » (2026.1.3) convient parfaitement** — c'est plus
+récent que Ladybug, donc au-dessus du minimum requis.
 
-Puis, dans PowerShell, indique à Gradle où trouver le SDK :
+1. Télécharge et installe depuis
+   [developer.android.com/studio](https://developer.android.com/studio)
+   (~1 Go, ~8 Go installés). Garde les cases par défaut : **Android SDK**,
+   **SDK Platform-Tools**, **Android Virtual Device**.
+2. Au **premier lancement**, l'assistant « Setup Wizard » télécharge le SDK.
+   Laisse-le finir — c'est lui qui installe ce qui manquait (`ERR_SDK_NOT_FOUND`).
+
+### Le JDK — tu as Java 17, il en faut 21
+
+Pas besoin d'installer quoi que ce soit : **Android Studio embarque son propre
+JDK 21** (le « JBR »). Il faut juste dire à tes outils de l'utiliser.
+
+Dans PowerShell, une fois Android Studio installé :
 
 ```powershell
 setx ANDROID_HOME "$env:LOCALAPPDATA\Android\Sdk"
 setx JAVA_HOME "C:\Program Files\Android\Android Studio\jbr"
 ```
 
-Ferme et rouvre le terminal, puis vérifie :
+**Ferme et rouvre TOUS tes terminaux** (`setx` ne s'applique qu'aux nouveaux),
+puis vérifie :
 
 ```powershell
-adb version
+adb version                 # doit répondre une version
+java -version               # doit dire 21 (via JAVA_HOME)
 ```
+
+> Ton `java -version` global peut rester à 17 pour PyCharm : ce qui compte,
+> c'est que `JAVA_HOME` pointe le JBR 21 pour les builds Android.
 
 ---
 
-## 2. Créer un appareil virtuel · 10 min
+## 2. Créer un appareil virtuel (la « tablette ») · 10 min
 
-Android Studio → **More Actions** → **Virtual Device Manager** → **Create
-Device**.
+Android Studio → **More Actions** (ou l'icône ⋮) → **Virtual Device Manager**
+→ **Create Device**.
 
 - **Modèle** : un format tablette — *Pixel Tablet* ou *Nexus 10*. Le POS est
   dessiné pour un écran large ; sur un téléphone, la grille des produits est
   serrée.
 - **Image système** : API 34 ou 35. Prends la variante *sans* Google Play,
-  elle démarre plus vite et on n'a besoin d'aucun service Google.
-- Termine, puis lance l'appareil avec ▶.
+  elle démarre plus vite et aucun service Google n'est nécessaire.
+- Termine, puis **lance l'appareil avec ▶**. Une tablette Android apparaît
+  dans une fenêtre : c'est là que tournera Kaissi.
 
 ---
 
@@ -109,7 +128,31 @@ Ajoute `--brut` pour voir les octets en hexadécimal.
 
 ## 4. Installer le POS sur l'émulateur · 5 min
 
-L'émulateur allumé :
+Il y a deux chemins. **Le premier est le plus fiable** pour débuter — c'est
+Android Studio qui gère le SDK, le JDK et l'émulateur, sans configuration.
+
+### Chemin A — par Android Studio (recommandé)
+
+```bash
+# 1) Construire le bundle web et le copier dans le projet Android
+pnpm pos:build
+pnpm --filter @kaissi/pos exec cap sync android
+```
+
+Puis **ouvre le dossier `apps/pos/android` dans Android Studio**
+(File → Open → ce dossier), attends la fin de l'indexation Gradle, sélectionne
+ton émulateur en haut, et appuie sur le **▶ vert**. Kaissi s'installe et se
+lance sur la tablette virtuelle.
+
+> C'est ce qui remplace `pnpm pos:android` quand la ligne de commande ne
+> trouve pas le SDK (`ERR_SDK_NOT_FOUND`) ou Android Studio
+> (`Unable to launch Android Studio`) : ces erreurs viennent de variables
+> d'environnement non posées, qu'Android Studio, lui, connaît déjà.
+
+### Chemin B — tout en ligne de commande
+
+Fonctionne **une fois `ANDROID_HOME` et `JAVA_HOME` posés** (§1) et l'émulateur
+allumé :
 
 ```bash
 pnpm pos:android
@@ -118,6 +161,10 @@ pnpm pos:android
 Cette commande construit le bundle, vérifie le mode avion, copie le tout dans
 l'APK, compile et installe. Le premier build Gradle prend cinq à dix minutes ;
 les suivants, moins d'une minute.
+
+> Si tu vois `ERR_SDK_NOT_FOUND`, c'est que `ANDROID_HOME` n'est pas vu par ce
+> terminal : ferme-le, rouvre-en un neuf (les `setx` du §1 ne s'appliquent
+> qu'aux nouveaux terminaux), ou prends le chemin A.
 
 ### Configurer l'imprimante
 
