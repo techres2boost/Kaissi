@@ -20,10 +20,43 @@ export { creerServeur } from './serveur.js'
 /** Démarrage autonome. Ignoré quand le module est importé par un test. */
 export function demarrer(): void {
   const url = process.env['DATABASE_URL']
+
+  // Message VOLONTAIREMENT gros et encadré : c'est l'erreur de démarrage la
+  // plus fréquente, et sous « node --watch » elle se noyait sous un discret
+  // « Waiting for file changes » qui donnait l'impression que rien ne se
+  // passait. Impossible à manquer désormais.
   if (!url) {
     console.error(
-      "DATABASE_URL est absente. L'API de synchronisation ne peut pas démarrer.\n" +
-        'Voir .env.example et docs/deploiement.md.',
+      [
+        '',
+        '  ┌───────────────────────────────────────────────────────────────┐',
+        '  │  DATABASE_URL est absente — le serveur ne peut pas démarrer.   │',
+        '  └───────────────────────────────────────────────────────────────┘',
+        '',
+        '  Crée le fichier  apps/sync/.env  (pas ailleurs) à partir du modèle :',
+        '',
+        '      cp apps/sync/.env.example apps/sync/.env',
+        '',
+        '  puis mets-y ta chaîne Supabase dans DATABASE_URL (onglet « Connect »',
+        '  → Session pooler). Relance ensuite  pnpm sync:dev.',
+        '',
+      ].join('\n'),
+    )
+    process.exit(1)
+  }
+
+  // Garde-fou : la valeur du modèle laissée telle quelle. Le serveur
+  // démarrerait, puis échouerait à la première requête avec une erreur
+  // d'authentification obscure. Autant le dire tout de suite.
+  if (url.includes('MOT2PASSE')) {
+    console.error(
+      [
+        '',
+        '  ⚠ DATABASE_URL contient encore « MOT2PASSE » — le mot de passe du',
+        '    modèle n\'a pas été remplacé. Édite apps/sync/.env avec le vrai',
+        '    mot de passe de la base (Supabase → Project Settings → Database).',
+        '',
+      ].join('\n'),
     )
     process.exit(1)
   }
@@ -41,7 +74,11 @@ export function demarrer(): void {
   const app = creerServeur({ depot, origines })
 
   const serveur = serve({ fetch: app.fetch, port, hostname: '0.0.0.0' })
-  console.log(`API de synchronisation Kaissi — port ${port}`)
+  console.log(
+    `\n  ✓ API de synchronisation Kaissi — en écoute sur le port ${port}` +
+      `\n    Laisse ce terminal OUVERT. Vérifie dans un autre : ` +
+      `curl http://127.0.0.1:${port}/sante\n`,
+  )
 
   const arreter = (signal: string) => {
     console.log(`${signal} reçu, arrêt en cours…`)
