@@ -15,7 +15,11 @@
  * Aucun des deux chemins ne fait le moindre appel réseau.
  */
 
-import type { AdaptateurSqlite, ValeurSql } from '@kaissi/db-local'
+import {
+  adaptateurCapacitor,
+  preparerConnexionCapacitor,
+  type AdaptateurSqlite,
+} from '@kaissi/db-local'
 import { Capacitor } from '@capacitor/core'
 
 export const NOM_BASE = 'kaissi'
@@ -41,7 +45,7 @@ export function estNatif(): boolean {
 
 export async function ouvrirBaseLocale(): Promise<BaseLocale> {
   if (estNatif()) {
-    const adaptateur = await adaptateurCapacitor()
+    const adaptateur = await ouvrirConnexionNative()
     return {
       adaptateur,
       mode: 'natif',
@@ -69,12 +73,17 @@ export async function ouvrirBaseLocale(): Promise<BaseLocale> {
 }
 
 /**
- * Adaptateur @capacitor-community/sqlite.
+ * Ouvre la base native et rend l'adaptateur correspondant.
  *
  * L'import est DYNAMIQUE : le module natif n'existe pas dans un navigateur,
  * et l'importer statiquement ferait échouer le build de développement.
+ *
+ * Toute la logique d'adaptation vit dans `@kaissi/db-local`
+ * (`adaptateurs/capacitor.ts`), où elle est testée contre un double qui
+ * reproduit la restriction d'`execSQL` d'Android. Ici, on se contente
+ * d'ouvrir la connexion : ce fichier n'a rien à tester.
  */
-async function adaptateurCapacitor(): Promise<AdaptateurSqlite> {
+async function ouvrirConnexionNative(): Promise<AdaptateurSqlite> {
   const { CapacitorSQLite, SQLiteConnection } = await import('@capacitor-community/sqlite')
   const connexion = new SQLiteConnection(CapacitorSQLite)
 
@@ -85,50 +94,15 @@ async function adaptateurCapacitor(): Promise<AdaptateurSqlite> {
     : await connexion.createConnection(NOM_BASE, false, 'no-encryption', 1, false)
 
   await db.open()
-  // WAL : la différence entre « base corrompue après coupure » et « base intacte ».
-  await db.execute('PRAGMA journal_mode = WAL;')
-  await db.execute('PRAGMA foreign_keys = ON;')
+  await preparerConnexionCapacitor(db)
 
-  let profondeur = 0
-
+  const adaptateur = adaptateurCapacitor(db)
   return {
-    async executer(sql: string, params: readonly ValeurSql[] = []) {
-      await db.run(sql, params as ValeurSql[], false)
-    },
-
-    async executerScript(sql: string) {
-      await db.execute(sql, false)
-    },
-
-    async lire<T>(sql: string, params: readonly ValeurSql[] = []) {
-      const r = await db.query(sql, params as ValeurSql[])
-      return (r.values ?? []) as T[]
-    },
-
-    async lireUne<T>(sql: string, params: readonly ValeurSql[] = []) {
-      const r = await db.query(sql, params as ValeurSql[])
-      return ((r.values ?? [])[0] ?? null) as T | null
-    },
-
-    async transaction<T>(travail: () => Promise<T>): Promise<T> {
-      const nom = `sp_${profondeur}`
-      const racine = profondeur === 0
-      profondeur += 1
-      await db.execute(racine ? 'BEGIN;' : `SAVEPOINT ${nom};`, false)
-      try {
-        const resultat = await travail()
-        await db.execute(racine ? 'COMMIT;' : `RELEASE ${nom};`, false)
-        return resultat
-      } catch (erreur) {
-        await db.execute(racine ? 'ROLLBACK;' : `ROLLBACK TO ${nom};`, false)
-        throw erreur
-      } finally {
-        profondeur -= 1
-      }
-    },
-
+    ...adaptateur,
+    // La connexion doit être RELÂCHÉE en plus d'être fermée : sans cela, une
+    // réouverture après rechargement à chaud échoue sur « already exists ».
     async fermer() {
-      await db.close()
+      await adaptateur.fermer()
       await connexion.closeConnection(NOM_BASE, false)
     },
   }

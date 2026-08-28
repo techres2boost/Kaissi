@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Fragment de manifeste fusionné dans le seul build `debug`.
+
+  Il ne fait qu'une chose : brancher la configuration de sécurité réseau qui
+  autorise le HTTP en clair vers la machine hôte de l'émulateur, pour que le
+  POS puisse joindre `pnpm sync:dev` pendant le développement.
+
+  Le build `release` ne voit pas ce fichier : il reste sur le comportement
+  par défaut d'Android, qui refuse tout trafic en clair.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:networkSecurityConfig="@xml/network_security_config" />
+</manifest>

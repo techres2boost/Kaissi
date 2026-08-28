@@ -217,13 +217,34 @@ C'est la chaîne complète, et elle ne peut se voir que sur un appareil
 catalogue figé sur la graine locale. L'écran affiche d'ailleurs
 **« démo — mémoire »** dans ce cas.
 
-1. Déploie l'API de synchronisation (voir [`deploiement.md`](deploiement.md)).
-2. Appaire l'émulateur :
+1. Lance l'API de synchronisation sur ton PC — un terminal **dédié**, qu'on
+   laisse ouvert (elle doit afficher « API de synchronisation Kaissi — port
+   8787 » et **rester** là) :
+   ```bash
+   pnpm sync:dev
+   ```
+   Pour la mettre en ligne plutôt que sur ton PC, voir
+   [`deploiement.md`](deploiement.md).
+2. Appaire l'émulateur, dans un **autre** terminal :
    ```bash
    node apps/sync/scripts/appairer.mjs --restaurant <uuid> --prefixe E1
    ```
    Le jeton n'est affiché **qu'une fois**.
 3. Dans l'application : bandeau → **⇅ local** → saisis l'URL et le jeton.
+
+   ```
+   http://10.0.2.2:8787
+   ```
+
+   > Encore `10.0.2.2` : depuis l'émulateur, c'est ainsi qu'on désigne ton PC.
+   > `localhost` désignerait l'émulateur lui-même.
+   >
+   > Le HTTP **en clair** est refusé par Android depuis la version 9. L'APK de
+   > débogage porte une exception limitée à cette seule adresse
+   > (`app/src/debug/res/xml/network_security_config.xml`). L'APK de
+   > production ne l'a pas : en production, l'API est en **HTTPS**. Si tu vois
+   > `ERR_CLEARTEXT_NOT_PERMITTED`, c'est que tu testes un build `release`
+   > contre une URL en clair.
 4. Change un prix dans le back-office.
 5. Reviens sur l'émulateur, ouvre **⇅** et force une synchronisation.
 
