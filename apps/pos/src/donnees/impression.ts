@@ -71,6 +71,17 @@ export class ServiceImpression {
     void this.notifier()
     try {
       const travaux = await this.file.aImprimer()
+
+      // Imprimantes déjà tombées DANS CETTE PASSE, avec leur erreur.
+      //
+      // Une imprimante éteinte fait échouer tous ses travaux de la même
+      // façon. Sans cette mémoire, dix bons pour la même cuisine, c'est dix
+      // `connect()` de quatre secondes : quarante secondes de travail
+      // strictement inutile, toutes les cinq secondes, sur une tablette
+      // d'entrée de gamme. On ne tente qu'UNE fois par imprimante et par
+      // passe ; la suivante réessaiera.
+      const tombees = new Map<string, string>()
+
       for (const travail of travaux) {
         if (!travail.hote) {
           await this.file.marquerEchec(
@@ -86,6 +97,17 @@ export class ServiceImpression {
           )
           continue
         }
+
+        const cible = `${travail.hote}:${travail.port}`
+        const dejaTombee = tombees.get(cible)
+        if (dejaTombee !== undefined) {
+          // Le travail RESTE en file — il n'est ni perdu, ni compté comme
+          // une tentative supplémentaire : c'est l'imprimante qui est en
+          // panne, pas ce ticket-là.
+          await this.file.marquerEchec(travail.id, dejaTombee)
+          continue
+        }
+
         await this.file.marquerEnCours(travail.id)
         try {
           await ImprimanteReseau.imprimer({
@@ -95,10 +117,9 @@ export class ServiceImpression {
           })
           await this.file.marquerImprime(travail.id)
         } catch (erreur) {
-          await this.file.marquerEchec(
-            travail.id,
-            erreur instanceof Error ? erreur.message : String(erreur),
-          )
+          const message = erreur instanceof Error ? erreur.message : String(erreur)
+          tombees.set(cible, message)
+          await this.file.marquerEchec(travail.id, message)
         }
       }
     } finally {

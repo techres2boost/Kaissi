@@ -285,22 +285,26 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 /*
- * Barre de défilement rendue visible là où le moteur l'honore.
+ * Barre de défilement visible ET saisissable au doigt.
  *
  * Android masque la sienne dès qu'on cesse de glisser : rien ne dit alors
- * qu'il reste du contenu plus bas. Ces règles aident, mais tous les moteurs
- * ne les appliquent pas (Chromium sans interface les ignore, la WebView
- * d'Android est inégale). Elles ne sont donc PAS la garantie : la garantie,
- * c'est que les réglages utiles — le bloc « Imprimantes » — sont placés en
- * haut de l'écran, à portée sans défiler.
+ * qu'il reste du contenu plus bas. La rendre permanente ne suffit pas — à
+ * 10 px de large, elle est visible et inattrapable. On la met à la largeur
+ * d'une cible tactile, avec un pouce d'au moins 44 px de haut : en dessous,
+ * un doigt ne l'accroche pas, et c'est aussi inutile qu'une barre absente.
  */
-.diagnostic::-webkit-scrollbar { width: 10px; }
-.diagnostic::-webkit-scrollbar-track { background: var(--fond); }
-.diagnostic::-webkit-scrollbar-thumb {
-  background: var(--bordure); border-radius: 999px;
-  border: 2px solid var(--fond);
+.diagnostic::-webkit-scrollbar { width: 22px; }
+.diagnostic::-webkit-scrollbar-track {
+  background: var(--surface);
+  border-left: 1px solid var(--bordure);
 }
-.diagnostic::-webkit-scrollbar-thumb:active { background: var(--accent-fonce); }
+.diagnostic::-webkit-scrollbar-thumb {
+  background: var(--accent-fonce); border-radius: 999px;
+  border: 5px solid var(--surface);
+  min-height: 44px;
+}
+.diagnostic::-webkit-scrollbar-thumb:hover,
+.diagnostic::-webkit-scrollbar-thumb:active { background: var(--bordure); }
 .bloc {
   background: var(--surface);
   border: 1px solid var(--bordure);
