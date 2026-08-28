@@ -313,6 +313,25 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .bloc dd.attention { color: var(--accent); }
 .bloc .note { font-size: 0.78rem; color: var(--texte-2); margin: 0.75rem 0 0; line-height: 1.5; }
 
+/* Saisie de l'adresse d'imprimante, dans le tableau des stations. */
+.bloc td input {
+  width: 100%; min-width: 7rem;
+  background: var(--surface-2); color: var(--texte);
+  border: 1px solid var(--bordure); border-radius: 6px;
+  padding: 0.45rem 0.5rem; font-size: 0.83rem;
+  font-family: ui-monospace, monospace;
+}
+.bloc td input.port { min-width: 4.5rem; text-align: right; }
+.bloc td button {
+  background: var(--surface-2); color: var(--texte);
+  border: 1px solid var(--bordure); border-radius: 6px;
+  padding: 0.45rem 0.9rem; font-size: 0.83rem; white-space: nowrap;
+}
+.bloc code {
+  font-family: ui-monospace, monospace;
+  background: var(--surface-2); border-radius: 4px; padding: 0.05rem 0.3rem;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Phase 1 — écrans de caisse
    ═══════════════════════════════════════════════════════════════════════════ */
