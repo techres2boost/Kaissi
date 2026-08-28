@@ -8,6 +8,23 @@
  * Le rendu ESC/POS est fait AVANT la mise en file, pas au moment d'imprimer :
  * ainsi un ticket mis en file reste imprimable même si le catalogue change
  * ou si le produit est supprimé entre-temps.
+ *
+ * La DESTINATION, elle, est résolue au moment d'imprimer — jamais figée.
+ * Le contenu d'un ticket appartient au passé ; l'adresse de l'imprimante
+ * appartient au présent. Les figer ensemble condamnerait toute la file le
+ * jour où l'imprimante de la cuisine est remplacée : chaque bon en attente
+ * repartirait indéfiniment vers une adresse morte.
+ *
+ * Trois cas, dans cet ordre :
+ *   1. le travail porte une station  → l'adresse ACTUELLE de cette station ;
+ *   2. il n'en porte pas (ticket client, rapport de clôture, tiroir) →
+ *      l'imprimante de la caisse, c'est-à-dire la première station
+ *      configurée ;
+ *   3. aucune station n'a d'imprimante → l'adresse enregistrée à la mise en
+ *      file, en dernier recours.
+ *
+ * Le cas 2 n'est pas un détail : un ticket client n'appartient à aucune
+ * station par nature, et c'est justement lui que le gérant réimprime.
  */
 
 import type { AdaptateurSqlite } from '../adaptateur.js'
@@ -33,6 +50,26 @@ export interface TravailImpression {
 
 /** Au-delà, on cesse de réessayer tout seul et on alerte le gérant. */
 export const TENTATIVES_MAX = 5
+
+/**
+ * Colonnes et jointures qui résolvent la destination d'un travail.
+ *
+ * Écrites une seule fois : la liste des échecs DOIT montrer l'adresse qui
+ * sera réellement tentée. En montrer une autre enverrait chercher la panne
+ * au mauvais endroit — exactement ce qu'on cherche à éviter.
+ */
+const DESTINATION_RESOLUE = `
+       COALESCE(s.printer_host, caisse.printer_host, f.target_host) AS target_host,
+       COALESCE(s.printer_port, caisse.printer_port, f.target_port) AS target_port
+  FROM print_queue f
+  LEFT JOIN stations s
+         ON s.id = f.station_id AND s.archived_at IS NULL
+  LEFT JOIN (SELECT printer_host, printer_port
+               FROM stations
+              WHERE archived_at IS NULL AND printer_host IS NOT NULL
+              ORDER BY position, name
+              LIMIT 1) caisse
+         ON f.station_id IS NULL`
 
 export function depotImpression(db: AdaptateurSqlite) {
   return {
@@ -65,12 +102,18 @@ export function depotImpression(db: AdaptateurSqlite) {
       )
     },
 
-    /** Prochains travaux à tenter, le plus ancien d'abord. */
+    /**
+     * Prochains travaux à tenter, le plus ancien d'abord.
+     *
+     * L'adresse rendue est celle que porte la station AUJOURD'HUI, et non
+     * celle enregistrée à la mise en file. `target_host` ne sert plus que de
+     * repli, pour les travaux sans station (ouverture de tiroir, rapport).
+     */
     async aImprimer(limite = 10): Promise<TravailImpression[]> {
       const lignes = await db.lire<Record<string, never>>(
-        `SELECT * FROM print_queue
-         WHERE status IN ('en_attente','en_cours') AND attempts < ?
-         ORDER BY created_at LIMIT ?`,
+        `SELECT f.*, ${DESTINATION_RESOLUE}
+          WHERE f.status IN ('en_attente','en_cours') AND f.attempts < ?
+          ORDER BY f.created_at LIMIT ?`,
         [TENTATIVES_MAX, limite],
       )
       return lignes.map(versTravail)
@@ -120,7 +163,9 @@ export function depotImpression(db: AdaptateurSqlite) {
 
     async enEchec(): Promise<TravailImpression[]> {
       const lignes = await db.lire<Record<string, never>>(
-        `SELECT * FROM print_queue WHERE status = 'echec' ORDER BY created_at DESC LIMIT 50`,
+        `SELECT f.*, ${DESTINATION_RESOLUE}
+          WHERE f.status = 'echec'
+          ORDER BY f.created_at DESC LIMIT 50`,
       )
       return lignes.map(versTravail)
     },
@@ -132,6 +177,26 @@ export function depotImpression(db: AdaptateurSqlite) {
          WHERE id = ?`,
         [id],
       )
+    },
+
+    /**
+     * Remet TOUS les travaux en échec dans la file — l'imprimante a été
+     * rallumée, ou son adresse corrigée.
+     *
+     * Reste une action explicite : au-delà de `TENTATIVES_MAX`, la file
+     * cesse de réessayer seule pour ne pas masquer une panne durable. Mais
+     * il fallait un geste pour la relancer, sinon « rien n'est jamais
+     * supprimé » signifiait « rien ne repart jamais ».
+     */
+    async reessayerTout(): Promise<number> {
+      const enEchec = await db.lireUne<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM print_queue WHERE status = 'echec'`,
+      )
+      await db.executer(
+        `UPDATE print_queue SET status = 'en_attente', attempts = 0, last_error = NULL
+         WHERE status = 'echec'`,
+      )
+      return enEchec?.n ?? 0
     },
 
     /** Purge des travaux imprimés il y a plus de N jours. */

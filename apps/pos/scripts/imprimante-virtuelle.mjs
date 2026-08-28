@@ -120,9 +120,20 @@ const serveur = createServer((socket) => {
   socket.on('data', (morceau) => morceaux.push(morceau))
 
   socket.on('end', () => {
-    compteur += 1
     const charge = Buffer.concat(morceaux)
 
+    // Zéro octet = le bouton « Tester » du POS : il ouvre le socket et le
+    // referme sans rien envoyer, justement pour ne PAS gaspiller de papier.
+    // L'annoncer comme un TICKET #N vide laissait croire qu'un ticket était
+    // parti et n'avait pas été rendu.
+    if (charge.length === 0) {
+      console.log(
+        `\n🔌 test de connexion — ${source} — ${Date.now() - debut} ms · le port répond, aucun ticket envoyé\n`,
+      )
+      return
+    }
+
+    compteur += 1
     console.log(`\n${'═'.repeat(46)}`)
     console.log(`TICKET #${compteur} — ${charge.length} octets — ${source} — ${Date.now() - debut} ms`)
     console.log('═'.repeat(46))

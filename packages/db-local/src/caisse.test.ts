@@ -18,6 +18,7 @@ import { depotCaisse } from './depots/caisse.js'
 import { depotCatalogue } from './depots/catalogue.js'
 import { depotEmployes } from './depots/employes.js'
 import { depotImpression, TENTATIVES_MAX } from './depots/impression.js'
+import { depotStations } from './depots/stations.js'
 
 let db: AdaptateurSqlite
 let config: ConfigCalcul
@@ -393,6 +394,100 @@ describe("file d'impression", () => {
     // Le gérant peut relancer explicitement.
     await file.reessayer('job-1')
     expect(await file.aImprimer()).toHaveLength(1)
+  })
+
+  it("suit l'adresse ACTUELLE de la station, pas celle de la mise en file", async () => {
+    // Le jour où l'imprimante de la cuisine est remplacée, les bons déjà en
+    // attente doivent partir vers la NOUVELLE. Figer la destination avec le
+    // contenu condamnerait toute la file à une adresse morte.
+    const file = depotImpression(db)
+    const stations = depotStations(db)
+    const cuisine = (await stations.toutes()).find((s) => s.nom === 'Cuisine')!
+
+    await file.mettreEnFile({
+      id: 'job-1',
+      restaurantId: DEMO_RESTO,
+      stationId: cuisine.id,
+      kind: 'kot',
+      chargeB64: 'GyE=',
+      hote: cuisine.hote,
+      port: cuisine.port,
+    })
+    expect((await file.aImprimer())[0]!.hote).toBe('192.168.1.50')
+
+    await stations.definirImprimante(cuisine.id, '10.0.2.2', 9100)
+    expect((await file.aImprimer())[0]!.hote).toBe('10.0.2.2')
+
+    // Et l'écran des échecs montre la même adresse que celle réellement
+    // tentée : afficher l'ancienne enverrait chercher la panne ailleurs.
+    for (let i = 0; i < TENTATIVES_MAX; i += 1) {
+      await file.marquerEnCours('job-1')
+      await file.marquerEchec('job-1', 'Imprimante injoignable')
+    }
+    expect((await file.enEchec())[0]!.hote).toBe('10.0.2.2')
+  })
+
+  it("envoie un travail SANS station à l'imprimante de la caisse", async () => {
+    // Un ticket client, un rapport de clôture ou une ouverture de tiroir
+    // n'appartiennent à aucune station. Ils partent vers la première
+    // imprimante configurée — et suivent donc, eux aussi, l'adresse du jour.
+    // C'est exactement le cas qui laissait les tickets client bloqués sur
+    // l'ancienne adresse alors que les bons de cuisine, eux, repartaient.
+    const file = depotImpression(db)
+    const stations = depotStations(db)
+    await file.mettreEnFile({
+      id: 'job-ticket',
+      restaurantId: DEMO_RESTO,
+      kind: 'ticket',
+      chargeB64: 'GyE=',
+      hote: '192.168.1.50',
+      port: 9100,
+    })
+
+    const cuisine = (await stations.toutes())[0]!
+    await stations.definirImprimante(cuisine.id, '10.0.2.2', 9100)
+    expect((await file.aImprimer())[0]!.hote).toBe('10.0.2.2')
+  })
+
+  it("retombe sur l'adresse enregistrée si AUCUNE station n'a d'imprimante", async () => {
+    const file = depotImpression(db)
+    const stations = depotStations(db)
+    for (const s of await stations.toutes()) {
+      await stations.definirImprimante(s.id, null, 9100)
+    }
+    await file.mettreEnFile({
+      id: 'job-tiroir',
+      restaurantId: DEMO_RESTO,
+      kind: 'tiroir',
+      chargeB64: 'GyE=',
+      hote: '192.168.1.99',
+      port: 9100,
+    })
+    expect((await file.aImprimer())[0]!.hote).toBe('192.168.1.99')
+  })
+
+  it('relance TOUS les travaux en échec d’un seul geste', async () => {
+    // Sans ce geste, « un ticket n'est jamais supprimé » voudrait dire
+    // « un ticket ne repart jamais » : six bons morts à la main, un par un.
+    const file = depotImpression(db)
+    for (const id of ['a', 'b', 'c']) {
+      await file.mettreEnFile({
+        id,
+        restaurantId: DEMO_RESTO,
+        kind: 'ticket',
+        chargeB64: 'GyE=',
+        hote: '192.168.1.50',
+      })
+      for (let i = 0; i < TENTATIVES_MAX; i += 1) {
+        await file.marquerEnCours(id)
+        await file.marquerEchec(id, 'Imprimante injoignable')
+      }
+    }
+    expect((await file.compteurs()).echecs).toBe(3)
+
+    expect(await file.reessayerTout()).toBe(3)
+    expect((await file.compteurs()).echecs).toBe(0)
+    expect(await file.aImprimer()).toHaveLength(3)
   })
 })
 

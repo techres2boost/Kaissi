@@ -74,6 +74,16 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
     [contexte],
   )
 
+  const relancerImpressions = useCallback(async () => {
+    await contexte.fileImpression.reessayerTout()
+    const [i, ech] = await Promise.all([
+      contexte.fileImpression.compteurs(),
+      contexte.fileImpression.enEchec(),
+    ])
+    setImpression(i)
+    setEchecs(ech)
+  }, [contexte])
+
   const testerStation = useCallback(async (station: Station) => {
     if (!station.hote) {
       setEssais((e) => ({ ...e, [station.id]: 'Aucune adresse saisie.' }))
@@ -311,9 +321,18 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
             </tbody>
           </table>
         )}
+        {impression.echecs > 0 && (
+          <p>
+            <button type="button" onClick={() => void relancerImpressions()}>
+              Relancer les {impression.echecs} ticket(s) en échec
+            </button>
+          </p>
+        )}
         <p className="note">
           Un ticket en échec n'est jamais supprimé : il reste ici jusqu'à ce
-          qu'un responsable le relance ou l'abandonne explicitement.
+          qu'un responsable le relance ou l'abandonne explicitement. Après cinq
+          tentatives, la file cesse de réessayer seule — sinon une panne
+          durable resterait invisible derrière des essais sans fin.
         </p>
       </section>
 

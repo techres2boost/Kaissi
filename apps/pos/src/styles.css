@@ -342,6 +342,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   font-family: ui-monospace, monospace;
 }
 .bloc td input.port { min-width: 4.5rem; text-align: right; }
+.bloc > p > button {
+  background: var(--surface-2); color: var(--texte);
+  border: 1px solid var(--bordure); border-radius: var(--rayon);
+  padding: 0.6rem 1.1rem; min-height: 44px; margin-top: 0.75rem;
+}
 .bloc td button {
   background: var(--surface-2); color: var(--texte);
   border: 1px solid var(--bordure); border-radius: 6px;
