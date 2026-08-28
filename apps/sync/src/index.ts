@@ -61,6 +61,34 @@ export function demarrer(): void {
     process.exit(1)
   }
 
+  // L'URL doit être analysable. La cause n°1 d'échec : un mot de passe qui
+  // contient un caractère spécial (?, @, #, /, :, espace…) non encodé. Dans
+  // une URL, « ? » démarre la requête et « @ » sépare le mot de passe de
+  // l'adresse — l'URL devient invalide ou mal découpée, et la connexion
+  // échoue plus tard avec une erreur d'authentification incompréhensible.
+  let hote: string
+  try {
+    hote = new URL(url).hostname
+  } catch {
+    console.error(
+      [
+        '',
+        '  ┌───────────────────────────────────────────────────────────────┐',
+        '  │  DATABASE_URL est mal formée — le mot de passe contient sans    │',
+        '  │  doute un caractère spécial (?, @, #, /, :, espace…).           │',
+        '  └───────────────────────────────────────────────────────────────┘',
+        '',
+        '  Le plus simple : donne à la base un mot de passe SANS caractère',
+        '  spécial — uniquement des lettres et des chiffres.',
+        '  Supabase → Project Settings → Database → Reset database password.',
+        '',
+        '  (Sinon, il faut encoder le caractère : ? → %3F, @ → %40, # → %23.)',
+        '',
+      ].join('\n'),
+    )
+    process.exit(1)
+  }
+
   const port = Number.parseInt(process.env['SYNC_PORT'] ?? '8787', 10)
   const origines = (process.env['SYNC_ORIGINES'] ?? '')
     .split(',')
@@ -76,6 +104,7 @@ export function demarrer(): void {
   const serveur = serve({ fetch: app.fetch, port, hostname: '0.0.0.0' })
   console.log(
     `\n  ✓ API de synchronisation Kaissi — en écoute sur le port ${port}` +
+      `\n    Base : ${hote}` +
       `\n    Laisse ce terminal OUVERT. Vérifie dans un autre : ` +
       `curl http://127.0.0.1:${port}/sante\n`,
   )
