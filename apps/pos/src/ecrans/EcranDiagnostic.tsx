@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import { formaterErreurImpression } from '@kaissi/printing'
 import type { Station, TravailImpression } from '@kaissi/db-local'
 import type { ContexteApplication } from '../donnees/demarrage.js'
 import type { EtatReseau } from '../donnees/reseau.js'
@@ -85,12 +86,14 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
         ...e,
         [station.id]: r.joignable
           ? `Joignable en ${r.dureeMs} ms`
-          : `Injoignable — ${r.erreur ?? 'raison inconnue'}`,
+          : `Injoignable — ${formaterErreurImpression(r.erreur ?? 'raison inconnue')}`,
       }))
     } catch (erreur) {
       setEssais((e) => ({
         ...e,
-        [station.id]: erreur instanceof Error ? erreur.message : String(erreur),
+        [station.id]: formaterErreurImpression(
+          erreur instanceof Error ? erreur.message : String(erreur),
+        ),
       }))
     }
   }, [])
@@ -300,7 +303,9 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
                     {t.hote ?? '—'}:{t.port}
                   </td>
                   <td className="nombre">{t.tentatives}</td>
-                  <td className="detail">{t.derniereErreur}</td>
+                  <td className="detail">
+                    {t.derniereErreur ? formaterErreurImpression(t.derniereErreur) : '—'}
+                  </td>
                 </tr>
               ))}
             </tbody>

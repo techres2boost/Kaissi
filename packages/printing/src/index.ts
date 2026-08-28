@@ -75,3 +75,4 @@ export function separateur(colonnes = 42, caractere = '-'): string {
 }
 
 export * from './rendu.js'
+export * from './diagnostic.js'
