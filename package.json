@@ -21,6 +21,7 @@
     "pos:build": "pnpm --filter @kaissi/pos build",
     "pos:android": "pnpm --filter @kaissi/pos android",
     "sync:dev": "pnpm --filter @kaissi/sync dev",
+    "sync:appairer": "node apps/sync/scripts/appairer.mjs",
     "backoffice:dev": "pnpm --filter @kaissi/backoffice dev",
     "verifier:natif": "pnpm --filter @kaissi/pos verifier:natif",
     "verifier:avion": "pnpm --filter @kaissi/pos verifier:avion",

@@ -297,12 +297,17 @@ catalogue figé sur la graine locale. L'écran affiche d'ailleurs
    ```
    Pour la mettre en ligne plutôt que sur ton PC, voir
    [`deploiement.md`](deploiement.md).
-2. Appaire l'émulateur, dans un **autre** terminal :
+2. Appaire l'émulateur, dans un **autre** terminal, à la racine du dépôt.
+   L'UUID est celui du restaurant de démonstration, posé par la graine :
    ```bash
-   node apps/sync/scripts/appairer.mjs --restaurant <uuid> --prefixe E1
+   pnpm sync:appairer --restaurant 01930000-0000-7000-8000-000000000002 --prefixe E1
    ```
-   Le jeton n'est affiché **qu'une fois**.
-3. Dans l'application : bandeau → **⇅ local** → saisis l'URL et le jeton.
+   Le script lit le même `apps/sync/.env` que `pnpm sync:dev` : rien d'autre
+   à poser. Le jeton `kdev_…` n'est affiché **qu'une fois** — la base n'en
+   garde que l'empreinte, donc un jeton perdu se réappaire, il ne se retrouve
+   pas.
+3. Dans l'application : bandeau du haut → bouton **⇅ local** → saisis l'URL
+   et le jeton.
 
    ```
    http://10.0.2.2:8787

@@ -13,7 +13,19 @@
  */
 
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import pg from 'pg'
+
+// Le même `apps/sync/.env` que `pnpm sync:dev`, quel que soit le dossier
+// depuis lequel on lance le script. Sans cela, appairer depuis la racine du
+// dépôt échouait sur « DATABASE_URL est absente » alors que le fichier
+// existait deux dossiers plus bas — et rien ne disait où le chercher.
+const FICHIER_ENV = join(dirname(dirname(fileURLToPath(import.meta.url))), '.env')
+if (existsSync(FICHIER_ENV) && !process.env.DATABASE_URL) {
+  process.loadEnvFile(FICHIER_ENV)
+}
 
 const args = new Map()
 for (let i = 2; i < process.argv.length; i += 2) {
@@ -22,7 +34,11 @@ for (let i = 2; i < process.argv.length; i += 2) {
 
 const url = process.env.DATABASE_URL
 if (!url) {
-  console.error('DATABASE_URL est absente. Voir docs/deploiement.md.')
+  console.error(
+    `DATABASE_URL est absente.\n` +
+      `  Attendue dans ${FICHIER_ENV}\n` +
+      `  Modèle : apps/sync/.env.example — voir docs/deploiement.md.`,
+  )
   process.exit(1)
 }
 

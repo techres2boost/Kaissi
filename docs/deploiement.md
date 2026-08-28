@@ -149,7 +149,8 @@ pnpm sync:dev
 curl http://127.0.0.1:8787/sante        # {"etat":"ok",...}
 
 # 4) Appaire l'émulateur (le script lit le même .env)
-node apps/sync/scripts/appairer.mjs --restaurant <uuid-resto> --prefixe E1
+#    L'UUID ci-dessous est le restaurant de démonstration (migration 0007).
+pnpm sync:appairer --restaurant 01930000-0000-7000-8000-000000000002 --prefixe E1
 #    → note le jeton kdev_… (affiché UNE fois)
 ```
 
@@ -159,9 +160,13 @@ node apps/sync/scripts/appairer.mjs --restaurant <uuid-resto> --prefixe E1
 > et quand ça marche, tu vois « API de synchronisation Kaissi — port 8787 »
 > qui RESTE à l'écran (le serveur tourne, ne le ferme pas).
 
-Sur l'émulateur, l'API de sync de ton PC se joint à l'adresse **`10.0.2.2:8787`**
-(voir docs/tester-sans-tablette.md). Saisis-la avec le jeton dans
-Diagnostic → Appairage.
+Sur l'émulateur, l'API de sync de ton PC se joint à l'adresse
+**`http://10.0.2.2:8787`** (voir docs/tester-sans-tablette.md). Saisis-la avec
+le jeton dans l'application : bandeau du haut → bouton **⇅ local**, qui
+affiche le formulaire d'appairage tant que l'appareil n'est pas appairé.
+
+> Le jeton est **vérifié avant d'être enregistré** : un appairage qui
+> s'affiche comme réussi en est vraiment un.
 
 Une fois que ça marche en local, le déploiement ci-dessous ne fait que
 remplacer `10.0.2.2:8787` par une URL publique.
