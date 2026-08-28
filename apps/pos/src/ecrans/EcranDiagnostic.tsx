@@ -10,10 +10,11 @@
  * « 17 produits lus depuis SQLite » sur la même page.
  */
 
-import { useEffect, useState } from 'react'
-import type { TravailImpression } from '@kaissi/db-local'
+import { useCallback, useEffect, useState } from 'react'
+import type { Station, TravailImpression } from '@kaissi/db-local'
 import type { ContexteApplication } from '../donnees/demarrage.js'
 import type { EtatReseau } from '../donnees/reseau.js'
+import { ImprimanteReseau } from '../plugins/imprimante.js'
 
 interface Props {
   contexte: ContexteApplication
@@ -26,16 +27,19 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
   const [produits, setProduits] = useState(0)
   const [impression, setImpression] = useState({ enAttente: 0, echecs: 0 })
   const [echecs, setEchecs] = useState<TravailImpression[]>([])
+  const [stations, setStations] = useState<Station[]>([])
+  const [essais, setEssais] = useState<Record<string, string>>({})
 
   useEffect(() => {
     let vivant = true
     void (async () => {
-      const [e, c, p, i, ech] = await Promise.all([
+      const [e, c, p, i, ech, st] = await Promise.all([
         contexte.etat.tout(),
         contexte.journal.enAttente(),
         contexte.catalogue.nombreProduits(),
         contexte.fileImpression.compteurs(),
         contexte.fileImpression.enEchec(),
+        contexte.stations.toutes(),
       ])
       if (!vivant) return
       setEtatLocal(e)
@@ -43,11 +47,53 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
       setProduits(p)
       setImpression(i)
       setEchecs(ech)
+      setStations(st)
     })()
     return () => {
       vivant = false
     }
   }, [contexte])
+
+  /**
+   * Écrit la saisie tout de suite : une adresse d'imprimante saisie puis
+   * perdue parce qu'on a changé d'onglet est exactement le genre de détail
+   * qui fait perdre une demi-heure en service.
+   */
+  const majStation = useCallback(
+    (id: string, champs: { hote?: string; port?: number }) => {
+      setStations((actuelles) => {
+        const suivantes = actuelles.map((s) => (s.id === id ? { ...s, ...champs } : s))
+        const modifiee = suivantes.find((s) => s.id === id)
+        if (modifiee) {
+          void contexte.stations.definirImprimante(id, modifiee.hote, modifiee.port)
+        }
+        return suivantes
+      })
+    },
+    [contexte],
+  )
+
+  const testerStation = useCallback(async (station: Station) => {
+    if (!station.hote) {
+      setEssais((e) => ({ ...e, [station.id]: 'Aucune adresse saisie.' }))
+      return
+    }
+    setEssais((e) => ({ ...e, [station.id]: 'Essai en cours…' }))
+    try {
+      const r = await ImprimanteReseau.tester({ hote: station.hote, port: station.port })
+      setEssais((e) => ({
+        ...e,
+        [station.id]: r.joignable
+          ? `Joignable en ${r.dureeMs} ms`
+          : `Injoignable — ${r.erreur ?? 'raison inconnue'}`,
+      }))
+    } catch (erreur) {
+      setEssais((e) => ({
+        ...e,
+        [station.id]: erreur instanceof Error ? erreur.message : String(erreur),
+      }))
+    }
+  }, [])
 
   return (
     <div className="diagnostic">
@@ -159,6 +205,70 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
         <p className="note">
           Le moteur de synchronisation (push / pull / curseurs) est la Phase 2.
           En Phase 0, l'outbox se remplit mais rien n'est envoyé : c'est voulu.
+        </p>
+      </section>
+
+      <section className="bloc">
+        <h2>Imprimantes</h2>
+        <p className="note">
+          L'adresse est celle de l'imprimante sur le réseau du restaurant, et
+          le port est presque toujours 9100. Sur un émulateur, la machine qui
+          fait tourner l'imprimante virtuelle se désigne par{' '}
+          <code>10.0.2.2</code> — <code>localhost</code> désignerait
+          l'émulateur lui-même.
+        </p>
+        {stations.length === 0 ? (
+          <p className="note">Aucune station configurée.</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Station</th>
+                <th>Adresse</th>
+                <th>Port</th>
+                <th />
+                <th>Dernier essai</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stations.map((s) => (
+                <tr key={s.id}>
+                  <td>{s.nom}</td>
+                  <td>
+                    <input
+                      className="mono"
+                      value={s.hote ?? ''}
+                      placeholder="192.168.1.50"
+                      onChange={(ev) => majStation(s.id, { hote: ev.target.value })}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="mono port"
+                      inputMode="numeric"
+                      value={String(s.port)}
+                      onChange={(ev) =>
+                        majStation(s.id, { port: Number(ev.target.value) || 0 })
+                      }
+                    />
+                  </td>
+                  <td>
+                    <button type="button" onClick={() => testerStation(s)}>
+                      Tester
+                    </button>
+                  </td>
+                  <td className="detail">{essais[s.id] ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <p className="note">
+          La saisie est enregistrée sur cet appareil. Une fois la tablette
+          appairée, <code>stations</code> devient un référentiel tiré du
+          serveur : c'est le back-office qui fait alors autorité, sinon deux
+          tablettes du même restaurant imprimeraient à deux endroits
+          différents.
         </p>
       </section>
 

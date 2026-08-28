@@ -168,44 +168,116 @@ les suivants, moins d'une minute.
 
 ### Configurer l'imprimante
 
-Dans l'application : **Diagnostic** → **Imprimante**, et saisis :
+Dans l'application, onglet **Diagnostic** en haut à droite, puis fais défiler
+jusqu'au bloc **Imprimantes**. Deux stations y sont listées — *Cuisine* et
+*Bar* — avec l'adresse de démonstration `192.168.1.50`, qui ne répond à rien
+sur ton émulateur.
+
+Remplace l'adresse des deux par :
 
 ```
-10.0.2.2   port 9100
+10.0.2.2     port 9100
 ```
 
 > `10.0.2.2` n'est pas une adresse au hasard : c'est ainsi que l'émulateur
-> Android désigne **la machine hôte**. `127.0.0.1` depuis l'émulateur
-> désignerait l'émulateur lui-même, et la connexion échouerait sans que
-> l'erreur ne dise pourquoi.
+> Android désigne **la machine hôte**, donc ton PC. `127.0.0.1` depuis
+> l'émulateur désignerait l'émulateur lui-même, et la connexion échouerait
+> sans que l'erreur ne dise pourquoi.
 
-Appuie sur **Tester l'imprimante** : la durée doit s'afficher en quelques
-millisecondes.
+La saisie est enregistrée à la frappe — il n'y a pas de bouton « Enregistrer ».
+Appuie sur **Tester** au bout de la ligne : la colonne « Dernier essai » doit
+afficher *Joignable en N ms*, et le terminal de l'imprimante virtuelle doit
+signaler une connexion.
+
+> Cette saisie vaut pour **cet appareil**. Une fois la tablette appairée,
+> `stations` devient un référentiel tiré du serveur et c'est le back-office
+> qui fait autorité — sinon deux tablettes du même restaurant imprimeraient à
+> deux endroits différents.
 
 ---
 
 ## 5. Le test qui compte : le mode avion
 
-C'est le critère de sortie du projet.
+C'est le critère de sortie du projet. **Tout se passe dans la fenêtre de
+l'émulateur**, pas sur ton PC : c'est le réseau de la *tablette* qu'on coupe,
+et le mode avion de Windows ne la concerne pas.
 
-1. Passe une commande, envoie-la en cuisine, encaisse. Le ticket doit
-   apparaître dans le terminal de l'imprimante virtuelle.
-2. Sur l'émulateur, **active le mode avion** (barre de notifications, ou
-   `adb shell cmd connectivity airplane-mode enable`).
-3. **Tue complètement l'application** — écran des applications récentes,
-   balaye pour la fermer. Ne te contente pas d'appuyer sur Accueil.
-4. Rouvre-la.
+### 5.1 Laisser une trace à retrouver
 
-**Elle doit démarrer et afficher le menu.** Si c'est le cas, la promesse du
-produit tient : le code de l'application est dans l'APK, pas sur le réseau.
+Dans l'émulateur : passe une commande, envoie-la en cuisine, encaisse. Le
+ticket doit apparaître dans le terminal de l'imprimante virtuelle.
 
-Vérifie ensuite qu'elle n'émet vraiment rien :
+Note le nombre affiché dans **Diagnostic → Synchronisation → opérations en
+attente**. C'est lui qui prouvera, tout à l'heure, que rien n'a été perdu.
+
+### 5.2 Couper le réseau de la tablette
+
+Deux façons, au choix.
+
+**À la souris, dans l'émulateur.** Clique dans la fenêtre de l'émulateur, puis
+tire la barre du haut vers le bas — deux fois, pour déplier tous les
+raccourcis. Touche **✈ Airplane mode** (ou *Mode avion*) : la vignette
+s'allume, l'icône Wi-Fi disparaît de la barre d'état et un petit avion la
+remplace.
+
+> Le pavé de boutons **à droite de la fenêtre** de l'émulateur (volume,
+> rotation, ⋮) est une télécommande matérielle : le mode avion ne s'y trouve
+> pas. Il est dans Android lui-même, comme sur une vraie tablette.
+
+**En ligne de commande**, depuis un terminal de ton PC :
 
 ```bash
-adb logcat | Select-String "Capacitor|Kaissi|ImprimanteReseau"
+adb shell cmd connectivity airplane-mode enable
+adb shell settings get global airplane_mode_on     # doit répondre 1
 ```
 
-La procédure détaillée, avec ce que signifie chaque symptôme, est dans
+Dans les deux cas, vérifie **dans l'application** : le bandeau du haut doit
+passer de « ● En ligne » à **« Hors ligne »**.
+
+### 5.3 Tuer complètement l'application
+
+**Ne te contente pas du bouton Accueil ni de Retour** : une application en
+arrière-plan garde sa base ouverte en mémoire et masquerait exactement le bug
+qu'on cherche.
+
+Dans l'émulateur : le bouton **▭** (carré, en bas ou en balayant depuis le
+bas), puis **balaye la vignette Kaissi vers le haut** pour la fermer.
+
+Ou, en ligne de commande — plus sûr, parce que sans ambiguïté :
+
+```bash
+adb shell am force-stop tn.res2boost.kaissi
+```
+
+### 5.4 Rouvrir, toujours en mode avion
+
+Touche l'icône Kaissi dans l'émulateur, ou :
+
+```bash
+adb shell monkey -p tn.res2boost.kaissi -c android.intent.category.LAUNCHER 1
+```
+
+**Elle doit démarrer en moins de deux secondes et afficher le plan de salle.**
+Si c'est le cas, la promesse du produit tient : le code de l'application est
+dans l'APK, pas sur le réseau.
+
+### 5.5 Ce qu'il faut regarder ensuite
+
+| Où | Ce qui doit s'afficher |
+|---|---|
+| Bandeau du haut | **Hors ligne** |
+| Diagnostic → verdict | « Réussi. 17 produits lus depuis SQLite local, réseau **INDISPONIBLE** » |
+| Diagnostic → Stockage | Mode **natif**, persistance **Oui** |
+| Diagnostic → Synchronisation | opérations en attente **≥** le nombre noté au § 5.1 |
+
+Ce dernier point est le second test, et il compte autant que le premier : si
+le compteur est retombé à zéro, la base n'est pas persistante et les ventes du
+service seraient perdues au redémarrage.
+
+Enfin, remets le réseau (`adb shell cmd connectivity airplane-mode disable`) :
+le bandeau doit repasser « En ligne » tout seul.
+
+La table des symptômes d'échec, et ce que chacun signifie, est dans
 [`tester-mode-avion.md`](tester-mode-avion.md).
 
 ---

@@ -272,9 +272,16 @@ vente.**
 
 1. brancher l'imprimante en Ethernet sur le même réseau que la tablette ;
 2. relever son adresse IP (bouton d'auto-test de l'imprimante, en général) ;
-3. la renseigner dans `stations.printer_host` — en Phase 1, via la graine ou
-   directement en SQL sur Supabase ;
+3. la saisir dans l'application : **Diagnostic** → bloc **Imprimantes**, puis
+   **Tester** pour vérifier que le port répond avant même d'imprimer ;
 4. passer une commande, appuyer sur **Cuisine**.
+
+> La saisie est **locale à l'appareil**. Une fois la tablette appairée,
+> `stations` est un référentiel tiré du serveur : le back-office redevient
+> autoritaire, sinon deux tablettes du même restaurant imprimeraient à deux
+> endroits différents. L'écran de gestion des stations côté back-office
+> **reste à écrire** — d'ici là, un restaurant appairé se règle depuis la
+> tablette avant appairage, ou en SQL.
 
 Le bon doit sortir en moins de deux secondes. Si rien ne sort :
 
