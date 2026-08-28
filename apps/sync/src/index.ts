@@ -7,6 +7,7 @@
  */
 
 import { serve } from '@hono/node-server'
+import { pathToFileURL } from 'node:url'
 import { DepotPostgres } from './depot-postgres.js'
 import { creerServeur } from './serveur.js'
 
@@ -120,8 +121,14 @@ export function demarrer(): void {
   process.on('SIGINT', () => arreter('SIGINT'))
 }
 
-// `import.meta.url` correspond au fichier lancé : on ne démarre le serveur
-// que si ce module EST le point d'entrée, pas quand un test l'importe.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+// On ne démarre le serveur que si ce module EST le point d'entrée, pas quand
+// un test l'importe.
+//
+// `pathToFileURL` et non « file:// + argv[1] » : sur Windows, argv[1] est un
+// chemin à antislash (C:\\…\\index.ts) et « file:// » n'ajoute pas la
+// troisième barre. La comparaison échouait donc en silence, demarrer()
+// n'était jamais appelé, et « pnpm sync:dev » ne faisait RIEN — sans la
+// moindre erreur. pathToFileURL produit l'URL correcte sur chaque OS.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   demarrer()
 }
