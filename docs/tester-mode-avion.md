@@ -26,18 +26,36 @@ application rouverte**.
 | Android Studio | Ladybug ou plus récent | — |
 | Android SDK | API 34+ | `sdkmanager --list_installed` |
 
+**macOS / Linux** — dans `~/.zshrc` ou `~/.bashrc` :
+
 ```bash
-# Renseigner le SDK (à mettre dans ~/.zshrc ou ~/.bashrc)
 export ANDROID_HOME="$HOME/Library/Android/sdk"        # macOS
 # export ANDROID_HOME="$HOME/Android/Sdk"              # Linux
 export PATH="$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/tools"
 ```
 
+**Windows** — dans **PowerShell** (`setx` ne s'applique qu'aux terminaux
+ouverts *ensuite* : ferme et rouvre tous tes terminaux après) :
+
+```powershell
+setx ANDROID_HOME "$env:LOCALAPPDATA\Android\Sdk"
+setx JAVA_HOME "C:\Program Files\Android\Android Studio\jbr"
+```
+
+> Pas besoin d'installer un JDK 21 séparé sous Windows : Android Studio
+> embarque le sien (le « JBR »). Ton `java` global peut rester en 17 pour le
+> reste de tes projets.
+
+**Tu n'as pas de tablette ?** Un émulateur Android suffit pour ce test, y
+compris pour le critère de sortie. Toute la procédure d'installation est dans
+[`tester-sans-tablette.md`](tester-sans-tablette.md) ; reviens ici ensuite
+pour le § 4.
+
 ---
 
 ## 2. Prérequis sur l'appareil
 
-Une **tablette Android** (ou un terminal Sunmi) :
+Une **tablette Android** (ou un terminal Sunmi), ou un **émulateur** :
 
 1. Réglages → À propos → taper 7 fois sur « Numéro de build » ;
 2. Réglages → Options pour les développeurs → **Débogage USB** activé ;
@@ -122,7 +140,9 @@ adb shell monkey -p tn.res2boost.kaissi -c android.intent.category.LAUNCHER 1
 5. Onglet **Diagnostic** :
    - « Mode avion — critère de sortie de la Phase 0 » → **Réussi** ;
    - Stockage → mode **natif**, persistance **Oui** ;
-   - Migrations locales → version 1, `schema_initial` ;
+   - Migrations locales appliquées → **toutes** celles de
+     `packages/db-local/src/migrations/` (aujourd'hui `001_schema_initial` et
+     `002_phase1_caisse`) ;
    - Synchronisation → Réseau **Hors ligne**, opérations en attente > 0 dès que
      tu as ajouté un article.
 
@@ -131,10 +151,52 @@ adb shell monkey -p tn.res2boost.kaissi -c android.intent.category.LAUNCHER 1
 | Symptôme | Cause probable |
 |---|---|
 | Écran blanc, ou « Page non disponible » | Un `server.url` a été réintroduit dans `capacitor.config.ts`, ou `webDir` ne pointe pas sur `dist` |
-| « Démarrage impossible » | SQLite n'a pas pu s'ouvrir ou migrer — le message exact est affiché à l'écran |
+| **« Démarrage impossible »** | SQLite n'a pas pu s'ouvrir ou migrer — voir le § 5.1, le message exact est affiché à l'écran |
 | Menu vide, 0 produit | La graine ne s'est pas installée ; regarder l'étape « Graine du catalogue » dans Diagnostic |
 | Stockage → mode **memoire** | La détection Capacitor a échoué ; l'application tourne comme une page web, les ventes ne survivraient pas au redémarrage |
 | Démarrage lent (> 5 s) | Une ressource distante est attendue et part en timeout — le bundle n'est pas autonome |
+
+### 5.1 « Démarrage impossible » — lire le message
+
+L'écran affiche toujours le message SQLite d'origine. Il est le seul
+diagnostic utile : sans lui, une panne de base sur la tablette d'un client à
+Sfax serait indiagnosticable à distance.
+
+| Message | Cause | Correction |
+|---|---|---|
+| `Queries can be performed using SQLiteDatabase query or rawQuery methods only.` | Une instruction **renvoyant une ligne** a été envoyée par `execute()` ou `run()` — typiquement `PRAGMA journal_mode = WAL`, qui répond `wal` | Tout PRAGMA doit partir par `query()`. C'est ce que fait `adaptateurCapacitor` (§ 5.2) |
+| `Base locale en version N, application prévue pour la version M` | Un APK **plus ancien** a été installé par-dessus une base plus récente | Réinstaller la bonne version. Le refus est volontaire : écrire dans un schéma inconnu détruirait des données |
+| `Échec de la migration locale N (…)` | Le SQL d'une migration est refusé par le moteur de la tablette | La transaction a été annulée, la base est intacte en version N−1. Reproduire le cas dans `packages/db-local` (§ 5.2) |
+| `Database not opened` | Une connexion précédente n'a pas été relâchée après un rechargement à chaud | Forcer l'arrêt de l'application et rouvrir |
+
+### 5.2 Pourquoi le moteur SQLite d'Android n'est pas SQLite tout court
+
+Le plugin `@capacitor-community/sqlite` ne parle pas directement à SQLite : il
+passe par **SQLCipher**, dont l'`execSQL()` **lève une exception dès qu'un
+`sqlite3_step()` renvoie une ligne**. Deux conséquences qu'aucun test écrit
+contre `node:sqlite` n'attrape :
+
+1. **Aucun PRAGMA ne doit passer par `execute()` ni par `run()`.** Beaucoup en
+   renvoient une (`journal_mode`, `user_version`, `foreign_keys` sans
+   affectation). L'adaptateur les route donc tous par `query()`.
+2. **Le SQL des migrations doit respecter le découpeur du plugin**, qui est
+   rudimentaire — un `split(";\n")` suivi d'un recollage des déclencheurs :
+
+   - chaque instruction se termine par `;` **suivi d'un saut de ligne** ;
+   - le `END;` d'un déclencheur est **seul sur sa ligne**, sinon le
+     déclencheur part en morceaux ;
+   - un `--` dans une chaîne littérale serait pris pour un commentaire et
+     tronquerait l'instruction.
+
+Ces deux règles sont tenues par un test, et non par la vigilance :
+`packages/db-local/src/adaptateurs/capacitor.test.ts` rejoue **toutes** les
+migrations contre un double qui porte le découpeur du plugin et le refus de
+SQLCipher. Un adaptateur ou une migration qui passe ce test démarre sur la
+tablette ; c'est le seul moyen de le savoir sans émulateur dans la CI.
+
+```bash
+pnpm --filter @kaissi/db-local test    # inclus dans pnpm test:rapide
+```
 
 ---
 
@@ -239,7 +301,84 @@ rester fermé sur un paiement par carte.
 
 ---
 
-## 10. Ce qui est vérifié sans SDK Android — et ce qui ne peut pas l'être
+## 10. Refaire le test en mode PRODUCTION
+
+Tout ce qui précède se fait sur un APK **debug**. Ce n'est pas ce que le
+client installera. Les différences réelles, aujourd'hui :
+
+| | debug | release |
+|---|---|---|
+| Signature | clé de débogage jetable | **ton** magasin de clés |
+| `android:debuggable` | vrai | faux |
+| **HTTP en clair** | autorisé vers `10.0.2.2` et `localhost` seulement | **refusé, sans exception** |
+| Rétrécissement R8 | non | **non** — `minifyEnabled false` dans `app/build.gradle` |
+
+Deux points méritent d'être compris plutôt que subis.
+
+**Le HTTP en clair.** Depuis Android 9, il est refusé par défaut. Une URL de
+synchronisation en `http://` échoue donc avec `ERR_CLEARTEXT_NOT_PERMITTED`,
+et rien à l'écran ne dit pourquoi. Le build `debug` porte une exception
+nominative — `app/src/debug/res/xml/network_security_config.xml` — limitée à
+la machine hôte de l'émulateur et à `localhost`, pour que `pnpm sync:dev`
+soit joignable pendant le développement. **Le build `release` ne l'a pas, et
+ne doit pas l'avoir** : un jeton d'appareil qui traverserait le Wi-Fi du
+restaurant en clair serait lisible par n'importe qui. En production, l'API de
+synchronisation est en **HTTPS**.
+
+**R8** est délibérément désactivé : un plugin Capacitor est chargé par
+réflexion, et le rétrécissement supprimerait une classe qu'aucun appel direct
+ne référence. Si un jour quelqu'un passe `minifyEnabled true`, ce test devient
+la seule chose qui l'attrapera — et il faudra garder les plugins dans
+`proguard-rules.pro`.
+
+Le test du mode avion se rejoue donc sur le `release`, une fois, avant toute
+distribution.
+
+```bash
+# À la racine du dépôt, dans ton terminal.
+pnpm pos:build                                   # build + vérification mode avion
+pnpm --filter @kaissi/pos exec cap sync android
+```
+
+Puis, dans `apps/pos/android` (PowerShell : remplace `./gradlew` par
+`.\gradlew.bat`) :
+
+```bash
+./gradlew assembleRelease
+adb install -r app/build/outputs/apk/release/app-release.apk
+```
+
+> La création du magasin de clés (`keystore`) et la signature sont décrites
+> dans [`deploiement.md` § 4.3](deploiement.md). **Le fichier `.keystore` ne
+> doit jamais entrer dans le dépôt** : le perdre, c'est ne plus jamais pouvoir
+> mettre à jour l'application déjà installée chez le client.
+
+Rejoue alors les § 4 à 6 **à l'identique**. Ce qu'on cherche spécifiquement :
+
+| À vérifier sur le release | Panne que ça attrape |
+|---|---|
+| L'application démarre en mode avion | Une ressource distante restée dans le bundle |
+| Diagnostic → Stockage = **natif** | Le plugin SQLite absent du build signé |
+| Un ticket sort sur l'imprimante (§ 9) | Le plugin `ImprimanteReseau` non enregistré |
+| La synchronisation atteint le serveur | Une URL en `http://` refusée par le manifeste — l'API doit être en **HTTPS** en production |
+| Les totaux sont identiques au millime | Rien — mais c'est le contrôle qui coûte le moins cher |
+
+Si le debug marche et le release non, lire d'abord :
+
+```bash
+adb logcat | grep -iE "ClassNotFound|NoSuchMethod|CLEARTEXT|Capacitor"
+```
+
+`CLEARTEXT communication ... not permitted` est le cas le plus fréquent : ce
+n'est pas une panne du POS, c'est une URL de synchronisation en clair.
+
+Le reste de la mise en production — API de synchronisation, back-office,
+appairage des tablettes, sauvegardes — est dans
+[`deploiement.md`](deploiement.md).
+
+---
+
+## 11. Ce qui est vérifié sans SDK Android — et ce qui ne peut pas l'être
 
 Le code natif d'impression est le seul morceau du projet qu'aucun test
 TypeScript n'atteint. Il ne se compile normalement qu'au moment du

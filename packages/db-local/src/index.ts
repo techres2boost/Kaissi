@@ -6,6 +6,7 @@
  */
 
 export * from './adaptateur.js'
+export * from './adaptateurs/capacitor.js'
 export * from './migrateur.js'
 export * from './migrations/index.js'
 export * from './graine.js'

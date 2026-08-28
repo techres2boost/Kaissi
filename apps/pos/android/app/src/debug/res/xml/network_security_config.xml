@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ═══════════════════════════════════════════════════════════════════════════
+  Trafic en clair — BUILD DE DÉBOGAGE UNIQUEMENT
+
+  Depuis Android 9 (API 28), le HTTP en clair est refusé par défaut. Une
+  requête vers http://10.0.2.2:8787 échoue alors avec
+  « ERR_CLEARTEXT_NOT_PERMITTED », sans que rien n'explique pourquoi.
+
+  Or c'est exactement l'adresse dont on a besoin pendant le développement :
+  depuis l'émulateur, 10.0.2.2 désigne la machine hôte, donc l'API de
+  synchronisation lancée par `pnpm sync:dev`.
+
+  Ce fichier vit dans `src/debug/` : il n'entre PAS dans l'APK de production.
+  En production, l'API de synchronisation est en HTTPS — un jeton d'appareil
+  qui traverserait le réseau en clair serait lisible par n'importe qui sur le
+  Wi-Fi du restaurant.
+
+  L'autorisation est nominative, jamais globale : aucun `<base-config
+  cleartextTrafficPermitted="true">`, qui ouvrirait tout Internet en clair
+  même en débogage.
+  ═══════════════════════════════════════════════════════════════════════════
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- La machine hôte, vue depuis l'émulateur Android. -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <!-- L'appareil lui-même (adb reverse). -->
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>
