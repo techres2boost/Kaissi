@@ -280,7 +280,27 @@ button { font: inherit; color: inherit; cursor: pointer; }
   padding: 1rem;
   display: flex; flex-direction: column; gap: 1rem;
   -webkit-user-select: text; user-select: text;
+  /* Le défilement ne doit pas « fuir » vers la page derrière. */
+  overscroll-behavior: contain;
 }
+
+/*
+ * Barre de défilement rendue visible là où le moteur l'honore.
+ *
+ * Android masque la sienne dès qu'on cesse de glisser : rien ne dit alors
+ * qu'il reste du contenu plus bas. Ces règles aident, mais tous les moteurs
+ * ne les appliquent pas (Chromium sans interface les ignore, la WebView
+ * d'Android est inégale). Elles ne sont donc PAS la garantie : la garantie,
+ * c'est que les réglages utiles — le bloc « Imprimantes » — sont placés en
+ * haut de l'écran, à portée sans défiler.
+ */
+.diagnostic::-webkit-scrollbar { width: 10px; }
+.diagnostic::-webkit-scrollbar-track { background: var(--fond); }
+.diagnostic::-webkit-scrollbar-thumb {
+  background: var(--bordure); border-radius: 999px;
+  border: 2px solid var(--fond);
+}
+.diagnostic::-webkit-scrollbar-thumb:active { background: var(--accent-fonce); }
 .bloc {
   background: var(--surface);
   border: 1px solid var(--bordure);

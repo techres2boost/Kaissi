@@ -116,6 +116,70 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
       </section>
 
       <section className="bloc">
+        <h2>Imprimantes</h2>
+        <p className="note">
+          L'adresse est celle de l'imprimante sur le réseau du restaurant, et
+          le port est presque toujours 9100. Sur un émulateur, la machine qui
+          fait tourner l'imprimante virtuelle se désigne par{' '}
+          <code>10.0.2.2</code> — <code>localhost</code> désignerait
+          l'émulateur lui-même.
+        </p>
+        {stations.length === 0 ? (
+          <p className="note">Aucune station configurée.</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Station</th>
+                <th>Adresse</th>
+                <th>Port</th>
+                <th />
+                <th>Dernier essai</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stations.map((s) => (
+                <tr key={s.id}>
+                  <td>{s.nom}</td>
+                  <td>
+                    <input
+                      className="mono"
+                      value={s.hote ?? ''}
+                      placeholder="192.168.1.50"
+                      onChange={(ev) => majStation(s.id, { hote: ev.target.value })}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      className="mono port"
+                      inputMode="numeric"
+                      value={String(s.port)}
+                      onChange={(ev) =>
+                        majStation(s.id, { port: Number(ev.target.value) || 0 })
+                      }
+                    />
+                  </td>
+                  <td>
+                    <button type="button" onClick={() => testerStation(s)}>
+                      Tester
+                    </button>
+                  </td>
+                  <td className="detail">{essais[s.id] ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <p className="note">
+          La saisie est enregistrée sur cet appareil. Une fois la tablette
+          appairée, <code>stations</code> devient un référentiel tiré du
+          serveur : c'est le back-office qui fait alors autorité, sinon deux
+          tablettes du même restaurant imprimeraient à deux endroits
+          différents.
+        </p>
+      </section>
+
+      <section className="bloc">
         <h2>Démarrage</h2>
         <table>
           <thead>
@@ -205,70 +269,6 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
         <p className="note">
           Le moteur de synchronisation (push / pull / curseurs) est la Phase 2.
           En Phase 0, l'outbox se remplit mais rien n'est envoyé : c'est voulu.
-        </p>
-      </section>
-
-      <section className="bloc">
-        <h2>Imprimantes</h2>
-        <p className="note">
-          L'adresse est celle de l'imprimante sur le réseau du restaurant, et
-          le port est presque toujours 9100. Sur un émulateur, la machine qui
-          fait tourner l'imprimante virtuelle se désigne par{' '}
-          <code>10.0.2.2</code> — <code>localhost</code> désignerait
-          l'émulateur lui-même.
-        </p>
-        {stations.length === 0 ? (
-          <p className="note">Aucune station configurée.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Station</th>
-                <th>Adresse</th>
-                <th>Port</th>
-                <th />
-                <th>Dernier essai</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stations.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.nom}</td>
-                  <td>
-                    <input
-                      className="mono"
-                      value={s.hote ?? ''}
-                      placeholder="192.168.1.50"
-                      onChange={(ev) => majStation(s.id, { hote: ev.target.value })}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="mono port"
-                      inputMode="numeric"
-                      value={String(s.port)}
-                      onChange={(ev) =>
-                        majStation(s.id, { port: Number(ev.target.value) || 0 })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <button type="button" onClick={() => testerStation(s)}>
-                      Tester
-                    </button>
-                  </td>
-                  <td className="detail">{essais[s.id] ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        <p className="note">
-          La saisie est enregistrée sur cet appareil. Une fois la tablette
-          appairée, <code>stations</code> devient un référentiel tiré du
-          serveur : c'est le back-office qui fait alors autorité, sinon deux
-          tablettes du même restaurant imprimeraient à deux endroits
-          différents.
         </p>
       </section>
 
