@@ -61,7 +61,13 @@ if (!/^[A-Z0-9]{1,4}$/.test(prefixe)) {
 // La MÊME configuration que le service — TLS et mot de passe compris. Deux
 // façons de se connecter, c'est un chemin vérifié et un chemin qui ne l'est
 // pas, sans que personne ne le sache.
-const client = new pg.Client(configurationPg())
+let client
+try {
+  client = new pg.Client(configurationPg())
+} catch (erreur) {
+  console.error(`\n  ✗ ${erreur instanceof Error ? erreur.message : String(erreur)}\n`)
+  process.exit(1)
+}
 
 try {
   await client.connect()

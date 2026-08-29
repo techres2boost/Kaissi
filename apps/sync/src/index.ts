@@ -115,7 +115,16 @@ export async function demarrer(): Promise<void> {
     .map((o) => o.trim())
     .filter(Boolean)
 
-  const configuration = configurationPg()
+  let configuration
+  try {
+    configuration = configurationPg()
+  } catch (erreur) {
+    // Configuration invalide AVANT toute connexion : DATABASE_CA_FILE
+    // introuvable, DATABASE_URL illisible. On imprime le message clair de
+    // l'erreur plutôt qu'une pile Node.
+    console.error(`\n  ✗ ${erreur instanceof Error ? erreur.message : String(erreur)}\n`)
+    process.exit(1)
+  }
   const hoteBase = hoteDe(configuration)
   const depot = new DepotPostgres(configuration)
 
