@@ -137,7 +137,12 @@ export async function demarrer(): Promise<void> {
   } catch (erreur) {
     console.error(
       `\n  ✗ La base de données est injoignable.\n    Hôte : ${hoteBase}\n\n  ` +
-        formaterErreurBase(erreur).split('\n').join('\n  ') +
+        formaterErreurBase(erreur, {
+          motDePasseSepare: configuration.password !== undefined,
+          utilisateur: configuration.user,
+        })
+          .split('\n')
+          .join('\n  ') +
         '\n',
     )
     await depot.fermer().catch(() => {})

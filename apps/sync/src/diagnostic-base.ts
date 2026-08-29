@@ -14,7 +14,21 @@ export interface DiagnosticBase {
   readonly origine: string
 }
 
-export function expliquerErreurBase(erreur: unknown): DiagnosticBase {
+/**
+ * Ce que la configuration a réellement tenté, pour ne pas conseiller un
+ * remède qui ne s'applique pas.
+ */
+export interface ContexteConnexion {
+  /** Vrai si le mot de passe vient de DATABASE_PASSWORD, hors de l'URL. */
+  readonly motDePasseSepare?: boolean
+  /** L'utilisateur envoyé au serveur. Une faute ici rend la même erreur. */
+  readonly utilisateur?: string
+}
+
+export function expliquerErreurBase(
+  erreur: unknown,
+  contexte: ContexteConnexion = {},
+): DiagnosticBase {
   const origine = erreur instanceof Error ? erreur.message : String(erreur)
   const code =
     typeof erreur === 'object' && erreur !== null && 'code' in erreur
@@ -64,11 +78,40 @@ export function expliquerErreurBase(erreur: unknown): DiagnosticBase {
   }
 
   if (m.includes('password authentication failed') || m.includes('28p01')) {
+    const utilisateur = contexte.utilisateur
+      ? `\n\n  Utilisateur envoyé : ${contexte.utilisateur}\n` +
+        '  (Supabase le rapporte tronqué à « postgres » — c\'est normal.)'
+      : ''
+
+    // Avec DATABASE_PASSWORD, le mot de passe n'a traversé AUCUNE URL. Lui
+    // reparler d'encodage l'enverrait chercher là où il n'y a rien : c'est
+    // exactement le remède qu'il vient d'appliquer.
+    if (contexte.motDePasseSepare) {
+      return {
+        origine,
+        explication:
+          'Mot de passe refusé par le serveur.\n\n' +
+          "  L'encodage n'est PAS en cause : DATABASE_PASSWORD ne traverse\n" +
+          '  aucune URL, sa valeur part telle quelle. Le serveur dit donc\n' +
+          "  simplement que ce mot de passe n'est pas le sien.\n\n" +
+          '  Réinitialise-le et recopie-le :\n' +
+          '    Supabase → Project Settings → Database → Reset database password' +
+          utilisateur,
+      }
+    }
+
     return {
       origine,
       explication:
-        'Mot de passe refusé. Attention aux caractères qui cassent une URL : ' +
-        "? # / % @ : et l'espace doivent être encodés, ou remplacés.",
+        'Mot de passe refusé.\n\n' +
+        '  Deux causes, dans cet ordre de probabilité :\n\n' +
+        "  1. Le mot de passe dans l'URL contient un caractère qui casse une\n" +
+        '     URL (? # / % @ : ou un espace). Ne l\'encode pas à la main :\n' +
+        '     laisse MOT2PASSE dans DATABASE_URL et ajoute plutôt\n' +
+        '       DATABASE_PASSWORD="ton mot de passe exact"\n\n' +
+        "  2. Ce n'est pas le bon mot de passe. Supabase → Project Settings\n" +
+        '     → Database → Reset database password.' +
+        utilisateur,
     }
   }
 
@@ -85,7 +128,10 @@ export function expliquerErreurBase(erreur: unknown): DiagnosticBase {
 }
 
 /** Bloc prêt à afficher dans un terminal. */
-export function formaterErreurBase(erreur: unknown): string {
-  const { explication, origine } = expliquerErreurBase(erreur)
+export function formaterErreurBase(
+  erreur: unknown,
+  contexte: ContexteConnexion = {},
+): string {
+  const { explication, origine } = expliquerErreurBase(erreur, contexte)
   return explication ? `${explication}\n\n  Message d'origine : ${origine}` : origine
 }

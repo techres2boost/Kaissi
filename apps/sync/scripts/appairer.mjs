@@ -61,20 +61,26 @@ if (!/^[A-Z0-9]{1,4}$/.test(prefixe)) {
 // La MÊME configuration que le service — TLS et mot de passe compris. Deux
 // façons de se connecter, c'est un chemin vérifié et un chemin qui ne l'est
 // pas, sans que personne ne le sache.
-let client
+let configuration
 try {
-  client = new pg.Client(configurationPg())
+  configuration = configurationPg()
 } catch (erreur) {
   console.error(`\n  ✗ ${erreur instanceof Error ? erreur.message : String(erreur)}\n`)
   process.exit(1)
 }
+const client = new pg.Client(configuration)
 
 try {
   await client.connect()
 } catch (erreur) {
   console.error(
     `\n  ✗ La base de données est injoignable.\n\n  ` +
-      formaterErreurBase(erreur).split('\n').join('\n  ') +
+      formaterErreurBase(erreur, {
+        motDePasseSepare: configuration.password !== undefined,
+        utilisateur: configuration.user,
+      })
+        .split('\n')
+        .join('\n  ') +
       '\n',
   )
   process.exit(1)

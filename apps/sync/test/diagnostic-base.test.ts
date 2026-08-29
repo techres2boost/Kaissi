@@ -22,7 +22,7 @@ describe('expliquerErreurBase', () => {
     const cas = [
       ['ECONNREFUSED', 'connect ECONNREFUSED 1.2.3.4:5432', /rien n'écoute/i],
       ['ENOTFOUND', 'getaddrinfo ENOTFOUND db.example', /résolu/i],
-      ['28P01', 'password authentication failed for user "postgres"', /mot de passe/i],
+      ['28P01', 'password authentication failed for user "postgres"', /Mot de passe refusé/],
       ['ETIMEDOUT', 'connect ETIMEDOUT', /pare-feu/i],
     ] as const
     const explications = new Set<string>()
@@ -32,6 +32,32 @@ describe('expliquerErreurBase', () => {
       explications.add(explication)
     }
     expect(explications.size).toBe(cas.length)
+  })
+
+  it("cesse de parler d'encodage quand le mot de passe est passé à part", () => {
+    // Le remède « encode ton mot de passe » est FAUX quand DATABASE_PASSWORD
+    // est utilisé : la valeur ne traverse aucune URL. Le répéter renverrait
+    // chercher là où il n'y a rien — précisément là où l'utilisateur vient
+    // de regarder.
+    const echec = Object.assign(
+      new Error('password authentication failed for user "postgres"'),
+      { code: '28P01' },
+    )
+
+    const sans = expliquerErreurBase(echec).explication
+    expect(sans).toMatch(/DATABASE_PASSWORD/)
+    expect(sans).toMatch(/casse une\s+URL/)
+
+    const avec = expliquerErreurBase(echec, {
+      motDePasseSepare: true,
+      utilisateur: 'postgres.mzrbpbqp',
+    }).explication
+    expect(avec).toMatch(/n'est PAS en cause/)
+    expect(avec).not.toMatch(/encode/i)
+    expect(avec).toMatch(/Reset database password/)
+    // L'utilisateur réellement envoyé : Supabase le rapporte tronqué à
+    // « postgres », ce qui fait croire à une erreur de nom d'utilisateur.
+    expect(avec).toContain('postgres.mzrbpbqp')
   })
 
   it("conserve le message d'origine, et n'invente rien sur l'inconnu", () => {
