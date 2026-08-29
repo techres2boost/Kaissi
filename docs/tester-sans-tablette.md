@@ -74,8 +74,18 @@ Android Studio → **More Actions** (ou l'icône ⋮) → **Virtual Device Manag
 - **Modèle** : un format tablette — *Pixel Tablet* ou *Nexus 10*. Le POS est
   dessiné pour un écran large ; sur un téléphone, la grille des produits est
   serrée.
-- **Image système** : API 34 ou 35. Prends la variante *sans* Google Play,
-  elle démarre plus vite et aucun service Google n'est nécessaire.
+- **Image système** : API 34 ou 35, et **impérativement la variante sans
+  Google Play** — la colonne *Services* doit dire `Android Open Source`, pas
+  `Google Play`.
+
+  > Ce n'est pas un détail de confort. L'image Google Play fait tourner en
+  > permanence les services Google, le Play Store et Google Search, qui
+  > saturent un processeur virtualisé. On voit alors « System UI isn't
+  > responding » toutes les deux minutes, et Kaissi devient injouable — alors
+  > que l'application n'y est pour rien. Sur une image AOSP, ces processus
+  > n'existent pas. Aucune fonction du POS ne dépend d'un service Google.
+
+- **RAM** : 4 Go. **Graphics** : *Hardware*. **CPU cores** : 4.
 - Termine, puis **lance l'appareil avec ▶**. Une tablette Android apparaît
   dans une fenêtre : c'est là que tournera Kaissi.
 
@@ -288,6 +298,12 @@ C'est la chaîne complète, et elle ne peut se voir que sur un appareil
 **appairé** — jamais dans `pnpm pos:dev`, dont la base est en mémoire et le
 catalogue figé sur la graine locale. L'écran affiche d'ailleurs
 **« démo — mémoire »** dans ce cas.
+
+> **« password authentication failed » ?** Ne cherche pas l'encodage : dans
+> `apps/sync/.env`, laisse `MOT2PASSE` dans l'URL et ajoute plutôt
+> `DATABASE_PASSWORD="ton mot de passe exact"`. Cette valeur ne traverse
+> aucune URL, donc aucun caractère n'a besoin d'être encodé — et les
+> guillemets évitent qu'un `#` ne soit pris pour un commentaire.
 
 1. Lance l'API de synchronisation sur ton PC — un terminal **dédié**, qu'on
    laisse ouvert (elle doit afficher « API de synchronisation Kaissi — port
