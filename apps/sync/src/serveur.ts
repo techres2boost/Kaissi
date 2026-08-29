@@ -35,9 +35,27 @@ export function creerServeur({ depot, origines }: OptionsServeur) {
   const service = new ServiceSync(depot)
   const app = new Hono<{ Variables: VariablesKaissi }>()
 
-  if (origines && origines.length > 0) {
-    app.use('/sync/*', cors({ origin: [...origines], allowHeaders: ['authorization', 'content-type'] }))
-  }
+  // Les origines de la coque Capacitor sont TOUJOURS autorisées.
+  //
+  // Le POS empaqueté appelle nativement (plugin CapacitorHttp), donc il ne
+  // dépend pas de CORS. Mais tout diagnostic depuis la WebView, et toute
+  // configuration où le plugin serait désactivé, se heurterait sinon à une
+  // réponse jetée par le navigateur avec « Failed to fetch » — un message
+  // qui ne dit ni d'où vient le refus, ni comment le lever.
+  //
+  // Autoriser ces origines ne relâche rien : l'authentification reste le
+  // jeton d'appareil. CORS protège l'utilisateur d'un SITE tiers, or il n'y
+  // a pas de session de navigateur à voler ici — aucun cookie, aucune
+  // identité implicite.
+  const ORIGINES_CAPACITOR = ['https://localhost', 'http://localhost', 'capacitor://localhost']
+  app.use(
+    '/sync/*',
+    cors({
+      origin: [...ORIGINES_CAPACITOR, ...(origines ?? [])],
+      allowHeaders: ['authorization', 'content-type'],
+      allowMethods: ['GET', 'POST', 'OPTIONS'],
+    }),
+  )
 
   // ── Santé ────────────────────────────────────────────────────────────
   // Sans authentification : c'est ce que sonde l'hébergeur.

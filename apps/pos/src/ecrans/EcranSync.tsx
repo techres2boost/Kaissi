@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react'
 import type { EnregistrementOutbox } from '@kaissi/db-local'
 import type { ResumeSync } from '@kaissi/sync-client'
 import { useApp } from '../etat/contexte.js'
+import { expliquerEchecReseau } from '../donnees/diagnostic-reseau.js'
 
 const LIBELLES_ETAT: Record<ResumeSync['etat'], string> = {
   inactif: 'En veille',
@@ -261,11 +262,7 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
       onAppaire()
     } catch (erreur) {
       setEtat('erreur')
-      setMessage(
-        erreur instanceof Error
-          ? `Serveur injoignable — ${erreur.message}`
-          : 'Serveur injoignable.',
-      )
+      setMessage(expliquerEchecReseau(erreur, url))
     }
   }
 

@@ -31,6 +31,32 @@ const config: CapacitorConfig = {
     webContentsDebuggingEnabled: true,
   },
   plugins: {
+    /*
+     * Les appels de synchronisation partent par le RÉSEAU NATIF, pas par la
+     * WebView. Sans cela, deux règles de navigateur se cumulent et bloquent
+     * tout, avec le même message inutile — « Failed to fetch » :
+     *
+     *  • CONTENU MIXTE. La page est servie par le schéma https:// interne de
+     *    Capacitor. Une requête vers http://10.0.2.2:8787 — le serveur de
+     *    développement sur le PC — est une ressource non sécurisée demandée
+     *    depuis une origine sécurisée : la WebView la refuse, et
+     *    `allowMixedContent: false` doit le RESTER.
+     *
+     *  • CORS. Le serveur de sync n'est pas la même origine que la page ;
+     *    sans en-tête Access-Control-Allow-Origin, la réponse est jetée.
+     *
+     * Le POS est une application native, pas un site : ses appels vers SON
+     * propre serveur n'ont aucune raison de subir les règles inter-origines
+     * d'un navigateur. Le plugin remplace `fetch` par une implémentation
+     * native, ce qui règle les deux d'un coup — en développement comme en
+     * production, où l'API sera de toute façon en HTTPS.
+     *
+     * Aucune conséquence sur le mode avion : c'est le TRANSPORT des appels
+     * réseau qui change, pas le fait qu'il n'y en ait aucun au démarrage.
+     */
+    CapacitorHttp: {
+      enabled: true,
+    },
     CapacitorSQLite: {
       androidIsEncryption: false,
       androidBiometric: {

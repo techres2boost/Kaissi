@@ -79,6 +79,12 @@ const HOTES_AUTORISES = [
   'react.dev',         // texte de message d'erreur React
   'capacitorjs.com',   // texte de message d'erreur Capacitor
   'localhost',         // développement uniquement, autorisé par la CSP
+  // Alias de la machine hôte vu depuis l'émulateur Android, cité dans un
+  // message d'aide à l'appairage. Adresse PRIVÉE (RFC 1918), non routable :
+  // elle ne peut désigner ni un CDN ni une dépendance distante. Inscrite
+  // littéralement, et non par plage, pour qu'un vrai serveur de LAN codé en
+  // dur reste refusé.
+  '10.0.2.2',
 ]
 const suspectes = new Set()
 for (const fichier of fichiers) {

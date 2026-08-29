@@ -136,8 +136,29 @@ try {
 `)
 } catch (erreur) {
   await client.query('rollback').catch(() => {})
-  console.error('Échec de l’appairage :', erreur.message)
-  process.exitCode = 1
+
+  // Le préfixe de ticket est UNIQUE par établissement, et c'est voulu : deux
+  // terminaux qui numéroteraient « E1-000001 » rendraient deux tickets
+  // différents portant le même numéro. Un comptable ne peut pas travailler
+  // avec ça. Le message brut de Postgres ne disait rien de tout cela.
+  if (erreur.code === '23505' && String(erreur.constraint).includes('ticket_prefix')) {
+    console.error(
+      `\n  ✗ Le préfixe « ${prefixe} » est DÉJÀ utilisé par un autre terminal\n` +
+        `    de cet établissement.\n\n` +
+        `  Chaque terminal numérote ses tickets avec son propre préfixe —\n` +
+        `  ${prefixe}-000001, ${prefixe}-000002… Deux terminaux qui le\n` +
+        `  partageraient produiraient deux tickets différents portant le même\n` +
+        `  numéro : impossible à démêler pour un comptable.\n\n` +
+        `  Prends-en un autre :\n` +
+        `      pnpm sync:appairer --restaurant ${restaurantId} --prefixe E2\n\n` +
+        `  Si tu réappaires le MÊME terminal (jeton perdu), révoque d'abord\n` +
+        `  l'ancien appareil — ses ventes locales ne sont jamais perdues.\n`,
+    )
+    process.exitCode = 1
+  } else {
+    console.error('Échec de l’appairage :', erreur.message)
+    process.exitCode = 1
+  }
 } finally {
   await client.end()
 }
