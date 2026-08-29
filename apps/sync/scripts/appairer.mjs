@@ -17,7 +17,7 @@ import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
-import { sslDepuisEnvironnement } from '../src/ssl.ts'
+import { configurationPg } from '../src/connexion.ts'
 import { formaterErreurBase } from '../src/diagnostic-base.ts'
 
 // Le même `apps/sync/.env` que `pnpm sync:dev`, quel que soit le dossier
@@ -58,12 +58,10 @@ if (!/^[A-Z0-9]{1,4}$/.test(prefixe)) {
   process.exit(1)
 }
 
-// La MÊME politique TLS que le service : deux réglages divergents, c'est un
-// chemin vérifié et un chemin qui ne l'est pas, sans que personne ne le sache.
-const client = new pg.Client({
-  connectionString: url,
-  ssl: sslDepuisEnvironnement(),
-})
+// La MÊME configuration que le service — TLS et mot de passe compris. Deux
+// façons de se connecter, c'est un chemin vérifié et un chemin qui ne l'est
+// pas, sans que personne ne le sache.
+const client = new pg.Client(configurationPg())
 
 try {
   await client.connect()

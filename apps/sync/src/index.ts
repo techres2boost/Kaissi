@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url'
 import { DepotPostgres } from './depot-postgres.js'
 import { creerServeur } from './serveur.js'
 import { formaterErreurBase } from './diagnostic-base.js'
-import { sslDepuisEnvironnement } from './ssl.js'
+import { configurationPg, hoteDe } from './connexion.js'
 
 export * from './protocole.js'
 export * from './depot.js'
@@ -81,12 +81,14 @@ export async function demarrer(): Promise<void> {
         '  │  doute un caractère spécial (?, @, #, /, :, espace…).           │',
         '  └───────────────────────────────────────────────────────────────┘',
         '',
-        '  Supabase EXIGE un caractère spécial. Choisis-en un qui ne casse',
-        '  pas une adresse : ! . - _ ~  (le « ! » est le plus simple).',
-        '  ÉVITE   ? # / % @ :  et l\'espace — ceux-là cassent l\'URL.',
+        '  Le plus simple : NE mets PAS le mot de passe dans l\'URL.',
+        '  Laisse MOT2PASSE tel quel et ajoute, dans apps/sync/.env :',
         '',
-        '  Supabase → Project Settings → Database → Reset database password,',
-        '  par exemple  Kaissi2026Res2boost!  puis remets-le dans apps/sync/.env.',
+        '      DATABASE_PASSWORD="ton mot de passe exact"',
+        '',
+        '  Cette valeur n\'est jamais analysée comme une URL : aucun caractère',
+        '  n\'a besoin d\'être encodé. Les guillemets évitent qu\'un « # » ne',
+        '  soit pris pour un commentaire.',
         '',
       ].join('\n'),
     )
@@ -99,10 +101,9 @@ export async function demarrer(): Promise<void> {
     .map((o) => o.trim())
     .filter(Boolean)
 
-  const depot = new DepotPostgres({
-    connectionString: url,
-    ssl: sslDepuisEnvironnement(),
-  })
+  const configuration = configurationPg()
+  const hoteBase = hoteDe(configuration)
+  const depot = new DepotPostgres(configuration)
 
   // On JOINT la base avant d'annoncer quoi que ce soit. Annoncer « en
   // écoute » sans l'avoir fait donnerait un serveur qui paraît sain et qui
@@ -112,7 +113,7 @@ export async function demarrer(): Promise<void> {
     await depot.verifier()
   } catch (erreur) {
     console.error(
-      `\n  ✗ La base de données est injoignable.\n    Hôte : ${hote}\n\n  ` +
+      `\n  ✗ La base de données est injoignable.\n    Hôte : ${hoteBase}\n\n  ` +
         formaterErreurBase(erreur).split('\n').join('\n  ') +
         '\n',
     )
@@ -125,7 +126,7 @@ export async function demarrer(): Promise<void> {
   const serveur = serve({ fetch: app.fetch, port, hostname: '0.0.0.0' })
   console.log(
     `\n  ✓ API de synchronisation Kaissi — en écoute sur le port ${port}` +
-      `\n    Base : ${hote} — connexion vérifiée` +
+      `\n    Base : ${hoteBase} — connexion vérifiée` +
       `\n    Laisse ce terminal OUVERT. Vérifie dans un autre : ` +
       `curl http://127.0.0.1:${port}/sante\n`,
   )

@@ -41,7 +41,13 @@ function uuidsValides(valeurs: readonly string[]): string[] {
 }
 
 export interface OptionsDepot {
-  readonly connectionString: string
+  /** Chaîne complète — ou les champs séparés ci-dessous, jamais les deux. */
+  readonly connectionString?: string
+  readonly host?: string
+  readonly port?: number
+  readonly database?: string
+  readonly user?: string
+  readonly password?: string
   readonly max?: number
   /**
    * `false` en test local : le Postgres de test n'a pas de TLS.
@@ -54,8 +60,18 @@ export class DepotPostgres implements DepotSync {
   private readonly pool: Pool
 
   constructor(options: OptionsDepot) {
+    // `connectionString` n'est passée QUE si elle existe : `pg` la
+    // ré-analyse et écraserait les champs séparés, mot de passe compris.
     this.pool = new Pool({
-      connectionString: options.connectionString,
+      ...(options.connectionString
+        ? { connectionString: options.connectionString }
+        : {
+            host: options.host,
+            port: options.port,
+            database: options.database,
+            user: options.user,
+            password: options.password,
+          }),
       max: options.max ?? 10,
       ssl:
         options.ssl === false
