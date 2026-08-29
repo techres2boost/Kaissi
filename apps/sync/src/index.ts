@@ -51,13 +51,27 @@ export async function demarrer(): Promise<void> {
   // Garde-fou : la valeur du modèle laissée telle quelle. Le serveur
   // démarrerait, puis échouerait à la première requête avec une erreur
   // d'authentification obscure. Autant le dire tout de suite.
-  if (url.includes('MOT2PASSE')) {
+  //
+  // Sauf si DATABASE_PASSWORD est renseignée : laisser « MOT2PASSE » dans
+  // l'URL est alors la marche à suivre RECOMMANDÉE, celle qui évite d'avoir
+  // à encoder quoi que ce soit. Refuser de démarrer dans ce cas ferait de ce
+  // garde-fou un obstacle à la seule solution correcte.
+  const motDePasseSepare = (process.env['DATABASE_PASSWORD'] ?? '') !== ''
+  if (url.includes('MOT2PASSE') && !motDePasseSepare) {
     console.error(
       [
         '',
-        '  ⚠ DATABASE_URL contient encore « MOT2PASSE » — le mot de passe du',
-        '    modèle n\'a pas été remplacé. Édite apps/sync/.env avec le vrai',
-        '    mot de passe de la base (Supabase → Project Settings → Database).',
+        '  ⚠ DATABASE_URL contient encore « MOT2PASSE », et aucun',
+        '    DATABASE_PASSWORD n\'est renseigné — la connexion ne peut pas',
+        '    aboutir.',
+        '',
+        '  Le plus simple, dans apps/sync/.env : garde « MOT2PASSE » dans',
+        '  l\'URL et ajoute la ligne',
+        '',
+        '      DATABASE_PASSWORD="ton mot de passe exact"',
+        '',
+        '  Cette valeur n\'est jamais analysée comme une URL : aucun caractère',
+        '  n\'a besoin d\'être encodé.',
         '',
       ].join('\n'),
     )
