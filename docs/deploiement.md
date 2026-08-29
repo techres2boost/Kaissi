@@ -99,6 +99,28 @@ postgresql://postgres.mzrbpbqpkpbbndtijipw:MOT_DE_PASSE@aws-0-eu-central-1.poole
 > les variables d'environnement du serveur de sync. Jamais dans le dépôt,
 > jamais dans l'APK.
 
+#### Deux mots de passe Supabase, à ne pas confondre
+
+C'est le piège le plus coûteux de cette étape, parce que les deux écrans se
+ressemblent et que l'erreur renvoyée est la même :
+
+| | Où | À quoi il sert |
+|---|---|---|
+| **Compte** | avatar en haut à droite → *Account settings* → *Change password* | Se connecter à supabase.com. Demande le mot de passe **actuel**. |
+| **Base de données** | *Project Settings* → **Database** → *Database password* → **Reset database password** | Ce que `DATABASE_PASSWORD` attend. Ne demande **aucun** mot de passe actuel — il est régénéré. |
+
+Le second n'est visible **nulle part** après sa création : Supabase ne le
+stocke pas en clair. S'il est perdu, il ne se retrouve pas, il se
+réinitialise.
+
+Le signe qui distingue les deux à coup sûr : **si l'écran te réclame le mot
+de passe actuel, tu es sur celui du compte** — ce n'est pas le bon.
+
+Bonne nouvelle quand `password authentication failed` apparaît : le serveur
+a **reconnu ton projet**. Un identifiant de projet erroné donnerait
+`Tenant or user not found`. L'URL, l'utilisateur et le certificat sont donc
+tous corrects — il ne reste que le mot de passe.
+
 ### Retirer le jeu de démonstration
 
 Quand tu passes à un vrai restaurant :

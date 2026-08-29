@@ -94,8 +94,14 @@ export function expliquerErreurBase(
           "  L'encodage n'est PAS en cause : DATABASE_PASSWORD ne traverse\n" +
           '  aucune URL, sa valeur part telle quelle. Le serveur dit donc\n' +
           "  simplement que ce mot de passe n'est pas le sien.\n\n" +
-          '  Réinitialise-le et recopie-le :\n' +
-          '    Supabase → Project Settings → Database → Reset database password' +
+          '  ⚠ Supabase a DEUX mots de passe, et ils se confondent facilement :\n' +
+          '      • celui du COMPTE — pour se connecter à supabase.com.\n' +
+          "        Son écran réclame le mot de passe ACTUEL. Ce n'est pas lui.\n" +
+          '      • celui de la BASE — le seul que cette variable attend :\n' +
+          '        Project Settings → Database → Reset database password.\n' +
+          "        Cet écran ne demande aucun mot de passe actuel.\n\n" +
+          '  Le serveur a reconnu ton projet — un identifiant erroné donnerait\n' +
+          "  « Tenant or user not found ». Seul le mot de passe est en cause." +
           utilisateur,
       }
     }

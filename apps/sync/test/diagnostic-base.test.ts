@@ -55,6 +55,11 @@ describe('expliquerErreurBase', () => {
     expect(avec).toMatch(/n'est PAS en cause/)
     expect(avec).not.toMatch(/encode/i)
     expect(avec).toMatch(/Reset database password/)
+    // Le piège qui a réellement coûté du temps : changer le mot de passe du
+    // COMPTE Supabase en croyant changer celui de la BASE. Les deux écrans
+    // se ressemblent, et l'erreur renvoyée est la même.
+    expect(avec).toMatch(/COMPTE/)
+    expect(avec).toMatch(/mot de passe ACTUEL/)
     // L'utilisateur réellement envoyé : Supabase le rapporte tronqué à
     // « postgres », ce qui fait croire à une erreur de nom d'utilisateur.
     expect(avec).toContain('postgres.mzrbpbqp')
