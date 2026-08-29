@@ -41,9 +41,31 @@ export function creerServeur({ depot, origines }: OptionsServeur) {
 
   // ── Santé ────────────────────────────────────────────────────────────
   // Sans authentification : c'est ce que sonde l'hébergeur.
-  app.get('/sante', (c) =>
-    c.json({ etat: 'ok', protocole: VERSION_PROTOCOLE, horodatage: new Date().toISOString() }),
-  )
+  // `/sante` joint la BASE, pas seulement le processus. Un contrôle de santé
+  // qui répond « ok » parce que Node tourne ne surveille rien : c'est lui
+  // qui décide si une plateforme redémarre le service ou le laisse dans un
+  // état où aucune tablette ne peut se synchroniser.
+  app.get('/sante', async (c) => {
+    try {
+      await depot.verifier()
+    } catch (erreur) {
+      return c.json(
+        {
+          etat: 'degrade',
+          protocole: VERSION_PROTOCOLE,
+          horodatage: new Date().toISOString(),
+          base: erreur instanceof Error ? erreur.message : String(erreur),
+        },
+        503,
+      )
+    }
+    return c.json({
+      etat: 'ok',
+      protocole: VERSION_PROTOCOLE,
+      horodatage: new Date().toISOString(),
+      base: 'joignable',
+    })
+  })
 
   // ── Authentification par jeton d'appareil ────────────────────────────
   app.use('/sync/*', async (c, next) => {

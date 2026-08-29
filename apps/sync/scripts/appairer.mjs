@@ -17,6 +17,8 @@ import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
+import { sslDepuisEnvironnement } from '../src/ssl.ts'
+import { formaterErreurBase } from '../src/diagnostic-base.ts'
 
 // Le même `apps/sync/.env` que `pnpm sync:dev`, quel que soit le dossier
 // depuis lequel on lance le script. Sans cela, appairer depuis la racine du
@@ -56,11 +58,23 @@ if (!/^[A-Z0-9]{1,4}$/.test(prefixe)) {
   process.exit(1)
 }
 
+// La MÊME politique TLS que le service : deux réglages divergents, c'est un
+// chemin vérifié et un chemin qui ne l'est pas, sans que personne ne le sache.
 const client = new pg.Client({
   connectionString: url,
-  ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: true },
+  ssl: sslDepuisEnvironnement(),
 })
-await client.connect()
+
+try {
+  await client.connect()
+} catch (erreur) {
+  console.error(
+    `\n  ✗ La base de données est injoignable.\n\n  ` +
+      formaterErreurBase(erreur).split('\n').join('\n  ') +
+      '\n',
+  )
+  process.exit(1)
+}
 
 try {
   const { rows: restos } = await client.query(
@@ -106,7 +120,7 @@ try {
 
   ${jetonClair}
 
-  À saisir sur la tablette : Diagnostic → Appairage.
+  À saisir sur la tablette : bandeau du haut → bouton « ⇅ local ».
   En cas de perte : révoquez l'appareil et réappairez-le. Ses ventes
   locales ne sont jamais perdues.
 `)

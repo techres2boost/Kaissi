@@ -29,6 +29,15 @@ export interface ResultatInsertion {
 }
 
 export interface DepotSync {
+  /**
+   * Ouvre une connexion et exécute une requête triviale.
+   *
+   * Une API de synchronisation qui répond « ok » sans avoir jamais joint sa
+   * base ne dit rien d'utile : elle promet un service qu'elle ne peut pas
+   * rendre.
+   */
+  verifier(): Promise<void>
+
   /** Retrouve un appareil par l'empreinte de son jeton. */
   appareilParJeton(empreinte: string): Promise<AppareilAuthentifie | null>
 

@@ -26,6 +26,7 @@ import {
 import { estUuid } from '@kaissi/domain'
 import type { AppareilAuthentifie, DepotSync, ResultatInsertion } from './depot.js'
 import type { ChangementCatalogue } from './protocole.js'
+import type { ReglageSsl } from './ssl.js'
 
 /**
  * Ne garde que les identifiants réellement au format UUID.
@@ -42,8 +43,11 @@ function uuidsValides(valeurs: readonly string[]): string[] {
 export interface OptionsDepot {
   readonly connectionString: string
   readonly max?: number
-  /** `false` en test local : le Postgres de test n'a pas de TLS. */
-  readonly ssl?: boolean
+  /**
+   * `false` en test local : le Postgres de test n'a pas de TLS.
+   * Sinon, le réglage rendu par `sslDepuisEnvironnement()`.
+   */
+  readonly ssl?: boolean | ReglageSsl
 }
 
 export class DepotPostgres implements DepotSync {
@@ -53,11 +57,33 @@ export class DepotPostgres implements DepotSync {
     this.pool = new Pool({
       connectionString: options.connectionString,
       max: options.max ?? 10,
-      ssl: options.ssl === false ? false : { rejectUnauthorized: true },
+      ssl:
+        options.ssl === false
+          ? false
+          : options.ssl === true || options.ssl === undefined
+            ? { rejectUnauthorized: true }
+            : options.ssl,
       // Une requête de sync qui dépasse dix secondes est une requête cassée :
       // mieux vaut la couper que laisser la connexion occupée.
       statement_timeout: 10_000,
     })
+  }
+
+  /**
+   * Vérifie que la base répond VRAIMENT.
+   *
+   * Appelée au démarrage et par `/sante`. Sans elle, l'API annonçait « ok »
+   * sans avoir jamais ouvert une connexion : une chaîne fausse, un mot de
+   * passe périmé ou un certificat refusé ne se voyaient qu'au premier
+   * encaissement d'une tablette — c'est-à-dire au pire moment.
+   */
+  async verifier(): Promise<void> {
+    const client = await this.pool.connect()
+    try {
+      await client.query('select 1')
+    } finally {
+      client.release()
+    }
   }
 
   /**

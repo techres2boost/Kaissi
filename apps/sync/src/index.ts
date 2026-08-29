@@ -10,6 +10,8 @@ import { serve } from '@hono/node-server'
 import { pathToFileURL } from 'node:url'
 import { DepotPostgres } from './depot-postgres.js'
 import { creerServeur } from './serveur.js'
+import { formaterErreurBase } from './diagnostic-base.js'
+import { sslDepuisEnvironnement } from './ssl.js'
 
 export * from './protocole.js'
 export * from './depot.js'
@@ -19,7 +21,7 @@ export { DepotPostgres } from './depot-postgres.js'
 export { creerServeur } from './serveur.js'
 
 /** Démarrage autonome. Ignoré quand le module est importé par un test. */
-export function demarrer(): void {
+export async function demarrer(): Promise<void> {
   const url = process.env['DATABASE_URL']
 
   // Message VOLONTAIREMENT gros et encadré : c'est l'erreur de démarrage la
@@ -99,14 +101,31 @@ export function demarrer(): void {
 
   const depot = new DepotPostgres({
     connectionString: url,
-    ssl: process.env['DATABASE_SSL'] !== 'false',
+    ssl: sslDepuisEnvironnement(),
   })
+
+  // On JOINT la base avant d'annoncer quoi que ce soit. Annoncer « en
+  // écoute » sans l'avoir fait donnerait un serveur qui paraît sain et qui
+  // échouera au premier encaissement d'une tablette — au pire moment, et
+  // loin d'ici.
+  try {
+    await depot.verifier()
+  } catch (erreur) {
+    console.error(
+      `\n  ✗ La base de données est injoignable.\n    Hôte : ${hote}\n\n  ` +
+        formaterErreurBase(erreur).split('\n').join('\n  ') +
+        '\n',
+    )
+    await depot.fermer().catch(() => {})
+    process.exit(1)
+  }
+
   const app = creerServeur({ depot, origines })
 
   const serveur = serve({ fetch: app.fetch, port, hostname: '0.0.0.0' })
   console.log(
     `\n  ✓ API de synchronisation Kaissi — en écoute sur le port ${port}` +
-      `\n    Base : ${hote}` +
+      `\n    Base : ${hote} — connexion vérifiée` +
       `\n    Laisse ce terminal OUVERT. Vérifie dans un autre : ` +
       `curl http://127.0.0.1:${port}/sante\n`,
   )
@@ -130,5 +149,8 @@ export function demarrer(): void {
 // n'était jamais appelé, et « pnpm sync:dev » ne faisait RIEN — sans la
 // moindre erreur. pathToFileURL produit l'URL correcte sur chaque OS.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  demarrer()
+  demarrer().catch((erreur) => {
+    console.error(erreur)
+    process.exit(1)
+  })
 }
