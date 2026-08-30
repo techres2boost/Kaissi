@@ -6,8 +6,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:web": "VITE_CIBLE=web vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build && node scripts/verifier-mode-avion.mjs",
+    "build:web": "tsc -p tsconfig.json --noEmit && VITE_CIBLE=web vite build && node scripts/verifier-mode-avion.mjs",
     "preview": "vite preview",
+    "preview:web": "VITE_CIBLE=web vite preview --port 4173",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "cap:sync": "pnpm build && cap sync android",
     "android:add": "cap add android",
@@ -15,7 +18,8 @@
     "android": "pnpm cap:sync && cap run android",
     "verifier:avion": "node scripts/verifier-mode-avion.mjs",
     "verifier:natif": "node scripts/verifier-plugin-natif.mjs",
-    "test:parcours": "node tests/parcours-caisse.mjs"
+    "test:parcours": "node tests/parcours-caisse.mjs",
+    "test:persistance": "node tests/persistance-web.mjs"
   },
   "dependencies": {
     "@kaissi/domain": "workspace:*",
