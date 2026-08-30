@@ -479,12 +479,20 @@ Maintenant que tu connais les deux URL Vercel, retourne dans Railway →
 |---|---|
 | `SYNC_ORIGINES` | `https://ton-pos.vercel.app,https://ton-backoffice.vercel.app` |
 
-Sans virgule superflue, sans barre oblique finale. Railway redéploie seul.
+**Deux adresses DISTINCTES**, séparées par une virgule : celle du **POS**
+d'abord, celle du back-office ensuite. Pas de virgule superflue, pas de barre
+oblique finale. Railway redéploie seul.
 
-> ⚠ **C'est l'oubli le plus coûteux de toute la liste.** L'APK Android appelle
-> par le réseau natif et ignore CORS ; un POS servi dans un navigateur, non.
-> Sans cette ligne, l'appairage de l'étape 7 échoue sur un « Failed to fetch »
-> qui ne dit ni d'où il vient, ni comment le lever.
+> ⚠ **C'est l'oubli le plus coûteux de toute la liste**, et le plus facile à
+> rater : coller deux fois le back-office, ou oublier le POS, laisse
+> l'appairage échouer. L'APK Android appelle par le réseau natif et ignore
+> CORS ; un POS servi dans un navigateur, non. Sans l'adresse EXACTE du POS
+> ici, l'étape 7 échoue sur « Failed to fetch » — et depuis la version
+> actuelle, le POS te dit alors précisément quelle adresse ajouter.
+>
+> L'adresse du POS est son URL de **production** Vercel (`kaissi-pos.vercel.app`),
+> pas une URL de prévisualisation `kaissi-xxxx-….vercel.app`. Ouvre le POS par
+> son domaine de production, sinon son origine ne correspondra pas.
 
 ---
 
@@ -615,7 +623,7 @@ l'idempotence et le banc à trois appareils contre une vraie base.
 | `{"status":"error","code":404,"message":"Application not found"}` | Railway : les modifications sont en attente. Clique **Deploy** (§3.3) |
 | Railway échoue sur un `COPY` du Dockerfile | *Root Directory* pointe sur `apps/sync` : remets-la à la racine (§3.1) |
 | Railway construit avec Nixpacks au lieu du Dockerfile | `railway.json` doit être à la **racine** du dépôt, pas dans `apps/sync` |
-| « Failed to fetch » à l'appairage | `SYNC_ORIGINES` n'inclut pas l'URL du POS (§6) |
+| « Failed to fetch » à l'appairage | `SYNC_ORIGINES` n'inclut pas l'URL **exacte** du POS (§6). Le POS affiche laquelle ajouter. Fréquent : le back-office collé deux fois, le POS oublié |
 | `password authentication failed` | mot de passe de **base**, pas celui du **compte** Supabase — Project Settings → Database → *Reset database password* |
 | Railway plante sur `connect ENETUNREACH 2a05:…` | `DATABASE_URL` pointe sur la connexion **directe** (IPv6). Prends le **Session pooler** (§1.4) |
 | `{"code":502,"message":"Application failed to respond"}` | le conteneur a démarré puis a **crashé** — ouvre *Deploy Logs*, le message y est en clair |

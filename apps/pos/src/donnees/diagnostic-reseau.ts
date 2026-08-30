@@ -45,5 +45,21 @@ export function expliquerEchecReseau(erreur: unknown, url: string): string {
     )
   }
 
-  return `Serveur injoignable. Vérifie l'adresse et que le serveur répond. — ${origine}`
+  // Hôte HTTPS distant + « Failed to fetch » = presque toujours CORS. Le
+  // serveur RÉPOND (curl .../sante le prouve), mais il n'autorise pas CE
+  // POS : le navigateur jette alors la réponse, et `fetch` ne peut pas dire
+  // pourquoi — la spécification le lui interdit. On donne donc le geste, et
+  // l'adresse EXACTE à autoriser.
+  const moi =
+    typeof window !== 'undefined' && window.location?.origin
+      ? window.location.origin
+      : "l'adresse de ce POS"
+  return (
+    `Le serveur répond peut-être, mais il refuse ce terminal (blocage CORS). ` +
+    `Sur le serveur de synchronisation (Railway), la variable SYNC_ORIGINES ` +
+    `doit CONTENIR « ${moi} » — plusieurs adresses séparées par des virgules, ` +
+    `sans barre oblique finale — puis redéploie. Vérifie aussi que le serveur ` +
+    `répond : ouvre « ${url.replace(/\/+$/, '')}/sante » dans un navigateur. ` +
+    `— ${origine}`
+  )
 }
