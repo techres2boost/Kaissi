@@ -24,10 +24,13 @@ import type {
   ProduitLocal,
   VarianteLocale,
 } from '@kaissi/db-local'
+import { rendreTicketCuisine } from '@kaissi/printing'
 import { useApp } from '../etat/contexte.js'
 import { RefusOperation } from '../donnees/session.js'
 import { Modale } from '../composants/Modale.js'
 import { DemandePin } from '../composants/DemandePin.js'
+import { TicketEcran } from '../composants/TicketEcran.js'
+import { IMPRESSION_ACTIVE } from '../config.js'
 import type { Employe } from '@kaissi/domain'
 
 interface Props {
@@ -57,6 +60,12 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
     action: (manager: Employe) => Promise<void>
   } | null>(null)
   const [remiseOuverte, setRemiseOuverte] = useState(false)
+  /**
+   * Bons de cuisine qui viennent de partir, affichés tant que l'impression
+   * est éteinte. La cuisine les voit de son côté au back-office ; cet aperçu
+   * sert au serveur qui veut vérifier ce qu'il vient d'envoyer.
+   */
+  const [bonsEmis, setBonsEmis] = useState<Uint8Array[] | null>(null)
 
   const recharger = useCallback(async () => {
     setEtat(await session.etatDe(orderId))
@@ -162,11 +171,17 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
         stations,
         libelleTable,
       )
-      setMessage(
-        resultat.lignesEnvoyees === 0
-          ? 'Tout est déjà parti en cuisine.'
-          : `${resultat.lignesEnvoyees} article(s) envoyé(s) — ${resultat.bons} bon(s).`,
-      )
+      if (resultat.lignesEnvoyees === 0) {
+        setMessage('Tout est déjà parti en cuisine.')
+        return
+      }
+      if (IMPRESSION_ACTIVE) {
+        setMessage(
+          `${resultat.lignesEnvoyees} article(s) envoyé(s) — ${resultat.bons} bon(s).`,
+        )
+        return
+      }
+      setBonsEmis(resultat.tickets.map((t) => rendreTicketCuisine(t)))
     }, 'Envoi en cuisine')
 
   const lignesActives = etat?.lignes.filter((l) => !l.annulee) ?? []
@@ -434,6 +449,18 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
       {message && (
         <Modale titre="Information" onFermer={() => setMessage(null)}>
           <p>{message}</p>
+        </Modale>
+      )}
+
+      {bonsEmis && (
+        <Modale titre="Envoyé en cuisine" onFermer={() => setBonsEmis(null)}>
+          <p className="aide">
+            La cuisine voit cette commande sur son écran. Ces bons ne
+            repartiront pas : ce qui est envoyé reste envoyé.
+          </p>
+          {bonsEmis.map((charge, i) => (
+            <TicketEcran key={i} charge={charge} />
+          ))}
         </Modale>
       )}
     </div>

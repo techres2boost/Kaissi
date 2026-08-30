@@ -20,6 +20,7 @@ import {
   type Shift,
 } from '@kaissi/domain'
 import { rendreTicketShift } from '@kaissi/printing'
+import { IMPRESSION_ACTIVE } from '../config.js'
 import { useApp } from '../etat/contexte.js'
 import { PaveNumerique } from '../composants/PaveNumerique.js'
 
@@ -137,23 +138,33 @@ export function EcranClotureShift({ shift, onFerme, onAnnuler }: PropsCloture) {
       await app.caisse.cloturerShift(shift.id, compte, resume.attenduMillimes, note || null)
       await app.etat.ecrire('shift_courant', '')
 
-      // Le rapport part à l'imprimante du bar, celle qui est près de la caisse.
-      const imprimante = [...stations.values()].find((s) => s.hote) ?? null
-      await impression.mettreEnFile({
-        id: uuidV7(),
-        restaurantId: identite.restaurantId,
-        kind: 'rapport',
-        charge: rendreTicketShift({
-          type: 'shift',
-          etablissement,
-          employe: employe?.nom ?? null,
-          ouvertA: shift.ouvertA,
-          closA: new Date().toISOString(),
-          resume: { ...resume, compteMillimes: millimes(compte), ecartMillimes: millimes(ecart) },
-        }),
-        hote: imprimante?.hote ?? null,
-        port: imprimante?.port,
-      })
+      // Impression éteinte (MVP) : le rapport n'entre pas en file. Il reste
+      // consultable — la clôture est écrite dans `shifts`, et le back-office
+      // la restitue dans « Journée ». Rien n'est perdu, rien n'attend une
+      // imprimante qui n'existe pas encore.
+      if (IMPRESSION_ACTIVE) {
+        // Le rapport part à l'imprimante du bar, celle qui est près de la caisse.
+        const imprimante = [...stations.values()].find((s) => s.hote) ?? null
+        await impression.mettreEnFile({
+          id: uuidV7(),
+          restaurantId: identite.restaurantId,
+          kind: 'rapport',
+          charge: rendreTicketShift({
+            type: 'shift',
+            etablissement,
+            employe: employe?.nom ?? null,
+            ouvertA: shift.ouvertA,
+            closA: new Date().toISOString(),
+            resume: {
+              ...resume,
+              compteMillimes: millimes(compte),
+              ecartMillimes: millimes(ecart),
+            },
+          }),
+          hote: imprimante?.hote ?? null,
+          port: imprimante?.port,
+        })
+      }
       onFerme()
     } finally {
       setEnCours(false)
@@ -266,7 +277,7 @@ export function EcranClotureShift({ shift, onFerme, onAnnuler }: PropsCloture) {
             disabled={enCours || (alerte && note.trim() === '')}
             onClick={() => void cloturer()}
           >
-            {enCours ? 'Clôture…' : 'Clôturer et imprimer'}
+            {enCours ? 'Clôture…' : IMPRESSION_ACTIVE ? 'Clôturer et imprimer' : 'Clôturer la caisse'}
           </button>
         </div>
         {alerte && note.trim() === '' && (

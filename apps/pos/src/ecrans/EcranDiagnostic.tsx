@@ -16,6 +16,7 @@ import type { Station, TravailImpression } from '@kaissi/db-local'
 import type { ContexteApplication } from '../donnees/demarrage.js'
 import type { EtatReseau } from '../donnees/reseau.js'
 import { ImprimanteReseau } from '../plugins/imprimante.js'
+import { IMPRESSION_ACTIVE } from '../config.js'
 
 interface Props {
   contexte: ContexteApplication
@@ -128,69 +129,84 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
         </div>
       </section>
 
-      <section className="bloc">
-        <h2>Imprimantes</h2>
-        <p className="note">
-          L'adresse est celle de l'imprimante sur le réseau du restaurant, et
-          le port est presque toujours 9100. Sur un émulateur, la machine qui
-          fait tourner l'imprimante virtuelle se désigne par{' '}
-          <code>10.0.2.2</code> — <code>localhost</code> désignerait
-          l'émulateur lui-même.
-        </p>
-        {stations.length === 0 ? (
-          <p className="note">Aucune station configurée.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Station</th>
-                <th>Adresse</th>
-                <th>Port</th>
-                <th />
-                <th>Dernier essai</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stations.map((s) => (
-                <tr key={s.id}>
-                  <td>{s.nom}</td>
-                  <td>
-                    <input
-                      className="mono"
-                      value={s.hote ?? ''}
-                      placeholder="192.168.1.50"
-                      onChange={(ev) => majStation(s.id, { hote: ev.target.value })}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      className="mono port"
-                      inputMode="numeric"
-                      value={String(s.port)}
-                      onChange={(ev) =>
-                        majStation(s.id, { port: Number(ev.target.value) || 0 })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <button type="button" onClick={() => testerStation(s)}>
-                      Tester
-                    </button>
-                  </td>
-                  <td className="detail">{essais[s.id] ?? '—'}</td>
+      {!IMPRESSION_ACTIVE && (
+        <section className="bloc">
+          <h2>Impression — désactivée</h2>
+          <p className="note">
+            Ce build n'imprime pas. Les tickets s'affichent à l'écran et la
+            cuisine lit ses commandes au back-office. Le module ESC/POS, la
+            file persistante et le plugin natif sont intacts : un build avec{' '}
+            <code>VITE_IMPRESSION=1</code> les rallume, et cet écran retrouve
+            la configuration des imprimantes.
+          </p>
+        </section>
+      )}
+
+      {IMPRESSION_ACTIVE && (
+        <section className="bloc">
+          <h2>Imprimantes</h2>
+          <p className="note">
+            L'adresse est celle de l'imprimante sur le réseau du restaurant, et
+            le port est presque toujours 9100. Sur un émulateur, la machine qui
+            fait tourner l'imprimante virtuelle se désigne par{' '}
+            <code>10.0.2.2</code> — <code>localhost</code> désignerait
+            l'émulateur lui-même.
+          </p>
+          {stations.length === 0 ? (
+            <p className="note">Aucune station configurée.</p>
+          ) : (
+            <table>
+              <thead>
+                <tr>
+                  <th>Station</th>
+                  <th>Adresse</th>
+                  <th>Port</th>
+                  <th />
+                  <th>Dernier essai</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        <p className="note">
-          La saisie est enregistrée sur cet appareil. Une fois la tablette
-          appairée, <code>stations</code> devient un référentiel tiré du
-          serveur : c'est le back-office qui fait alors autorité, sinon deux
-          tablettes du même restaurant imprimeraient à deux endroits
-          différents.
-        </p>
-      </section>
+              </thead>
+              <tbody>
+                {stations.map((s) => (
+                  <tr key={s.id}>
+                    <td>{s.nom}</td>
+                    <td>
+                      <input
+                        className="mono"
+                        value={s.hote ?? ''}
+                        placeholder="192.168.1.50"
+                        onChange={(ev) => majStation(s.id, { hote: ev.target.value })}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="mono port"
+                        inputMode="numeric"
+                        value={String(s.port)}
+                        onChange={(ev) =>
+                          majStation(s.id, { port: Number(ev.target.value) || 0 })
+                        }
+                      />
+                    </td>
+                    <td>
+                      <button type="button" onClick={() => testerStation(s)}>
+                        Tester
+                      </button>
+                    </td>
+                    <td className="detail">{essais[s.id] ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <p className="note">
+            La saisie est enregistrée sur cet appareil. Une fois la tablette
+            appairée, <code>stations</code> devient un référentiel tiré du
+            serveur : c'est le back-office qui fait alors autorité, sinon deux
+            tablettes du même restaurant imprimeraient à deux endroits
+            différents.
+          </p>
+        </section>
+      )}
 
       <section className="bloc">
         <h2>Démarrage</h2>
@@ -235,6 +251,12 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
           </dd>
           <dt>Détail</dt>
           <dd>{contexte.base.detail}</dd>
+          {contexte.base.avertissement && (
+            <>
+              <dt>Réserve</dt>
+              <dd className="attention">{contexte.base.avertissement}</dd>
+            </>
+          )}
           <dt>Version de schéma</dt>
           <dd>{contexte.versionSchema}</dd>
         </dl>
@@ -285,56 +307,58 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
         </p>
       </section>
 
-      <section className="bloc">
-        <h2>File d'impression</h2>
-        <dl>
-          <dt>En attente</dt>
-          <dd className={impression.enAttente > 0 ? 'attention' : ''}>
-            {impression.enAttente}
-          </dd>
-          <dt>En échec</dt>
-          <dd className={impression.echecs > 0 ? 'attention' : ''}>{impression.echecs}</dd>
-        </dl>
-        {echecs.length > 0 && (
-          <table>
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Imprimante</th>
-                <th>Tentatives</th>
-                <th>Erreur</th>
-              </tr>
-            </thead>
-            <tbody>
-              {echecs.map((t) => (
-                <tr key={t.id}>
-                  <td>{t.kind}</td>
-                  <td className="mono">
-                    {t.hote ?? '—'}:{t.port}
-                  </td>
-                  <td className="nombre">{t.tentatives}</td>
-                  <td className="detail">
-                    {t.derniereErreur ? formaterErreurImpression(t.derniereErreur) : '—'}
-                  </td>
+      {IMPRESSION_ACTIVE && (
+        <section className="bloc">
+          <h2>File d'impression</h2>
+          <dl>
+            <dt>En attente</dt>
+            <dd className={impression.enAttente > 0 ? 'attention' : ''}>
+              {impression.enAttente}
+            </dd>
+            <dt>En échec</dt>
+            <dd className={impression.echecs > 0 ? 'attention' : ''}>{impression.echecs}</dd>
+          </dl>
+          {echecs.length > 0 && (
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Imprimante</th>
+                  <th>Tentatives</th>
+                  <th>Erreur</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        {impression.echecs > 0 && (
-          <p>
-            <button type="button" onClick={() => void relancerImpressions()}>
-              Relancer les {impression.echecs} ticket(s) en échec
-            </button>
+              </thead>
+              <tbody>
+                {echecs.map((t) => (
+                  <tr key={t.id}>
+                    <td>{t.kind}</td>
+                    <td className="mono">
+                      {t.hote ?? '—'}:{t.port}
+                    </td>
+                    <td className="nombre">{t.tentatives}</td>
+                    <td className="detail">
+                      {t.derniereErreur ? formaterErreurImpression(t.derniereErreur) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {impression.echecs > 0 && (
+            <p>
+              <button type="button" onClick={() => void relancerImpressions()}>
+                Relancer les {impression.echecs} ticket(s) en échec
+              </button>
+            </p>
+          )}
+          <p className="note">
+            Un ticket en échec n'est jamais supprimé : il reste ici jusqu'à ce
+            qu'un responsable le relance ou l'abandonne explicitement. Après cinq
+            tentatives, la file cesse de réessayer seule — sinon une panne
+            durable resterait invisible derrière des essais sans fin.
           </p>
-        )}
-        <p className="note">
-          Un ticket en échec n'est jamais supprimé : il reste ici jusqu'à ce
-          qu'un responsable le relance ou l'abandonne explicitement. Après cinq
-          tentatives, la file cesse de réessayer seule — sinon une panne
-          durable resterait invisible derrière des essais sans fin.
-        </p>
-      </section>
+        </section>
+      )}
 
       <section className="bloc">
         <h2>Identité locale</h2>

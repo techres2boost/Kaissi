@@ -34,8 +34,10 @@ import {
   type TypeCommande,
   type TypeEvenement,
 } from '@kaissi/domain'
+import type { TicketClient, TicketCuisine } from '@kaissi/domain'
 import { projeterCommande } from '@kaissi/db-local'
 import { rendreTicketClient, rendreTicketCuisine } from '@kaissi/printing'
+import { IMPRESSION_ACTIVE } from '../config.js'
 import type { ContexteApplication } from './demarrage.js'
 import type { ServiceImpression } from './impression.js'
 
@@ -318,7 +320,13 @@ export class SessionCaisse {
     orderId: string,
     stations: ReadonlyMap<string, { nom: string; hote: string | null; port: number }>,
     libelleTable: string | null,
-  ): Promise<{ etat: EtatCommande; lignesEnvoyees: number; bons: number }> {
+  ): Promise<{
+    etat: EtatCommande
+    lignesEnvoyees: number
+    bons: number
+    /** Bons construits, à AFFICHER quand l'impression est éteinte. */
+    tickets: readonly TicketCuisine[]
+  }> {
     this.garde(acteur, 'commande.envoyer_cuisine')
     const etat = await this.etatDe(orderId)
     this.gardeTransition(etat, 'order.sent')
@@ -326,7 +334,7 @@ export class SessionCaisse {
     const dejaEnvoyees = await this.contexte.caisse.lignesDejaEnvoyees(orderId)
     const aEnvoyer = etat.lignes.filter((l) => !l.annulee && !dejaEnvoyees.has(l.id))
     if (aEnvoyer.length === 0) {
-      return { etat, lignesEnvoyees: 0, bons: 0 }
+      return { etat, lignesEnvoyees: 0, bons: 0, tickets: [] }
     }
 
     const parStation = new Map<string, string[]>()
@@ -346,6 +354,7 @@ export class SessionCaisse {
     const nouvelEtat = await this.appliquer(orderId, [e])
 
     let bons = 0
+    const tickets: TicketCuisine[] = []
     for (const [stationId, lignesId] of parStation) {
       const station = stations.get(stationId)
       const ticket = construireTicketCuisine(nouvelEtat, {
@@ -356,17 +365,25 @@ export class SessionCaisse {
         // Une commande déjà envoyée qui repart, c'est une tournée de plus.
         rappel: dejaEnvoyees.size > 0,
       })
-      const jobId = uuidV7()
-      await this.impression.mettreEnFile({
-        id: jobId,
-        restaurantId: this.identite.restaurantId,
-        orderId,
-        stationId: stationId === '__sans_station__' ? null : stationId,
-        kind: 'kot',
-        charge: rendreTicketCuisine(ticket),
-        hote: station?.hote ?? null,
-        port: station?.port,
-      })
+      tickets.push(ticket)
+
+      // Impression éteinte (MVP) : le bon n'entre pas en file, mais l'envoi
+      // reste TRACÉ dans `kitchen_sends`. C'est cette trace, et non le
+      // ticket, qui interdit de préparer deux fois le même plat — et c'est
+      // elle que la cuisine lit au back-office via l'événement `order.sent`.
+      const jobId = IMPRESSION_ACTIVE ? uuidV7() : null
+      if (jobId !== null) {
+        await this.impression.mettreEnFile({
+          id: jobId,
+          restaurantId: this.identite.restaurantId,
+          orderId,
+          stationId: stationId === '__sans_station__' ? null : stationId,
+          kind: 'kot',
+          charge: rendreTicketCuisine(ticket),
+          hote: station?.hote ?? null,
+          port: station?.port,
+        })
+      }
       await this.contexte.caisse.marquerEnvoyees(
         orderId,
         lignesId,
@@ -376,7 +393,7 @@ export class SessionCaisse {
       bons += 1
     }
 
-    return { etat: nouvelEtat, lignesEnvoyees: aEnvoyer.length, bons }
+    return { etat: nouvelEtat, lignesEnvoyees: aEnvoyer.length, bons, tickets }
   }
 
   // ── Encaissement ──────────────────────────────────────────────────────
@@ -406,9 +423,14 @@ export class SessionCaisse {
   }
 
   /**
-   * Clôture la commande et met le ticket client en file d'impression.
-   * L'impression n'est PAS bloquante : si l'imprimante est éteinte, la vente
-   * est quand même enregistrée et le badge « ticket non imprimé » s'allume.
+   * Clôture la commande et construit le ticket client.
+   *
+   * Le ticket est TOUJOURS construit, et rendu à l'appelant : c'est lui qui
+   * décide de l'afficher, de l'imprimer, ou des deux. L'impression, quand
+   * elle est allumée, n'est PAS bloquante — si l'imprimante est éteinte, la
+   * vente est quand même enregistrée et le badge « ticket non imprimé »
+   * s'allume. Éteinte (MVP), le ticket s'affiche à l'écran et rien n'entre
+   * en file.
    */
   async cloturer(
     acteur: Employe | null,
@@ -421,7 +443,7 @@ export class SessionCaisse {
       readonly ouvrirTiroir: boolean
       readonly imprimer: boolean
     },
-  ): Promise<EtatCommande> {
+  ): Promise<{ etat: EtatCommande; ticket: TicketClient }> {
     this.garde(acteur, 'paiement.encaisser')
     const etat = await this.etatDe(orderId)
     this.gardeTransition(etat, 'order.closed')
@@ -440,14 +462,15 @@ export class SessionCaisse {
     )
     const nouvelEtat = await this.appliquer(orderId, [e])
 
-    if (options.imprimer) {
-      const ticket = construireTicketClient(nouvelEtat, totaux, {
-        etablissement: this.etablissement,
-        employe: acteur?.nom ?? null,
-        libelleTable: options.libelleTable,
-        numeroFiscal: null,
-        libellesPaiement: options.libellesPaiement,
-      })
+    const ticket = construireTicketClient(nouvelEtat, totaux, {
+      etablissement: this.etablissement,
+      employe: acteur?.nom ?? null,
+      libelleTable: options.libelleTable,
+      numeroFiscal: null,
+      libellesPaiement: options.libellesPaiement,
+    })
+
+    if (options.imprimer && IMPRESSION_ACTIVE) {
       await this.impression.mettreEnFile({
         id: uuidV7(),
         restaurantId: this.identite.restaurantId,
@@ -459,7 +482,7 @@ export class SessionCaisse {
       })
     }
 
-    return nouvelEtat
+    return { etat: nouvelEtat, ticket }
   }
 
   async annulerCommande(

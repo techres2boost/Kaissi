@@ -21,10 +21,13 @@ import {
   type Millimes,
   type ModePaiement,
 } from '@kaissi/domain'
+import { rendreTicketClient } from '@kaissi/printing'
 import { useApp } from '../etat/contexte.js'
 import { RefusOperation } from '../donnees/session.js'
 import { Modale } from '../composants/Modale.js'
 import { PaveNumerique } from '../composants/PaveNumerique.js'
+import { TicketEcran } from '../composants/TicketEcran.js'
+import { IMPRESSION_ACTIVE } from '../config.js'
 
 interface Props {
   readonly orderId: string
@@ -41,6 +44,12 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
   const [saisie, setSaisie] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [enCours, setEnCours] = useState(false)
+  /**
+   * Ticket de la vente qui vient d'être close, tant que le caissier ne l'a
+   * pas fermé. La vente est DÉJÀ enregistrée à ce stade : fermer cette
+   * fenêtre ne peut plus rien annuler, elle ne fait que rendre la caisse.
+   */
+  const [ticketEmis, setTicketEmis] = useState<Uint8Array | null>(null)
 
   const recharger = useCallback(async () => {
     setEtat(await session.etatDe(orderId))
@@ -125,7 +134,7 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
       const libelleTable = tables.find((t) => t.id === etat?.tableId)?.label ?? null
       const imprimante = [...stations.values()].find((s) => s.hote) ?? null
       const especes = (etat?.paiements ?? []).some((p) => !p.annule && p.mode === 'cash')
-      await session.cloturer(employe, orderId, {
+      const { ticket } = await session.cloturer(employe, orderId, {
         libellesPaiement: Object.fromEntries(methodesPaiement.map((m) => [m.id, m.nom])),
         libelleTable,
         hoteImprimante: imprimante?.hote ?? null,
@@ -134,7 +143,13 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
         imprimer: true,
       })
       app.rafraichir()
-      onTermine()
+      // Impression allumée : le ticket part en file et la caisse enchaîne.
+      // Éteinte (MVP) : on l'affiche, et c'est le caissier qui enchaîne.
+      if (IMPRESSION_ACTIVE) {
+        onTermine()
+      } else {
+        setTicketEmis(rendreTicketClient(ticket, { ouvrirTiroir: false }))
+      }
     } catch (e) {
       setMessage(e instanceof Error ? e.message : String(e))
     } finally {
@@ -192,7 +207,7 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
             disabled={enCours}
             onClick={() => void cloturer()}
           >
-            {enCours ? 'Clôture…' : 'Encaisser et imprimer'}
+            {enCours ? 'Clôture…' : IMPRESSION_ACTIVE ? 'Encaisser et imprimer' : 'Encaisser'}
           </button>
         )}
       </section>
@@ -248,6 +263,19 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
       {message && (
         <Modale titre="Opération refusée" onFermer={() => setMessage(null)}>
           <p>{message}</p>
+        </Modale>
+      )}
+
+      {ticketEmis && (
+        <Modale titre="Ticket client" onFermer={onTermine}>
+          <TicketEcran charge={ticketEmis} />
+          <p className="aide">
+            La vente est enregistrée. Montrez ce ticket au client, ou fermez
+            simplement cette fenêtre.
+          </p>
+          <button type="button" className="principal grand" onClick={onTermine}>
+            Terminer
+          </button>
         </Modale>
       )}
     </div>
