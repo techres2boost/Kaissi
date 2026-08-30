@@ -10,9 +10,12 @@ describe('expliquerErreurBase', () => {
       code: 'SELF_SIGNED_CERT_IN_CHAIN',
     })
     const { explication } = expliquerErreurBase(e)
-    expect(explication).toMatch(/NODE_EXTRA_CA_CERTS/)
+    // La solution mise en avant est de FOURNIR le certificat — par son
+    // contenu (DATABASE_CA, la forme des conteneurs) ou par un chemin en
+    // local (DATABASE_CA_FILE) — et jamais de couper la vérification.
+    expect(explication).toMatch(/DATABASE_CA\b/)
     expect(explication).toMatch(/DATABASE_CA_FILE/)
-    expect(explication.indexOf('NODE_EXTRA_CA_CERTS')).toBeLessThan(
+    expect(explication.indexOf('DATABASE_CA')).toBeLessThan(
       explication.indexOf('DATABASE_SSL=false'),
     )
     expect(explication).toMatch(/jamais en production/)

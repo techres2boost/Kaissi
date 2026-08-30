@@ -326,6 +326,26 @@ build command, ni start command, ni port à saisir.
 |---|---|
 | `DATABASE_URL` | l'URI du §1.4, avec `MOT2PASSE` laissé tel quel |
 | `DATABASE_PASSWORD` | le vrai mot de passe, **sans encodage** |
+| `DATABASE_CA` | le **contenu** du certificat Supabase (voir juste en dessous) |
+
+Le certificat, c'est le piège suivant, et il est réel : le pooler Supabase
+présente un certificat signé par **sa propre autorité**, que Node ne connaît
+pas. Sans lui, le conteneur démarre puis crashe sur `self-signed certificate
+in certificate chain`.
+
+En local on donne un **chemin** de fichier ; dans un conteneur, un chemin ne
+désigne rien. Il faut donc le **contenu** :
+
+1. Supabase → **Project Settings → Database → SSL Configuration →
+   « Download certificate »**. Tu obtiens `prod-ca-2021.crt`.
+2. Ouvre-le dans un éditeur de texte, copie **tout** (de `-----BEGIN` à
+   `-----END-----`).
+3. Railway → *Variables* → **Raw Editor** (il accepte les valeurs
+   multi-lignes) → ajoute `DATABASE_CA` avec ce contenu collé tel quel.
+
+> `DATABASE_CA` porte le contenu ; `DATABASE_CA_FILE` un chemin. N'utilise
+> **pas** `DATABASE_CA_FILE` sur Railway : le fichier `C:\…` de ton PC
+> n'existe pas dans le conteneur — c'est exactement ce qui échoue sinon.
 
 Et c'est tout. Pas de `NODE_ENV` (le Dockerfile le pose), pas de `SYNC_PORT`
 (le service écoute le `PORT` que Railway injecte). Laisse aussi
@@ -583,6 +603,7 @@ l'idempotence et le banc à trois appareils contre une vraie base.
 | `password authentication failed` | mot de passe de **base**, pas celui du **compte** Supabase — Project Settings → Database → *Reset database password* |
 | Railway plante sur `connect ENETUNREACH 2a05:…` | `DATABASE_URL` pointe sur la connexion **directe** (IPv6). Prends le **Session pooler** (§1.4) |
 | `{"code":502,"message":"Application failed to respond"}` | le conteneur a démarré puis a **crashé** — ouvre *Deploy Logs*, le message y est en clair |
+| `self-signed certificate in certificate chain` sur Railway | il manque `DATABASE_CA` (le **contenu** du certificat Supabase), ou tu as mis `DATABASE_CA_FILE` avec un chemin qui n'existe pas dans le conteneur (§3.2) |
 | Le POS affiche « démo — mémoire » | build fait avec la mauvaise cible : `pnpm pos:build:web` |
 | Écran de cuisine vide | la caisse n'est pas appairée, ou rien n'a encore été envoyé en cuisine |
 | Le badge `⇅ n` ne redescend pas | API de sync injoignable : `curl .../sante` |
