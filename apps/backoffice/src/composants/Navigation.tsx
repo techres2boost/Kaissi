@@ -5,10 +5,21 @@ import { usePathname } from 'next/navigation'
 import { seDeconnecter } from '../app/connexion/actions.js'
 import type { Etablissement, SessionBackoffice } from '../serveur/session.js'
 
+/**
+ * Les onglets, et qui les voit.
+ *
+ * `gestionnaire` marque ceux qui MODIFIENT le référentiel. Les afficher à
+ * un cuisinier ne serait pas une faille — RLS refuserait l'écriture — mais
+ * un bouton qui échoue toujours fait conclure que le logiciel est cassé.
+ *
+ * L'inverse est vrai aussi : « Cuisine » reste visible pour tout le monde.
+ * Un gérant a de bonnes raisons de regarder ce que la cuisine voit.
+ */
 const ONGLETS = [
-  { chemin: 'journee', libelle: 'Journée' },
-  { chemin: 'catalogue', libelle: 'Catalogue' },
-  { chemin: 'employes', libelle: 'Employés' },
+  { chemin: 'cuisine', libelle: 'Cuisine', gestionnaire: false },
+  { chemin: 'journee', libelle: 'Journée', gestionnaire: false },
+  { chemin: 'catalogue', libelle: 'Catalogue', gestionnaire: true },
+  { chemin: 'employes', libelle: 'Employés', gestionnaire: true },
 ] as const
 
 export function Navigation({
@@ -33,7 +44,7 @@ export function Navigation({
       )}
 
       <nav>
-        {ONGLETS.map((onglet) => {
+        {ONGLETS.filter((o) => !o.gestionnaire || etablissement.gestionnaire).map((onglet) => {
           // Le gabarit est écrit dans le JSX plutôt que stocké dans un `const` :
           // TypeScript conserve alors son type littéral, et les routes typées
           // détectent un onglet qui pointerait vers une page inexistante.
