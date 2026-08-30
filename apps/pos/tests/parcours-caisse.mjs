@@ -107,11 +107,11 @@ await etape('le total tient compte du supplément', async () => {
   if (!total.includes('20,200')) throw new Error(`total inattendu : ${total}`)
 })
 
-await etape('envoi en cuisine', async () => {
+await etape('envoi en cuisine — le bon s’affiche au lieu de s’imprimer', async () => {
   await page.click('.actions-commande button:has-text("Cuisine")')
-  await page.waitForSelector('.modale:has-text("article")', { timeout: 10000 })
-  const msg = await page.textContent('.modale .corps')
-  console.log(`    ${msg.trim()}`)
+  await page.waitForSelector('.modale:has-text("Envoyé en cuisine")', { timeout: 10000 })
+  const bon = await page.textContent('.modale .ticket-ecran')
+  console.log(`    bon de cuisine :\n${bon.split('\n').map((l) => `      ${l}`).join('\n')}`)
   await page.click('.modale .fermer')
 })
 
@@ -163,8 +163,13 @@ await etape('paiement en espèces avec suggestion', async () => {
   if (!rendu.includes('0,900')) throw new Error(`rendu attendu 0,900 — obtenu ${rendu}`)
 })
 
-await etape('clôture de la commande', async () => {
+await etape('clôture de la commande — le ticket client s’affiche', async () => {
   await page.click('.colonne-recap .principal.grand')
+  await page.waitForSelector('.modale:has-text("Ticket client")', { timeout: 15000 })
+  const ticket = await page.textContent('.modale .ticket-ecran')
+  console.log(`    ticket client :\n${ticket.split('\n').map((l) => `      ${l}`).join('\n')}`)
+  if (!ticket.includes('TOTAL')) throw new Error('le ticket ne porte pas de total')
+  await page.click('.modale .principal')
   await page.waitForSelector('.grille-tables', { timeout: 15000 })
 })
 
@@ -173,9 +178,10 @@ await etape('la table 3 est de nouveau libre', async () => {
   if (!libre) throw new Error('la table 3 est restée occupée')
 })
 
-await etape('le badge d’impression signale les tickets non partis', async () => {
-  const badge = await page.textContent('.badge-impression').catch(() => null)
-  console.log(`    badge : ${badge ?? 'aucun'}`)
+await etape('aucune file d’impression : ce build n’imprime pas', async () => {
+  const badge = await page.$('.badge-impression')
+  if (badge) throw new Error("un badge d'impression est apparu alors que l'impression est éteinte")
+  console.log('    aucun badge — rien n’attend une imprimante')
 })
 
 await nav.close()

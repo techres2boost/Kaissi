@@ -150,8 +150,12 @@ export type LigneVentilation = {
 
 export type Commande = {
   id: Uuid
+  organization_id: Uuid
   restaurant_id: Uuid
+  table_id: Uuid | null
   status: string
+  /** `dine_in` | `takeaway` | `delivery`. */
+  type: string
   ticket_number: string | null
   subtotal_millimes: Millimes
   discount_millimes: Millimes
@@ -161,7 +165,49 @@ export type Commande = {
   total_millimes: Millimes
   tax_breakdown: LigneVentilation[]
   covers: number | null
+  opened_at: Horodatage
+  /** Horodatage du premier envoi en cuisine. Alimente l'écran de cuisine. */
+  sent_at: Horodatage | null
   closed_at: Horodatage | null
+}
+
+/**
+ * Une ligne de commande, telle que l'écran de cuisine la lit.
+ *
+ * Réduite à ce qui sert à PRÉPARER un plat : ni prix, ni taxe, ni remise. La
+ * cuisine n'a aucune raison de voir des montants, et les colonnes non
+ * déclarées ici ne peuvent pas être demandées par erreur.
+ */
+export type LigneCommande = {
+  id: Uuid
+  restaurant_id: Uuid
+  order_id: Uuid
+  station_id: Uuid | null
+  designation: string
+  qty: number
+  modifiers: { nom?: string; prixDeltaMillimes?: number }[]
+  note: string | null
+  position: number
+  voided_at: Horodatage | null
+}
+
+export type TableSalle = {
+  id: Uuid
+  restaurant_id: Uuid
+  label: string
+  archived_at: Horodatage | null
+}
+
+/**
+ * Marqueur « commande prête », posé depuis l'écran de cuisine (0018).
+ * N'appartient PAS au journal de la commande : voir la migration.
+ */
+export type CuisinePrete = {
+  order_id: Uuid
+  organization_id: Uuid
+  restaurant_id: Uuid
+  ready_at: Horodatage
+  ready_by: Uuid | null
 }
 
 export type Paiement = {
@@ -218,6 +264,9 @@ export type Database = {
       tax_rates: Table<TauxTaxe>
       products: Table<Produit>
       orders: Table<Commande>
+      order_items: Table<LigneCommande>
+      tables: Table<TableSalle>
+      kitchen_ready: Table<CuisinePrete>
       payments: Table<Paiement>
       shifts: Table<Shift, [VersUtilisateur<'shifts_user_id_fkey'>]>
     }

@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react'
 import type { Shift } from '@kaissi/domain'
+import { IMPRESSION_ACTIVE } from './config.js'
 import { demarrer, type ContexteApplication } from './donnees/demarrage.js'
 import { useEtatReseau } from './donnees/reseau.js'
 import { FournisseurApp, useApp } from './etat/contexte.js'
@@ -289,7 +290,7 @@ function Bandeau({
           Le badge « tickets non imprimés » est visible en permanence : un KOT
           resté en file, c'est un plat qui n'arrivera jamais en salle.
         */}
-        {(impression.enAttente > 0 || impression.echecs > 0) && (
+        {IMPRESSION_ACTIVE && (impression.enAttente > 0 || impression.echecs > 0) && (
           <span
             className={`badge-impression ${impression.echecs > 0 ? 'echec' : ''}`}
             title={

@@ -20,6 +20,7 @@ import type { EmployeLocal, MethodePaiementLocale, TableLocale } from '@kaissi/d
 import type { ContexteApplication } from '../donnees/demarrage.js'
 import { MoteurSync, transportHttp, type ResumeSync } from '@kaissi/sync-client'
 import { uuidV7 } from '@kaissi/domain'
+import { IMPRESSION_ACTIVE } from '../config.js'
 import { SessionCaisse, type IdentiteTerminal } from '../donnees/session.js'
 import { ServiceImpression, type EtatImpression } from '../donnees/impression.js'
 import { depotLocalSync } from '../donnees/synchronisation.js'
@@ -166,6 +167,10 @@ export function FournisseurApp({ app, children }: Props) {
   }, [app])
 
   useEffect(() => {
+    // Impression éteinte : ni abonnement, ni boucle de drainage. Une boucle
+    // qui tourne toutes les cinq secondes pour ne rien trouver, c'est de la
+    // batterie dépensée à ne rien faire sur une tablette d'entrée de gamme.
+    if (!IMPRESSION_ACTIVE) return
     const desabonner = impression.abonner(setEtatImpression)
     impression.demarrer()
     return () => {

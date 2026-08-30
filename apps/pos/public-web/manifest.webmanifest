@@ -1,0 +1,20 @@
+{
+  "name": "Kaissi — Caisse",
+  "short_name": "Kaissi",
+  "description": "Terminal de caisse Kaissi (Res2Boost).",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#111417",
+  "theme_color": "#111417",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "./icone.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -64,12 +64,26 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Build du POS + vérification du mode avion
+      - name: Build du POS (cible Android) + vérification du mode avion
         run: pnpm --filter @kaissi/pos build
-      - name: Archiver le bundle
+      # Archivé AVANT le build web : les deux cibles écrivent dans le même
+      # `dist`, et c'est le bundle embarqué dans l'APK qu'on veut pouvoir
+      # inspecter après coup.
+      - name: Archiver le bundle Android
         uses: actions/upload-artifact@v4
         with:
           name: bundle-pos
+          path: apps/pos/dist
+          retention-days: 7
+      # La cible web sert le MÊME code comme site statique. Elle a sa propre
+      # politique de sécurité (WebAssembly) et son propre service worker :
+      # la construire ici évite de découvrir une régression au déploiement.
+      - name: Build du POS (cible web) + vérification du mode avion
+        run: pnpm --filter @kaissi/pos build:web
+      - name: Archiver le bundle web
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-pos-web
           path: apps/pos/dist
           retention-days: 7
 

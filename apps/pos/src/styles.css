@@ -692,3 +692,24 @@ button { font: inherit; color: inherit; cursor: pointer; }
   border: 1px solid rgba(201, 168, 107, 0.4);
   cursor: help;
 }
+
+/* ── Ticket à l'écran ──────────────────────────────────────────────────────
+   Le ticket est du texte à chasse fixe, aligné sur 42 colonnes comme le
+   papier. La police proportionnelle casserait les colonnes de montants et
+   ferait douter d'un total pourtant juste. */
+.ticket-ecran {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  white-space: pre;
+  overflow-x: auto;
+  margin: 0 0 1rem;
+  padding: 0.9rem 1rem;
+  color: #14181c;
+  background: #fffdf7;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 6px;
+  /* Le papier thermique n'a pas de marge : la sienne vient du rouleau. */
+  max-height: 55vh;
+  overflow-y: auto;
+}
