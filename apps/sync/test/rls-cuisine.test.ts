@@ -141,6 +141,26 @@ describe('un cuisinier fait son travail', () => {
   })
 })
 
+describe('ce que RLS ne fait PAS à la place de l’application', () => {
+  it('rend aussi les appartenances des COLLÈGUES — d’où le filtre du back-office', async () => {
+    // `memberships_lecture` est volontairement large : l'écran « Employés »
+    // doit pouvoir lister l'équipe. Conséquence à ne jamais oublier : une
+    // requête sur `memberships` sans `where user_id = moi` ne rend pas MON
+    // rôle, elle rend ceux de tout le monde.
+    //
+    // `sessionObligatoire` filtre donc explicitement. Sans ce filtre, le rôle
+    // retenu était celui de la première ligne rendue par la base : un
+    // cuisinier héritait des droits d'un gérant, sans la moindre erreur.
+    // Ce test existe pour qu'un élargissement de la politique ne passe pas
+    // inaperçu.
+    expect(
+      await dansLaPeauDe(cuisinier, 'select 1 from kaissi.memberships where user_id = $1', [
+        gerant,
+      ]),
+    ).toBe('applique')
+  })
+})
+
 describe('cloisonnement — l’écran de cuisine ne traverse pas les clients', () => {
   it('un cuisinier d’un autre restaurant ne voit ni la commande, ni le « prêt »', async () => {
     const autreOrg = uuidV7()

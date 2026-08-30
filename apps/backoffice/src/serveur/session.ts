@@ -66,10 +66,28 @@ export async function sessionObligatoire(): Promise<SessionBackoffice> {
     .eq('auth_user_id', user.id)
     .maybeSingle()
 
-  const { data, error } = await supabase
-    .from('memberships')
-    .select('role, organization_id, restaurant_id, restaurants(name)')
-    .is('revoked_at', null)
+  /*
+   * MES appartenances — et le filtre sur `user_id` est INDISPENSABLE.
+   *
+   * La politique `memberships_lecture` rend, à dessein, TOUTES les
+   * appartenances de mes établissements : c'est ce qui permet à l'écran
+   * « Employés » de lister l'équipe. Sans `eq('user_id', …)`, cette requête
+   * renvoyait donc une ligne par COLLÈGUE, et `etablissements` contenait
+   * vingt fois le même restaurant avec des rôles arbitraires. Le rôle retenu
+   * était alors celui de la première ligne rendue par la base : un cuisinier
+   * pouvait hériter des droits d'un gérant, et un admin se voir refuser les
+   * siens — sans la moindre erreur nulle part.
+   *
+   * RLS protège du CLOISONNEMENT entre clients ; elle ne dit pas qui je suis
+   * dans mon propre restaurant. Ce filtre-là est applicatif, par nature.
+   */
+  const { data, error } = moi
+    ? await supabase
+        .from('memberships')
+        .select('role, organization_id, restaurant_id, restaurants(name)')
+        .eq('user_id', moi.id as string)
+        .is('revoked_at', null)
+    : { data: [], error: null }
 
   if (error) {
     throw new Error(
