@@ -59,6 +59,35 @@ export function expliquerErreurBase(
     }
   }
 
+  // ENETUNREACH / EHOSTUNREACH : aucune route vers l’adresse. Sur Railway,
+  // Render ou Fly, c’est presque toujours la connexion DIRECTE de Supabase,
+  // qui ne résout plus qu’en IPv6 alors que ces plateformes n’ont pas de
+  // sortie IPv6. Le message brut (une adresse « 2a05:… ») ne dit rien de
+  // tout cela, et pousse à chercher un pare-feu qui n’existe pas.
+  if (m.includes('enetunreach') || m.includes('ehostunreach')) {
+    const ipv6 = /connect e(net|host)unreach [0-9a-f]*:[0-9a-f]*:/i.test(origine)
+    return {
+      origine,
+      explication: [
+        "Aucune route réseau vers l'adresse de la base." +
+          (ipv6 ? ' Elle a été jointe en IPv6.' : ''),
+        '',
+        "  C'est le piège Supabase + Railway/Render/Fly le plus courant :",
+        "  la connexion DIRECTE « db.<ref>.supabase.co » ne résout plus qu'en",
+        "  IPv6, et ces plateformes n'ont pas de sortie IPv6. La connexion",
+        "  échoue donc avant même d'atteindre le serveur.",
+        '',
+        "  La solution n'est PAS d'activer IPv6 : utilise le SESSION POOLER,",
+        "  qui répond en IPv4. Dans DATABASE_URL, l'hôte doit être",
+        '      aws-0-<région>.pooler.supabase.com     (port 5432)',
+        "  et l'utilisateur   postgres.<ref>   — et non « postgres » seul.",
+        '',
+        '  Supabase → bouton « Connect » → onglet « Session pooler »',
+        "  (ni « Direct connection », ni la chaîne « DIRECT_URL » de Prisma).",
+      ].join('\n'),
+    }
+  }
+
   if (m.includes('econnrefused')) {
     return {
       origine,

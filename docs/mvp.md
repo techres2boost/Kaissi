@@ -216,9 +216,22 @@ select id, name from kaissi.restaurants; -- note l'UUID, tu en auras besoin
 Si `kaissi.products` n'existe pas, les migrations ne sont pas passées.
 
 **1.4 — La chaîne de connexion.** En haut du projet, bouton **Connect** →
-onglet **ORMs** ou **Session pooler** → prends l'URI du **Session pooler**
-(port `5432`), pas la connexion directe : l'API de sync ouvre plusieurs
-connexions, et le pooler évite de saturer la base.
+onglet **Session pooler** → prends cette URI-là (port `5432`).
+
+L'hôte doit ressembler à `aws-0-<région>.pooler.supabase.com`, et
+l'utilisateur à `postgres.<ref>` (avec le point). C'est **le bon choix pour
+deux raisons**, pas une :
+
+- l'API de sync ouvre plusieurs connexions, et le pooler évite de saturer la
+  base ;
+- surtout, la **connexion directe** `db.<ref>.supabase.co` ne résout
+  aujourd'hui **qu'en IPv6**, et Railway (comme Render et Fly) n'a pas de
+  sortie IPv6. La choisir donne un conteneur qui plante au démarrage sur
+  `connect ENETUNREACH 2a05:…` — l'erreur exacte, et la plus déroutante,
+  puisqu'elle ressemble à un pare-feu. Le pooler, lui, répond en IPv4.
+
+Ne prends donc **ni** « Direct connection », **ni** la chaîne `DIRECT_URL`
+que propose l'onglet ORMs/Prisma — c'est aussi la connexion directe.
 
 ```
 postgresql://postgres.abcdefgh:MOT2PASSE@aws-0-eu-central-1.pooler.supabase.com:5432/postgres
@@ -568,6 +581,8 @@ l'idempotence et le banc à trois appareils contre une vraie base.
 | Railway construit avec Nixpacks au lieu du Dockerfile | `railway.json` doit être à la **racine** du dépôt, pas dans `apps/sync` |
 | « Failed to fetch » à l'appairage | `SYNC_ORIGINES` n'inclut pas l'URL du POS (§6) |
 | `password authentication failed` | mot de passe de **base**, pas celui du **compte** Supabase — Project Settings → Database → *Reset database password* |
+| Railway plante sur `connect ENETUNREACH 2a05:…` | `DATABASE_URL` pointe sur la connexion **directe** (IPv6). Prends le **Session pooler** (§1.4) |
+| `{"code":502,"message":"Application failed to respond"}` | le conteneur a démarré puis a **crashé** — ouvre *Deploy Logs*, le message y est en clair |
 | Le POS affiche « démo — mémoire » | build fait avec la mauvaise cible : `pnpm pos:build:web` |
 | Écran de cuisine vide | la caisse n'est pas appairée, ou rien n'a encore été envoyé en cuisine |
 | Le badge `⇅ n` ne redescend pas | API de sync injoignable : `curl .../sante` |

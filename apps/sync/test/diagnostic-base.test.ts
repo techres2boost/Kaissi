@@ -24,6 +24,8 @@ describe('expliquerErreurBase', () => {
       ['ENOTFOUND', 'getaddrinfo ENOTFOUND db.example', /résolu/i],
       ['28P01', 'password authentication failed for user "postgres"', /Mot de passe refusé/],
       ['ETIMEDOUT', 'connect ETIMEDOUT', /pare-feu/i],
+      // Le piège Supabase direct + Railway : pas de route IPv6.
+      ['ENETUNREACH', 'connect ENETUNREACH 2a05:d014:1:2:3:4:5:6:5432', /SESSION POOLER/],
     ] as const
     const explications = new Set<string>()
     for (const [code, message, attendu] of cas) {
@@ -32,6 +34,20 @@ describe('expliquerErreurBase', () => {
       explications.add(explication)
     }
     expect(explications.size).toBe(cas.length)
+  })
+
+  it('oriente vers le session pooler quand la base est injoignable en IPv6', () => {
+    // Reproduit à la lettre le log Railway : connexion directe
+    // db.<ref>.supabase.co, jointe en IPv6, sans route.
+    const e = Object.assign(
+      new Error('connect ENETUNREACH 2a05:d014:7c9:4e01:a7ed:5ee6:3da4:1344:5432 - Local (:::0)'),
+      { code: 'ENETUNREACH' },
+    )
+    const { explication } = expliquerErreurBase(e)
+    expect(explication).toMatch(/IPv6/)
+    expect(explication).toMatch(/pooler\.supabase\.com/)
+    // Surtout PAS conseiller d'activer IPv6 : ce n'est pas la solution.
+    expect(explication).toMatch(/n'est PAS d'activer IPv6/)
   })
 
   it("cesse de parler d'encodage quand le mot de passe est passé à part", () => {
