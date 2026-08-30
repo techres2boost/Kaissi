@@ -109,7 +109,23 @@ export async function demarrer(): Promise<void> {
     process.exit(1)
   }
 
-  const port = Number.parseInt(process.env['SYNC_PORT'] ?? '8787', 10)
+  /*
+   * Le port d'écoute, dans l'ordre de priorité.
+   *
+   * `PORT` est la convention des plateformes — Railway, Render et Fly
+   * l'injectent et routent le domaine public dessus. S'en tenir à
+   * `SYNC_PORT` obligeait à saisir le port À LA MAIN dans l'interface de
+   * l'hébergeur, et un chiffre oublié donne un service qui tourne
+   * parfaitement derrière un domaine qui répond 404 — le pire des symptômes,
+   * puisque les journaux du conteneur, eux, sont verts.
+   *
+   * `SYNC_PORT` reste prioritaire : c'est celui qu'on pose explicitement en
+   * local et dans les tests.
+   */
+  const port = Number.parseInt(
+    process.env['SYNC_PORT'] || process.env['PORT'] || '8787',
+    10,
+  )
   const origines = (process.env['SYNC_ORIGINES'] ?? '')
     .split(',')
     .map((o) => o.trim())

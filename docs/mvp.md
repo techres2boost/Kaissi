@@ -296,8 +296,16 @@ Sans elle, une caisse fonctionne, mais **seule** : le back-office ne voit
 aucune vente, et la cuisine aucune commande.
 
 **3.1** railway.app → **New Project** → **Deploy from GitHub repo** → ton
-dépôt. Railway lit `apps/sync/railway.json` et construit avec le Dockerfile :
-ni build command, ni start command à saisir.
+dépôt.
+
+Railway lit le `railway.json` **à la racine du dépôt** : il y trouve le
+builder Dockerfile, le chemin `apps/sync/Dockerfile` et la sonde `/sante`. Ni
+build command, ni start command, ni port à saisir.
+
+> Laisse **Root Directory vide** (la racine). Le Dockerfile copie
+> `pnpm-lock.yaml` et `packages/domain` : son contexte de build est le
+> monorepo entier, pas `apps/sync`. Pointer Railway sur `apps/sync` casse le
+> build à la première ligne `COPY`.
 
 **3.2 — Variables** (onglet *Variables*) :
 
@@ -306,22 +314,43 @@ ni build command, ni start command à saisir.
 | `DATABASE_URL` | l'URI du §1.4, avec `MOT2PASSE` laissé tel quel |
 | `DATABASE_PASSWORD` | le vrai mot de passe, **sans encodage** |
 
-Laisse `SYNC_ORIGINES` de côté pour l'instant : tu ne connais pas encore les
-URL de Vercel. On y revient à l'étape 6.
+Et c'est tout. Pas de `NODE_ENV` (le Dockerfile le pose), pas de `SYNC_PORT`
+(le service écoute le `PORT` que Railway injecte). Laisse aussi
+`SYNC_ORIGINES` de côté : tu ne connais pas encore les URL de Vercel, on y
+revient à l'étape 6.
 
-**3.3** *Settings → Networking → Generate Domain*. Tu obtiens quelque chose
-comme `https://kaissi-sync-production.up.railway.app`.
+**3.3 — DÉPLOIE.** Railway *empile* les modifications sans les appliquer : en
+haut à gauche, un bandeau **« Apply N changes »** avec un bouton **Deploy**.
+Tant que tu ne cliques pas dessus, **rien n'est construit et rien ne tourne**.
 
-**3.4 — Vérifie :**
+C'est le piège le plus courant de cette étape, et son symptôme n'a rien
+d'évident :
 
 ```bash
 curl https://TON-DOMAINE/sante
-# {"etat":"ok","protocole":1,"horodatage":"…"}
+{"status":"error","code":404,"message":"Application not found","request_id":"…"}
 ```
 
-`/sante` joint **la base**, pas seulement le processus. S'il répond autre
-chose que `"etat":"ok"`, le message dit laquelle des deux est en cause —
-n'avance pas tant qu'il n'est pas vert.
+Ce JSON-là vient du routeur de Railway, **pas de Kaissi** : le domaine existe,
+mais il n'y a aucun conteneur derrière. Notre API répondrait
+`{"etat":…}`, en français. Si tu vois `status`/`code`/`request_id`, c'est
+Railway qui parle — clique sur *Deploy*, ou regarde l'onglet *Deployments* :
+il doit y avoir un déploiement **Active**.
+
+**3.4** *Settings → Networking → Generate Domain*. Tu obtiens quelque chose
+comme `https://kaissi-production.up.railway.app`. Railway propose un port :
+celui du `EXPOSE` du Dockerfile, `8787` — accepte-le.
+
+**3.5 — Vérifie :**
+
+```bash
+curl https://TON-DOMAINE/sante
+# {"etat":"ok","protocole":1,"base":"joignable","horodatage":"…"}
+```
+
+`/sante` joint **la base**, pas seulement le processus : un service qui répond
+`ok` prouve que la chaîne complète tient. S'il répond autre chose, le message
+dit laquelle des deux est en cause — n'avance pas tant qu'il n'est pas vert.
 
 ---
 
@@ -534,6 +563,9 @@ l'idempotence et le banc à trois appareils contre une vraie base.
 |---|---|
 | « Votre compte n'est rattaché à aucun établissement » | `pnpm sync:acces` pas encore lancé (§2.3) |
 | Erreur qui parle de « schema » au back-office | `kaissi` retiré des *Exposed schemas* de Supabase |
+| `{"status":"error","code":404,"message":"Application not found"}` | Railway : les modifications sont en attente. Clique **Deploy** (§3.3) |
+| Railway échoue sur un `COPY` du Dockerfile | *Root Directory* pointe sur `apps/sync` : remets-la à la racine (§3.1) |
+| Railway construit avec Nixpacks au lieu du Dockerfile | `railway.json` doit être à la **racine** du dépôt, pas dans `apps/sync` |
 | « Failed to fetch » à l'appairage | `SYNC_ORIGINES` n'inclut pas l'URL du POS (§6) |
 | `password authentication failed` | mot de passe de **base**, pas celui du **compte** Supabase — Project Settings → Database → *Reset database password* |
 | Le POS affiche « démo — mémoire » | build fait avec la mauvaise cible : `pnpm pos:build:web` |

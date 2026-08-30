@@ -107,6 +107,42 @@ it('démarre avec la commande de production et répond à /sante', async () => {
   )
 }, 30_000)
 
+it('écoute sur PORT quand la plateforme l’injecte, sans SYNC_PORT', async () => {
+  // Railway, Render et Fly posent `PORT` et routent le domaine public
+  // dessus. Un service qui n'écoute que `SYNC_PORT` tourne alors très bien
+  // derrière un domaine qui répond 404 : les journaux du conteneur sont
+  // verts, et rien n'indique où chercher. Ce test fige la convention.
+  const port = PORT + 2
+  const lance = lancer({
+    DATABASE_URL: URL_TEST,
+    DATABASE_SSL: 'false',
+    PORT: String(port),
+    // Explicitement vidée : sans cela, un `.env` local la fournirait et le
+    // test passerait sans rien prouver.
+    SYNC_PORT: '',
+  })
+
+  const debut = Date.now()
+  let repond = false
+  while (Date.now() - debut < 20_000) {
+    try {
+      const r = await fetch(`http://127.0.0.1:${port}/sante`)
+      if (r.ok) {
+        repond = true
+        break
+      }
+    } catch {
+      // Pas encore prêt.
+    }
+    await new Promise((r) => setTimeout(r, 250))
+  }
+
+  expect(
+    repond,
+    `Le serveur n'a pas écouté sur PORT=${port}. Sortie :\n${lance.journal()}`,
+  ).toBe(true)
+}, 30_000)
+
 it('accepte MOT2PASSE dans l’URL quand DATABASE_PASSWORD est renseigné', async () => {
   // Laisser « MOT2PASSE » dans l'URL et mettre le vrai mot de passe dans
   // DATABASE_PASSWORD est la marche à suivre RECOMMANDÉE : c'est elle qui

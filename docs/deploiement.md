@@ -195,9 +195,16 @@ remplacer `10.0.2.2:8787` par une URL publique.
 
 ### 2.1 Railway (recommandé pour commencer)
 
-Railway lit le `railway.json` du dépôt : il **construit avec le Dockerfile**
-d'`apps/sync` (Node 22, sonde de santé, utilisateur non-root). Tu n'as donc ni
-build command ni start command à saisir.
+Railway lit le `railway.json` **à la racine du dépôt** : il y trouve le
+builder Dockerfile, le chemin `apps/sync/Dockerfile` (Node 22, sonde de santé,
+utilisateur non-root) et le port. Tu n'as donc ni build command, ni start
+command, ni port à saisir — et *Root Directory* reste **vide** : le contexte
+de build est le monorepo entier.
+
+> Railway EMPILE les modifications : tant que tu n'as pas cliqué sur
+> **Deploy** dans le bandeau « Apply N changes », rien ne tourne, et le
+> domaine répond `{"status":"error","code":404,"message":"Application not
+> found"}` — un message du routeur Railway, pas de Kaissi.
 
 1. **New Project → Deploy from GitHub repo** → `techres2boost/Kaissi`
 2. **Variables** (onglet Variables) :
@@ -205,11 +212,12 @@ build command ni start command à saisir.
    | Nom | Valeur |
    |---|---|
    | `DATABASE_URL` | la chaîne du §1 (session pooler, port 5432) |
-   | `SYNC_ORIGINES` | l'URL de ton back-office Vercel (pour le CORS) |
+   | `DATABASE_PASSWORD` | le mot de passe de la base, sans encodage |
+   | `SYNC_ORIGINES` | les URL du back-office **et du POS web** (pour le CORS) |
 
-   `SYNC_PORT` (8787) est déjà posé par le Dockerfile ; Railway route dessus
-   automatiquement. `DATABASE_SSL` reste à sa valeur par défaut (activé) : le
-   pooler Supabase exige TLS.
+   Pas de `SYNC_PORT` : le service écoute le `PORT` que Railway injecte, et
+   la plateforme route dessus toute seule. `DATABASE_SSL` reste à sa valeur
+   par défaut (activé) : le pooler Supabase exige TLS.
 
 3. **Settings → Networking → Generate Domain** → tu obtiens
    `https://kaissi-sync-production.up.railway.app`
