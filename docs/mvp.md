@@ -347,10 +347,22 @@ désigne rien. Il faut donc le **contenu** :
 > **pas** `DATABASE_CA_FILE` sur Railway : le fichier `C:\…` de ton PC
 > n'existe pas dans le conteneur — c'est exactement ce qui échoue sinon.
 
-Et c'est tout. Pas de `NODE_ENV` (le Dockerfile le pose), pas de `SYNC_PORT`
-(le service écoute le `PORT` que Railway injecte). Laisse aussi
-`SYNC_ORIGINES` de côté : tu ne connais pas encore les URL de Vercel, on y
-revient à l'étape 6.
+Ajoute enfin une quatrième variable, `SYNC_PORT`, à `8787` :
+
+| Nom | Valeur |
+|---|---|
+| `SYNC_PORT` | `8787` |
+
+Pourquoi la fixer : Railway injecte de son côté un `PORT` **imprévisible**
+(souvent `8080`), et le domaine public que tu généreras à l'étape 3.4 route
+vers **un** port précis. Si le service écoute le `PORT` injecté pendant que
+le domaine pointe ailleurs, le conteneur est parfaitement sain mais le
+domaine répond `502` — le symptôme le plus déroutant, puisque les logs sont
+verts. En figeant `SYNC_PORT=8787`, on aligne les trois : le service écoute
+`8787`, le Dockerfile l'expose, et le domaine y pointera.
+
+Pas de `NODE_ENV` (le Dockerfile le pose). Laisse `SYNC_ORIGINES` de côté :
+tu ne connais pas encore les URL de Vercel, on y revient à l'étape 6.
 
 **3.3 — DÉPLOIE.** Railway *empile* les modifications sans les appliquer : en
 haut à gauche, un bandeau **« Apply N changes »** avec un bouton **Deploy**.
@@ -371,8 +383,12 @@ Railway qui parle — clique sur *Deploy*, ou regarde l'onglet *Deployments* :
 il doit y avoir un déploiement **Active**.
 
 **3.4** *Settings → Networking → Generate Domain*. Tu obtiens quelque chose
-comme `https://kaissi-production.up.railway.app`. Railway propose un port :
-celui du `EXPOSE` du Dockerfile, `8787` — accepte-le.
+comme `https://kaissi-production.up.railway.app`. Railway demande **« Enter
+the port your app is listening on »** : saisis **`8787`** — le même que le
+`SYNC_PORT` du §3.2. C'est ce numéro-là qui doit correspondre, sinon 502.
+
+> Si tu avais déjà généré le domaine sur un autre port, corrige-le ici :
+> *Settings → Networking*, puis remets le port cible à `8787`.
 
 **3.5 — Vérifie :**
 
@@ -604,6 +620,7 @@ l'idempotence et le banc à trois appareils contre une vraie base.
 | Railway plante sur `connect ENETUNREACH 2a05:…` | `DATABASE_URL` pointe sur la connexion **directe** (IPv6). Prends le **Session pooler** (§1.4) |
 | `{"code":502,"message":"Application failed to respond"}` | le conteneur a démarré puis a **crashé** — ouvre *Deploy Logs*, le message y est en clair |
 | `self-signed certificate in certificate chain` sur Railway | il manque `DATABASE_CA` (le **contenu** du certificat Supabase), ou tu as mis `DATABASE_CA_FILE` avec un chemin qui n'existe pas dans le conteneur (§3.2) |
+| 502 alors que les logs disent « en écoute sur le port N » | le domaine public route vers un **autre** port que `N`. Fixe `SYNC_PORT=8787` et pointe le domaine sur `8787` (§3.2, §3.4) |
 | Le POS affiche « démo — mémoire » | build fait avec la mauvaise cible : `pnpm pos:build:web` |
 | Écran de cuisine vide | la caisse n'est pas appairée, ou rien n'a encore été envoyé en cuisine |
 | Le badge `⇅ n` ne redescend pas | API de sync injoignable : `curl .../sante` |

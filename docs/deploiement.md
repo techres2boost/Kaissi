@@ -213,11 +213,17 @@ de build est le monorepo entier.
    |---|---|
    | `DATABASE_URL` | la chaîne du §1 (session pooler, port 5432) |
    | `DATABASE_PASSWORD` | le mot de passe de la base, sans encodage |
+   | `DATABASE_CA` | le **contenu** du certificat Supabase (SSL Configuration → Download certificate) |
+   | `SYNC_PORT` | `8787` — fige le port d'écoute |
    | `SYNC_ORIGINES` | les URL du back-office **et du POS web** (pour le CORS) |
 
-   Pas de `SYNC_PORT` : le service écoute le `PORT` que Railway injecte, et
-   la plateforme route dessus toute seule. `DATABASE_SSL` reste à sa valeur
-   par défaut (activé) : le pooler Supabase exige TLS.
+   `SYNC_PORT=8787` fixe le port : Railway injecte sinon un `PORT`
+   imprévisible, et le domaine public route vers un port précis — un
+   désaccord donne un conteneur sain derrière un domaine qui répond 502.
+   Génère donc le domaine (§3) sur ce même `8787`. `DATABASE_SSL` reste à sa
+   valeur par défaut (activé) : le pooler Supabase exige TLS, et son certificat
+   voyage par `DATABASE_CA` (un chemin de fichier ne désigne rien dans un
+   conteneur).
 
 3. **Settings → Networking → Generate Domain** → tu obtiens
    `https://kaissi-sync-production.up.railway.app`

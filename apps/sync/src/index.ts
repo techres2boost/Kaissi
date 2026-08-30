@@ -171,6 +171,10 @@ export async function demarrer(): Promise<void> {
   console.log(
     `\n  ✓ API de synchronisation Kaissi — en écoute sur le port ${port}` +
       `\n    Base : ${hoteBase} — connexion vérifiée` +
+      // Le piège du déploiement : un hébergeur route son domaine public vers
+      // UN port. Si ce port ne correspond pas à celui-ci, le conteneur est
+      // sain mais le domaine répond 502 « Application failed to respond ».
+      `\n    Hébergeur : le domaine public DOIT pointer sur le port ${port}.` +
       `\n    Laisse ce terminal OUVERT. Vérifie dans un autre : ` +
       `curl http://127.0.0.1:${port}/sante\n`,
   )
