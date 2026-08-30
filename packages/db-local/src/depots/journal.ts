@@ -167,6 +167,29 @@ export function depotJournal(db: AdaptateurSqlite) {
       )
     },
 
+    /**
+     * Abandonne les rejets d'un CODE donné — sans jamais toucher au journal.
+     *
+     * L'outbox est la FILE d'envoi, distincte de `order_events` (la source de
+     * vérité, en insertion seule). Retirer une ligne d'outbox n'efface donc
+     * aucune vente : la commande reste dans le journal et dans la projection,
+     * elle cesse seulement d'être présentée à l'envoi.
+     *
+     * Le seul usage prévu : les rejets « appareil_etranger » consécutifs à un
+     * ré-appairage. Ces événements portent l'ancien identifiant d'appareil et
+     * ne pourront JAMAIS être acceptés par le serveur ; les garder à l'écran
+     * noierait les vrais rejets, ceux qui appellent une décision. On borne
+     * donc au code, pour ne pas offrir d'effacer un rejet métier légitime.
+     */
+    async abandonnerRejets(code: string): Promise<number> {
+      const avant = await db.lireUne<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM outbox WHERE status = 'rejete' AND reject_code = ?`,
+        [code],
+      )
+      await db.executer(`DELETE FROM outbox WHERE status = 'rejete' AND reject_code = ?`, [code])
+      return avant?.n ?? 0
+    },
+
     /** Nombre d'opérations en attente — badge de l'écran de synchronisation. */
     async enAttente(): Promise<{ enAttente: number; rejetes: number }> {
       const ligne = await db.lireUne<{ en_attente: number; rejetes: number }>(

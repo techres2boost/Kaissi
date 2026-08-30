@@ -97,6 +97,11 @@ export function EcranSync() {
     }
   }
 
+  const abandonnerEtrangers = async () => {
+    await app.journal.abandonnerRejets('appareil_etranger')
+    rafraichir()
+  }
+
   // Sans appairage, il n'y a rien à synchroniser : on montre le formulaire
   // plutôt qu'un écran d'état vide et incompréhensible.
   if (!sync) {
@@ -177,6 +182,21 @@ export function EcranSync() {
               ))}
             </tbody>
           </table>
+
+          {rejets.some((r) => r.codeRejet === 'appareil_etranger') && (
+            <div className="note" style={{ marginTop: '0.75rem' }}>
+              <p>
+                Les opérations « {LIBELLES_REJET['appareil_etranger']} » viennent
+                d’un appairage précédent : elles portent l’ancien identifiant de
+                ce terminal et ne pourront jamais partir. La vente reste
+                enregistrée localement ; seule sa remontée au serveur est
+                abandonnée.
+              </p>
+              <button type="button" onClick={() => void abandonnerEtrangers()}>
+                Abandonner ces opérations d’un ancien appairage
+              </button>
+            </div>
+          )}
         </section>
       )}
 
@@ -243,22 +263,58 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
   const appairer = async () => {
     setEtat('test')
     setMessage(null)
+    const base = url.replace(/\/+$/, '')
+    const jetonPropre = jeton.trim()
     try {
-      // On VÉRIFIE le jeton avant de l'enregistrer : un appairage qui
-      // échoue silencieusement se découvrirait au pire moment, en plein
-      // service, quand le gérant n'est pas là.
-      const reponse = await fetch(
-        `${url.replace(/\/+$/, '')}/sync/pull?protocolVersion=1&depuisCatalogue=0&depuisEvenements=0&taillePage=1`,
-        { headers: { authorization: `Bearer ${jeton.trim()}` } },
-      )
+      // On VÉRIFIE le jeton avant de l'enregistrer, ET on récupère l'identité
+      // de l'appareil qu'il désigne. C'est cette identité — le device_id —
+      // que le terminal doit apposer sur ses ventes. Sans elle, il signerait
+      // avec l'identifiant de la graine de démonstration, et le serveur
+      // refuserait chaque vente avec « appareil_etranger » : le jeton est bon,
+      // mais l'événement prétend venir d'un autre appareil.
+      const reponse = await fetch(`${base}/sync/appareil`, {
+        headers: { authorization: `Bearer ${jetonPropre}` },
+      })
       if (!reponse.ok) {
         const corps = (await reponse.json().catch(() => null)) as { message?: string } | null
         setEtat('erreur')
         setMessage(corps?.message ?? `Le serveur a répondu ${reponse.status}.`)
         return
       }
-      await app.etat.ecrire('url_sync', url.replace(/\/+$/, ''))
-      await app.etat.ecrire('jeton_appareil', jeton.trim())
+      const identite = (await reponse.json()) as {
+        deviceId?: string
+        restaurantId?: string
+        organizationId?: string
+      }
+      if (!identite.deviceId) {
+        setEtat('erreur')
+        setMessage(
+          "Le serveur n'a pas renvoyé l'identité de l'appareil. Mets à jour " +
+            "l'API de synchronisation (elle doit exposer /sync/appareil).",
+        )
+        return
+      }
+
+      const ancienDevice = (await app.etat.lire('device_id')) || null
+      await app.etat.ecrire('url_sync', base)
+      await app.etat.ecrire('jeton_appareil', jetonPropre)
+      // On ADOPTE l'identité du serveur : c'est lui qui fait autorité sur
+      // « quel appareil suis-je ». Les trois vont ensemble — un device dans un
+      // autre établissement changerait aussi restaurant_id et organization_id.
+      await app.etat.ecrire('device_id', identite.deviceId)
+      if (identite.restaurantId) await app.etat.ecrire('restaurant_id', identite.restaurantId)
+      if (identite.organizationId) {
+        await app.etat.ecrire('organization_id', identite.organizationId)
+      }
+
+      // Le device_id est lu UNE fois au montage du contexte, puis figé dans la
+      // session de caisse. S'il vient de changer, un simple rafraîchir ne
+      // suffit pas : on recharge la page pour que les ventes suivantes soient
+      // signées correctement. La base est persistante, rien n'est perdu.
+      if (ancienDevice && ancienDevice !== identite.deviceId) {
+        window.location.reload()
+        return
+      }
       onAppaire()
     } catch (erreur) {
       setEtat('erreur')

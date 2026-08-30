@@ -115,6 +115,22 @@ export function creerServeur({ depot, origines }: OptionsServeur) {
     await next()
   })
 
+  // ── GET /sync/appareil ───────────────────────────────────────────────
+  // L'identité de l'appareil derrière le jeton. C'est ce que le POS lit au
+  // moment de l'appairage : il connaît alors le device_id à apposer sur ses
+  // événements. Sans cette étape, un terminal signe avec un identifiant qui
+  // n'est pas celui que son jeton désigne, et le serveur refuse toutes ses
+  // ventes avec « appareil_etranger » — le jeton est bon, mais l'événement
+  // prétend venir d'ailleurs.
+  app.get('/sync/appareil', (c) => {
+    const appareil = c.get('appareil')
+    return c.json({
+      deviceId: appareil.deviceId,
+      restaurantId: appareil.restaurantId,
+      organizationId: appareil.organizationId,
+    })
+  })
+
   // ── POST /sync/push ──────────────────────────────────────────────────
   app.post('/sync/push', async (c) => {
     const appareil = c.get('appareil')

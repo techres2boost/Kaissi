@@ -17,6 +17,8 @@ import {
   creerAppareil,
   ev,
   nettoyer,
+  DEMO_ORG,
+  DEMO_RESTO,
   ESPECES,
   TVA_07,
   TVA_19,
@@ -133,6 +135,23 @@ describe('authentification', () => {
     expect(r.statut).toBe(403)
     expect(r.corps.erreur).toBe('appareil_revoque')
     expect(r.corps.message).toMatch(/ne sont pas perdues/)
+  })
+
+  it('rend l’identité de l’appareil derrière le jeton (appairage)', async () => {
+    // C'est ce que le POS lit à l'appairage pour adopter le bon device_id.
+    // Sans, il signe avec l'identifiant de la graine et le serveur refuse
+    // toutes ses ventes en « appareil_etranger ».
+    const a = await creerAppareil('P8')
+    const r = await appeler('/sync/appareil', a.jetonClair)
+    expect(r.statut).toBe(200)
+    expect(r.corps.deviceId).toBe(a.id)
+    expect(r.corps.restaurantId).toBe(DEMO_RESTO)
+    expect(r.corps.organizationId).toBe(DEMO_ORG)
+  })
+
+  it('refuse /sync/appareil sans jeton', async () => {
+    const r = await appeler('/sync/appareil', null)
+    expect(r.statut).toBe(401)
   })
 
   it('laisse passer un appareil valide', async () => {
