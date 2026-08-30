@@ -5,14 +5,22 @@
 > La caisse ne doit **jamais** s'arrêter. Un restaurant qui ne peut pas encaisser
 > désinstalle le logiciel le soir même et le dit à tous ses confrères.
 
-État : **Phase 2 terminée, back-office en place.** Plusieurs terminaux
-encaissent en parallèle, hors ligne, et se réconcilient sans perdre ni
-dupliquer une vente. Le gérant administre sa carte et ses employés depuis un
-navigateur, sans plus toucher au SQL.
+État : **MVP prêt à partir en production.** Plusieurs terminaux encaissent en
+parallèle, hors ligne, et se réconcilient sans perdre ni dupliquer une vente.
+Le gérant administre sa carte et ses employés depuis un navigateur, la cuisine
+lit ses commandes sur un écran, et le ticket s'affiche à l'encaissement.
+
+> **L'impression est éteinte dans ce périmètre**, et rien n'a été supprimé :
+> c'est un drapeau de build. Le pourquoi, et comment la rallumer, sont dans
+> **[`docs/mvp.md`](docs/mvp.md)**.
 
 ---
 
 ## 👉 Par où commencer
+
+**Tu veux mettre le MVP en production ?** →
+**[`docs/mvp.md`](docs/mvp.md)** : le périmètre, les commandes, le
+déploiement, en un seul document court.
 
 **Tu n'as encore rien lancé ?** Va directement à
 **[`docs/decouverte.md`](docs/decouverte.md)**.
@@ -37,6 +45,7 @@ mode avion — le seul test qui compte vraiment.
 
 | Document | Pour |
 |---|---|
+| **[`docs/mvp.md`](docs/mvp.md)** | **Le périmètre livré** — ce qui est dedans, ce qui est éteint, comment déployer |
 | **[`docs/decouverte.md`](docs/decouverte.md)** | **Commencer ici** — voir le produit tourner en cinq étapes |
 | [`docs/fonctionnel.md`](docs/fonctionnel.md) | **Comprendre** chaque module et pourquoi il est ainsi |
 | [`docs/tester.md`](docs/tester.md) | **Tester** en détail — de l'automatique à la tablette |
@@ -54,6 +63,8 @@ mode avion — le seul test qui compte vraiment.
 |---|---|---|
 | `pnpm test:rapide` | 225 tests : domaine, schéma local, ESC/POS | aucun |
 | `pnpm pos:dev` | Le POS dans le navigateur (base **en mémoire**) | aucun |
+| `pnpm pos:build:web` | Le POS comme site statique (base **persistante**) | aucun |
+| `pnpm persistance` | La caisse web survit-elle à un rechargement ? | `preview:web` lancé |
 | `pnpm parcours` | Rejoue une journée de service dans Chromium | `pnpm pos:dev` lancé |
 | `pnpm imprimante` | Imprimante ESC/POS virtuelle sur le port 9100 | aucun |
 | `pnpm sync:dev` | L'API de synchronisation, en local | `DATABASE_URL` |

@@ -136,6 +136,24 @@ Pour la minorité de champs réellement conflictuels — numéro de table, statu
 nom du client — dernier-écrivain-gagne arbitré par `(server_seq, device_id)`,
 et l'ancienne valeur reste visible dans le journal.
 
+### Périmètre MVP : l'impression est éteinte, pas supprimée
+
+`apps/pos/src/config.ts` porte `IMPRESSION_ACTIVE`, faux par défaut. Tant
+qu'il l'est : rien n'entre en file, la boucle de drainage ne tourne pas, le
+ticket client et le bon de cuisine s'affichent À L'ÉCRAN, et la cuisine lit
+ses commandes au back-office (`/‹resto›/cuisine`).
+
+Le module d'impression reste **écrit, testé et importé** — `VITE_IMPRESSION=1`
+au build le rallume. N'en supprime aucune partie « puisqu'elle ne sert pas » :
+les règles ci-dessous restent celles qui s'appliqueront le jour où on la
+rallume, et `kitchen_sends` est déjà utilisé aujourd'hui.
+
+Le POS a par ailleurs deux cibles de build. `android` (défaut) reste la cible
+nominale ; `web` sert le même bundle comme site statique, avec SQLite persisté
+dans IndexedDB — plus rapide à déployer, mais son stockage est évinçable par
+le navigateur, ce que l'écran Diagnostic dit explicitement. Aucune des deux ne
+charge son code depuis le réseau : la règle `server.url` reste entière.
+
 ### L'impression ne bloque jamais la caisse
 
 Un ticket part en **file persistante**, pas directement à l'imprimante. Une
