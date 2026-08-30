@@ -143,8 +143,9 @@ qu'il l'est : rien n'entre en file, la boucle de drainage ne tourne pas, le
 ticket client et le bon de cuisine s'affichent À L'ÉCRAN, et la cuisine lit
 ses commandes au back-office (`/‹resto›/cuisine`).
 
-Le module d'impression reste **écrit, testé et importé** — `VITE_IMPRESSION=1`
-au build le rallume. N'en supprime aucune partie « puisqu'elle ne sert pas » :
+Le module d'impression reste **écrit, testé et importé** —
+`pnpm pos:build:impression` le rallume (ou `pos:build:web:impression`).
+N'en supprime aucune partie « puisqu'elle ne sert pas » :
 les règles ci-dessous restent celles qui s'appliqueront le jour où on la
 rallume, et `kitchen_sends` est déjà utilisé aujourd'hui.
 
@@ -176,6 +177,20 @@ l'argent, c'est le jeton d'appareil révocable, RLS, et le journal d'audit.
 L'appareil affiche le dernier stock connu, alerte, **mais ne bloque jamais une
 vente**. Refuser de vendre une pizza sur une donnée périmée est le pire des deux
 mondes.
+
+### Un compte de back-office se relie hors de l'application
+
+Créer un compte Supabase exige la clé `service_role`, qui contourne RLS : elle
+n'entre donc jamais dans le back-office. Le premier administrateur, et toute
+personne qui doit ouvrir le back-office ensuite (cuisine, comptable), passent
+par `pnpm sync:acces`, qui tourne sur le poste de l'exploitant avec la
+connexion PostgreSQL.
+
+Corollaire à ne pas oublier : **RLS ne dit pas qui je suis dans mon propre
+restaurant.** `memberships_lecture` rend, à dessein, toutes les appartenances
+de mes établissements — l'écran « Employés » en dépend. Une requête sur
+`memberships` sans `where user_id = moi` ne rend donc pas mon rôle, mais ceux
+de toute l'équipe. Ce filtre-là est applicatif, par nature.
 
 ### Trois identités distinctes, jamais confondues
 

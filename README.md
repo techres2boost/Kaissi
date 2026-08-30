@@ -64,6 +64,7 @@ mode avion — le seul test qui compte vraiment.
 | `pnpm test:rapide` | 225 tests : domaine, schéma local, ESC/POS | aucun |
 | `pnpm pos:dev` | Le POS dans le navigateur (base **en mémoire**) | aucun |
 | `pnpm pos:build:web` | Le POS comme site statique (base **persistante**) | aucun |
+| `pnpm sync:acces` | Donner à un compte l'accès au back-office | `DATABASE_URL` |
 | `pnpm persistance` | La caisse web survit-elle à un rechargement ? | `preview:web` lancé |
 | `pnpm parcours` | Rejoue une journée de service dans Chromium | `pnpm pos:dev` lancé |
 | `pnpm imprimante` | Imprimante ESC/POS virtuelle sur le port 9100 | aucun |
