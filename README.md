@@ -46,6 +46,7 @@ mode avion — le seul test qui compte vraiment.
 | Document | Pour |
 |---|---|
 | **[`docs/mvp.md`](docs/mvp.md)** | **Le périmètre livré** — ce qui est dedans, ce qui est éteint, comment déployer |
+| **[`docs/gestion.md`](docs/gestion.md)** | **Ventes, coûts, marges et stock** — les écrans de gestion et leur protocole de test |
 | **[`docs/decouverte.md`](docs/decouverte.md)** | **Commencer ici** — voir le produit tourner en cinq étapes |
 | [`docs/fonctionnel.md`](docs/fonctionnel.md) | **Comprendre** chaque module et pourquoi il est ainsi |
 | [`docs/tester.md`](docs/tester.md) | **Tester** en détail — de l'automatique à la tablette |

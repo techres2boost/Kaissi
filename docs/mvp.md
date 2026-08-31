@@ -25,7 +25,7 @@ catalogue → commande → paiement → vente → cuisine → ticket
 | 👨‍🍳 Cuisine (« commandes à préparer ») | back-office `/‹resto›/cuisine` | **fait** |
 | 🧾 Ticket | affiché à l'écran du POS | **fait** |
 | 📈 Administration (journée, clôture, employés) | back-office | **fait** |
-| 📊 Stock | — | **hors MVP**, voir §3 |
+| 📊 Stock, coûts et marges | back-office — voir [`gestion.md`](gestion.md) | **fait** |
 
 Deux choses valent la peine d'être dites, parce qu'elles ne se voient pas :
 
@@ -81,12 +81,14 @@ s'excluent pas. Le détail est au §7.
 
 ## 3. Ce qui n'est pas dans le MVP
 
-**Le stock.** Il n'est sur le chemin critique d'aucune vente, et la règle du
-dépôt dit déjà qu'il ne bloque jamais un encaissement (une donnée de stock
-périmée ne doit pas empêcher de vendre une pizza). Le construire maintenant
-retarderait la mise en production sans rien débloquer.
+**Les recettes et le stock d'ingrédients.** Le coût est saisi par produit
+fini — un burger a un coût, pas « 1 pain + 1 steak ». C'est suffisant pour
+calculer une marge, et cela évite de construire une nomenclature avant d'en
+avoir l'usage.
 
-La place est réservée : `products.track_stock` existe déjà dans le schéma.
+Le stock simple, lui, **est** livré : quantités, seuils, alertes, mouvements
+manuels, et décrément automatique à la vente. Tout est dans
+[`gestion.md`](gestion.md).
 
 ---
 
@@ -644,7 +646,7 @@ trois appareils.
 ## 10. Ce qui viendra après, dans cet ordre
 
 1. **Imprimante** — un drapeau à basculer, le code est déjà là (§2, §7).
-2. **Stock** — quantités par produit, seuil d'alerte, jamais bloquant (§3).
+2. **Recettes** — décomposer le coût d'un plat en ingrédients (§3).
 3. **Écran de cuisine hors ligne** — aujourd'hui la cuisine lit le
    back-office, donc le réseau. Le porter dans le POS lui-même le rendrait
    indépendant d'Internet, comme la caisse.

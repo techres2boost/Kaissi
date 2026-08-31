@@ -178,6 +178,25 @@ L'appareil affiche le dernier stock connu, alerte, **mais ne bloque jamais une
 vente**. Refuser de vendre une pizza sur une donnée périmée est le pire des deux
 mondes.
 
+Corollaire de conception (migration 0019) : le stock est **calculé à la
+lecture** — comptage de référence + mouvements manuels − ventes depuis ce
+comptage — et jamais maintenu par un compteur qu'un déclencheur décrémenterait.
+La reprojection serveur réécrit toutes les lignes d'une commande (`DELETE`
+puis `INSERT`) à chaque nouvel événement : un compteur devrait défaire
+exactement ce qu'il a fait, y compris quand la commande passe « annulée »
+entre les deux. Il dériverait en silence.
+
+### Les marges se calculent dans `packages/domain`, sur le CA hors taxe
+
+`marge.ts` porte les coûts et les marges, comme `totaux.ts` porte la TVA. Deux
+règles à ne pas contourner : la marge se rapporte au **CA** (5/15 = 33,33 %,
+jamais 5/10), et le CA retenu est **hors taxe et après remises** — la seule
+grandeur comparable à un coût d'achat, lui aussi hors taxe.
+
+Un coût **non saisi** n'est pas un coût nul : les rapports comptent ces lignes
+et le disent. Sans ce garde-fou, la marge s'afficherait à 100 % et paraîtrait
+juste.
+
 ### Un compte de back-office se relie hors de l'application
 
 Créer un compte Supabase exige la clé `service_role`, qui contourne RLS : elle
