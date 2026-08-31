@@ -17,7 +17,11 @@ import type { Etablissement, SessionBackoffice } from '../serveur/session.js'
  */
 const ONGLETS = [
   { chemin: 'cuisine', libelle: 'Cuisine', gestionnaire: false },
+  { chemin: 'tableau-bord', libelle: 'Tableau de bord', gestionnaire: true },
+  { chemin: 'ventes', libelle: 'Ventes', gestionnaire: true },
+  { chemin: 'tickets', libelle: 'Tickets', gestionnaire: true },
   { chemin: 'journee', libelle: 'Journée', gestionnaire: false },
+  { chemin: 'stock', libelle: 'Stock', gestionnaire: true },
   { chemin: 'catalogue', libelle: 'Catalogue', gestionnaire: true },
   { chemin: 'employes', libelle: 'Employés', gestionnaire: true },
 ] as const

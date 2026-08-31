@@ -1,0 +1,217 @@
+'use client'
+
+/**
+ * Le tableau de stock, et ses deux gestes : compter, et mouvementer.
+ *
+ * Un seul produit est ouvert à la fois. Un formulaire par ligne, déplié sur
+ * 40 produits, transformerait la page en mur de champs où l'on se trompe de
+ * ligne — et une erreur de stock ne se voit pas avant l'inventaire suivant.
+ */
+
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { formaterPourcentage, formaterTND, millimes } from '@kaissi/domain'
+import { activerSuivi, arreterSuivi, enregistrerMouvement } from '../app/[restaurant]/stock/actions.js'
+import type { ProduitStock } from '../app/[restaurant]/stock/page.js'
+
+const LIBELLE_ETAT: Record<string, string> = {
+  rupture: 'Rupture',
+  faible: 'Faible',
+  ok: 'OK',
+  non_suivi: 'Non suivi',
+}
+
+export function TableauStock({
+  restaurantId,
+  produits,
+}: {
+  restaurantId: string
+  produits: ProduitStock[]
+}) {
+  const router = useRouter()
+  const [ouvert, setOuvert] = useState<string | null>(null)
+  const [message, setMessage] = useState<{ texte: string; erreur: boolean } | null>(null)
+  const [enCours, demarrer] = useTransition()
+
+  const agir = (action: () => Promise<{ erreur?: string; succes?: string }>) => {
+    demarrer(async () => {
+      const r = await action()
+      setMessage(
+        r.erreur
+          ? { texte: r.erreur, erreur: true }
+          : { texte: r.succes ?? 'Enregistré.', erreur: false },
+      )
+      if (!r.erreur) {
+        setOuvert(null)
+        router.refresh()
+      }
+    })
+  }
+
+  return (
+    <section className="bloc">
+      <h2>Tous les produits</h2>
+
+      {message && (
+        <p className={`message ${message.erreur ? 'erreur' : 'succes'}`}>{message.texte}</p>
+      )}
+
+      <table>
+        <thead>
+          <tr>
+            <th>Produit</th>
+            <th>Catégorie</th>
+            <th className="nombre">Prix</th>
+            <th className="nombre">Coût</th>
+            <th className="nombre">Marge</th>
+            <th className="nombre">Stock</th>
+            <th className="nombre">Seuil</th>
+            <th>État</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {produits.map((p) => (
+            <>
+              <tr key={p.id}>
+                <td>{p.nom}</td>
+                <td className="detail">{p.categorie ?? '—'}</td>
+                <td className="nombre">{formaterTND(millimes(p.prixMillimes))}</td>
+                <td className="nombre">
+                  {p.coutUnitaire === null ? (
+                    <span className="detail">non saisi</span>
+                  ) : (
+                    formaterTND(millimes(Math.round(p.coutUnitaire)))
+                  )}
+                </td>
+                <td className={`nombre ${p.margeMillimes < 0 ? 'ecart negatif' : ''}`}>
+                  {formaterTND(millimes(p.margeMillimes))}
+                  {p.margeBp !== null && (
+                    <small className="detail"> {formaterPourcentage(p.margeBp)} %</small>
+                  )}
+                </td>
+                <td className="nombre">{p.suivi ? p.quantite : '—'}</td>
+                <td className="nombre">{p.seuil ?? '—'}</td>
+                <td>
+                  <span className={`etiquette etat-${p.etat}`}>{LIBELLE_ETAT[p.etat]}</span>
+                </td>
+                <td>
+                  <button
+                    type="button"
+                    className="discret"
+                    onClick={() => setOuvert(ouvert === p.id ? null : p.id)}
+                  >
+                    {ouvert === p.id ? 'Fermer' : p.suivi ? 'Ajuster' : 'Suivre'}
+                  </button>
+                </td>
+              </tr>
+
+              {ouvert === p.id && (
+                <tr key={`${p.id}-edition`} className="ligne-edition">
+                  <td colSpan={9}>
+                    <div className="grille deux">
+                      <form
+                        action={(donnees) =>
+                          agir(() => activerSuivi(restaurantId, p.id, null, donnees))
+                        }
+                      >
+                        <h3>{p.suivi ? 'Recompter le stock' : 'Activer le suivi'}</h3>
+                        <p className="indication">
+                          Saisir la quantité <strong>constatée maintenant</strong>. Les
+                          ventes antérieures sont réputées déjà déduites : sans cela,
+                          activer le suivi retrancherait tout l’historique d’un coup.
+                        </p>
+                        <div className="champs deux">
+                          <label className="champ">
+                            Quantité en stock
+                            <input
+                              name="quantite"
+                              inputMode="decimal"
+                              defaultValue={p.suivi ? String(p.quantite) : '0'}
+                              required
+                            />
+                          </label>
+                          <label className="champ">
+                            Seuil d’alerte (facultatif)
+                            <input
+                              name="seuil"
+                              inputMode="decimal"
+                              defaultValue={p.seuil === null ? '' : String(p.seuil)}
+                            />
+                          </label>
+                        </div>
+                        <button type="submit" className="principal" disabled={enCours}>
+                          {p.suivi ? 'Enregistrer le comptage' : 'Activer le suivi'}
+                        </button>
+                        {p.suivi && (
+                          <button
+                            type="button"
+                            className="discret danger"
+                            disabled={enCours}
+                            onClick={() => agir(() => arreterSuivi(restaurantId, p.id))}
+                          >
+                            Arrêter le suivi
+                          </button>
+                        )}
+                      </form>
+
+                      {p.suivi && (
+                        <form
+                          action={(donnees) =>
+                            agir(() => enregistrerMouvement(restaurantId, p.id, null, donnees))
+                          }
+                        >
+                          <h3>Mouvement</h3>
+                          <p className="indication">
+                            Une réception ajoute, une perte retranche. Saisissez
+                            toujours un nombre <strong>positif</strong> : le signe
+                            découle du motif.
+                          </p>
+                          <div className="champs deux">
+                            <label className="champ">
+                              Quantité
+                              <input name="delta" inputMode="decimal" required />
+                            </label>
+                            <label className="champ">
+                              Motif
+                              <select name="raison" defaultValue="reception">
+                                <option value="reception">Réception</option>
+                                <option value="perte">Perte / casse</option>
+                                <option value="correction">Correction</option>
+                              </select>
+                            </label>
+                          </div>
+                          <label className="champ">
+                            Note (facultatif)
+                            <input name="note" placeholder="Livraison Sfax, facture 128" />
+                          </label>
+                          <button type="submit" className="principal" disabled={enCours}>
+                            Enregistrer le mouvement
+                          </button>
+                        </form>
+                      )}
+                    </div>
+
+                    {p.suivi && (
+                      <p className="indication">
+                        Depuis le comptage : {p.vendue} vendu(s).
+                        {p.compteA &&
+                          ` Dernier comptage le ${new Date(p.compteA).toLocaleString('fr-FR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}.`}
+                      </p>
+                    )}
+                  </td>
+                </tr>
+              )}
+            </>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  )
+}

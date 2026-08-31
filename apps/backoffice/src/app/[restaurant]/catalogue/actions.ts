@@ -102,6 +102,28 @@ export async function archiverCategorie(
   })
 }
 
+/**
+ * Lit le coût d'achat unitaire, facultatif.
+ *
+ * Il ne passe PAS par `montantMillimes` : ce dernier rend un entier, or le
+ * coût est la seule exception au tout-entier du dépôt — `numeric(18,6)` en
+ * base, parce que le coût d'un gramme de mozzarella vaut moins qu'un millime.
+ * On conserve donc les décimales, et l'arrondi n'a lieu qu'au total, dans
+ * les rapports.
+ */
+function coutFacultatif(donnees: FormData, champ: string): number | null {
+  const brut = String(donnees.get(champ) ?? '').trim().replace(',', '.')
+  if (brut === '') return null
+  const valeur = Number(brut)
+  if (!Number.isFinite(valeur) || valeur < 0) {
+    throw new ErreurSaisie(champ, "Le coût d'achat doit être un nombre positif, ou vide.")
+  }
+  // Saisi en DINARS comme le prix, stocké en millimes : « 10 » → 10000.
+  // Arrondi à la 6e décimale — la précision de la colonne — pour ne pas
+  // stocker le bruit du flottant : 0,1 × 1000 vaut 100,00000000000001.
+  return Math.round(valeur * 1000 * 1e6) / 1e6
+}
+
 // ── Produits ────────────────────────────────────────────────────────────────
 
 export async function enregistrerProduit(
@@ -126,6 +148,13 @@ export async function enregistrerProduit(
       tax_rate_id: choix(donnees, 'taux', 'Le taux de TVA', tauxAutorises),
       // Le prix passe par depuisDecimal : « 24,5 » devient 24500 millimes.
       base_price_millimes: montantMillimes(donnees, 'prix', 'Le prix'),
+      /*
+       * Le coût d'achat, dans la MÊME unité que le prix : des millimes.
+       * `null` quand il n'est pas saisi — et c'est un état distinct de
+       * « coût nul » : les rapports comptent les lignes sans coût pour dire
+       * que la marge est surestimée, au lieu de l'afficher à 100 %.
+       */
+      cost_per_unit: coutFacultatif(donnees, 'cout'),
       position: position(donnees, 'position'),
       is_available: caseCochee(donnees, 'disponible'),
       updated_at: new Date().toISOString(),

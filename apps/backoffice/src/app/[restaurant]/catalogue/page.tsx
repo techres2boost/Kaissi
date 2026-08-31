@@ -45,7 +45,7 @@ export default async function PageCatalogue({
       supabase
         .from('products')
         .select(
-          'id, name, description, category_id, station_id, tax_rate_id, base_price_millimes, position, is_available',
+          'id, name, description, category_id, station_id, tax_rate_id, base_price_millimes, cost_per_unit, position, is_available',
         )
         .eq('restaurant_id', restaurant)
         .is('archived_at', null)
@@ -97,6 +97,10 @@ export default async function PageCatalogue({
           tauxId: p.tax_rate_id as string,
           prixMillimes: Number(p.base_price_millimes) || 0,
           prixAffiche: formaterTND(millimes(Number(p.base_price_millimes) || 0)),
+          // `null` reste `null` : « coût non saisi » et « coût nul » sont deux
+          // états différents, et les rapports comptent le premier pour dire
+          // que la marge est surestimée.
+          coutUnitaire: p.cost_per_unit === null ? null : Number(p.cost_per_unit),
           position: (p.position as number) ?? 0,
           disponible: Boolean(p.is_available),
         }))}

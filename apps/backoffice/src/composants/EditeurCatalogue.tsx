@@ -10,6 +10,26 @@ import {
   type Resultat,
 } from '../app/[restaurant]/catalogue/actions.js'
 import { pourChampMontant } from '../serveur/formulaire.js'
+import { formaterPourcentage, formaterTND, margeProduit, millimes } from '@kaissi/domain'
+
+/**
+ * La marge d'un produit, telle qu'elle s'affiche au catalogue.
+ *
+ * Calculée par `@kaissi/domain` — le même module que les rapports et la
+ * caisse. Un burger à 15 dinars acheté 10 affiche « 5,000 TND · 33,33 % ».
+ */
+function margeAffichee(produit: Produit) {
+  if (produit.coutUnitaire === null) return <span className="detail">—</span>
+  const marge = margeProduit(millimes(produit.prixMillimes), produit.coutUnitaire)
+  return (
+    <span className={marge.margeMillimes < 0 ? 'ecart negatif' : ''}>
+      {formaterTND(marge.margeMillimes)}
+      {marge.margeBp !== null && (
+        <small className="detail"> {formaterPourcentage(marge.margeBp)} %</small>
+      )}
+    </span>
+  )
+}
 
 export interface Categorie {
   id: string
@@ -35,6 +55,8 @@ export interface Produit {
   tauxId: string
   prixMillimes: number
   prixAffiche: string
+  /** Coût d'achat unitaire en millimes fractionnaires, ou `null` si non saisi. */
+  coutUnitaire: number | null
   position: number
   disponible: boolean
 }
@@ -125,6 +147,27 @@ export function EditeurCatalogue({
                 <p className="indication">
                   En dinars, avec <strong>trois</strong> décimales. « 24,5 » et « 24.500 »
                   donnent le même prix.
+                </p>
+              </div>
+
+              <div className="champ">
+                <label htmlFor="cout">Coût d’achat (facultatif)</label>
+                <input
+                  id="cout"
+                  name="cout"
+                  inputMode="decimal"
+                  defaultValue={
+                    cible?.coutUnitaire === null || cible?.coutUnitaire === undefined
+                      ? ''
+                      : String(cible.coutUnitaire / 1000)
+                  }
+                  placeholder="10"
+                />
+                <p className="indication">
+                  Ce que le produit vous COÛTE, en dinars. C’est lui qui donne la
+                  marge dans les rapports. Laissé vide, le produit est compté
+                  sans coût — et les rapports le signalent, plutôt que d’afficher
+                  une marge de 100 % qui paraîtrait juste.
                 </p>
               </div>
             </div>
@@ -226,6 +269,8 @@ export function EditeurCatalogue({
                 <th>Produit</th>
                 <th>Catégorie</th>
                 <th className="nombre">Prix</th>
+                <th className="nombre">Coût</th>
+                <th className="nombre">Marge</th>
                 <th>État</th>
                 {modifiable && <th />}
               </tr>
@@ -241,6 +286,14 @@ export function EditeurCatalogue({
                   </td>
                   <td>{categories.find((c) => c.id === produit.categorieId)?.nom ?? '—'}</td>
                   <td className="nombre">{produit.prixAffiche}</td>
+                  <td className="nombre">
+                    {produit.coutUnitaire === null ? (
+                      <span className="detail">—</span>
+                    ) : (
+                      formaterTND(millimes(Math.round(produit.coutUnitaire)))
+                    )}
+                  </td>
+                  <td className="nombre">{margeAffichee(produit)}</td>
                   <td>
                     <span className={`etiquette ${produit.disponible ? 'actif' : 'inactif'}`}>
                       {produit.disponible ? 'en vente' : 'retiré'}

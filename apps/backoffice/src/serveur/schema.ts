@@ -133,6 +133,15 @@ export type Produit = {
   name: string
   description: string | null
   base_price_millimes: Millimes
+  /**
+   * Coût d'achat unitaire — SEULE exception au tout-entier (numeric(18,6)).
+   * Exprimé dans la même unité que le prix : des millimes, mais
+   * fractionnaires. Un burger acheté 10 TND vaut 10000.
+   * `null` = coût non renseigné, ce que les rapports signalent au lieu de
+   * le confondre avec un coût nul.
+   */
+  cost_per_unit: number | null
+  track_stock: boolean
   position: number
   is_available: boolean
   archived_at: Horodatage | null
@@ -153,6 +162,9 @@ export type Commande = {
   organization_id: Uuid
   restaurant_id: Uuid
   table_id: Uuid | null
+  /** L'employé qui a OUVERT la commande, et celui qui l'a ENCAISSÉE. */
+  opened_by: Uuid | null
+  closed_by: Uuid | null
   status: string
   /** `dine_in` | `takeaway` | `delivery`. */
   type: string
@@ -182,13 +194,73 @@ export type LigneCommande = {
   id: Uuid
   restaurant_id: Uuid
   order_id: Uuid
+  product_id: Uuid | null
   station_id: Uuid | null
   designation: string
   qty: number
+  /** Brut = (prix + modificateurs) × quantité, AVANT toute remise. */
+  line_gross_millimes: Millimes
+  line_discount_millimes: Millimes
+  global_discount_share_millimes: Millimes
+  /**
+   * Base APRÈS remises et HORS taxe exclusive. C'est LA grandeur comparable
+   * au coût d'achat : mélanger un CA TTC et un coût HT gonflerait la marge
+   * d'un point de TVA.
+   */
+  line_total_millimes: Millimes
+  line_tax_millimes: Millimes
   modifiers: { nom?: string; prixDeltaMillimes?: number }[]
   note: string | null
   position: number
   voided_at: Horodatage | null
+}
+
+export type Remboursement = {
+  id: Uuid
+  restaurant_id: Uuid
+  payment_id: Uuid
+  amount_millimes: Millimes
+  reason: string
+  created_at: Horodatage
+}
+
+/** Comptage de référence du stock (0019). Le stock RÉEL est dans la vue. */
+export type StockItem = {
+  product_id: Uuid
+  organization_id: Uuid
+  restaurant_id: Uuid
+  qty_reference: number
+  counted_at: Horodatage
+  min_qty: number | null
+  updated_at: Horodatage
+}
+
+export type MouvementStock = {
+  id: Uuid
+  organization_id: Uuid
+  restaurant_id: Uuid
+  product_id: Uuid
+  /** Signé : +12 pour une réception, −3 pour une casse. */
+  qty_delta: number
+  reason: string
+  note: string | null
+  created_by: Uuid | null
+  created_at: Horodatage
+}
+
+/**
+ * Vue en LECTURE SEULE : référence + mouvements manuels − ventes depuis le
+ * comptage. Calculée à la lecture, donc insensible aux reprojections.
+ */
+export type StockActuel = {
+  product_id: Uuid
+  restaurant_id: Uuid
+  qty_reference: number
+  counted_at: Horodatage
+  min_qty: number | null
+  qty_mouvements: number
+  qty_vendue: number
+  qty_on_hand: number
 }
 
 export type TableSalle = {
@@ -213,8 +285,12 @@ export type CuisinePrete = {
 export type Paiement = {
   id: Uuid
   restaurant_id: Uuid
+  order_id: Uuid
   type: string
   amount_millimes: Millimes
+  /** Ce que le client a TENDU, et ce qu'on lui a rendu. */
+  received_millimes: Millimes
+  change_millimes: Millimes
   voided_at: Horodatage | null
   created_at: Horodatage
 }
@@ -268,6 +344,10 @@ export type Database = {
       tables: Table<TableSalle>
       kitchen_ready: Table<CuisinePrete>
       payments: Table<Paiement>
+      refunds: Table<Remboursement>
+      stock_items: Table<StockItem>
+      stock_movements: Table<MouvementStock>
+      stock_actuel: Table<StockActuel>
       shifts: Table<Shift, [VersUtilisateur<'shifts_user_id_fkey'>]>
     }
     Views: Aucun
