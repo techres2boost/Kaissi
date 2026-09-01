@@ -312,8 +312,16 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
       // avec l'identifiant de la graine de démonstration, et le serveur
       // refuserait chaque vente avec « appareil_etranger » : le jeton est bon,
       // mais l'événement prétend venir d'un autre appareil.
+      // DÉLAI MAXIMAL, comme le transport de synchronisation (15 s).
+      //
+      // Sans lui, une requête qui reste en suspens — serveur en cours de
+      // redéploiement, préflight CORS sans réponse — laissait le bouton figé
+      // sur « Vérification… » indéfiniment, sans message et sans issue autre
+      // que recharger la page. C'est pourtant le seul endroit du produit où
+      // un humain attend devant l'écran.
       const reponse = await fetch(`${base}/sync/appareil`, {
         headers: { authorization: `Bearer ${jetonPropre}` },
+        signal: AbortSignal.timeout(15_000),
       })
       if (!reponse.ok) {
         const corps = (await reponse.json().catch(() => null)) as { message?: string } | null
@@ -358,7 +366,18 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
       onAppaire()
     } catch (erreur) {
       setEtat('erreur')
-      setMessage(expliquerEchecReseau(erreur, url))
+      // Un abandon sur délai n'est pas une adresse fausse : le distinguer
+      // évite d'envoyer chercher l'erreur là où elle n'est pas.
+      const expire =
+        erreur instanceof DOMException &&
+        (erreur.name === 'TimeoutError' || erreur.name === 'AbortError')
+      setMessage(
+        expire
+          ? `Le serveur n'a pas répondu en 15 secondes. Il est probablement en ` +
+            `cours de redéploiement — vérifie que ${base}/sante répond, puis ` +
+            `réessaie. La caisse fonctionne normalement en attendant.`
+          : expliquerEchecReseau(erreur, url),
+      )
     }
   }
 

@@ -202,8 +202,12 @@ export function FournisseurApp({ app, children }: Props) {
     let vivant = true
     void (async () => {
       try {
+        // Délai maximal : sans lui, une requête en suspens garderait une
+        // promesse vivante pour toute la session, et l'adoption ne serait
+        // jamais retentée.
         const reponse = await fetch(`${appairage.url}/sync/appareil`, {
           headers: { authorization: `Bearer ${appairage.jeton}` },
+          signal: AbortSignal.timeout(15_000),
         })
         if (!reponse.ok || !vivant) return
         const identite = (await reponse.json()) as {
