@@ -43,17 +43,27 @@ Si tu vois **`⇅ local`**, elle n'est pas appairée : voir §7.
 
 **1.3 — Aucune opération refusée**
 
-Bandeau → **⇅** → *État de la synchronisation*. « Opérations refusées » doit
-être à **0**.
+Dans le bandeau du haut de la caisse, clique la **pastille ronde à gauche de
+« Diagnostic »** — elle affiche `⇅ 0`, `⇅ local` ou un nombre en rouge. Elle
+ouvre la page titrée **« État de la synchronisation »** : c'est *elle*,
+l'écran de synchronisation.
+
+« Opérations refusées » doit être à **0**.
 
 > **S'il y a des refus « Événement signé par un autre appareil »** — le
-> terminal signait avec l'identité de la graine de démonstration au lieu de
-> celle que son jeton désigne. Il se répare désormais **tout seul au
-> démarrage** : recharge complètement la page de la caisse (Ctrl+Maj+R),
-> puis clique **« Abandonner ces opérations d'un ancien appairage »** au bas
-> de l'écran Synchronisation. Ces ventes-là ne remonteront jamais — elles
-> portent l'ancien identifiant — mais elles restent enregistrées localement,
-> et **toutes les suivantes** partiront normalement.
+> terminal signe ses ventes avec un identifiant d'appareil que son jeton ne
+> désigne pas. Deux gestes, dans cet ordre :
+>
+> 1. **Fais défiler la page jusqu'en bas**, sous le tableau des refus : le
+>    bouton **« Abandonner ces opérations d'un ancien appairage »** s'y
+>    trouve. Ces ventes ne remonteront jamais — elles portent l'ancien
+>    identifiant — mais elles restent enregistrées localement.
+> 2. Recharge la caisse en **Ctrl+Maj+R**. Au démarrage, le terminal demande
+>    au serveur quelle est son identité et l'adopte.
+>
+> Si le bouton n'apparaît pas, c'est que la caisse tourne encore sur un build
+> antérieur : vide les données du site dans le navigateur (Paramètres →
+> Données de site), puis ré-appaire.
 
 ---
 
@@ -322,6 +332,8 @@ Back-office → **Stock** → bouton **Suivre** ou **Ajuster**.
 | Opérations refusées « signé par un autre appareil » | Recharge la caisse (Ctrl+Maj+R) : elle adopte son identité au démarrage. Puis « Abandonner ces opérations d'un ancien appairage ». |
 | Badge **⇅ local** | Terminal non appairé. `pnpm sync:appairer --restaurant 01930000-0000-7000-8000-000000000002 --prefixe P3`, puis saisir l'URL et le jeton dans la caisse. |
 | « Failed to fetch » à l'appairage | `SYNC_ORIGINES` sur Railway doit contenir l'URL **exacte** du POS. |
+| Écran Cuisine vide, ou erreur `kitchen_ready` | Migration **0018** non appliquée. Toutes les migrations doivent passer, dans l'ordre. |
+| Push refusé sur une vente pourtant valide | Un employé du POS n'existe pas côté serveur (`orders.opened_by`). Migration **0020** les crée. |
 | Stock inchangé après une vente | La vente n'est pas synchronisée : badge `⇅ 0` ? |
 | Tableau de bord vide | Mauvaise période, ou vente non synchronisée. Vérifie d'abord **Tickets**. |
 | CA inférieur au total des tickets | **Normal** : le CA est HT, les tickets TTC. |
@@ -340,10 +352,17 @@ Dans le **SQL Editor** de Supabase.
 -- propriétaire. On le désactive le temps du ménage — un privilège réservé à
 -- une base de démonstration, JAMAIS à une base de production réelle.
 alter table kaissi.order_events disable trigger order_events_immuable;
-delete from kaissi.payments  where restaurant_id = '01930000-0000-7000-8000-000000000002';
-delete from kaissi.order_items where restaurant_id = '01930000-0000-7000-8000-000000000002';
-delete from kaissi.order_events where restaurant_id = '01930000-0000-7000-8000-000000000002';
-delete from kaissi.orders     where restaurant_id = '01930000-0000-7000-8000-000000000002';
+delete from kaissi.kitchen_ready   where restaurant_id = '01930000-0000-7000-8000-000000000002';
+delete from kaissi.refunds         where restaurant_id = '01930000-0000-7000-8000-000000000002';
+delete from kaissi.payments        where restaurant_id = '01930000-0000-7000-8000-000000000002';
+delete from kaissi.order_items     where restaurant_id = '01930000-0000-7000-8000-000000000002';
+delete from kaissi.order_events    where restaurant_id = '01930000-0000-7000-8000-000000000002';
+delete from kaissi.orders          where restaurant_id = '01930000-0000-7000-8000-000000000002';
+delete from kaissi.cash_movements  where restaurant_id = '01930000-0000-7000-8000-000000000002';
+delete from kaissi.shifts          where restaurant_id = '01930000-0000-7000-8000-000000000002';
+delete from kaissi.sync_mutations  where restaurant_id = '01930000-0000-7000-8000-000000000002';
+delete from kaissi.sync_cursors    where restaurant_id = '01930000-0000-7000-8000-000000000002';
+delete from kaissi.stock_movements where restaurant_id = '01930000-0000-7000-8000-000000000002';
 alter table kaissi.order_events enable trigger order_events_immuable;
 ```
 
