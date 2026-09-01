@@ -52,7 +52,7 @@ const LIBELLES_REJET: Record<string, string> = {
 }
 
 export function EcranSync() {
-  const { app, sync, resumeSync, rafraichir } = useApp()
+  const { app, sync, resumeSync, rafraichir, identite } = useApp()
   const [rejets, setRejets] = useState<EnregistrementOutbox[]>([])
   const [enAttente, setEnAttente] = useState<EnregistrementOutbox[]>([])
 
@@ -99,6 +99,22 @@ export function EcranSync() {
 
   const abandonnerEtrangers = async () => {
     await app.journal.abandonnerRejets('appareil_etranger')
+    rafraichir()
+  }
+
+  /*
+   * Oublie l'appairage pour réafficher le formulaire.
+   *
+   * L'écran d'appairage ne s'affiche QUE si le terminal n'est pas appairé.
+   * Sans ce bouton, un terminal mal appairé était dans un état dont il ne
+   * pouvait plus sortir : ni corriger l'adresse, ni changer de jeton.
+   *
+   * Rien n'est perdu : le journal des ventes et l'outbox restent intacts,
+   * seuls l'adresse et le jeton sont effacés.
+   */
+  const oublierAppairage = async () => {
+    await app.etat.ecrire('url_sync', '')
+    await app.etat.ecrire('jeton_appareil', '')
     rafraichir()
   }
 
@@ -155,6 +171,30 @@ export function EcranSync() {
             {resumeSync.etat === 'en_cours' ? 'Synchronisation…' : 'Synchroniser maintenant'}
           </button>
         </div>
+      </section>
+
+      <section className="bloc">
+        <h2>Identité de cet appareil</h2>
+        <dl>
+          <dt>Identifiant</dt>
+          <dd className="mono">{identite.deviceId || '—'}</dd>
+        </dl>
+        <p className="note">
+          Le serveur fait autorité : au démarrage, le terminal adopte
+          automatiquement l’identité que son jeton désigne. Si des ventes sont
+          refusées pour « appareil étranger », c’est que cette adoption n’a pas
+          encore eu lieu — relancez l’application, ou ré-appairez ci-dessous.
+        </p>
+        <p>
+          <button type="button" onClick={() => void oublierAppairage()}>
+            Ré-appairer ce terminal
+          </button>
+        </p>
+        <p className="note">
+          Le formulaire réapparaîtra pour saisir une autre adresse ou un autre
+          jeton. Aucune vente n’est perdue : seuls l’adresse et le jeton sont
+          effacés.
+        </p>
       </section>
 
       {rejets.length > 0 && (

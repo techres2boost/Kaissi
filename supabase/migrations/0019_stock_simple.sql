@@ -161,3 +161,15 @@ create trigger stock_items_updated_at
 -- La vue hérite des politiques de ses tables (security_invoker), mais le
 -- privilège de SELECT doit être accordé explicitement.
 grant select on kaissi.stock_actuel to authenticated, kaissi_device;
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- Rendre les nouvelles tables visibles à l'API REST
+-- ───────────────────────────────────────────────────────────────────────────
+-- PostgREST garde en mémoire un cache du schéma. Une table créée après son
+-- démarrage n'y figure pas, et le back-office répond « Could not find the
+-- table 'kaissi.stock_items' in the schema cache » — un message qui laisse
+-- croire que la migration n'est pas passée alors qu'elle l'est.
+--
+-- `reload schema` et non `reload config` : la 0012 rechargeait la
+-- configuration, ce qui ne relit PAS la liste des tables.
+notify pgrst, 'reload schema';

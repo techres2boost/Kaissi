@@ -179,6 +179,73 @@ export function FournisseurApp({ app, children }: Props) {
     }
   }, [impression])
 
+  /*
+   * L'appareil ADOPTE l'identité que son jeton désigne.
+   *
+   * Le terminal démarre avec le `device_id` de la graine de démonstration.
+   * L'appairage, lui, crée un appareil au tout autre identifiant côté
+   * serveur. Tant que les deux divergent, CHAQUE vente part et revient
+   * refusée en « appareil_etranger » : le jeton est bon, mais l'événement
+   * prétend venir d'ailleurs. La caisse encaisse, et rien ne remonte.
+   *
+   * Le serveur fait autorité sur « quel appareil suis-je » : on le lui
+   * demande, une fois, au démarrage. C'est une réparation AUTOMATIQUE —
+   * l'ancienne version exigeait de ré-appairer à la main, or le formulaire
+   * d'appairage ne s'affiche que si l'on ne l'est PAS. Le terminal était donc
+   * dans un état dont il ne pouvait pas sortir seul.
+   *
+   * Hors du chemin de vente, non bloquant, et silencieux en cas d'échec :
+   * hors ligne, on réessaiera au prochain démarrage.
+   */
+  useEffect(() => {
+    if (!appairage || !donnees) return
+    let vivant = true
+    void (async () => {
+      try {
+        const reponse = await fetch(`${appairage.url}/sync/appareil`, {
+          headers: { authorization: `Bearer ${appairage.jeton}` },
+        })
+        if (!reponse.ok || !vivant) return
+        const identite = (await reponse.json()) as {
+          deviceId?: string
+          restaurantId?: string
+          organizationId?: string
+        }
+        if (!identite.deviceId || identite.deviceId === donnees.identite.deviceId) return
+
+        await app.etat.ecrire('device_id', identite.deviceId)
+        if (identite.restaurantId) await app.etat.ecrire('restaurant_id', identite.restaurantId)
+        if (identite.organizationId) {
+          await app.etat.ecrire('organization_id', identite.organizationId)
+        }
+        if (!vivant) return
+        // On corrige l'identité EN MÉMOIRE plutôt que de recharger la page :
+        // `SessionCaisse` est reconstruite, et un caissier en pleine saisie ne
+        // perd rien.
+        setDonnees((precedent) =>
+          precedent
+            ? {
+                ...precedent,
+                identite: {
+                  deviceId: identite.deviceId!,
+                  restaurantId: identite.restaurantId ?? precedent.identite.restaurantId,
+                  organizationId: identite.organizationId ?? precedent.identite.organizationId,
+                },
+              }
+            : precedent,
+        )
+      } catch {
+        // Serveur injoignable : la caisse fonctionne, on retentera plus tard.
+      }
+    })()
+    return () => {
+      vivant = false
+    }
+    // `donnees.identite.deviceId` et non `donnees` : ce dernier change à
+    // chaque rechargement du catalogue, et relancerait l'appel pour rien.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app, appairage, donnees?.identite.deviceId])
+
   const sync = useMemo(() => {
     if (!donnees || !appairage) return null
     return new MoteurSync({
