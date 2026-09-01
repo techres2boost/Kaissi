@@ -363,6 +363,10 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
         window.location.reload()
         return
       }
+      // Le contexte relit l'appairage sur `rafraichir()` et fera disparaître
+      // ce formulaire ; on rend quand même le bouton à son état normal, pour
+      // que rien ne reste figé si ce rendu-là survit un instant.
+      setEtat('saisie')
       onAppaire()
     } catch (erreur) {
       setEtat('erreur')

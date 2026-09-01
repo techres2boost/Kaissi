@@ -104,6 +104,37 @@ export function FournisseurApp({ app, children }: Props) {
 
   const impression = useMemo(() => new ServiceImpression(app.fileImpression), [app])
 
+  /*
+   * L'appairage, relu à chaque `rafraichir()`.
+   *
+   * Effet À PART, et c'est tout l'intérêt : le chargement du catalogue ne
+   * dépend que de `app`, pour ne pas se relancer après chaque vente — un
+   * caissier qui consulte « Boissons » ne doit pas être renvoyé sur
+   * « Plats ». Mais l'appairage, lui, DOIT être relu quand il vient de
+   * changer.
+   *
+   * Sans cette séparation, valider le formulaire d'appairage enregistrait
+   * bien le jeton, puis appelait `rafraichir()` — que rien n'écoutait ici.
+   * `sync` restait nul, le formulaire restait affiché, et le bouton restait
+   * figé sur « Vérification… ». Le terminal ÉTAIT appairé, mais il fallait
+   * recharger la page pour s'en apercevoir.
+   *
+   * Deux lectures de clé : assez peu coûteux pour être refait à chaque
+   * rafraîchissement.
+   */
+  useEffect(() => {
+    let vivant = true
+    void Promise.all([app.etat.lire('url_sync'), app.etat.lire('jeton_appareil')]).then(
+      ([url, jeton]) => {
+        if (!vivant) return
+        setAppairage(url && jeton ? { url, jeton } : null)
+      },
+    )
+    return () => {
+      vivant = false
+    }
+  }, [app, version])
+
   useEffect(() => {
     let vivant = true
     void (async () => {
@@ -128,15 +159,7 @@ export function FournisseurApp({ app, children }: Props) {
         'SELECT name FROM restaurants LIMIT 1',
       )
 
-      // Appairage : sans jeton d'appareil, la synchronisation reste éteinte
-      // et la caisse fonctionne en local — c'est le mode Phase 0/1.
-      const [urlSync, jetonSync] = await Promise.all([
-        app.etat.lire('url_sync'),
-        app.etat.lire('jeton_appareil'),
-      ])
-
       if (!vivant) return
-      setAppairage(urlSync && jetonSync ? { url: urlSync, jeton: jetonSync } : null)
       setDonnees({
         identite: {
           organizationId: org ?? '',
