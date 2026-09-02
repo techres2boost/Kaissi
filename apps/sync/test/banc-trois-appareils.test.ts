@@ -39,6 +39,7 @@ import {
   TVA_19,
   URL_TEST,
   type AppareilTest,
+  EMPLOYE_DEMO,
 } from './aide.js'
 
 const depot = new DepotPostgres({ connectionString: URL_TEST, ssl: false })
@@ -79,7 +80,7 @@ class Terminal {
     const orderId = uuidV7()
     this.emettre(orderId, 'order.opened', {
       type: 'takeaway',
-      ouvertePar: null,
+      ouvertePar: EMPLOYE_DEMO,
       numeroTicket: `${this.appareil.prefixe}-${String(this.ventesLocales + 1).padStart(6, '0')}`,
     })
     this.emettre(orderId, 'line.added', {
@@ -99,7 +100,7 @@ class Terminal {
       recuMillimes: millimes(prix),
       renduMillimes: millimes(0),
     })
-    this.emettre(orderId, 'order.closed', { totalMillimes: millimes(prix), closePar: null })
+    this.emettre(orderId, 'order.closed', { totalMillimes: millimes(prix), closePar: EMPLOYE_DEMO })
     this.ventesLocales += 1
     return orderId
   }
@@ -386,7 +387,7 @@ describe('BANC TROIS APPAREILS — jalon de décision Phase 2', () => {
     t1.emettre(orderId, 'order.opened', {
       type: 'dine_in',
       tableId: '01930000-0000-7000-8000-000000000112',
-      ouvertePar: null,
+      ouvertePar: EMPLOYE_DEMO,
       numeroTicket: 'P1-000001',
     })
     t1.emettre(orderId, 'line.added', {

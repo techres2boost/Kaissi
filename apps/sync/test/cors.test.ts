@@ -23,25 +23,22 @@ const depotMuet = {
 const CAPACITOR = 'https://localhost'
 
 describe('CORS sur /sync', () => {
-  it('autorise la coque Capacitor SANS configuration', () => {
+  it('autorise la coque Capacitor SANS configuration', async () => {
     // Le cas du terrain : SYNC_ORIGINES vide, donc `origines` absent. Avant,
     // aucun en-tête CORS n'était posé du tout.
     const app = creerServeur({ depot: depotMuet })
-    return app
-      .request('http://test/sync/pull', {
-        method: 'OPTIONS',
-        headers: {
-          origin: CAPACITOR,
-          'access-control-request-method': 'GET',
-          'access-control-request-headers': 'authorization',
-        },
-      })
-      .then((r) => {
-        expect(r.headers.get('access-control-allow-origin')).toBe(CAPACITOR)
-        expect(r.headers.get('access-control-allow-headers')?.toLowerCase()).toContain(
-          'authorization',
-        )
-      })
+    const r = await app.request('http://test/sync/pull', {
+      method: 'OPTIONS',
+      headers: {
+        origin: CAPACITOR,
+        'access-control-request-method': 'GET',
+        'access-control-request-headers': 'authorization',
+      },
+    })
+    expect(r.headers.get('access-control-allow-origin')).toBe(CAPACITOR)
+    expect(r.headers.get('access-control-allow-headers')?.toLowerCase()).toContain(
+      'authorization',
+    )
   })
 
   it('ajoute les origines configurées sans perdre celles de Capacitor', async () => {

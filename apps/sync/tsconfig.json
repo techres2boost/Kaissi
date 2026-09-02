@@ -11,7 +11,14 @@
       ]
     }
   },
+  // Les TESTS sont typés eux aussi.
+  //
+  // Sans eux, un test peut appeler une aide avec des champs qui n'existent
+  // pas et « compiler » : il échoue alors à l'exécution sur un symptôme sans
+  // rapport — un 401 pour un jeton `undefined` — et on cherche le bug dans
+  // le service. Vitest transforme sans vérifier ; c'est tsc qui vérifie.
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "test/**/*.ts"
   ]
 }

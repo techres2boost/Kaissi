@@ -99,4 +99,13 @@ export function ev<T extends TypeEvenement>(
 /** Identifiant du taux de TVA 19 % du jeu de démonstration. */
 export const TVA_19 = '01930000-0000-7000-8000-000000000010'
 export const TVA_07 = '01930000-0000-7000-8000-000000000012'
+/**
+ * Employé de démonstration (migration 0020).
+ *
+ * `order.opened` porte `ouvertePar: Uuid`, non nul : le POS ne l'émet
+ * qu'une fois le PIN saisi, donc un employé est toujours connu. Passer
+ * `null` dans un test décrivait une vente que la caisse ne produit jamais.
+ */
+export const EMPLOYE_DEMO = '01930000-0000-7000-8000-000000000701'
+
 export const ESPECES = '01930000-0000-7000-8000-000000000500'

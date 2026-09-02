@@ -239,10 +239,33 @@ export class ServiceSync {
       await this.depot.consignerRejets(appareil, requete.batchId, rejetes)
     }
 
-    // La projection ne se recalcule que pour les commandes réellement
-    // touchées : reprojeter la journée entière à chaque push écroulerait le
-    // serveur en heure de pointe.
-    const touchees = [...new Set(recevables.map((e) => e.orderId))]
+    /*
+     * La projection ne se recalcule que pour les commandes du LOT :
+     * reprojeter la journée entière à chaque push écroulerait le serveur en
+     * heure de pointe.
+     *
+     * Mais les DOUBLONS comptent autant que les nouveautés, et c'est le
+     * point qui a coûté deux ventes en production.
+     *
+     * Les événements sont insérés dans une transaction, la projection dans
+     * une autre. Si la projection échoue — verrou, indisponibilité passagère
+     * — le push rend 500 et la caisse réessaie, comme elle doit. Mais au
+     * second passage l'idempotence reconnaît tous les événements : sans
+     * cette ligne, `recevables` est vide, la reprojection n'est pas
+     * rappelée, et le serveur répond 200. La caisse vide alors son outbox
+     * sur une commande qui n'entrera JAMAIS dans `orders` — présente dans le
+     * journal, invisible au back-office, définitivement.
+     *
+     * L'idempotence signifie « inséré une seule fois », jamais « projeté
+     * jamais ». La reprojection est elle-même idempotente : la refaire ne
+     * coûte qu'un peu de travail, l'omettre coûte une vente.
+     */
+    const touchees = [
+      ...new Set([
+        ...recevables.map((e) => e.orderId),
+        ...lot.filter((e) => connus.has(e.eventId)).map((e) => e.orderId),
+      ]),
+    ]
     if (touchees.length > 0) {
       await this.depot.reprojeter(appareil.restaurantId, touchees)
     }
