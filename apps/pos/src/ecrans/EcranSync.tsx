@@ -490,13 +490,15 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
                   type="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://kaissi-production.up.railway.app"
+                  placeholder="https://…"
                   autoComplete="off"
                   spellCheck={false}
                 />
                 <span className="note">
-                  Fournie par l’installateur, une seule fois. Elle sera
-                  mémorisée sur ce terminal.
+                  L’adresse de l’API de synchronisation, fournie par
+                  l’installateur — elle se termine souvent par
+                  <span className="mono"> .up.railway.app</span>. À saisir une
+                  seule fois : elle sera mémorisée sur ce terminal.
                 </span>
               </label>
             ) : (
