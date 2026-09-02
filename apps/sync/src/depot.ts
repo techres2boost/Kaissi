@@ -28,6 +28,30 @@ export interface ResultatInsertion {
   readonly curseur: number
 }
 
+export interface EtablissementEnrolable {
+  readonly restaurantId: string
+  readonly organizationId: string
+  readonly nom: string
+  readonly role: string
+}
+
+export interface DemandeEnrolement {
+  readonly restaurantId: string
+  readonly libelle: string
+  /** Laissé vide : le serveur attribue le prochain préfixe libre. */
+  readonly prefixe?: string
+}
+
+export interface AppareilEnrole {
+  readonly deviceId: string
+  readonly restaurantId: string
+  readonly organizationId: string
+  readonly nomEtablissement: string
+  readonly prefixe: string
+  /** En CLAIR. Ne sera plus jamais lisible ensuite. */
+  readonly jeton: string
+}
+
 export interface DepotSync {
   /**
    * Ouvre une connexion et exécute une requête triviale.
@@ -37,6 +61,20 @@ export interface DepotSync {
    * rendre.
    */
   verifier(): Promise<void>
+
+  /**
+   * Établissements où cet utilisateur a le droit d'enrôler un terminal.
+   *
+   * Seuls `admin` et `gerant` : un caissier ne décide pas quelle tablette
+   * rejoint la caisse de l'établissement.
+   */
+  etablissementsEnrolables(userId: string): Promise<EtablissementEnrolable[]>
+
+  /**
+   * Crée un appareil et rend son jeton EN CLAIR — la seule et unique fois
+   * où il existe hors de l'appareil. La base n'en garde que l'empreinte.
+   */
+  enrolerAppareil(demande: DemandeEnrolement): Promise<AppareilEnrole>
 
   /** Retrouve un appareil par l'empreinte de son jeton. */
   appareilParJeton(empreinte: string): Promise<AppareilAuthentifie | null>

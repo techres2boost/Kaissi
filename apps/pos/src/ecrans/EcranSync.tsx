@@ -17,6 +17,7 @@ import type { EnregistrementOutbox } from '@kaissi/db-local'
 import type { ResumeSync } from '@kaissi/sync-client'
 import { useApp } from '../etat/contexte.js'
 import { expliquerEchecReseau } from '../donnees/diagnostic-reseau.js'
+import { URL_SYNC_PAR_DEFAUT } from '../config.js'
 
 const LIBELLES_ETAT: Record<ResumeSync['etat'], string> = {
   inactif: 'En veille',
@@ -291,27 +292,29 @@ export function EcranSync() {
  */
 function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
   const { app } = useApp()
-  const [url, setUrl] = useState('')
-  const [jeton, setJeton] = useState('')
+  const [url, setUrl] = useState(URL_SYNC_PAR_DEFAUT)
+  const [email, setEmail] = useState('')
+  const [motDePasse, setMotDePasse] = useState('')
   const [etat, setEtat] = useState<'saisie' | 'test' | 'erreur'>('saisie')
   const [message, setMessage] = useState<string | null>(null)
+  const [choix, setChoix] = useState<{ restaurantId: string; nom: string }[]>([])
 
   useEffect(() => {
     void app.etat.lire('url_sync').then((u) => u && setUrl(u))
   }, [app])
 
-  const appairer = async () => {
+  /**
+   * Échange les identifiants du gérant contre un jeton d'appareil.
+   *
+   * `restaurantId` n'est fourni qu'au second appel, quand le compte gère
+   * plusieurs établissements : enrôler la caisse dans le mauvais restaurant
+   * enverrait ses ventes au mauvais endroit, donc on ne devine pas.
+   */
+  const appairer = async (restaurantId?: string) => {
     setEtat('test')
     setMessage(null)
     const base = url.replace(/\/+$/, '')
-    const jetonPropre = jeton.trim()
     try {
-      // On VÉRIFIE le jeton avant de l'enregistrer, ET on récupère l'identité
-      // de l'appareil qu'il désigne. C'est cette identité — le device_id —
-      // que le terminal doit apposer sur ses ventes. Sans elle, il signerait
-      // avec l'identifiant de la graine de démonstration, et le serveur
-      // refuserait chaque vente avec « appareil_etranger » : le jeton est bon,
-      // mais l'événement prétend venir d'un autre appareil.
       // DÉLAI MAXIMAL, comme le transport de synchronisation (15 s).
       //
       // Sans lui, une requête qui reste en suspens — serveur en cours de
@@ -319,53 +322,70 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
       // sur « Vérification… » indéfiniment, sans message et sans issue autre
       // que recharger la page. C'est pourtant le seul endroit du produit où
       // un humain attend devant l'écran.
-      const reponse = await fetch(`${base}/sync/appareil`, {
-        headers: { authorization: `Bearer ${jetonPropre}` },
+      const reponse = await fetch(`${base}/appairage`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          motDePasse,
+          restaurantId,
+          libelle: 'Terminal',
+        }),
         signal: AbortSignal.timeout(15_000),
       })
+
+      const corps = (await reponse.json().catch(() => null)) as {
+        jeton?: string
+        deviceId?: string
+        restaurantId?: string
+        organizationId?: string
+        nomEtablissement?: string
+        choix?: { restaurantId: string; nom: string }[]
+        message?: string
+      } | null
+
       if (!reponse.ok) {
-        const corps = (await reponse.json().catch(() => null)) as { message?: string } | null
         setEtat('erreur')
         setMessage(corps?.message ?? `Le serveur a répondu ${reponse.status}.`)
         return
       }
-      const identite = (await reponse.json()) as {
-        deviceId?: string
-        restaurantId?: string
-        organizationId?: string
+
+      // Plusieurs établissements : on demande lequel, on n'en choisit pas un.
+      if (corps?.choix && corps.choix.length > 0) {
+        setChoix(corps.choix)
+        setEtat('saisie')
+        return
       }
-      if (!identite.deviceId) {
+
+      if (!corps?.jeton || !corps.deviceId) {
         setEtat('erreur')
         setMessage(
-          "Le serveur n'a pas renvoyé l'identité de l'appareil. Mets à jour " +
-            "l'API de synchronisation (elle doit exposer /sync/appareil).",
+          "Le serveur n'a pas renvoyé de jeton. Mets à jour l'API de " +
+            'synchronisation (elle doit exposer /appairage).',
         )
         return
       }
 
       const ancienDevice = (await app.etat.lire('device_id')) || null
       await app.etat.ecrire('url_sync', base)
-      await app.etat.ecrire('jeton_appareil', jetonPropre)
-      // On ADOPTE l'identité du serveur : c'est lui qui fait autorité sur
-      // « quel appareil suis-je ». Les trois vont ensemble — un device dans un
-      // autre établissement changerait aussi restaurant_id et organization_id.
-      await app.etat.ecrire('device_id', identite.deviceId)
-      if (identite.restaurantId) await app.etat.ecrire('restaurant_id', identite.restaurantId)
-      if (identite.organizationId) {
-        await app.etat.ecrire('organization_id', identite.organizationId)
-      }
+      await app.etat.ecrire('jeton_appareil', corps.jeton)
+      // On ADOPTE l'identité que le serveur vient d'attribuer. Les trois vont
+      // ensemble — un appareil d'un autre établissement changerait aussi
+      // restaurant_id et organization_id. Sans cette adoption, le terminal
+      // signerait ses ventes avec l'identifiant de la graine de démonstration
+      // et le serveur les refuserait toutes avec « appareil_etranger ».
+      await app.etat.ecrire('device_id', corps.deviceId)
+      if (corps.restaurantId) await app.etat.ecrire('restaurant_id', corps.restaurantId)
+      if (corps.organizationId) await app.etat.ecrire('organization_id', corps.organizationId)
 
       // Le device_id est lu UNE fois au montage du contexte, puis figé dans la
       // session de caisse. S'il vient de changer, un simple rafraîchir ne
       // suffit pas : on recharge la page pour que les ventes suivantes soient
       // signées correctement. La base est persistante, rien n'est perdu.
-      if (ancienDevice && ancienDevice !== identite.deviceId) {
+      if (ancienDevice && ancienDevice !== corps.deviceId) {
         window.location.reload()
         return
       }
-      // Le contexte relit l'appairage sur `rafraichir()` et fera disparaître
-      // ce formulaire ; on rend quand même le bouton à son état normal, pour
-      // que rien ne reste figé si ce rendu-là survit un instant.
       setEtat('saisie')
       onAppaire()
     } catch (erreur) {
@@ -385,51 +405,97 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
     }
   }
 
+  const pretASoumettre =
+    url.trim() !== '' && email.trim() !== '' && motDePasse !== '' && etat !== 'test'
+
   return (
     <div className="diagnostic">
       <section className="bloc">
-        <h2>Appairer ce terminal</h2>
+        <h2>Mettre cette caisse en service</h2>
         <p className="note">
-          Ce terminal n’est pas encore relié au serveur. La caisse fonctionne
-          normalement en local ; l’appairage ajoute la synchronisation entre
-          terminaux et l’accès au back-office.
+          Connectez-vous avec le compte du gérant. Ce terminal recevra
+          automatiquement son identité — il n’y a aucun code à recopier.
+        </p>
+        <p className="note">
+          La caisse fonctionne déjà en local : cette étape ajoute la
+          synchronisation entre terminaux et l’accès au back-office.
         </p>
 
-        <label className="champ-note">
-          Adresse du serveur de synchronisation
-          <input
-            type="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://…"
-            autoComplete="off"
-          />
-        </label>
+        {choix.length > 0 ? (
+          <>
+            <p className="note">
+              Ce compte gère plusieurs établissements. Choisissez celui de
+              cette caisse — ses ventes y seront rattachées.
+            </p>
+            <div className="actions" style={{ flexDirection: 'column' }}>
+              {choix.map((e) => (
+                <button
+                  key={e.restaurantId}
+                  type="button"
+                  className="principal"
+                  disabled={etat === 'test'}
+                  onClick={() => void appairer(e.restaurantId)}
+                >
+                  {e.nom}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <label className="champ-note">
+              E-mail du gérant
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="gerant@monresto.tn"
+                autoComplete="username"
+                spellCheck={false}
+              />
+            </label>
 
-        <label className="champ-note">
-          Jeton d’appareil (fourni par le gérant)
-          <input
-            type="text"
-            value={jeton}
-            onChange={(e) => setJeton(e.target.value)}
-            placeholder="kdev_…"
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </label>
+            <label className="champ-note">
+              Mot de passe
+              <input
+                type="password"
+                value={motDePasse}
+                onChange={(e) => setMotDePasse(e.target.value)}
+                autoComplete="current-password"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && pretASoumettre) void appairer()
+                }}
+              />
+            </label>
 
-        {message && <p className="erreur">{message}</p>}
+            <details>
+              <summary className="note">Adresse du serveur</summary>
+              <label className="champ-note">
+                <input
+                  type="url"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://…"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </label>
+            </details>
 
-        <div className="actions">
-          <button
-            type="button"
-            className="principal"
-            disabled={etat === 'test' || url.trim() === '' || jeton.trim() === ''}
-            onClick={() => void appairer()}
-          >
-            {etat === 'test' ? 'Vérification…' : 'Vérifier et appairer'}
-          </button>
-        </div>
+            {message && <p className="erreur">{message}</p>}
+
+            <div className="actions">
+              <button
+                type="button"
+                className="principal"
+                disabled={!pretASoumettre}
+                onClick={() => void appairer()}
+              >
+                {etat === 'test' ? 'Connexion…' : 'Mettre en service'}
+              </button>
+            </div>
+          </>
+        )}
       </section>
     </div>
   )

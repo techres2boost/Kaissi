@@ -15,6 +15,12 @@ import type { AppareilAuthentifie, DepotSync } from './depot.js'
 import { jetonDepuisEntete, empreinteDe } from './jeton.js'
 import { ErreurSync, VERSION_PROTOCOLE, type ReponseErreur } from './protocole.js'
 import { ServiceSync } from './service.js'
+import {
+  configAuthDepuisEnvironnement,
+  identifierParMotDePasse,
+  ErreurAuth,
+  type ConfigAuth,
+} from './auth-supabase.js'
 
 /**
  * Variables portées par le contexte de requête.
@@ -29,9 +35,19 @@ export interface OptionsServeur {
   /** Origines autorisées. Le POS empaqueté n'en a pas besoin ; le
    *  back-office et les outils de diagnostic, oui. */
   readonly origines?: readonly string[]
+  /** Supabase Auth, pour l'appairage par identifiants. Absent : la route
+   *  répond 501 et les terminaux déjà appairés continuent normalement. */
+  readonly auth?: ConfigAuth | null
+  /** Injectable pour les tests : le seul appel réseau sortant du service. */
+  readonly fetchAuth?: typeof fetch
 }
 
-export function creerServeur({ depot, origines }: OptionsServeur) {
+export function creerServeur({
+  depot,
+  origines,
+  auth = configAuthDepuisEnvironnement(),
+  fetchAuth,
+}: OptionsServeur) {
   const service = new ServiceSync(depot)
   const app = new Hono<{ Variables: VariablesKaissi }>()
 
@@ -48,14 +64,13 @@ export function creerServeur({ depot, origines }: OptionsServeur) {
   // a pas de session de navigateur à voler ici — aucun cookie, aucune
   // identité implicite.
   const ORIGINES_CAPACITOR = ['https://localhost', 'http://localhost', 'capacitor://localhost']
-  app.use(
-    '/sync/*',
-    cors({
-      origin: [...ORIGINES_CAPACITOR, ...(origines ?? [])],
-      allowHeaders: ['authorization', 'content-type'],
-      allowMethods: ['GET', 'POST', 'OPTIONS'],
-    }),
-  )
+  const corsKaissi = cors({
+    origin: [...ORIGINES_CAPACITOR, ...(origines ?? [])],
+    allowHeaders: ['authorization', 'content-type'],
+    allowMethods: ['GET', 'POST', 'OPTIONS'],
+  })
+  app.use('/sync/*', corsKaissi)
+  app.use('/appairage', corsKaissi)
 
   // ── Santé ────────────────────────────────────────────────────────────
   // Sans authentification : c'est ce que sonde l'hébergeur.
@@ -83,6 +98,101 @@ export function creerServeur({ depot, origines }: OptionsServeur) {
       horodatage: new Date().toISOString(),
       base: 'joignable',
     })
+  })
+
+  // ── POST /appairage ──────────────────────────────────────────────────
+  //
+  // La SEULE route qui ne demande pas de jeton d'appareil : c'est elle qui
+  // en délivre un. Un gérant saisit ses identifiants sur la tablette, et
+  // celle-ci reçoit son jeton — plus rien à recopier à la main.
+  //
+  // Le modèle d'identités ne change pas : le jeton d'appareil reste ce qui
+  // authentifie la caisse, révocable, distinct du compte et du PIN employé.
+  // Seule sa REMISE est automatisée.
+  app.post('/appairage', async (c) => {
+    if (!auth) {
+      const corps: ReponseErreur = {
+        erreur: 'appairage_indisponible',
+        message:
+          "L'appairage par identifiants n'est pas configuré sur ce serveur " +
+          '(SUPABASE_URL et SUPABASE_ANON_KEY).',
+      }
+      return c.json(corps, 501)
+    }
+
+    let brut: unknown
+    try {
+      brut = await c.req.json()
+    } catch {
+      const corps: ReponseErreur = { erreur: 'requete_invalide', message: 'Corps JSON illisible.' }
+      return c.json(corps, 400)
+    }
+    const { email, motDePasse, restaurantId, libelle } = (brut ?? {}) as Record<string, unknown>
+    if (typeof email !== 'string' || typeof motDePasse !== 'string' || !email || !motDePasse) {
+      const corps: ReponseErreur = {
+        erreur: 'requete_invalide',
+        message: 'E-mail et mot de passe sont requis.',
+      }
+      return c.json(corps, 400)
+    }
+
+    try {
+      const identite = await identifierParMotDePasse(auth, email, motDePasse, fetchAuth)
+      const etablissements = await depot.etablissementsEnrolables(identite.userId)
+
+      if (etablissements.length === 0) {
+        const corps: ReponseErreur = {
+          erreur: 'aucun_etablissement',
+          message:
+            "Ce compte n'est gérant d'aucun établissement. Demandez à " +
+            "l'administrateur de vous y rattacher.",
+        }
+        return c.json(corps, 403)
+      }
+
+      // Plusieurs établissements et aucun choix : on rend la liste plutôt
+      // que d'en choisir un au hasard. Enrôler la caisse dans le mauvais
+      // restaurant enverrait ses ventes au mauvais endroit.
+      const choisi =
+        typeof restaurantId === 'string'
+          ? etablissements.find((e) => e.restaurantId === restaurantId)
+          : etablissements.length === 1
+            ? etablissements[0]
+            : undefined
+
+      if (!choisi) {
+        if (typeof restaurantId === 'string') {
+          const corps: ReponseErreur = {
+            erreur: 'etablissement_refuse',
+            message: "Ce compte n'est pas gérant de cet établissement.",
+          }
+          return c.json(corps, 403)
+        }
+        return c.json({
+          choix: etablissements.map((e) => ({ restaurantId: e.restaurantId, nom: e.nom })),
+        })
+      }
+
+      const enrole = await depot.enrolerAppareil({
+        restaurantId: choisi.restaurantId,
+        libelle: typeof libelle === 'string' && libelle.trim() ? libelle.trim() : 'Terminal',
+      })
+
+      return c.json({
+        jeton: enrole.jeton,
+        deviceId: enrole.deviceId,
+        restaurantId: enrole.restaurantId,
+        organizationId: enrole.organizationId,
+        nomEtablissement: enrole.nomEtablissement,
+        prefixe: enrole.prefixe,
+      })
+    } catch (erreur) {
+      if (erreur instanceof ErreurAuth) {
+        const corps: ReponseErreur = { erreur: 'identifiants_refuses', message: erreur.message }
+        return c.json(corps, erreur.statut)
+      }
+      return reponseErreur(c, erreur)
+    }
   })
 
   // ── Authentification par jeton d'appareil ────────────────────────────

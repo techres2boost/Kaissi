@@ -127,6 +127,15 @@ export type CodeErreur =
   | 'protocole_non_supporte'
   | 'requete_invalide'
   | 'erreur_serveur'
+  // ── Appairage par identifiants ──────────────────────────────────────────
+  /** Le serveur n'a pas SUPABASE_URL / SUPABASE_ANON_KEY. */
+  | 'appairage_indisponible'
+  /** E-mail ou mot de passe refusé — volontairement indistincts. */
+  | 'identifiants_refuses'
+  /** Le compte existe mais n'est gérant nulle part. */
+  | 'aucun_etablissement'
+  /** Le compte n'est pas gérant de l'établissement demandé. */
+  | 'etablissement_refuse'
 
 export interface ReponseErreur {
   readonly erreur: CodeErreur

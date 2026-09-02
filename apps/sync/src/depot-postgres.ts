@@ -24,8 +24,16 @@ import {
   type PointsDeBase,
 } from '@kaissi/domain'
 import { estUuid } from '@kaissi/domain'
-import type { AppareilAuthentifie, DepotSync, ResultatInsertion } from './depot.js'
+import type {
+  AppareilAuthentifie,
+  AppareilEnrole,
+  DemandeEnrolement,
+  DepotSync,
+  EtablissementEnrolable,
+  ResultatInsertion,
+} from './depot.js'
 import type { ChangementCatalogue } from './protocole.js'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { ReglageSsl } from './ssl.js'
 
 /**
@@ -132,6 +140,96 @@ export class DepotPostgres implements DepotSync {
       return resultat
     } catch (erreur) {
       await client.query('rollback').catch(() => undefined)
+      throw erreur
+    } finally {
+      client.release()
+    }
+  }
+
+  async etablissementsEnrolables(userId: string): Promise<EtablissementEnrolable[]> {
+    const { rows } = await this.pool.query<{
+      restaurant_id: string
+      organization_id: string
+      nom: string
+      role: string
+    }>(
+      // On entre par `auth_user_id`, JAMAIS par `users.id`.
+      //
+      // Depuis la migration 0017 les deux identités sont distinctes : un
+      // serveur en salle a une ligne `users` sans compte de connexion. Le
+      // compte Supabase ne désigne donc l'employé que par `auth_user_id`.
+      // Comparer avec `memberships.user_id` ne rendrait aucune ligne — et
+      // l'appairage refuserait un gérant parfaitement légitime.
+      `select m.restaurant_id, m.organization_id, r.name as nom, m.role
+         from kaissi.users u
+         join kaissi.memberships m on m.user_id = u.id
+         join kaissi.restaurants r on r.id = m.restaurant_id
+        where u.auth_user_id = $1
+          and u.status = 'actif'
+          and m.revoked_at is null
+          and m.role in ('admin', 'gerant')
+        order by r.name`,
+      [userId],
+    )
+    return rows.map((l) => ({
+      restaurantId: l.restaurant_id,
+      organizationId: l.organization_id,
+      nom: l.nom,
+      role: l.role,
+    }))
+  }
+
+  async enrolerAppareil(demande: DemandeEnrolement): Promise<AppareilEnrole> {
+    const client = await this.pool.connect()
+    try {
+      await client.query('begin')
+
+      const { rows: restos } = await client.query<{ organization_id: string; nom: string }>(
+        'select organization_id, name as nom from kaissi.restaurants where id = $1',
+        [demande.restaurantId],
+      )
+      const resto = restos[0]
+      if (!resto) throw new Error(`Établissement ${demande.restaurantId} introuvable.`)
+
+      // Le préfixe est verrouillé POUR TOUT L'ÉTABLISSEMENT le temps de la
+      // transaction. Deux tablettes qui s'enrôlent à la même seconde
+      // choisiraient sinon le même « P2 » — et deux tickets différents
+      // porteraient le même numéro.
+      await client.query('select pg_advisory_xact_lock(hashtext($1))', [
+        `kaissi:prefixe:${demande.restaurantId}`,
+      ])
+
+      const prefixe = demande.prefixe ?? (await prochainPrefixeLibre(client, demande.restaurantId))
+
+      const deviceId = randomUUID()
+      const jeton = `kdev_${randomBytes(32).toString('base64url')}`
+      const empreinte = createHash('sha256').update(jeton, 'utf8').digest('hex')
+
+      await client.query(
+        `insert into kaissi.devices
+           (id, organization_id, restaurant_id, label, type, ticket_prefix,
+            token_hash, protocol_version)
+         values ($1,$2,$3,$4,'pos',$5,$6,1)`,
+        [deviceId, resto.organization_id, demande.restaurantId, demande.libelle, prefixe, empreinte],
+      )
+      await client.query(
+        `insert into kaissi.device_pairings
+           (organization_id, restaurant_id, device_id, token_hash)
+         values ($1,$2,$3,$4)`,
+        [resto.organization_id, demande.restaurantId, deviceId, empreinte],
+      )
+      await client.query('commit')
+
+      return {
+        deviceId,
+        restaurantId: demande.restaurantId,
+        organizationId: resto.organization_id,
+        nomEtablissement: resto.nom,
+        prefixe,
+        jeton,
+      }
+    } catch (erreur) {
+      await client.query('rollback').catch(() => {})
       throw erreur
     } finally {
       client.release()
@@ -569,4 +667,30 @@ function versEvenement(r: any): EvenementCommande {
     clientTs:
       r.client_ts instanceof Date ? r.client_ts.toISOString() : String(r.client_ts),
   }
+}
+
+/**
+ * Prochain préfixe de ticket libre : P1, P2, P3…
+ *
+ * On balaie plutôt que de compter les appareils : la contrainte
+ * `unique (restaurant_id, ticket_prefix)` ne relâche PAS un préfixe quand
+ * l'appareil est révoqué — et c'est délibéré, sinon un nouveau terminal
+ * réutiliserait la numérotation d'un ancien et deux tickets d'archive
+ * porteraient le même numéro. Compter donnerait donc une collision dès la
+ * première révocation.
+ */
+async function prochainPrefixeLibre(
+  client: PoolClient,
+  restaurantId: string,
+): Promise<string> {
+  const { rows } = await client.query<{ ticket_prefix: string }>(
+    'select ticket_prefix from kaissi.devices where restaurant_id = $1',
+    [restaurantId],
+  )
+  const pris = new Set(rows.map((l) => l.ticket_prefix))
+  for (let n = 1; n <= 999; n += 1) {
+    const candidat = `P${n}`
+    if (!pris.has(candidat)) return candidat
+  }
+  throw new Error("Plus aucun préfixe de ticket disponible pour cet établissement.")
 }

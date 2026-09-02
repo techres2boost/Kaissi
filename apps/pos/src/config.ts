@@ -25,3 +25,13 @@ export const IMPRESSION_ACTIVE = import.meta.env.VITE_IMPRESSION === '1'
 
 /** Cible du build : APK Android (défaut) ou site statique. */
 export const CIBLE_WEB = import.meta.env.VITE_CIBLE === 'web'
+
+/**
+ * Adresse du serveur de synchronisation, pré-remplie à l'appairage.
+ *
+ * Ce n'est PAS un `server.url` : le bundle ne charge rien depuis cette
+ * adresse, il ne s'y synchronise qu'après mise en service, et la caisse
+ * fonctionne entièrement sans elle. C'est un simple confort de saisie —
+ * le gérant peut la corriger dans le formulaire.
+ */
+export const URL_SYNC_PAR_DEFAUT = import.meta.env.VITE_URL_SYNC ?? ''
