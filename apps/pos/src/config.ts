@@ -35,3 +35,13 @@ export const CIBLE_WEB = import.meta.env.VITE_CIBLE === 'web'
  * le gérant peut la corriger dans le formulaire.
  */
 export const URL_SYNC_PAR_DEFAUT = import.meta.env.VITE_URL_SYNC ?? ''
+
+/**
+ * Empreinte du build en cours d'exécution.
+ *
+ * Affichée dans l'écran Diagnostic. Sans elle, « ma correction est-elle en
+ * ligne ? » ne se répond qu'en cherchant un texte au hasard dans l'écran —
+ * et on finit par déboguer du code qui n'est pas celui qui tourne.
+ */
+export const BUILD_COMMIT = import.meta.env.VITE_BUILD_COMMIT ?? ''
+export const BUILD_DATE = import.meta.env.VITE_BUILD_DATE ?? ''

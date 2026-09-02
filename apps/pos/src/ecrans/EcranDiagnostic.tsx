@@ -17,6 +17,7 @@ import type { ContexteApplication } from '../donnees/demarrage.js'
 import type { EtatReseau } from '../donnees/reseau.js'
 import { ImprimanteReseau } from '../plugins/imprimante.js'
 import { IMPRESSION_ACTIVE } from '../config.js'
+import { BUILD_COMMIT, BUILD_DATE } from '../config.js'
 
 interface Props {
   contexte: ContexteApplication
@@ -359,6 +360,23 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
           </p>
         </section>
       )}
+
+      <section className="bloc">
+        <h2>Version en cours d’exécution</h2>
+        <dl>
+          <dt>Construit le</dt>
+          <dd>
+            {BUILD_DATE ? new Date(BUILD_DATE).toLocaleString('fr-FR') : 'inconnu'}
+          </dd>
+          <dt>Commit</dt>
+          <dd className="mono">{BUILD_COMMIT || '—'}</dd>
+        </dl>
+        <p className="note">
+          À comparer au dernier déploiement avant de chercher un bug : une
+          correction poussée il y a deux minutes n’est peut-être pas encore
+          celle qui tourne ici.
+        </p>
+      </section>
 
       <section className="bloc">
         <h2>Identité locale</h2>

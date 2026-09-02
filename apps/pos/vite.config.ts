@@ -82,6 +82,18 @@ export default defineConfig(({ command, mode }) => {
       // Figée ici plutôt que laissée à l'environnement du shell : le bundle
       // doit dire lui-même pour quelle cible il a été construit.
       'import.meta.env.VITE_CIBLE': JSON.stringify(cible),
+      // Empreinte du build, lisible dans l'écran Diagnostic.
+      //
+      // Avec trois déploiements qui se redéploient tout seuls, « est-ce que
+      // ma correction est en ligne ? » devient la question la plus fréquente
+      // — et la plus coûteuse, parce qu'on cherche un bug dans du code qui
+      // n'est pas celui qui tourne. Le bundle porte donc sa propre date et
+      // son commit. Vercel fournit VERCEL_GIT_COMMIT_SHA ; ailleurs, la
+      // date suffit à trancher.
+      'import.meta.env.VITE_BUILD_COMMIT': JSON.stringify(
+        (process.env['VERCEL_GIT_COMMIT_SHA'] ?? process.env['GIT_COMMIT'] ?? '').slice(0, 7),
+      ),
+      'import.meta.env.VITE_BUILD_DATE': JSON.stringify(new Date().toISOString()),
     },
     // Chemins RELATIFS : indispensable pour un chargement depuis le schéma
     // interne de Capacitor.

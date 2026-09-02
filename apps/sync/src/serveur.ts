@@ -111,11 +111,21 @@ export function creerServeur({
   // Seule sa REMISE est automatisée.
   app.post('/appairage', async (c) => {
     if (!auth) {
+      // On NOMME ce qui manque, une variable à la fois.
+      //
+      // « non configuré » sans plus de détail envoie relire deux réglages
+      // dont l'un est déjà bon — et une faute de frappe dans un nom de
+      // variable est invisible à l'œil sur un tableau de bord d'hébergeur.
+      const absentes = ['SUPABASE_URL', 'SUPABASE_ANON_KEY'].filter(
+        (nom) => !(process.env[nom] ?? '').trim(),
+      )
       const corps: ReponseErreur = {
         erreur: 'appairage_indisponible',
         message:
-          "L'appairage par identifiants n'est pas configuré sur ce serveur " +
-          '(SUPABASE_URL et SUPABASE_ANON_KEY).',
+          "L'appairage par identifiants n'est pas configuré sur ce serveur. " +
+          `Variable(s) absente(s) ou vide(s) : ${absentes.join(', ')}. ` +
+          "Vérifiez l'orthographe EXACTE du nom sur l'hébergeur, puis " +
+          'redéployez — une variable ajoutée ne prend effet qu’au redémarrage.',
       }
       return c.json(corps, 501)
     }
