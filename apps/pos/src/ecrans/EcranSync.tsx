@@ -405,8 +405,23 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
     }
   }
 
-  const pretASoumettre =
-    url.trim() !== '' && email.trim() !== '' && motDePasse !== '' && etat !== 'test'
+  /**
+   * Ce qui manque encore, en toutes lettres.
+   *
+   * Un bouton grisé sans explication est un cul-de-sac : on clique, rien ne
+   * bouge, et rien ne dit pourquoi. Le cas s'est produit avec l'adresse du
+   * serveur — un champ OBLIGATOIRE que j'avais replié dans un volet fermé.
+   */
+  const manquant =
+    url.trim() === ''
+      ? "l'adresse du serveur de synchronisation"
+      : email.trim() === ''
+        ? "l'e-mail du gérant"
+        : motDePasse === ''
+          ? 'le mot de passe'
+          : null
+
+  const pretASoumettre = manquant === null && etat !== 'test'
 
   return (
     <div className="diagnostic">
@@ -468,19 +483,40 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
               />
             </label>
 
-            <details>
-              <summary className="note">Adresse du serveur</summary>
+            {url.trim() === '' ? (
               <label className="champ-note">
+                Adresse du serveur de synchronisation
                 <input
                   type="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://…"
+                  placeholder="https://kaissi-production.up.railway.app"
                   autoComplete="off"
                   spellCheck={false}
                 />
+                <span className="note">
+                  Fournie par l’installateur, une seule fois. Elle sera
+                  mémorisée sur ce terminal.
+                </span>
               </label>
-            </details>
+            ) : (
+              // Renseignée : on la replie, elle n'intéresse plus personne.
+              <details>
+                <summary className="note">
+                  Serveur : <span className="mono">{url}</span> — modifier
+                </summary>
+                <label className="champ-note">
+                  <input
+                    type="url"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="https://…"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </label>
+              </details>
+            )}
 
             {message && <p className="erreur">{message}</p>}
 
@@ -494,6 +530,9 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
                 {etat === 'test' ? 'Connexion…' : 'Mettre en service'}
               </button>
             </div>
+            {manquant && (
+              <p className="note">Il manque encore {manquant}.</p>
+            )}
           </>
         )}
       </section>
