@@ -86,6 +86,33 @@ const HOTES_AUTORISES = [
   // dur reste refusé.
   '10.0.2.2',
 ]
+
+/*
+ * L'adresse de synchronisation CONFIGURÉE au build, si elle existe.
+ *
+ * Ce n'est pas une entorse à la règle, et il faut le dire précisément :
+ * la promesse du mode avion est que le CODE de l'application vive dans le
+ * paquet, pour qu'elle s'ouvre sans réseau. Une adresse de synchronisation
+ * est une DONNÉE — personne ne la contacte au démarrage, et le POS
+ * fonctionne entièrement sans elle. La confondre avec une dépendance de
+ * CDN interdisait la seule façon propre de pré-remplir l'adresse : la
+ * saisir à la main sur chaque terminal.
+ *
+ * On n'autorise QUE l'hôte réellement configuré, jamais une plage : une
+ * URL distante arrivée par accident reste refusée.
+ */
+const urlSync = (process.env['VITE_URL_SYNC'] ?? '').trim()
+if (urlSync) {
+  try {
+    HOTES_AUTORISES.push(new URL(urlSync).hostname.toLowerCase())
+  } catch {
+    console.error(
+      `\n✗ VITE_URL_SYNC n'est pas une URL valide : « ${urlSync} »\n` +
+        '  Attendu : https://mon-serveur-de-sync.example\n',
+    )
+    process.exit(1)
+  }
+}
 const suspectes = new Set()
 for (const fichier of fichiers) {
   if (extname(fichier) !== '.js') continue
