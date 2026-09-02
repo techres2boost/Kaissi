@@ -495,6 +495,37 @@ export class DepotPostgres implements DepotSync {
    * le MÊME code que la tablette. C'est ce qui garantit qu'un total calculé
    * hors ligne et le total du rapport du back-office ne divergent jamais.
    */
+  /**
+   * Commandes dont la projection est à refaire.
+   *
+   * `toutes` à faux — le défaut — ne rend que celles ABSENTES de `orders` :
+   * c'est le cas qui répare une panne, et il ne touche à rien d'autre.
+   * À vrai, il rend toute la journée, ce qui n'a de sens qu'après un
+   * changement de calcul des totaux, et hors service.
+   *
+   * Réservé à l'outillage d'exploitation : le service de synchronisation
+   * ne reprojette, lui, que les commandes de son lot.
+   */
+  async commandesAReprojeter(
+    restaurantId: string,
+    toutes = false,
+  ): Promise<string[]> {
+    const { rows } = await this.pool.query<{ order_id: string }>(
+      toutes
+        ? `select distinct e.order_id
+             from kaissi.order_events e
+            where e.restaurant_id = $1
+            order by e.order_id`
+        : `select distinct e.order_id
+             from kaissi.order_events e
+        left join kaissi.orders o on o.id = e.order_id
+            where e.restaurant_id = $1 and o.id is null
+            order by e.order_id`,
+      [restaurantId],
+    )
+    return rows.map((l) => l.order_id)
+  }
+
   async reprojeter(restaurantId: string, orderIds: readonly string[]): Promise<void> {
     if (orderIds.length === 0) return
     const client = await this.pool.connect()

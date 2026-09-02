@@ -26,6 +26,7 @@
     "pos:android": "pnpm --filter @kaissi/pos android",
     "sync:dev": "pnpm --filter @kaissi/sync dev",
     "sync:appairer": "node --experimental-strip-types --import ./apps/sync/scripts/charger-ts.mjs apps/sync/scripts/appairer.mjs",
+    "sync:reprojeter": "node --experimental-strip-types --import ./apps/sync/scripts/charger-ts.mjs apps/sync/scripts/reprojeter.mjs",
     "sync:acces": "node --experimental-strip-types --import ./apps/sync/scripts/charger-ts.mjs apps/sync/scripts/acces.mjs",
     "backoffice:dev": "pnpm --filter @kaissi/backoffice dev",
     "verifier:natif": "pnpm --filter @kaissi/pos verifier:natif",
