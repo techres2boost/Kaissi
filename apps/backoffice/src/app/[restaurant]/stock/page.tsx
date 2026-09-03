@@ -31,8 +31,12 @@ export interface ProduitStock {
   margeMillimes: number
   margeBp: number | null
   suivi: boolean
-  /** `false` = retiré de la carte de la caisse (rupture déclarée). */
+  /** `false` = retiré de la carte de la caisse. */
   enVente: boolean
+  /** `'manuel'` | `'stock'` | `null` — pourquoi il en est sorti. */
+  motifRetrait: string | null
+  /** Retirer automatiquement de la carte quand le stock atteint zéro. */
+  ruptureAuto: boolean
   quantite: number | null
   seuil: number | null
   vendue: number
@@ -49,11 +53,11 @@ export default async function PageStock({
   const { etablissement } = await etablissementObligatoire(restaurant)
   const supabase = await supabaseServeur()
 
-  const [produitsRes, categoriesRes, stockRes] = await Promise.all([
+  const [produitsRes, categoriesRes, stockRes, suiviRes] = await Promise.all([
     supabase
       .from('products')
       .select(
-        'id, name, category_id, base_price_millimes, cost_per_unit, track_stock, is_available, archived_at',
+        'id, name, category_id, base_price_millimes, cost_per_unit, track_stock, is_available, unavailable_reason, archived_at',
       )
       .eq('restaurant_id', restaurant)
       .is('archived_at', null)
@@ -62,6 +66,10 @@ export default async function PageStock({
     supabase
       .from('stock_actuel')
       .select('product_id, qty_on_hand, min_qty, qty_vendue, counted_at')
+      .eq('restaurant_id', restaurant),
+    supabase
+      .from('stock_items')
+      .select('product_id, auto_rupture')
       .eq('restaurant_id', restaurant),
   ])
 
@@ -76,6 +84,7 @@ export default async function PageStock({
 
   const categories = new Map((categoriesRes.data ?? []).map((c) => [c.id, c.name]))
   const stocks = new Map((stockRes.data ?? []).map((s) => [s.product_id, s]))
+  const reglages = new Map((suiviRes.data ?? []).map((s) => [s.product_id, s]))
 
   const produits: ProduitStock[] = (produitsRes.data ?? []).map((p) => {
     const stock = stocks.get(p.id)
@@ -90,6 +99,8 @@ export default async function PageStock({
       margeBp: marge.margeBp,
       suivi: stock !== undefined,
       enVente: p.is_available,
+      motifRetrait: p.unavailable_reason,
+      ruptureAuto: reglages.get(p.id)?.auto_rupture ?? true,
       quantite: stock ? Number(stock.qty_on_hand) : null,
       seuil: stock?.min_qty === null || stock?.min_qty === undefined ? null : Number(stock.min_qty),
       vendue: stock ? Number(stock.qty_vendue) : 0,

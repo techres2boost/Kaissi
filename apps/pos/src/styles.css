@@ -730,3 +730,23 @@ button { font: inherit; color: inherit; cursor: pointer; }
   max-height: 55vh;
   overflow-y: auto;
 }
+
+/* ── Diagnostic : le lisible devant, le technique replié ─────────────────── */
+.etat-simple { display: grid; grid-template-columns: max-content 1fr; gap: 0.5rem 1rem; }
+.etat-simple dt { color: var(--texte-2); font-weight: 600; }
+.etat-simple dd { margin: 0; }
+.etat-simple dd.ok { color: var(--ok); }
+.etat-simple dd.attention { color: var(--alerte); font-weight: 600; }
+
+/*
+  Replié PAR DÉFAUT, et c'est le point : ces informations doivent rester sur
+  l'appareil pour le support, sans être la première chose que lit la personne
+  qui tient la caisse.
+*/
+.details-techniques { margin-top: 1.2rem; }
+.details-techniques > summary {
+  cursor: pointer; padding: 0.7rem 0.9rem; border-radius: var(--rayon);
+  background: var(--surface); border: 1px solid var(--bordure);
+  color: var(--texte-2); font-weight: 600;
+}
+.details-techniques[open] > summary { margin-bottom: 1rem; }

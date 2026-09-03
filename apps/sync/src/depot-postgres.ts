@@ -678,6 +678,7 @@ export class DepotPostgres implements DepotSync {
   async reprojeter(restaurantId: string, orderIds: readonly string[]): Promise<void> {
     if (orderIds.length === 0) return
     const client = await this.pool.connect()
+    const produitsTouches = new Set<string>()
     try {
       const config = await chargerConfig(client, restaurantId)
       for (const orderId of orderIds) {
@@ -814,6 +815,35 @@ export class DepotPostgres implements DepotSync {
         } catch (erreur) {
           await client.query('rollback').catch(() => undefined)
           throw erreur
+        }
+
+        for (const ligne of etat.lignes) {
+          if (ligne.produitId) produitsTouches.add(ligne.produitId)
+        }
+      }
+
+      /*
+       * Aligne la carte sur le stock, une fois toutes les commandes du lot
+       * projetées.
+       *
+       * C'est ICI, et pas dans la tablette, que se décide qu'un produit sort
+       * de la carte : le serveur travaille sur `stock_actuel`, calculé à
+       * l'instant, tandis qu'une tablette hors ligne ne connaîtrait qu'un
+       * souvenir vieux de plusieurs heures. La caisse, elle, ne fait
+       * qu'appliquer un réglage de catalogue — le même chemin qu'un
+       * changement de prix.
+       *
+       * HORS de la transaction de projection, et sans jamais la faire
+       * échouer : perdre une vente pour un réglage de carte serait absurde.
+       */
+      if (produitsTouches.size > 0) {
+        try {
+          await client.query('select kaissi.appliquer_rupture_auto($1, $2::uuid[])', [
+            restaurantId,
+            [...produitsTouches],
+          ])
+        } catch (erreur) {
+          console.warn('[sync] rupture automatique non appliquée', erreur)
         }
       }
     } finally {

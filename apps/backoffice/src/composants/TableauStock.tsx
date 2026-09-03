@@ -15,6 +15,7 @@ import {
   activerSuivi,
   arreterSuivi,
   basculerDisponibilite,
+  basculerRuptureAuto,
   enregistrerMouvement,
 } from '../app/[restaurant]/stock/actions.js'
 import type { ProduitStock } from '../app/[restaurant]/stock/page.js'
@@ -103,9 +104,10 @@ export function TableauStock({
                 </td>
                 <td>
                   {/*
-                    Le seul geste qui fait disparaître un produit de la caisse.
-                    Il est manuel PAR CONSTRUCTION : une quantité calculée peut
-                    dater d'avant le dernier réassort, une décision humaine non.
+                    Deux informations en un bouton : l'état de la carte, et
+                    QUI l'a décidé. « Rupture » seul laissait croire à un bug
+                    quand c'était l'automatisme, et à un automatisme quand
+                    c'était une décision de gestion.
                   */}
                   <button
                     type="button"
@@ -115,11 +117,30 @@ export function TableauStock({
                     title={
                       p.enVente
                         ? 'Retirer ce produit de la carte des caisses'
-                        : 'Remettre ce produit en vente sur les caisses'
+                        : p.motifRetrait === 'stock'
+                          ? 'Retiré automatiquement : stock à zéro. Il reviendra seul à la première réception.'
+                          : 'Retiré à la main. L’automatisme ne le remettra jamais en vente tout seul.'
                     }
                   >
-                    {p.enVente ? 'En vente' : 'En rupture'}
+                    {p.enVente
+                      ? 'En vente'
+                      : p.motifRetrait === 'stock'
+                        ? 'Rupture (auto)'
+                        : 'Rupture (manuel)'}
                   </button>
+                  {p.suivi && (
+                    <label className="bascule-auto" title="Retirer de la carte dès que le stock atteint zéro">
+                      <input
+                        type="checkbox"
+                        checked={p.ruptureAuto}
+                        disabled={enCours}
+                        onChange={(e) =>
+                          agir(() => basculerRuptureAuto(restaurantId, p.id, e.target.checked))
+                        }
+                      />
+                      auto
+                    </label>
+                  )}
                 </td>
                 <td>
                   <button

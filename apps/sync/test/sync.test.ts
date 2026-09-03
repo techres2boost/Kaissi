@@ -421,7 +421,7 @@ describe('pull — curseur serveur, jamais un horodatage (RÈGLE 4)', () => {
     let recus = r.corps.evenements.length
     let pages = 0
 
-    while (pages < 20) {
+    while (pages < 50) {
       const suite = await appeler(
         `/sync/pull?protocolVersion=1&depuisEvenements=${curseurEvenements}` +
           `&depuisCatalogue=${curseurCatalogue}&taillePage=5`,
@@ -437,8 +437,10 @@ describe('pull — curseur serveur, jamais un horodatage (RÈGLE 4)', () => {
     // Les douze événements des trois commandes, ni un de plus ni un de moins.
     expect(recus).toBe(12)
     // Et la pagination TERMINE : sans cela, un terminal en retard bouclerait
-    // indéfiniment sans jamais se déclarer à jour.
-    expect(pages).toBeLessThan(20)
+    // indéfiniment sans jamais se déclarer à jour. La borne est large à
+    // dessein — ce test prouve la TERMINAISON, pas un nombre de pages, qui
+    // dépend d'un `change_log` partagé avec les autres fichiers.
+    expect(pages).toBeLessThan(50)
   })
 
   it('signale « encore » tant que le CATALOGUE a du retard', async () => {

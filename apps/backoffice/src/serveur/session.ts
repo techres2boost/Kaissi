@@ -23,6 +23,16 @@ export interface Etablissement {
   role: RoleMembre
   /** Vrai si ce membre peut modifier le référentiel — miroir de est_gestionnaire(). */
   gestionnaire: boolean
+  /**
+   * Vrai pour le seul rôle `admin` — miroir de `est_administrateur()`.
+   *
+   * La différence avec `gestionnaire` tient en une phrase : un gérant EXPLOITE
+   * l'établissement (carte, stock, rapports, embauche de caissiers, serveurs
+   * et cuisine), un administrateur décide QUI d'autre obtient ces pouvoirs.
+   * C'est la seule frontière entre les deux rôles, et elle est appliquée par
+   * RLS (migration 0024) autant qu'ici.
+   */
+  administrateur: boolean
 }
 
 export interface SessionBackoffice {
@@ -107,6 +117,7 @@ export async function sessionObligatoire(): Promise<SessionBackoffice> {
       nom: nom ?? 'Établissement',
       role,
       gestionnaire: ROLES_GESTIONNAIRES.includes(role),
+      administrateur: role === 'admin',
     }
   })
 
@@ -141,6 +152,22 @@ export async function etablissementObligatoire(
 }
 
 /** Refuse une action d'encadrement, avec un motif affichable. */
+/**
+ * Exige le rôle `admin`.
+ *
+ * Réservé aux gestes qui DONNENT DU POUVOIR : accorder ou retirer un rôle
+ * `gerant` ou `admin`. Tout le reste de la gestion appartient au gérant.
+ */
+export function exigerAdministrateur(etablissement: Etablissement, geste: string): void {
+  if (!etablissement.administrateur) {
+    throw new Error(
+      `${geste} est réservé à un administrateur. Un gérant gère la carte, le ` +
+        `stock, les rapports et l'équipe d'exploitation — mais il ne distribue ` +
+        `pas les accès qui donnent les mêmes pouvoirs que les siens.`,
+    )
+  }
+}
+
 export function exigerGestionnaire(etablissement: Etablissement): void {
   if (!etablissement.gestionnaire) {
     throw new Error(

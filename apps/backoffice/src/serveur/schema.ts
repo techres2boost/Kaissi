@@ -144,6 +144,12 @@ export type Produit = {
   track_stock: boolean
   position: number
   is_available: boolean
+  /**
+   * Pourquoi le produit est hors carte : `'manuel'` (décision du gérant, que
+   * l'automatisme ne défera jamais) ou `'stock'` (rupture automatique, levée
+   * dès que le stock repasse au-dessus de zéro). `null` s'il est en vente.
+   */
+  unavailable_reason: string | null
   archived_at: Horodatage | null
   updated_at: Horodatage
 }
@@ -244,6 +250,11 @@ export type StockItem = {
   qty_reference: number
   counted_at: Horodatage
   min_qty: number | null
+  /**
+   * Retirer automatiquement le produit de la carte quand son stock atteint
+   * zéro. À couper pour un produit dont le comptage n'est qu'indicatif.
+   */
+  auto_rupture: boolean
   updated_at: Horodatage
 }
 
@@ -363,7 +374,19 @@ export type Database = {
       shifts: Table<Shift, [VersUtilisateur<'shifts_user_id_fkey'>]>
     }
     Views: Aucun
-    Functions: Aucun
+    Functions: {
+      /**
+       * Aligne `products.is_available` sur le stock calculé (migration 0023).
+       *
+       * Le back-office l'appelle après tout geste qui change une quantité —
+       * mouvement, recomptage, activation ou arrêt du suivi. Le service de
+       * synchronisation l'appelle, lui, après chaque reprojection de vente.
+       */
+      appliquer_rupture_auto: {
+        Args: { p_restaurant: string; p_produits?: string[] | null }
+        Returns: number
+      }
+    }
     Enums: Aucun
     CompositeTypes: Aucun
   }

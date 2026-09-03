@@ -2,7 +2,12 @@
 
 import { revalidatePath } from 'next/cache'
 import { hacherPin, validerFormatPin, pinTropFaible, ErreurPin } from '@kaissi/domain'
-import { etablissementObligatoire, exigerGestionnaire } from '../../../serveur/session.js'
+import {
+  etablissementObligatoire,
+  exigerAdministrateur,
+  exigerGestionnaire,
+  type Etablissement,
+} from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { uuidV7 } from '@kaissi/domain'
 import {
@@ -19,14 +24,28 @@ export interface Resultat {
 
 const ROLES = ['gerant', 'caissier', 'serveur', 'cuisine'] as const
 
+/**
+ * Les rôles qui donnent accès à l'argent et à la configuration.
+ *
+ * Les accorder, c'est distribuer ses propres pouvoirs : réservé à un
+ * administrateur. Un gérant embauche et gère l'équipe d'exploitation —
+ * caissiers, serveurs, cuisine — et rien au-dessus. RLS applique la même
+ * règle (migration 0024) ; ce contrôle-ci sert surtout à rendre un message
+ * clair plutôt qu'un « aucune ligne modifiée ».
+ */
+const ROLES_QUI_DONNENT_LES_CLES: readonly string[] = ['admin', 'gerant']
+
 async function agir(
   restaurantId: string,
-  travail: (supabase: Awaited<ReturnType<typeof supabaseServeur>>) => Promise<string>,
+  travail: (
+    supabase: Awaited<ReturnType<typeof supabaseServeur>>,
+    etablissement: Etablissement,
+  ) => Promise<string>,
 ): Promise<Resultat> {
   try {
     const { etablissement } = await etablissementObligatoire(restaurantId)
     exigerGestionnaire(etablissement)
-    const succes = await travail(await supabaseServeur())
+    const succes = await travail(await supabaseServeur(), etablissement)
     revalidatePath(`/${restaurantId}/employes`)
     return { succes }
   } catch (erreur) {
@@ -93,8 +112,11 @@ export async function changerRole(
   _precedent: Resultat | null,
   donnees: FormData,
 ): Promise<Resultat> {
-  return agir(restaurantId, async (supabase) => {
+  return agir(restaurantId, async (supabase, etablissement) => {
     const role = choix(donnees, 'role', 'Le rôle', ROLES)
+    if (ROLES_QUI_DONNENT_LES_CLES.includes(role)) {
+      exigerAdministrateur(etablissement, `Accorder le rôle « ${role} »`)
+    }
     const { count, error } = await supabase
       .from('memberships')
       .update({ role, updated_at: new Date().toISOString() }, { count: 'exact' })
@@ -166,10 +188,12 @@ export async function embaucher(
   _precedent: Resultat | null,
   donnees: FormData,
 ): Promise<Resultat> {
-  return agir(restaurantId, async (supabase) => {
-    const { etablissement } = await etablissementObligatoire(restaurantId)
+  return agir(restaurantId, async (supabase, etablissement) => {
     const nom = texteObligatoire(donnees, 'nom', 'Le nom', 200)
     const role = choix(donnees, 'role', 'Le rôle', ROLES)
+    if (ROLES_QUI_DONNENT_LES_CLES.includes(role)) {
+      exigerAdministrateur(etablissement, `Embaucher quelqu'un comme « ${role} »`)
+    }
     const email = texteFacultatif(donnees, 'email')
     const pinHash = hachageDuPin(donnees, 'pin', 'confirmation')
 

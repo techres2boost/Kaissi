@@ -26,6 +26,17 @@ export interface ProduitLocal {
   couleur: string | null
   position: number
   disponible: boolean
+  /**
+   * Pourquoi le produit est hors carte, quand il l'est.
+   *
+   * `'stock'` — retiré automatiquement par le serveur, stock suivi à zéro.
+   * `'manuel'` — décision du gérant : « on n'en fait plus ce soir ».
+   * `null` — en vente, ou motif inconnu d'un serveur antérieur.
+   *
+   * La caisse ne s'en sert QUE pour choisir sa phrase. Elle n'en tire aucune
+   * règle : c'est `disponible` qui décide, et lui seul.
+   */
+  motifRetrait: 'stock' | 'manuel' | null
 }
 
 export interface TauxTaxeLocal {
@@ -103,9 +114,11 @@ export function depotCatalogue(db: AdaptateurSqlite) {
         color: string | null
         position: number
         is_available: number
+        unavailable_reason: string | null
       }>(
         `SELECT id, category_id, station_id, tax_rate_id, name, description,
-                base_price_millimes, color, position, is_available
+                base_price_millimes, color, position, is_available,
+                unavailable_reason
          FROM products
          WHERE archived_at IS NULL ${filtre}
          ORDER BY position, name`,
@@ -122,6 +135,10 @@ export function depotCatalogue(db: AdaptateurSqlite) {
         couleur: l.color,
         position: l.position,
         disponible: l.is_available === 1,
+        motifRetrait:
+          l.unavailable_reason === 'stock' || l.unavailable_reason === 'manuel'
+            ? l.unavailable_reason
+            : null,
       }))
     },
 

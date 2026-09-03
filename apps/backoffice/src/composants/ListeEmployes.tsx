@@ -20,20 +20,31 @@ export interface Employe {
   administrable: boolean
 }
 
+/**
+ * `cles: true` = ce rôle donne accès à l'argent et à la configuration.
+ * Seul un administrateur peut l'accorder : le distribuer, c'est distribuer
+ * ses propres pouvoirs. RLS applique la même règle (migration 0024).
+ */
+/** Les rôles qui donnent accès à l'argent et à la configuration. */
+const ROLES_A_CLES: readonly string[] = ['admin', 'gerant']
+
 const ROLES = [
-  { valeur: 'gerant', libelle: 'Gérant — remises sans limite' },
-  { valeur: 'caissier', libelle: 'Caissier — remises jusqu’à 10 %' },
-  { valeur: 'serveur', libelle: 'Serveur — remises jusqu’à 5 %' },
-  { valeur: 'cuisine', libelle: 'Cuisine — pas de caisse' },
+  { valeur: 'gerant', libelle: 'Gérant — remises sans limite', cles: true },
+  { valeur: 'caissier', libelle: 'Caissier — remises jusqu’à 10 %', cles: false },
+  { valeur: 'serveur', libelle: 'Serveur — remises jusqu’à 5 %', cles: false },
+  { valeur: 'cuisine', libelle: 'Cuisine — pas de caisse', cles: false },
 ]
 
 export function ListeEmployes({
   restaurantId,
   modifiable,
+  administrateur,
   employes,
 }: {
   restaurantId: string
   modifiable: boolean
+  /** Seul un administrateur peut accorder un rôle qui donne les clés. */
+  administrateur: boolean
   employes: Employe[]
 }) {
   const [cible, setCible] = useState<Employe | null>(null)
@@ -44,6 +55,7 @@ export function ListeEmployes({
       {modifiable && (
         <FormulaireEmbauche
           restaurantId={restaurantId}
+          administrateur={administrateur}
           ouvert={embaucheOuverte}
           ouvrir={() => setEmbaucheOuverte(true)}
           fermer={() => setEmbaucheOuverte(false)}
@@ -129,6 +141,7 @@ export function ListeEmployes({
         <PanneauEmploye
           key={cible.id}
           restaurantId={restaurantId}
+          administrateur={administrateur}
           employe={cible}
           fermer={() => setCible(null)}
         />
@@ -139,10 +152,12 @@ export function ListeEmployes({
 
 function PanneauEmploye({
   restaurantId,
+  administrateur,
   employe,
   fermer,
 }: {
   restaurantId: string
+  administrateur: boolean
   employe: Employe
   fermer: () => void
 }) {
@@ -202,13 +217,29 @@ function PanneauEmploye({
           </p>
         </form>
 
+        {/*
+          Un gérant ne touche pas au rôle d'un pair ni d'un administrateur.
+          RLS le refuse déjà (migration 0024) — mais afficher un formulaire qui
+          va échouer, avec une liste où le rôle actuel n'apparaît même pas,
+          ferait croire à une rétrogradation qui n'a pas eu lieu.
+        */}
+        {!administrateur && ROLES_A_CLES.includes(employe.role) ? (
+          <section>
+            <h2 style={{ fontSize: '0.95rem' }}>Rôle</h2>
+            <p className="indication">
+              {employe.nom} est {employe.role}. Seul un administrateur peut
+              modifier ce rôle : accorder ou retirer l’accès à l’argent et à la
+              configuration ne relève pas de la gestion courante.
+            </p>
+          </section>
+        ) : (
         <form action={actionRole}>
           <h2 style={{ fontSize: '0.95rem' }}>Rôle</h2>
           <Message resultat={resultatRole} />
           <div className="champ">
             <label htmlFor={`role-${employe.id}`}>Rôle dans cet établissement</label>
             <select id={`role-${employe.id}`} name="role" defaultValue={employe.role}>
-              {ROLES.map((role) => (
+              {ROLES.filter((r) => administrateur || !r.cles).map((role) => (
                 <option key={role.valeur} value={role.valeur}>
                   {role.libelle}
                 </option>
@@ -220,10 +251,11 @@ function PanneauEmploye({
           </button>
           <p className="indication">
             Le rôle vaut pour <strong>cet établissement</strong> seulement. Le même employé
-            peut être serveur ici et caissier ailleurs. « Administrateur » ne s&apos;attribue
-            que par un administrateur.
+            peut être serveur ici et caissier ailleurs. « Gérant » et
+            « Administrateur » ne s&apos;attribuent que par un administrateur.
           </p>
         </form>
+        )}
       </div>
     </section>
   )
@@ -240,11 +272,13 @@ function Message({ resultat }: { resultat: Resultat | null }) {
 
 function FormulaireEmbauche({
   restaurantId,
+  administrateur,
   ouvert,
   ouvrir,
   fermer,
 }: {
   restaurantId: string
+  administrateur: boolean
   ouvert: boolean
   ouvrir: () => void
   fermer: () => void
@@ -285,7 +319,7 @@ function FormulaireEmbauche({
           <div className="champ">
             <label htmlFor="role-embauche">Rôle</label>
             <select id="role-embauche" name="role" defaultValue="serveur">
-              {ROLES.map((role) => (
+              {ROLES.filter((r) => administrateur || !r.cles).map((role) => (
                 <option key={role.valeur} value={role.valeur}>
                   {role.libelle}
                 </option>

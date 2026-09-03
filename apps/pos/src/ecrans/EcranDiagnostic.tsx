@@ -1,13 +1,20 @@
 /**
- * Écran Diagnostic.
+ * Écran Diagnostic — deux écrans en un, et c'est délibéré.
  *
- * Tu ne peux pas envoyer quelqu'un à Sfax pour comprendre pourquoi une
- * tablette ne démarre pas. Cet écran donne, sur l'appareil, tout ce qu'il
- * faut pour qualifier un incident au téléphone : mode de stockage, version
- * de schéma, migrations appliquées, contenu du catalogue, état de l'outbox.
+ * EN HAUT, quatre phrases qu'un caissier comprend : est-ce que la carte est
+ * là, est-ce que mes ventes sont en sécurité, est-ce que j'ai Internet,
+ * est-ce qu'il reste des ventes à envoyer. Rien d'autre. La première version
+ * ouvrait sur « Mode avion — critère de sortie de la Phase 0 » et « SQLite
+ * persisté dans IndexedDB » : vrai, utile au support, illisible pour la
+ * personne qui tient la caisse à 20 h.
  *
- * C'est aussi l'écran qui PROUVE le mode avion : « Réseau : hors ligne » et
- * « 17 produits lus depuis SQLite » sur la même page.
+ * EN DESSOUS, replié, tout le reste — mode de stockage, version de schéma,
+ * migrations, étapes de démarrage, identité locale. On ne peut pas envoyer
+ * quelqu'un à Sfax pour comprendre pourquoi une tablette ne démarre pas :
+ * ces informations doivent rester SUR l'appareil, lisibles au téléphone.
+ *
+ * Replier n'est pas cacher. Le caissier n'a pas à les lire ; le support doit
+ * pouvoir les dicter en trois secondes.
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -110,24 +117,62 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
     }
   }, [])
 
+  const toutVaBien =
+    produits > 0 && contexte.base.persistant && compteurs.rejetes === 0
+
   return (
     <div className="diagnostic">
       <section className="bloc">
-        <h2>Mode avion — critère de sortie de la Phase 0</h2>
-        <div className={`verdict ${produits > 0 ? 'ok' : 'ko'}`}>
-          {produits > 0 ? (
+        <h2>État de cet appareil</h2>
+        <div className={`verdict ${toutVaBien ? 'ok' : 'ko'}`}>
+          {toutVaBien ? (
             <>
-              <strong>Réussi.</strong> {produits} produits lus depuis SQLite
-              local, réseau {reseau.connecte ? 'disponible mais non sollicité' : 'INDISPONIBLE'}.
-              Aucune requête n'a été émise au démarrage.
+              <strong>Tout va bien.</strong> Vous pouvez encaisser, même sans
+              Internet.
             </>
           ) : (
             <>
-              <strong>Échec.</strong> Le catalogue local est vide : l'écran de
-              caisse ne peut rien afficher.
+              <strong>Un point demande votre attention.</strong> Voyez la ligne
+              en orange ci-dessous.
             </>
           )}
         </div>
+
+        <dl className="etat-simple">
+          <dt>La carte</dt>
+          <dd className={produits > 0 ? 'ok' : 'attention'}>
+            {produits > 0
+              ? `${produits} produits enregistrés sur l'appareil.`
+              : 'Aucun produit : la caisse ne peut rien afficher. Prévenez le gérant.'}
+          </dd>
+
+          <dt>Vos ventes</dt>
+          <dd className={contexte.base.persistant ? 'ok' : 'attention'}>
+            {contexte.base.persistant
+              ? 'Enregistrées sur l’appareil. Elles survivent à une coupure de courant.'
+              : 'NON enregistrées — cette page est une démonstration, pas une caisse.'}
+          </dd>
+
+          <dt>Internet</dt>
+          <dd className={reseau.connecte ? 'ok' : ''}>
+            {reseau.connecte
+              ? 'Connecté.'
+              : 'Absent — la caisse fonctionne quand même. Rien n’est perdu.'}
+          </dd>
+
+          <dt>Envoi au bureau</dt>
+          <dd className={compteurs.rejetes > 0 ? 'attention' : ''}>
+            {compteurs.rejetes > 0
+              ? `${compteurs.rejetes} opération(s) refusée(s) — à montrer au gérant.`
+              : compteurs.enAttente > 0
+                ? `${compteurs.enAttente} vente(s) en attente. Elles partiront seules.`
+                : 'Tout est arrivé au bureau.'}
+          </dd>
+        </dl>
+
+        {contexte.base.avertissement && (
+          <p className="note attention">{contexte.base.avertissement}</p>
+        )}
       </section>
 
       {!IMPRESSION_ACTIVE && (
@@ -208,6 +253,9 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
           </p>
         </section>
       )}
+
+      <details className="details-techniques">
+        <summary>Détails techniques — à lire au support, si on vous les demande</summary>
 
       <section className="bloc">
         <h2>Démarrage</h2>
@@ -303,8 +351,11 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
           </dd>
         </dl>
         <p className="note">
-          Le moteur de synchronisation (push / pull / curseurs) est la Phase 2.
-          En Phase 0, l'outbox se remplit mais rien n'est envoyé : c'est voulu.
+          L'envoi est AUTOMATIQUE et continu : rien à déclencher à la main. Une
+          opération ne quitte la file que sur accusé de réception du serveur —
+          jamais au bout d'un délai, jamais « au bout de N essais ». Un rejet,
+          lui, ne se réessaie jamais tout seul : c'est une règle de gestion, et
+          elle remonte au gérant.
         </p>
       </section>
 
@@ -391,6 +442,8 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
           </tbody>
         </table>
       </section>
+
+      </details>
     </div>
   )
 }

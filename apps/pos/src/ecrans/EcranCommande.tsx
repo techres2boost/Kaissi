@@ -143,9 +143,11 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
     // s'agit d'une rupture ou d'un écran qui a mal réagi.
     if (!produit.disponible) {
       setMessage(
-        `${produit.nom} est en rupture de stock : il a été retiré de la carte ` +
-          `depuis le back-office. Le gérant peut le remettre en vente dans ` +
-          `Stock → « En rupture ».`,
+        produit.motifRetrait === 'manuel'
+          ? `${produit.nom} a été retiré de la carte par le gérant. ` +
+            `Il n'est pas proposé pour le moment.`
+          : `${produit.nom} est en rupture de stock. ` +
+            `Il reviendra sur la carte dès que le gérant aura saisi la réception.`,
       )
       return
     }

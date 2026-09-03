@@ -65,6 +65,12 @@ export async function nettoyer(): Promise<void> {
     // échouait alors selon l'ordre d'exécution, ce qui est le pire des
     // échecs : il n'apprend rien et on finit par l'ignorer.
     await client.query("delete from kaissi.change_log where entity_type = 'employees'")
+    // Même raison pour les produits : la rupture automatique bascule
+    // `products.is_available`, et chaque bascule est journalisée. Sans ce
+    // ménage, le catalogue accumule un retard que la pagination du pull met
+    // des dizaines de pages à rattraper — et un test de pagination échoue
+    // selon l'ordre d'exécution, ce qui est le pire des échecs.
+    await client.query("delete from kaissi.change_log where entity_type = 'products'")
     await client.query('alter table kaissi.order_events enable trigger order_events_immuable')
   } finally {
     await client.end()

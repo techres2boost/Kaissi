@@ -148,6 +148,12 @@ button.danger { color: var(--danger); }
   border-radius: 999px; padding: 0.05rem 0.7rem; min-width: 2.2rem; text-align: center;
 }
 
+/* La case « rupture auto », sous le bouton d'état de carte. */
+.bascule-auto {
+  display: flex; align-items: center; gap: 0.3rem; margin-top: 0.3rem;
+  font-size: 0.78rem; color: var(--texte-2); cursor: pointer;
+}
+
 /* Postes de préparation : la même séparation que les bons émis par la caisse. */
 .onglets-postes {
   display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.8rem;

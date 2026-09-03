@@ -176,7 +176,8 @@ const TABLES_MIROIR: Record<string, { nom: string; colonnes: string[] }> = {
     nom: 'products',
     colonnes: ['id', 'organization_id', 'restaurant_id', 'category_id', 'station_id',
                'tax_rate_id', 'name', 'description', 'base_price_millimes', 'color',
-               'position', 'is_available', 'track_stock', 'archived_at'],
+               'position', 'is_available', 'unavailable_reason', 'track_stock',
+               'archived_at'],
   },
   product_variants: {
     nom: 'product_variants',

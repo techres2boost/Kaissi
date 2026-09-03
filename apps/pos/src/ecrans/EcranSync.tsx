@@ -147,10 +147,6 @@ export function EcranSync() {
               ? new Date(resumeSync.derniereSyncA).toLocaleString('fr-FR')
               : 'jamais'}
           </dd>
-          <dt>Curseur événements</dt>
-          <dd className="mono">{resumeSync.curseurEvenements}</dd>
-          <dt>Curseur catalogue</dt>
-          <dd className="mono">{resumeSync.curseurCatalogue}</dd>
           {resumeSync.tentatives > 0 && (
             <>
               <dt>Tentatives échouées</dt>
@@ -163,14 +159,39 @@ export function EcranSync() {
           <p className="note">Dernier message du serveur : {resumeSync.derniereErreur}</p>
         )}
 
+        <details className="details-techniques">
+          <summary>Détails techniques — à lire au support, si on vous les demande</summary>
+          <dl>
+            <dt>Curseur événements</dt>
+            <dd className="mono">{resumeSync.curseurEvenements}</dd>
+            <dt>Curseur catalogue</dt>
+            <dd className="mono">{resumeSync.curseurCatalogue}</dd>
+          </dl>
+        </details>
+
+        {/*
+          L'envoi est AUTOMATIQUE — toutes les quinze secondes réseau
+          disponible, avec recul exponentiel après un échec. Ce bouton ne
+          « fait pas » la synchronisation : il avance le prochain cycle.
+          Il reste utile dans un seul cas, mais un vrai : on veut vérifier
+          quelque chose au back-office tout de suite, sans attendre.
+          Le présenter comme l'action principale laissait croire que rien ne
+          partait sans lui.
+        */}
+        <p className="note">
+          L'envoi se fait <strong>tout seul</strong>, en continu, dès qu'il y a
+          du réseau. Vous n'avez rien à déclencher : ce bouton ne sert qu'à ne
+          pas attendre les quelques secondes du prochain cycle.
+        </p>
+
         <div className="actions">
           <button
             type="button"
-            className="principal"
+            className="secondaire"
             disabled={resumeSync.etat === 'en_cours' || !sync}
             onClick={() => void sync?.cycle()}
           >
-            {resumeSync.etat === 'en_cours' ? 'Synchronisation…' : 'Synchroniser maintenant'}
+            {resumeSync.etat === 'en_cours' ? 'Envoi en cours…' : 'Ne pas attendre — envoyer maintenant'}
           </button>
         </div>
       </section>

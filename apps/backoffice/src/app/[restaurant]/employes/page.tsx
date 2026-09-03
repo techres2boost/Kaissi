@@ -83,6 +83,7 @@ export default async function PageEmployes({
       <ListeEmployes
         restaurantId={restaurant}
         modifiable={etablissement.gestionnaire}
+        administrateur={etablissement.administrateur}
         employes={employes}
       />
 

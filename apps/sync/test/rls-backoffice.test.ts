@@ -138,6 +138,16 @@ describe('un gérant administre les employés de son établissement', () => {
   })
 })
 
+describe('ce qu’un ADMINISTRATEUR peut faire, et lui seul', () => {
+  it('nommer un gérant', async () => {
+    expect(await dansLaPeauDe(admin, ROLE, ['gerant', serveur])).toBe('applique')
+  })
+
+  it('nommer un administrateur', async () => {
+    expect(await dansLaPeauDe(admin, ROLE, ['admin', serveur])).toBe('applique')
+  })
+})
+
 describe('ce qu’un gérant ne peut PAS faire', () => {
   it('toucher au PIN d’un administrateur', async () => {
     // Sinon, réinitialiser le code de son propre patron serait à portée de clic.
@@ -147,11 +157,28 @@ describe('ce qu’un gérant ne peut PAS faire', () => {
   it('se promouvoir administrateur', async () => {
     // C'était possible avant la migration 0014 : « memberships_gestion »
     // laissait tout gérant écrire n'importe quel rôle, « admin » compris.
-    expect(await dansLaPeauDe(gerant, ROLE, ['admin', gerant])).toBe('refuse')
+    //
+    // « filtre » et non « refuse » depuis la 0024, et c'est PLUS fort : sa
+    // propre appartenance porte le rôle « gerant », que le `using` ne lui
+    // rend plus. La ligne est écartée avant même que le `with check` ne
+    // regarde le rôle visé.
+    expect(await dansLaPeauDe(gerant, ROLE, ['admin', gerant])).toBe('filtre')
   })
 
   it('promouvoir quelqu’un d’autre administrateur', async () => {
     expect(await dansLaPeauDe(gerant, ROLE, ['admin', serveur])).toBe('refuse')
+  })
+
+  it('promouvoir quelqu’un GÉRANT — la protection valait ce cran-là aussi', async () => {
+    // Avant la 0024, la frontière était posée un cran trop haut : un gérant ne
+    // pouvait pas créer d'administrateur, mais il pouvait créer un gérant —
+    // qui voit tout l'argent, modifie la carte et gère l'équipe. La protection
+    // ne protégeait donc rien.
+    expect(await dansLaPeauDe(gerant, ROLE, ['gerant', serveur])).toBe('refuse')
+  })
+
+  it('rétrograder un pair — le `using` porte sur le rôle ACTUEL', async () => {
+    expect(await dansLaPeauDe(gerant, ROLE, ['caissier', admin])).toBe('filtre')
   })
 
   it('changer l’e-mail d’un employé', async () => {
