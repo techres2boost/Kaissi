@@ -1,6 +1,36 @@
 apply plugin: 'com.android.application'
 
 /*
+ * Version publiée — UNE seule source de vérité : `apps/pos/package.json`.
+ *
+ * Le Play Store refuse un envoi dont le `versionCode` n'est pas strictement
+ * supérieur au précédent, et il ne se corrige pas : un numéro brûlé est brûlé.
+ * Le laisser à « 1 » en dur garantissait de l'oublier, puis de perdre vingt
+ * minutes à comprendre le refus.
+ *
+ * `1.4.2` devient donc `10402` : deux chiffres par segment, ordre naturel
+ * préservé, et pas de collision jusqu'à 99 correctifs par mineure.
+ */
+def versionNpm = '0.0.0'
+def codeVersion = 1
+try {
+    versionNpm = new groovy.json.JsonSlurper()
+        .parse(rootProject.file('../package.json'))['version'] as String
+    def segments = versionNpm.split('\\.')
+    def majeure = segments[0].replaceAll(/\D/, '') as int
+    def mineure = segments.length > 1 ? (segments[1].replaceAll(/\D/, '') as int) : 0
+    // `2.3.1-rc4` → on ne garde que le « 1 » : une préversion et sa version
+    // finale portent le même code, ce qui est le comportement voulu — on ne
+    // publie pas les deux.
+    def correctif = segments.length > 2 ? (segments[2].replaceAll(/\D.*/, '') as int) : 0
+    codeVersion = majeure * 10000 + mineure * 100 + correctif
+} catch (Exception e) {
+    // Un build local ne doit JAMAIS échouer pour une histoire de numéro : on
+    // retombe sur 1, et l'avertissement dit quoi regarder avant de publier.
+    logger.warn("Version illisible dans apps/pos/package.json (${e.message}) — versionCode = 1.")
+}
+
+/*
  * Signature de production.
  *
  * Les identifiants vivent dans `keystore.properties`, HORS du dépôt (voir
@@ -35,8 +65,8 @@ android {
         applicationId "tn.res2boost.kaissi"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode codeVersion
+        versionName versionNpm
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

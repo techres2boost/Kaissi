@@ -46,13 +46,22 @@ curl https://kaissi-production.up.railway.app/sante
 
 Ouvre la caisse → bandeau du haut → bouton **Sync**.
 
-> **Le bandeau porte maintenant trois liens permanents : Salle · Sync ·
-> Diagnostic.** Le badge coloré `⇅ n`, lui, n'apparaît *que* s'il a quelque
-> chose à dire — il disparaît donc quand tout va bien, ce qui est
-> précisément le moment où l'on cherche à vérifier que tout va bien. D'où le
-> lien **Sync**, toujours là.
+> **Le bandeau porte trois liens permanents : Salle · Sync · Diagnostic.** Le
+> badge coloré `⇅ n`, lui, n'apparaît *que* s'il a quelque chose à dire — il
+> disparaît donc quand tout va bien, ce qui est précisément le moment où l'on
+> cherche à vérifier que tout va bien. D'où le lien **Sync**, toujours là.
 >
 > **Salle** ramène à l'écran des tables depuis n'importe où.
+>
+> **L'envoi est automatique**, en continu, dès qu'il y a du réseau : un cycle
+> toutes les quinze secondes, avec recul progressif après un échec. Le bouton
+> « Ne pas attendre — envoyer maintenant » ne déclenche rien de plus : il
+> avance le prochain cycle, pour vérifier tout de suite au back-office.
+>
+> **Diagnostic** ouvre sur quatre phrases — la carte, vos ventes, Internet,
+> l'envoi au bureau. Le reste (SQLite, IndexedDB, migrations, curseurs) est
+> replié sous « Détails techniques » : le caissier n'a pas à le lire, mais le
+> support doit pouvoir se le faire dicter au téléphone.
 
 L'écran doit annoncer **À jour**. S'il affiche **Non appairé**, voir §7.
 
@@ -147,7 +156,7 @@ reviens l'encaisser par **Carte bancaire**.
 > que le protocole n'a pas encore : `kitchen_ready` n'est ni un événement de
 > commande, ni une table de référentiel, et la règle 4 interdit un curseur
 > horodaté — il lui faut donc son propre `bigserial`. C'est la prochaine
-> chose à construire (§9), pas un réglage oublié. En attendant, la cuisine
+> chose à construire (§10), pas un réglage oublié. En attendant, la cuisine
 > annonce de vive voix, comme avec un bon papier.
 
 ### Ticket 4 — l'autre employé *(sert « Ventes par employé »)*
@@ -210,7 +219,7 @@ En dessous :
   > non. Aujourd'hui, une erreur se répare **avant** l'encaissement — on
   > annule la ligne (ticket 5) ou la commande entière. Le geste
   > « rembourser un ticket déjà payé » viendra avec le module correspondant
-  > (§9).
+  > (§10).
 - **Volume** — articles vendus, références, catégories actives.
 - **Meilleures ventes** — le top 10 par CA, avec marge par produit.
 
@@ -311,6 +320,24 @@ donc **le CA hors taxe de la journée, toutes lignes confondues**. À ne pas
 confondre avec le *Total encaissé* juste au-dessus, qui est **TTC** : la
 différence entre les deux, c'est exactement la TVA, le service et le timbre.
 
+**Un exemple, ligne par ligne.** Un article à **13,500 TND** avec une TVA de
+**19 % incluse** — « incluse » veut dire que le prix affiché sur la carte est
+déjà TTC, ce qui est la règle en restauration :
+
+```
+prix affiché (TTC)  13,500
+base HT = 13,500 ÷ 1,19  =  11,345
+TVA     = 13,500 − 11,345 =   2,155   ← le chiffre que tu cherchais
+```
+
+Les **2,155 TND** ne s'ajoutent donc pas aux 13,500 : ils sont **dedans**.
+C'est la part que le restaurant reverse à l'État, et le CA qu'il garde sur
+cette ligne est 11,345.
+
+Si le taux était **exclusif** — prix hors taxe affiché, TVA ajoutée — la même
+ligne donnerait `13,500 × 19 % = 2,565` et un total de `16,065`. Le catalogue
+porte ce réglage par taux (`is_included`), et c'est lui qui décide.
+
 > **La TVA est arrondie PAR TAUX, puis additionnée** — jamais l'inverse.
 > Sommer d'abord et arrondir ensuite produit un écart d'un ou deux millimes
 > qu'aucun comptable n'accepte, et qui grossit avec le nombre de tickets.
@@ -355,8 +382,10 @@ qu'il faut retenir de cet écran :
 
 - **État** — *OK · Faible · Rupture* — est **calculé** à partir des ventes et
   du seuil. Il informe, il ne décide rien (§6, « Le seuil d'alerte »).
-- **En vente** est un **interrupteur** : c'est le seul mécanisme qui retire
-  réellement un produit de la carte des caisses (§5.3).
+- **En vente** est ce que voit la caisse. Le bouton dit aussi *pourquoi* le
+  produit en est sorti : **Rupture (auto)** — le stock est à zéro, ça se lèvera
+  seul à la réception — ou **Rupture (manuel)** — tu l'as décidé, et rien ne le
+  défera sans toi (§5.3).
 
 **Vérifie que la vente a bien décrémenté** : Coca-Cola devait être à 48, tu en
 as vendu 2 au ticket 1 → il doit afficher **46**. Déplie la ligne : *« Depuis
@@ -442,61 +471,94 @@ au back-office.
 
 ### 5.3 — Rupture : ce qui bloque, et ce qui ne bloque pas
 
-C'est la question la plus importante de ce document, parce que la réponse
-n'est pas celle qu'on attend. **Deux mécanismes distincts** :
+**Un produit tombé à zéro sort de la carte tout seul.** C'est le comportement
+attendu, et c'est ce que fait Kaissi. Mais *qui* le décide, et *sur quelle
+donnée*, n'est pas anodin — c'est ce que ce chapitre explique.
 
-| | **En vente / En rupture** | **Stock calculé** |
-|---|---|---|
-| Qui décide | un humain, au back-office | le système, à la lecture |
-| Où | Stock → colonne **En vente** | Stock → colonnes **Stock** et **État** |
-| Effet sur la caisse | le produit **passe en « Rupture »** et refuse d'être ajouté | **aucun** |
-| Vrai quand ? | au moment où on clique | peut dater de plusieurs heures |
+### Ce qui se passe, en une phrase
 
-**Fais l'essai.** Back-office → **Stock** → ligne *Pizza Margherita* → clique
-**En vente**, qui bascule en **En rupture**. Sur la caisse : **Sync**, puis
-retourne dans une commande. La Pizza Margherita est barrée, marquée
-**RUPTURE**, et un clic dessus affiche :
+Quand la vente arrive au serveur, celui-ci recalcule le stock du produit. S'il
+est à **zéro ou en dessous**, il retire le produit de la carte. Le réglage
+redescend aux caisses **par le catalogue**, exactement comme un changement de
+prix, à la synchronisation suivante.
 
-> *Pizza Margherita est en rupture de stock : il a été retiré de la carte
-> depuis le back-office.*
+Sur la caisse, le produit devient barré et marqué **RUPTURE**. Un clic dessus
+affiche :
+
+> *Pizza Margherita est en rupture de stock. Il reviendra sur la carte dès que
+> le gérant aura saisi la réception.*
 
 Le produit reste **visible et cliquable**. C'est délibéré : un bouton grisé ne
 dit rien, et le caissier tape trois fois dessus avant d'aller chercher le
 gérant. Un clic, une phrase, et il sait quoi répondre au client.
 
-Ce réglage passe par le **catalogue**, déjà synchronisé : toutes les tablettes
-l'apprennent au cycle suivant, sans rien réinstaller. Le geste inverse remet
-le produit en vente.
+**Le retour est automatique aussi.** Saisis une réception dans Stock : le
+produit repasse en vente au cycle suivant, sans autre geste.
 
-#### Pourquoi le stock CALCULÉ, lui, ne bloque rien
+### Trois réglages, à connaître avant de s'agacer
 
-Pizza Margherita est à **0** au stock. Laisse-la **En vente** et vends-en une.
-**La caisse ne refuse rien**, et après synchronisation le stock affiche **−1**.
+| Dans Stock | Ce que ça fait |
+|---|---|
+| **En vente / Rupture (auto)** | posé par le système. Se lève seul à la réception. |
+| **En vente / Rupture (manuel)** | posé par toi. « On ne fait plus de brik ce soir ». L'automatisme ne le défera **jamais** — sinon une livraison de pâte remettrait en vente ce que tu avais délibérément arrêté. |
+| case **auto** | coche par produit. La décocher, c'est dire « je compte ce produit pour savoir où j'en suis, mais je ne veux pas qu'une erreur d'inventaire vide ma carte en plein service ». |
 
-Ce n'est pas un oubli, c'est la règle qui porte le produit :
+Un produit **non suivi en stock** n'est jamais retiré automatiquement : rien
+n'est compté, donc rien ne peut tomber à zéro. C'est le cas de la plupart des
+articles d'un snack.
 
-- **Hors ligne, cette quantité est un souvenir.** La tablette a le dernier
-  stock reçu — il peut avoir trois heures et deux livraisons de retard.
-  Refuser une pizza qui est en cuisine, c'est perdre le client *et* garder
-  une donnée fausse : le pire des deux mondes.
+### Pourquoi c'est le SERVEUR qui décide, et pas la tablette
+
+C'est le point qui compte, et il tient en trois lignes :
+
+- **Une tablette hors ligne ne connaît qu'un souvenir.** Sa dernière donnée de
+  stock peut avoir trois heures et deux livraisons de retard. La laisser
+  refuser une vente sur cette base, c'est refuser une pizza qui est en
+  cuisine : on perd le client *et* la donnée reste fausse.
 - **Deux tablettes hors ligne ne peuvent pas se mettre d'accord.** Chacune
-  croit qu'il reste une part. Un blocage local n'en est donc pas un — il
-  donne l'illusion d'une garantie qu'il ne tient pas.
-- **Le négatif est l'information, pas le bug.** Un stock à −1 dit exactement
-  une chose : *il manque une réception à saisir, ou le comptage de référence
-  était faux*. Le borner à zéro effacerait le seul signal qui appelle à
-  recompter, et le stock paraîtrait juste en étant faux. C'est aussi pour
-  cela que **−1 s'affiche en « Rupture »**, jamais en « presque en
-  rupture » : négatif et zéro sont le même état.
+  croit qu'il reste une part. Un blocage local n'en serait pas un — il
+  donnerait l'illusion d'une garantie qu'il ne tient pas.
+- **Le serveur, lui, calcule à l'instant.** Il voit toutes les tablettes. Sa
+  décision est donc vraie, et la caisse n'a plus rien à arbitrer : elle
+  applique un réglage de catalogue, comme un prix.
 
-> **En résumé** : ce n'est pas au stock d'arbitrer une vente, c'est au
-> gérant. Le bouton **En rupture** lui donne ce pouvoir en un clic, et sa
-> décision est vraie au moment où il la prend. Le stock, lui, garde son rôle
-> : alerter, chiffrer, et dire quand recompter.
+C'est pour cela que la règle « le stock ne bloque jamais une vente » reste
+entière : ce n'est pas le stock **local** qui retire le produit.
 
-Pour repartir propre après cet essai : Stock → *Ajuster* → **Recompter le
-stock** avec la quantité réelle. Le comptage repose la référence à maintenant,
-et les ventes antérieures cessent d'être soustraites.
+### « Comment un stock à −1 peut-il encore être commandé ? »
+
+Il peut, dans **une** situation, et une seule : **la caisse était hors ligne**.
+
+Déroulé exact :
+
+```
+stock = 1
+  ↓  la caisse perd le réseau
+  ↓  elle vend 2 pizzas — elle n'a AUCUNE donnée de stock, elle ne
+  ↓  consulte rien ; elle enregistre deux ventes, c'est son métier
+  ↓  le réseau revient, les deux ventes partent
+  ↓  le serveur recalcule : 1 − 2 = −1
+  ↓  il retire le produit de la carte
+  ↓  la tablette l'apprend au cycle suivant
+stock = −1, produit hors carte
+```
+
+Personne n'a mal fonctionné. Le client a été servi, la vente est encaissée, et
+le **−1 est la trace exacte de ce qui s'est passé** : on a vendu une pizza de
+plus qu'on n'en avait compté. Le borner à zéro effacerait précisément
+l'information qui dit « recompte, ou saisis la réception que tu as oubliée ».
+
+C'est aussi pourquoi **−1 s'affiche « Rupture »** et jamais « presque en
+rupture » : zéro et négatif sont le même état.
+
+**Pour vérifier toi-même**, sans couper le Wi-Fi : Stock → *Ajuster* →
+**Recompter le stock** à `1`. Vends-en deux d'affilée très vite depuis la
+caisse : la première passe, et la seconde aussi si la synchronisation n'a pas
+eu le temps de faire l'aller-retour. C'est le même phénomène, en accéléré.
+
+**Pour repartir propre** : Stock → *Ajuster* → **Recompter le stock** avec la
+quantité réelle. Le comptage repose la référence à maintenant, les ventes
+antérieures cessent d'être soustraites, et le produit revient en carte.
 
 ---
 
@@ -596,8 +658,9 @@ le geste qui répare un stock négatif.
 
 | Autre geste | Quand | Effet |
 |---|---|---|
-| **En vente / En rupture** | Plus de pâte à pizza ce soir | Retire le produit de la carte des caisses (§5.3) |
-| **Arrêter le suivi** | Produit non stocké (café, eau du robinet) | Retire le produit des alertes et du calcul |
+| **En vente / En rupture** | Plus de pâte à pizza ce soir, machine en panne | Retire le produit de la carte des caisses, **à la main**. Marqué « manuel » : l'automatisme ne le remettra jamais en vente tout seul (§5.3) |
+| case **auto** | Produit dont le comptage n'est qu'indicatif | Coupe la rupture automatique pour ce produit : il reste vendable même à zéro |
+| **Arrêter le suivi** | Produit non stocké (café, eau du robinet) | Retire le produit des alertes et du calcul, et le remet en vente s'il en était sorti pour cause de stock |
 
 ---
 
@@ -618,8 +681,10 @@ le geste qui répare un stock négatif.
 | Le détail d'un ticket répond « server-side exception » | Corrigé (§4.3). Si cela réapparaît, c'est une autre page : note le *Digest* et le chemin. |
 | Bloc **Caisses** vide dans Journée | Le POS remonte ses services depuis la migration **0022**. Vérifie qu'elle est passée, puis synchronise. |
 | Le POS redemande un PIN à chaque rechargement | Corrigé : le poste est repris. Si cela persiste, le navigateur a évincé IndexedDB — voir *Diagnostic* → Stockage. |
-| Un produit reste vendable alors qu'il est à 0 | **Normal** : le stock ne bloque pas. Pour le retirer de la carte, Stock → **En rupture** (§5.3). |
-| « Rupture » sur un produit qu'on a réapprovisionné | La colonne **En vente** est restée sur *En rupture* : re-clique pour le remettre en vente. |
+| Un produit reste vendable alors qu'il est à 0 | Trois causes : il n'est pas **suivi** en stock ; sa case **auto** est décochée ; ou la caisse n'a pas encore synchronisé. |
+| « Rupture (manuel) » sur un produit réapprovisionné | Le retrait manuel ne se lève **jamais** tout seul, par construction. Clique le bouton pour le remettre en vente. |
+| Un produit disparaît de la carte sans qu'on comprenne | Stock → son état est à zéro ou négatif. Saisis la réception, ou décoche **auto** si ce produit ne doit pas suivre cette règle. |
+| Stock à **−1** ou moins | Une vente est passée pendant que la caisse était hors ligne : c'est la trace, pas un bug (§5.3). Recompte pour repartir juste. |
 
 ---
 
@@ -671,7 +736,54 @@ update kaissi.products set is_available = true
 
 ---
 
-## 9. Ce qui n'est pas encore là — et pourquoi
+## 9. Admin, gérant, caissier, serveur, cuisine
+
+Cinq rôles, et la question qui revient : **qu'est-ce qui distingue vraiment un
+admin d'un gérant ?**
+
+**Sur la caisse : rien.** Les deux ont exactement les mêmes permissions —
+annuler une commande, forcer un prix, rembourser, remise sans plafond, ouvrir
+le tiroir hors vente. C'est voulu : devant un client qui attend, un
+administrateur fait le travail d'un gérant.
+
+**Au back-office : une seule différence, et elle est nette.**
+
+> Un **gérant** exploite l'établissement. Un **administrateur** décide qui
+> d'autre obtient ce pouvoir.
+
+| | admin | gérant | caissier | serveur | cuisine |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Encaisser, ouvrir et clôturer la caisse | ✓ | ✓ | ✓ | — | — |
+| Ouvrir une commande, envoyer en cuisine | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Remise | illimitée | illimitée | 10 % | 5 % | — |
+| Annuler une commande, forcer un prix, rembourser | ✓ | ✓ | — | — | — |
+| Tableau de bord, ventes, marges | ✓ | ✓ | — | — | — |
+| Catalogue, stock, prix, coûts | ✓ | ✓ | — | — | — |
+| Embaucher un caissier, un serveur, un cuisinier | ✓ | ✓ | — | — | — |
+| **Nommer un gérant ou un administrateur** | **✓** | — | — | — | — |
+| **Rétrograder ou révoquer un gérant** | **✓** | — | — | — | — |
+| Écran de cuisine | ✓ | ✓ | — | — | ✓ |
+
+La ligne était mal placée jusqu'ici : un gérant ne pouvait pas créer
+d'administrateur, mais il pouvait créer un **gérant** — qui voit tout
+l'argent, modifie la carte et gère l'équipe. La protection ne protégeait donc
+rien. Elle a été déplacée là où elle a un sens, et **RLS l'applique**, pas
+seulement l'interface : ce n'est pas un bouton caché, c'est un refus de la
+base de données.
+
+**En pratique, dans un restaurant :** tu es admin. Ton associé ou ton
+responsable de salle est gérant — il fait tourner la maison, il n'ouvre pas
+les accès. Tout le monde n'a pas besoin d'un compte back-office : un serveur
+tape un PIN sur la tablette, c'est tout.
+
+> Pour donner un accès back-office à quelqu'un qui n'en a pas encore (un
+> comptable, la cuisine), c'est `pnpm sync:acces` sur ton poste — créer un
+> compte Supabase exige une clé qui contourne RLS, et elle n'a rien à faire
+> dans une application web.
+
+---
+
+## 10. Ce qui n'est pas encore là — et pourquoi
 
 Trois limites que la démonstration met en évidence. Elles sont assumées, pas
 oubliées : chacune est écrite ici pour qu'on la choisisse, plutôt que de la
@@ -693,13 +805,25 @@ caisse, elle, encaisse hors ligne : c'est *elle* qui porte la promesse du
 produit. Porter la cuisine dans le POS la rendrait indépendante d'Internet à
 son tour.
 
+**4. L'application n'est pas encore sur les stores.** L'APK Capacitor existe
+et s'installe à la main, ce qui est plus rapide pour les premiers clients.
+Google Play demande surtout des choses qui ne sont pas du code — captures
+d'écran, politique de confidentialité, questionnaire Data safety. Tout est
+détaillé dans [`stores.md`](stores.md), y compris pourquoi une TWA Bubblewrap,
+qui convenait très bien à Digital Fidelity, est **disqualifiée** pour une
+caisse : dans une TWA, le code de l'application vient du réseau.
+
 Et une question ouverte, volontairement laissée telle quelle :
 
-**Faut-il masquer « Diagnostic » aux caissiers ?** Mon avis : **non**. C'est
-un écran de **lecture** — état du stockage, appairage, réseau, version du
-schéma — et rien de ce qu'il montre ne vaut de l'argent. Or c'est exactement
-la page qu'il faut ouvrir quand une caisse ne synchronise plus, à 20 h, sans
-le gérant sur place. La cacher ne protège rien et laisse le caissier sans
-recours ; le vrai garde-fou est ailleurs — jeton d'appareil révocable, RLS,
-journal d'audit. Le seul reproche défendable était l'encombrement du bandeau,
-et les liens **Salle** et **Sync** le règlent.
+**Faut-il masquer « Diagnostic » aux caissiers ?** Non — mais le reproche était
+juste, et il a été corrigé autrement. C'est un écran de **lecture**, rien de ce
+qu'il montre ne vaut de l'argent, et c'est exactement la page qu'il faut ouvrir
+quand une caisse ne synchronise plus, à 20 h, sans le gérant sur place. Le
+cacher ne protège rien et laisse le caissier sans recours ; le vrai garde-fou
+est ailleurs — jeton d'appareil révocable, RLS, journal d'audit.
+
+Le vrai problème n'était pas qu'il soit visible, c'est qu'il s'ouvrait sur
+« Mode avion — critère de sortie de la Phase 0 » et « SQLite persisté dans
+IndexedDB ». Vrai, utile au support, illisible pour la personne qui tient la
+caisse. Il ouvre désormais sur quatre phrases en français, et tout le
+technique est replié dessous.

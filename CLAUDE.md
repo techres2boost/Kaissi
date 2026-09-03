@@ -179,15 +179,26 @@ vente**. Refuser de vendre une pizza sur une donnée périmée est le pire des d
 mondes. Hors ligne, deux tablettes croient chacune qu'il reste une part : un
 blocage local donnerait l'illusion d'une garantie qu'il ne tient pas.
 
-Ce qui retire un produit de la carte, c'est **`products.is_available`**, basculé
-à la main au back-office (Stock → « En rupture »). Une décision humaine est vraie
-au moment où on la prend ; une quantité calculée peut dater d'avant le dernier
-réassort. Le réglage descend par le **catalogue**, déjà journalisé dans
-`change_log` — aucune nouvelle voie de synchronisation. Côté caisse, le produit
-reste **visible et cliquable** : le clic affiche « X est en rupture de stock ».
-Un bouton grisé ne dit rien, et le caissier tape trois fois dessus.
+Ce qui retire un produit de la carte, c'est **`products.is_available`** — et
+c'est le **SERVEUR** qui le bascule, jamais la tablette (migration 0023). La
+distinction est tout le sujet : le serveur travaille sur `stock_actuel` calculé
+à l'instant, une tablette hors ligne sur un souvenir vieux de trois heures. Le
+réglage descend ensuite par le **catalogue**, déjà journalisé dans `change_log`
+— aucune nouvelle voie de synchronisation, et la caisse ne fait qu'appliquer,
+exactement comme pour un changement de prix.
 
-Corollaire : une quantité **négative ne se borne pas à zéro**. C'est le seul
+Trois garde-fous, sans lesquels l'automatisme serait ingérable :
+`stock_items.auto_rupture` le coupe produit par produit ;
+`products.unavailable_reason` distingue « retiré à la main » de « retiré à
+zéro », et l'automatisme ne défait **jamais** une décision humaine ; le retour
+en carte est automatique à la réception, mais pour le seul motif `'stock'`.
+
+Côté caisse, le produit reste **visible et cliquable** : le clic dit lequel des
+deux motifs. Un bouton grisé ne dit rien, et le caissier tape trois fois dessus.
+
+Corollaire : un stock **négatif reste possible**, et c'est le cas normal d'une
+vente encaissée hors ligne qui arrive après coup. Une quantité **négative ne se
+borne donc pas à zéro**. C'est le seul
 signal qui dit « il manque une réception, ou le comptage de référence est faux ».
 La borner ferait paraître juste un stock faux.
 
@@ -225,6 +236,13 @@ de mes établissements — l'écran « Employés » en dépend. Une requête sur
 de toute l'équipe. Ce filtre-là est applicatif, par nature.
 
 ### Trois identités distinctes, jamais confondues
+
+**Un gérant exploite, un administrateur distribue les pouvoirs.** C'est la
+seule frontière entre les deux rôles, et elle est posée dans RLS (migration
+0024), pas dans l'interface : un gérant gère carte, stock, rapports et
+l'équipe d'exploitation ; seul un `admin` accorde, retire ou rétrograde un
+`gerant` ou un `admin`. Sur la caisse, les deux rôles sont **identiques** —
+devant un client qui attend, un administrateur fait le travail d'un gérant.
 
 | Identité | Mécanisme | Portée |
 |---|---|---|
@@ -374,7 +392,10 @@ téléchargé : une migration qui a besoin du réseau ne s'applique pas en mode 
 
 ## Ce qu'il ne faut surtout pas faire
 
-- Reproduire le pattern Stampi (`server.url`) ou une TWA Bubblewrap.
+- Reproduire le pattern Stampi (`server.url`) ou une TWA Bubblewrap — y compris
+  « juste pour aller vite sur le Play Store ». Dans une TWA, le CODE de
+  l'application vient du réseau : sans connexion, elle ne s'ouvre pas. Le
+  raisonnement complet est dans [`docs/stores.md`](docs/stores.md).
 - Mettre une Server Action sur le chemin de la caisse.
 - Synchroniser des lignes mutables plutôt que des événements.
 - Utiliser un flottant pour de l'argent, ou supposer deux décimales.

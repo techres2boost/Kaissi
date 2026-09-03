@@ -353,7 +353,7 @@ cd apps/pos/android
 # → app/build/outputs/apk/release/app-release.apk
 ```
 
-### 4.4 Play Store (plus tard)
+### 4.4 Play Store et App Store
 
 Pour le Play Store il faut un **bundle**, pas un APK :
 
@@ -361,8 +361,15 @@ Pour le Play Store il faut un **bundle**, pas un APK :
 ./gradlew bundleRelease   # → app/build/outputs/bundle/release/app-release.aab
 ```
 
-Compte développeur Google Play : 25 $ une fois. Compte **une à deux semaines**
-de validation pour une première publication.
+Le numéro de version se pose à **un seul endroit** : `apps/pos/package.json`.
+Le `build.gradle` en dérive `versionName` et `versionCode` (`1.4.2` → `10402`).
+Play refuse un envoi dont le `versionCode` n'est pas strictement supérieur au
+précédent, et un numéro consommé l'est définitivement.
+
+Tout le reste — keystore, captures d’écran, politique de confidentialité,
+questionnaire Data safety, et le cas iOS — est dans
+[`stores.md`](stores.md), avec la raison pour laquelle une TWA Bubblewrap est
+disqualifiée ici alors qu'elle convenait très bien à Digital Fidelity.
 
 > **Tu n'en as pas besoin pour commencer.** Installer l'APK directement sur
 > les tablettes de tes premiers clients est plus rapide, et te laisse

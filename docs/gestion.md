@@ -77,13 +77,16 @@ Conséquences pratiques :
 - **Le stock ne bloque JAMAIS une vente.** La caisse encaisse hors ligne et
   ne consulte pas cet écran. Une quantité peut donc devenir négative : c'est
   une information utile — celle d'une réception oubliée.
-- **Pour retirer réellement un produit de la carte**, il y a la colonne
-  **En vente** du tableau de stock, qui bascule `products.is_available`. C'est
-  une décision **humaine**, et c'est ce qui la rend légitime : elle est vraie
-  au moment où on la prend, alors qu'une quantité calculée peut dater d'avant
-  le dernier réassort. Le réglage descend par le catalogue ; côté caisse le
-  produit reste visible, barré et marqué **RUPTURE**, et un clic explique
-  pourquoi.
+- **Un produit à zéro sort de la carte tout seul** — mais c'est le SERVEUR qui
+  le décide, sur le stock calculé à l'instant, jamais la tablette sur un
+  souvenir. Le réglage descend par le catalogue ; côté caisse le produit reste
+  visible, barré et marqué **RUPTURE**, et un clic explique pourquoi. La
+  réception le remet en vente sans autre geste.
+- **La colonne « En vente » reste, pour ce que le stock ne sait pas** : « la
+  machine à café est en panne », « on ne fait plus de brik ce soir ». Un
+  retrait manuel est marqué comme tel, et l'automatisme ne le défait jamais.
+- **La case « auto » coupe l'automatisme produit par produit**, pour un article
+  dont le comptage n'est qu'indicatif.
 - **Un inventaire repart de zéro** : recompter repose la référence à la date
   du jour, et les ventes antérieures ne sont plus soustraites.
 

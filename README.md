@@ -52,6 +52,7 @@ mode avion — le seul test qui compte vraiment.
 | [`docs/fonctionnel.md`](docs/fonctionnel.md) | **Comprendre** chaque module et pourquoi il est ainsi |
 | [`docs/tester.md`](docs/tester.md) | **Tester** en détail — de l'automatique à la tablette |
 | [`docs/deploiement.md`](docs/deploiement.md) | **Déployer** — Supabase, Railway, Vercel, APK Android |
+| [`docs/stores.md`](docs/stores.md) | **Publier sur Google Play et l'App Store** — et pourquoi surtout pas une TWA Bubblewrap |
 | [`docs/tester-sans-tablette.md`](docs/tester-sans-tablette.md) | **Tester Android et l'impression sans matériel** — émulateur + imprimante virtuelle |
 | [`docs/tester-mode-avion.md`](docs/tester-mode-avion.md) | Le critère de sortie : démarrer sans réseau |
 | [`docs/architecture.md`](docs/architecture.md) | Les décisions structurantes, en version courte |
