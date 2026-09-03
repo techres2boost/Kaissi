@@ -176,7 +176,20 @@ l'argent, c'est le jeton d'appareil révocable, RLS, et le journal d'audit.
 
 L'appareil affiche le dernier stock connu, alerte, **mais ne bloque jamais une
 vente**. Refuser de vendre une pizza sur une donnée périmée est le pire des deux
-mondes.
+mondes. Hors ligne, deux tablettes croient chacune qu'il reste une part : un
+blocage local donnerait l'illusion d'une garantie qu'il ne tient pas.
+
+Ce qui retire un produit de la carte, c'est **`products.is_available`**, basculé
+à la main au back-office (Stock → « En rupture »). Une décision humaine est vraie
+au moment où on la prend ; une quantité calculée peut dater d'avant le dernier
+réassort. Le réglage descend par le **catalogue**, déjà journalisé dans
+`change_log` — aucune nouvelle voie de synchronisation. Côté caisse, le produit
+reste **visible et cliquable** : le clic affiche « X est en rupture de stock ».
+Un bouton grisé ne dit rien, et le caissier tape trois fois dessus.
+
+Corollaire : une quantité **négative ne se borne pas à zéro**. C'est le seul
+signal qui dit « il manque une réception, ou le comptage de référence est faux ».
+La borner ferait paraître juste un stock faux.
 
 Corollaire de conception (migration 0019) : le stock est **calculé à la
 lecture** — comptage de référence + mouvements manuels − ventes depuis ce
@@ -419,6 +432,11 @@ révélait autre chose.
   remonte au gérant.
 - **Push avant pull.** Si le réseau ne tient que trois secondes, ce sont nos
   encaissements qui en profitent.
+- **Les routes ADDITIVES échouent en silence côté client.** `POST /sync/shifts`
+  remonte les services de caisse — sans elle, l'écran « Journée » n'a ni fond de
+  caisse ni écart. Un serveur antérieur répond 404 : le moteur avale l'erreur et
+  réessaie au cycle suivant. Rien de ce qui n'est pas une vente ne doit pouvoir
+  mettre le cycle en échec, ni le bandeau en « bloqué ».
 - **Le service emprunte le rôle `kaissi_device`** et pose son contexte en
   variables de session : tout passe par RLS. Un défaut de filtrage applicatif
   ne peut pas provoquer de fuite entre restaurants.
