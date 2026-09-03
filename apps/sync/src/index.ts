@@ -12,7 +12,7 @@ import { DepotPostgres } from './depot-postgres.js'
 import { creerServeur } from './serveur.js'
 import { formaterErreurBase } from './diagnostic-base.js'
 import { configurationPg, hoteDe } from './connexion.js'
-import { reparerProjectionsOrphelines } from './reparation.js'
+import { planifierReparation, INTERVALLE_DEFAUT_MINUTES } from './reparation.js'
 
 export * from './protocole.js'
 export * from './depot.js'
@@ -192,8 +192,18 @@ export async function demarrer(): Promise<void> {
   // Volontairement non attendu : la caisse doit pouvoir se synchroniser
   // pendant que ça tourne, et la sonde de santé de l'hébergeur ne doit pas
   // expirer — un redémarrage relancerait le balayage, en boucle.
+  // Il se RÉPÈTE, il ne se contente pas du démarrage : un service de
+  // synchronisation tourne des semaines sans redémarrer, et faire dépendre
+  // la réparation d'un redéploiement, c'est la faire dépendre d'une action
+  // humaine — celle-là même qu'on voulait supprimer.
   if (process.env['SYNC_REPARATION'] !== '0') {
-    void reparerProjectionsOrphelines(depot)
+    const minutes = Number.parseInt(
+      process.env['SYNC_REPARATION_MINUTES'] || String(INTERVALLE_DEFAUT_MINUTES),
+      10,
+    )
+    planifierReparation(depot, {
+      ...(Number.isFinite(minutes) ? { intervalleMinutes: minutes } : {}),
+    })
   }
 
   const arreter = (signal: string) => {

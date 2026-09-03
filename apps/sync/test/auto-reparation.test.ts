@@ -16,12 +16,12 @@
  * la reprojection qu'on vérifie, pas notre idée de ce qu'elles font.
  */
 
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Client } from 'pg'
 import { millimes, uuidV7, type Millimes } from '@kaissi/domain'
 import { DepotPostgres } from '../src/depot-postgres.js'
 import { creerServeur } from '../src/serveur.js'
-import { reparerProjectionsOrphelines } from '../src/reparation.js'
+import { planifierReparation, reparerProjectionsOrphelines } from '../src/reparation.js'
 import {
   EMPLOYE_DEMO,
   ESPECES,
@@ -166,5 +166,73 @@ describe('balayage des projections orphelines', () => {
     const resultat = await reparerProjectionsOrphelines(casse, { journaliser: silence })
     expect(resultat.erreur).toContain('base indisponible')
     expect(resultat.reparees).toBe(0)
+  })
+})
+
+/**
+ * Le balayage se RÉPÈTE — il ne se contente pas du démarrage.
+ *
+ * Erreur de ma première version, vue en production dans l'heure : les deux
+ * ventes attendaient d'être reconstruites, le correctif était en ligne, et
+ * rien ne se passait — l'hébergeur n'avait pas encore redéployé.
+ *
+ * Faire dépendre la réparation d'un redéploiement, c'est la faire dépendre
+ * d'une action humaine, celle-là même qu'on voulait supprimer.
+ */
+describe('planification du balayage', () => {
+  it('balaie tout de suite, sans attendre le premier intervalle', async () => {
+    const a = await creerAppareil('P1')
+    const orderId = await encaisser(a, millimes(15))
+    await sql('delete from kaissi.orders where id = $1', [orderId])
+
+    const arreter = planifierReparation(depot, {
+      intervalleMinutes: 0,
+      journaliser: silence,
+    })
+    // Le premier tour part immédiatement ; on lui laisse le temps d'aboutir.
+    await vi.waitFor(async () => {
+      const r = await sql('select 1 from kaissi.orders where id = $1', [orderId])
+      expect(r.rowCount).toBe(1)
+    })
+    arreter()
+  })
+
+  it('repasse à l’intervalle, sans redémarrage du service', async () => {
+    const a = await creerAppareil('P1')
+    const arreter = planifierReparation(depot, {
+      // 1/600 de minute = 100 ms : le test ne dort pas six secondes.
+      intervalleMinutes: 1 / 600,
+      journaliser: silence,
+    })
+
+    // La vente n'existe même pas au moment du premier tour : c'est le
+    // deuxième — ou le troisième — qui doit la rattraper.
+    const orderId = await encaisser(a, millimes(15))
+    await sql('delete from kaissi.orders where id = $1', [orderId])
+
+    await vi.waitFor(async () => {
+      const r = await sql('select 1 from kaissi.orders where id = $1', [orderId])
+      expect(r.rowCount).toBe(1)
+    })
+    arreter()
+  })
+
+  it('arrête vraiment de balayer quand on le lui demande', async () => {
+    // Sinon un minuteur oublié continue de taper dans la base après l'arrêt
+    // du service — et les tests eux-mêmes ne se termineraient jamais.
+    const a = await creerAppareil('P1')
+    const arreter = planifierReparation(depot, {
+      intervalleMinutes: 1 / 600,
+      journaliser: silence,
+    })
+    await vi.waitFor(() => expect(true).toBe(true))
+    arreter()
+
+    const orderId = await encaisser(a, millimes(15))
+    await sql('delete from kaissi.orders where id = $1', [orderId])
+    await new Promise((r) => setTimeout(r, 400))
+
+    const apres = await sql('select 1 from kaissi.orders where id = $1', [orderId])
+    expect(apres.rowCount).toBe(0)
   })
 })

@@ -429,10 +429,15 @@ sert au dépannage et aux tests, pas à l'installation chez un client.
 Elle n'est pas perdue. `order_events` est la source de vérité ; `orders` n'en
 est qu'une projection, et une projection se reconstruit.
 
-**Il n'y a rien à faire.** Le service balaie les derniers événements reçus à
-chaque démarrage et reconstruit les projections manquantes : un
-redéploiement Railway suffit. `SYNC_REPARATION=0` l'éteint, si un jour on en
-a besoin.
+**Il n'y a rien à faire.** Le service balaie les derniers événements reçus et
+reconstruit les projections manquantes — au démarrage, puis **toutes les
+demi-heures**. Aucun redéploiement à déclencher : un service de
+synchronisation tourne des semaines sans redémarrer, et faire dépendre la
+réparation d'un redéploiement, ce serait la faire dépendre d'une action
+humaine.
+
+Deux réglages, si un jour on en a besoin : `SYNC_REPARATION=0` éteint le
+balayage, `SYNC_REPARATION_MINUTES` change l'intervalle.
 
 Pour rejouer l'historique ENTIER — plus ancien que la fenêtre de démarrage,
 après un changement de calcul des totaux — le script reste là, à réserver aux

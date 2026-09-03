@@ -1,5 +1,5 @@
 /**
- * Auto-réparation des projections, au démarrage du service.
+ * Auto-réparation des projections — au démarrage, puis périodiquement.
  *
  * ── Pourquoi le serveur se répare tout seul ────────────────────────────────
  *
@@ -14,16 +14,17 @@
  * et il aura raison. Une vente invisible au back-office doit se réparer
  * SEULE — c'est tout l'intérêt d'avoir choisi un journal d'événements.
  *
- * Le service balaie donc, à chaque démarrage, les commandes dont les
- * événements sont arrivés mais dont la projection manque, et les reconstruit.
- * Un redéploiement suffit à rattraper le trou.
+ * Le service balaie donc les commandes dont les événements sont arrivés mais
+ * dont la projection manque, et les reconstruit — au démarrage, puis toutes
+ * les demi-heures (voir `planifierReparation`, et pourquoi le démarrage seul
+ * ne suffisait pas).
  *
  * ── Ce que ce balayage ne fait PAS ────────────────────────────────────────
  *
  *   • il n'écrit jamais dans `order_events` : la source de vérité reste
  *     intacte, en insertion seule ;
  *   • il ne touche AUCUNE commande déjà projetée. Rejouer tout l'historique
- *     est une opération d'heures creuses, pas de démarrage ;
+ *     est une opération d'heures creuses, pas de balayage automatique ;
  *   • il ne bloque pas l'écoute. Il est lancé APRÈS l'ouverture du port :
  *     une caisse doit pouvoir se synchroniser pendant que la réparation
  *     tourne, et un balayage lent ne doit pas faire échouer la sonde de
@@ -42,7 +43,7 @@
  * La borne est un intervalle de `server_seq`, jamais une durée : c'est le
  * curseur du protocole (règle 4), il est indexé, et il ne dépend d'aucune
  * horloge. Une commande plus ancienne que la fenêtre a déjà été vue par un
- * démarrage précédent ; si elle avait besoin d'être réparée, elle l'a été.
+ * tour précédent ; si elle avait besoin d'être réparée, elle l'a été.
  */
 
 import type { DepotSync } from './depot.js'
@@ -50,7 +51,7 @@ import type { DepotSync } from './depot.js'
 /** Nombre d'événements récents examinés. Environ deux semaines de service. */
 export const FENETRE_DEFAUT = 20_000
 
-/** Plafond de commandes reconstruites en un démarrage. */
+/** Plafond de commandes reconstruites en un tour. */
 export const PLAFOND_DEFAUT = 500
 
 export interface OptionsReparation {
@@ -70,7 +71,8 @@ export interface ResultatReparation {
  * Reconstruit les projections manquantes des derniers événements reçus.
  *
  * Ne lance jamais : un échec est rendu dans `erreur`. L'appelant est le
- * démarrage du service, et le démarrage ne doit pas dépendre de ceci.
+ * démarrage du service — puis un minuteur — et ni l'un ni l'autre ne doit
+ * dépendre de la réussite de ceci.
  */
 export async function reparerProjectionsOrphelines(
   depot: DepotSync,
@@ -105,7 +107,7 @@ export async function reparerProjectionsOrphelines(
       `  ⟳ ${reparees} vente(s) sans projection reconstruite(s) depuis le journal` +
         ` (${parEtablissement.size} établissement(s)).` +
         (orphelines.length >= plafond
-          ? `\n    Plafond de ${plafond} atteint : relance le service pour la suite.`
+          ? `\n    Plafond de ${plafond} atteint : le tour suivant prendra la suite.`
           : ''),
     )
     return { examinees: orphelines.length, reparees }
@@ -120,4 +122,66 @@ export async function reparerProjectionsOrphelines(
     )
     return { examinees: 0, reparees: 0, erreur: message }
   }
+}
+
+/** Intervalle par défaut entre deux balayages, en minutes. */
+export const INTERVALLE_DEFAUT_MINUTES = 30
+
+export interface OptionsPlanification extends OptionsReparation {
+  /** 0 ou négatif : aucun balayage périodique, seulement celui du démarrage. */
+  readonly intervalleMinutes?: number
+}
+
+/**
+ * Lance le balayage au démarrage, puis le répète.
+ *
+ * ── Pourquoi le démarrage NE SUFFIT PAS ───────────────────────────────────
+ *
+ * Première version de ce code : un seul balayage, au démarrage. L'erreur
+ * s'est vue tout de suite en production — deux ventes attendaient d'être
+ * reconstruites, le correctif était en ligne, et rien ne se passait, parce
+ * que l'hébergeur n'avait tout simplement pas encore redéployé.
+ *
+ * Faire dépendre la réparation d'un redéploiement, c'est la faire dépendre
+ * d'une action humaine — la même que celle qu'on voulait supprimer, déguisée.
+ * Un service de synchronisation tourne des semaines sans redémarrer ; c'est
+ * même le but.
+ *
+ * Le balayage se répète donc tout seul. Une demi-heure est volontairement
+ * lente : ce n'est pas un mécanisme de temps réel — le chemin normal reste
+ * la reprojection immédiate au push — c'est un filet, et un filet qu'on
+ * relève trop souvent coûte plus qu'il ne rapporte.
+ *
+ * Le minuteur est `unref()` : il n'empêche jamais le process de s'arrêter.
+ * Sans cela, un SIGTERM d'hébergeur attendrait le prochain tour, et le
+ * redéploiement paraîtrait bloqué.
+ */
+export function planifierReparation(
+  depot: DepotSync,
+  options: OptionsPlanification = {},
+): () => void {
+  const minutes = options.intervalleMinutes ?? INTERVALLE_DEFAUT_MINUTES
+
+  // Un seul balayage à la fois. Sur une base lente, deux tours qui se
+  // chevauchent reprojetteraient les mêmes commandes en concurrence — sans
+  // rien casser (la reprojection est idempotente), mais en doublant la
+  // charge exactement quand elle est déjà trop haute.
+  let enCours = false
+  const tour = async () => {
+    if (enCours) return
+    enCours = true
+    try {
+      await reparerProjectionsOrphelines(depot, options)
+    } finally {
+      enCours = false
+    }
+  }
+
+  void tour()
+
+  if (minutes <= 0) return () => {}
+
+  const minuteur = setInterval(() => void tour(), minutes * 60_000)
+  minuteur.unref()
+  return () => clearInterval(minuteur)
 }
