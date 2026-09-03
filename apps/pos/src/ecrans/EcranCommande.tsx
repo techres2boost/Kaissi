@@ -138,6 +138,17 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
   )
 
   const ouvrirProduit = async (produit: ProduitLocal) => {
+    // Un produit retiré de la carte au back-office le DIT, au lieu d'être un
+    // bouton gris sans explication. Le caissier n'a alors pas à deviner s'il
+    // s'agit d'une rupture ou d'un écran qui a mal réagi.
+    if (!produit.disponible) {
+      setMessage(
+        `${produit.nom} est en rupture de stock : il a été retiré de la carte ` +
+          `depuis le back-office. Le gérant peut le remettre en vente dans ` +
+          `Stock → « En rupture ».`,
+      )
+      return
+    }
     const [variantes, modificateurs] = await Promise.all([
       app.app.catalogue.variantes(produit.id),
       app.app.catalogue.modificateurs(produit.id),
@@ -214,12 +225,19 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
               <button
                 key={p.id}
                 type="button"
-                className="carte-produit"
-                disabled={!p.disponible || !modifiable}
+                className={`carte-produit${p.disponible ? '' : ' rupture'}`}
+                // Indisponible reste CLIQUABLE : c'est le clic qui déclenche
+                // l'explication. Un bouton désactivé ne dit rien, et le
+                // caissier finit par taper trois fois dessus.
+                disabled={!modifiable}
                 onClick={() => void ouvrirProduit(p)}
               >
                 <span className="nom">{p.nom}</span>
-                <span className="prix">{formaterTND(millimes(p.prixBaseMillimes))}</span>
+                {p.disponible ? (
+                  <span className="prix">{formaterTND(millimes(p.prixBaseMillimes))}</span>
+                ) : (
+                  <span className="prix mention-rupture">Rupture</span>
+                )}
               </button>
             ))}
         </div>

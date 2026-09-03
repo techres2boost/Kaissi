@@ -80,6 +80,10 @@ interface DonneesChargees {
 
 export function FournisseurApp({ app, children }: Props) {
   const [employe, setEmploye] = useState<Employe | null>(null)
+  // `undefined` tant que la reprise de poste n'a pas été tentée : sans ce
+  // troisième état, le premier rendu affiche l'écran de PIN, et l'employé
+  // repris apparaîtrait ensuite dans un clignotement.
+  const [reprisePoste, setReprisePoste] = useState<Employe | null | undefined>(undefined)
   const [version, setVersion] = useState(0)
   // Stable : une fonction recréée à chaque rendu entre dans les dépendances
   // des effets qui l'utilisent et les relance pour rien.
@@ -134,6 +138,46 @@ export function FournisseurApp({ app, children }: Props) {
       vivant = false
     }
   }, [app, version])
+
+  /*
+   * Reprise de poste après un simple rechargement de page.
+   *
+   * L'employé en poste vit en mémoire React : un F5, une mise en veille de la
+   * tablette ou un service worker qui recharge le bundle le perdaient, et le
+   * caissier retapait son PIN en plein coup de feu. Le shift, lui, était déjà
+   * repris (`shift_courant`) — l'employé ne l'était pas, ce qui n'était pas
+   * cohérent.
+   *
+   * Ce n'est pas un affaiblissement : le PIN TRACE, il ne protège pas. Ce qui
+   * garde l'argent, c'est le jeton d'appareil, RLS et le journal d'audit. Le
+   * verrouillage explicite (bouton « Verrouiller ») efface la clé et redemande
+   * un PIN — c'est lui qui sert au changement de service.
+   */
+  useEffect(() => {
+    let vivant = true
+    void (async () => {
+      const id = await app.etat.lire('employe_courant')
+      const repris = id ? await app.employes.parId(id) : null
+      if (vivant) setReprisePoste(repris)
+    })()
+    return () => {
+      vivant = false
+    }
+  }, [app])
+
+  useEffect(() => {
+    if (reprisePoste === undefined) return
+    setEmploye(reprisePoste)
+  }, [reprisePoste])
+
+  /** Prend ou quitte le poste, en gardant la trace sur le disque local. */
+  const definirEmploye = useCallback(
+    (e: Employe | null) => {
+      setEmploye(e)
+      void app.etat.ecrire('employe_courant', e?.id ?? '')
+    },
+    [app],
+  )
 
   useEffect(() => {
     let vivant = true
@@ -330,7 +374,7 @@ export function FournisseurApp({ app, children }: Props) {
             methodesPaiement: donnees.methodesPaiement,
             employes: donnees.employes,
             employe,
-            definirEmploye: setEmploye,
+            definirEmploye,
             etatImpression,
             sync,
             resumeSync,
@@ -344,6 +388,7 @@ export function FournisseurApp({ app, children }: Props) {
       session,
       impression,
       employe,
+      definirEmploye,
       etatImpression,
       sync,
       resumeSync,
@@ -352,7 +397,9 @@ export function FournisseurApp({ app, children }: Props) {
     ],
   )
 
-  if (!valeur) {
+  // On attend AUSSI la reprise de poste : sans cela, l'écran de PIN
+  // apparaîtrait une fraction de seconde avant d'être remplacé par la salle.
+  if (!valeur || reprisePoste === undefined) {
     return (
       <div className="ecran-bloquant">
         <div className="pastille-chargement" aria-hidden="true" />

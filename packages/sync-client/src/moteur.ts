@@ -17,7 +17,7 @@
 
 import type { EvenementCommande } from '@kaissi/domain'
 import { delaiRetentative, estReessayable, type PolitiqueRetentative } from './index.js'
-import { ErreurTransport, type Transport } from './transport.js'
+import { ErreurTransport, type ShiftSynchronise, type Transport } from './transport.js'
 
 export interface DepotLocalSync {
   /** Lot à pousser, le plus ancien d'abord. */
@@ -38,6 +38,14 @@ export interface DepotLocalSync {
       donnees: Record<string, unknown> | null
     }[],
   ): Promise<void>
+  /**
+   * FACULTATIF : services de caisse restant à remonter.
+   * Optionnel pour que les transports et dépôts de test existants — dont le
+   * banc à trois appareils — continuent de compiler sans le connaître.
+   */
+  shiftsAPousser?(limite: number): Promise<readonly ShiftSynchronise[]>
+  /** FACULTATIF : marque poussés les shifts que le serveur a accusés. */
+  accuserShifts?(ids: readonly string[]): Promise<void>
   lireCurseur(cle: 'catalogue' | 'evenements'): Promise<number>
   ecrireCurseur(cle: 'catalogue' | 'evenements', valeur: number): Promise<void>
   /** Compteurs du bandeau : opérations en attente et rejets. */
@@ -125,6 +133,7 @@ export class MoteurSync {
 
     try {
       await this.pousser()
+      await this.pousserShifts()
       await this.tirer()
       this.tentatives = 0
       await this.publier({
@@ -174,6 +183,36 @@ export class MoteurSync {
       // boucherait la boucle à l'infini sur le même lot.
       if (reponse.acceptes.length === 0 && reponse.rejetes.length === 0) return
       if (lot.length < taille) return
+    }
+  }
+
+  /**
+   * Étape 1 bis — les services de caisse.
+   *
+   * Après les ventes, jamais avant : si le réseau ne tient que trois
+   * secondes, ce sont les encaissements qui doivent en profiter.
+   *
+   * Toute erreur est AVALÉE ici, et c'est délibéré. Un serveur antérieur
+   * répond 404 sur cette route ; la laisser remonter mettrait le cycle en
+   * échec et le bandeau en « bloqué » alors que les ventes, elles, sont
+   * parties. Un shift non remonté se rattrape au cycle suivant — une vente
+   * qui ne part pas, non.
+   */
+  private async pousserShifts(): Promise<void> {
+    const lire = this.options.depot.shiftsAPousser
+    const accuser = this.options.depot.accuserShifts
+    const envoyer = this.options.transport.shifts
+    if (!lire || !accuser || !envoyer) return
+
+    try {
+      const lot = await lire.call(this.options.depot, 50)
+      if (lot.length === 0) return
+      const reponse = await envoyer.call(this.options.transport, lot)
+      if (reponse.enregistres.length > 0) {
+        await accuser.call(this.options.depot, reponse.enregistres)
+      }
+    } catch {
+      // Silencieux à dessein — voir le commentaire ci-dessus.
     }
   }
 

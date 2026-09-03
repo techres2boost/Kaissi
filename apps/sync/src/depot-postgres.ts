@@ -32,7 +32,7 @@ import type {
   EtablissementEnrolable,
   ResultatInsertion,
 } from './depot.js'
-import type { ChangementCatalogue } from './protocole.js'
+import type { ChangementCatalogue, ShiftSynchronise } from './protocole.js'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { ReglageSsl } from './ssl.js'
 
@@ -435,6 +435,68 @@ export class DepotPostgres implements DepotSync {
         )
       }
     })
+  }
+
+  /**
+   * Écrit les services de caisse d'un terminal.
+   *
+   * Trois choses valent d'être dites :
+   *
+   * 1. `organization_id`, `restaurant_id` et `device_id` viennent du JETON,
+   *    jamais du corps de la requête. Un terminal compromis ne peut pas
+   *    écrire un shift dans le restaurant du voisin (défense en profondeur —
+   *    RLS le refuserait déjà).
+   * 2. `user_id` est résolu par une SOUS-REQUÊTE sur `kaissi.users` : un
+   *    employé qui n'existe que dans la graine locale de la tablette
+   *    ferait sinon échouer la clé étrangère, et le shift ne remonterait
+   *    JAMAIS. Un shift sans nom d'employé vaut mieux qu'un shift perdu.
+   * 3. `on conflict (id) do update` : la tablette renvoie le shift à son
+   *    ouverture PUIS à sa clôture. C'est le même shift, enrichi.
+   */
+  async enregistrerShifts(
+    appareil: AppareilAuthentifie,
+    shifts: readonly ShiftSynchronise[],
+  ): Promise<readonly string[]> {
+    const recevables = shifts.filter((s) => estUuid(s.id))
+    if (recevables.length === 0) return []
+
+    const ecrits: string[] = []
+    await this.sousIdentite(appareil, async (client) => {
+      for (const s of recevables) {
+        await client.query(
+          `insert into kaissi.shifts
+             (id, organization_id, restaurant_id, device_id, user_id, opened_at,
+              opening_float_millimes, closed_at, counted_millimes,
+              expected_millimes, variance_millimes)
+           values (
+             $1, $2, $3, $4,
+             (select u.id from kaissi.users u
+               where u.id = $5::uuid and u.organization_id = $2),
+             $6, $7, $8, $9, $10, $11)
+           on conflict (id) do update set
+             closed_at         = excluded.closed_at,
+             counted_millimes  = excluded.counted_millimes,
+             expected_millimes = excluded.expected_millimes,
+             variance_millimes = excluded.variance_millimes,
+             updated_at        = now()`,
+          [
+            s.id,
+            appareil.organizationId,
+            appareil.restaurantId,
+            appareil.deviceId,
+            s.employeId && estUuid(s.employeId) ? s.employeId : null,
+            s.ouvertA,
+            Math.max(Math.round(s.fondDeCaisseMillimes) || 0, 0),
+            s.fermeA,
+            s.compteMillimes === null ? null : Math.round(s.compteMillimes),
+            s.attenduMillimes === null ? null : Math.round(s.attenduMillimes),
+            s.ecartMillimes === null ? null : Math.round(s.ecartMillimes),
+          ],
+        )
+        ecrits.push(s.id)
+      }
+    })
+    return ecrits
   }
 
   async statutsDesCommandes(

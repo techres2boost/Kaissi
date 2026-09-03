@@ -230,6 +230,56 @@ describe('shift de caisse, de bout en bout', () => {
     expect(ligne?.variance_millimes).toBe(-200)
   })
 
+  it('remonte le shift à l ouverture, PUIS à la clôture avec son écart', async () => {
+    const caisse = depotCaisse(db)
+    const shiftId = uuidV7()
+    await caisse.ouvrirShift({
+      id: shiftId,
+      organizationId: DEMO_ORG,
+      restaurantId: DEMO_RESTO,
+      deviceId: DEMO_DEVICE,
+      employeId: 'emp-1',
+      caisseId: null,
+      fondDeCaisseMillimes: 50_000,
+    })
+
+    // Premier envoi : la caisse est ouverte, le gérant doit la voir PENDANT
+    // le service, pas seulement après.
+    const ouverture = await caisse.shiftsAPousser()
+    expect(ouverture.map((s) => s.id)).toEqual([shiftId])
+    expect(ouverture[0]!.fondDeCaisseMillimes).toBe(50_000)
+    expect(ouverture[0]!.fermeA).toBeNull()
+
+    await caisse.marquerShiftsPousses([shiftId])
+    expect(await caisse.shiftsAPousser()).toHaveLength(0)
+
+    // La clôture remet le shift dans la file : il porte maintenant l'écart.
+    await caisse.cloturerShift(shiftId, 49_800, 50_000, null)
+    const cloture = await caisse.shiftsAPousser()
+    expect(cloture).toHaveLength(1)
+    expect(cloture[0]!.fermeA).not.toBeNull()
+    expect(cloture[0]!.ecartMillimes).toBe(-200)
+  })
+
+  it('n accuse QUE les shifts que le serveur a nommés', async () => {
+    const caisse = depotCaisse(db)
+    const garde = uuidV7()
+    await caisse.ouvrirShift({
+      id: garde,
+      organizationId: DEMO_ORG,
+      restaurantId: DEMO_RESTO,
+      deviceId: DEMO_DEVICE,
+      employeId: 'emp-1',
+      caisseId: null,
+      fondDeCaisseMillimes: 10_000,
+    })
+    // Un accusé vide ne vide rien : c'est la même discipline que l'outbox.
+    await caisse.marquerShiftsPousses([])
+    expect(await caisse.shiftsAPousser()).toHaveLength(1)
+    await caisse.marquerShiftsPousses([uuidV7()])
+    expect(await caisse.shiftsAPousser()).toHaveLength(1)
+  })
+
   it('REFUSE d ouvrir un second shift tant que le premier est ouvert', async () => {
     const caisse = depotCaisse(db)
     const ouvrir = () =>

@@ -32,10 +32,13 @@ const PLAFOND = 60
 
 export default async function PageCuisine({
   params,
+  searchParams,
 }: {
   params: Promise<{ restaurant: string }>
+  searchParams: Promise<{ poste?: string }>
 }) {
   const { restaurant } = await params
+  const { poste } = await searchParams
   await etablissementObligatoire(restaurant)
   const supabase = await supabaseServeur()
 
@@ -62,12 +65,14 @@ export default async function PageCuisine({
   // Trois lectures parallèles plutôt qu'une jointure imbriquée : PostgREST
   // sait le faire, mais la requête imbriquée devient illisible dès qu'on y
   // ajoute un filtre, et le gain est nul à soixante lignes.
-  const [lignes, tables, pretes] = await Promise.all([
+  const [lignes, tables, postes, pretes] = await Promise.all([
     ids.length === 0
       ? { data: [] }
       : supabase
           .from('order_items')
-          .select('id, order_id, designation, qty, modifiers, note, position, voided_at')
+          .select(
+            'id, order_id, designation, qty, modifiers, note, position, voided_at, station_id',
+          )
           .in('order_id', ids)
           .is('voided_at', null)
           .order('position', { ascending: true }),
@@ -76,16 +81,28 @@ export default async function PageCuisine({
       .select('id, label')
       .eq('restaurant_id', restaurant)
       .is('archived_at', null),
+    supabase
+      .from('stations')
+      .select('id, name')
+      .eq('restaurant_id', restaurant)
+      .is('archived_at', null)
+      .order('name', { ascending: true }),
     ids.length === 0
       ? { data: [] }
       : supabase.from('kitchen_ready').select('order_id, ready_at').in('order_id', ids),
   ])
 
   const libelleTable = new Map((tables.data ?? []).map((t) => [t.id, t.label]))
+  // Les postes de préparation : le POS émet DÉJÀ un bon par poste (Cuisine,
+  // Bar). Sans ce filtre ici, le barman lisait les pizzas et le cuisinier
+  // les cafés — les deux faisaient le tri à l'œil sur le même écran.
+  const listePostes = (postes.data ?? []).map((s) => ({ id: s.id, nom: s.name }))
+  const posteActif = listePostes.some((s) => s.id === poste) ? (poste as string) : null
   const preteA = new Map((pretes.data ?? []).map((p) => [p.order_id, p.ready_at]))
 
   const parCommande = new Map<string, CommandeCuisine['lignes'][number][]>()
   for (const l of lignes.data ?? []) {
+    if (posteActif && l.station_id !== posteActif) continue
     const liste = parCommande.get(l.order_id) ?? []
     liste.push({
       id: l.id,
@@ -101,16 +118,28 @@ export default async function PageCuisine({
     parCommande.set(l.order_id, liste)
   }
 
-  const aPreparer: CommandeCuisine[] = (commandes ?? []).map((c) => ({
-    id: c.id,
-    numero: c.ticket_number,
-    table: c.table_id ? (libelleTable.get(c.table_id) ?? null) : null,
-    type: c.type,
-    couverts: c.covers,
-    envoyeeA: c.sent_at ?? c.opened_at,
-    preteA: preteA.get(c.id) ?? null,
-    lignes: parCommande.get(c.id) ?? [],
-  }))
+  const aPreparer: CommandeCuisine[] = (commandes ?? [])
+    // Filtré sur un poste : une commande dont aucune ligne ne le concerne
+    // n'a rien à faire sur cet écran.
+    .filter((c) => !posteActif || (parCommande.get(c.id)?.length ?? 0) > 0)
+    .map((c) => ({
+      id: c.id,
+      numero: c.ticket_number,
+      table: c.table_id ? (libelleTable.get(c.table_id) ?? null) : null,
+      type: c.type,
+      couverts: c.covers,
+      envoyeeA: c.sent_at ?? c.opened_at,
+      preteA: preteA.get(c.id) ?? null,
+      lignes: parCommande.get(c.id) ?? [],
+    }))
 
-  return <TableauCuisine restaurantId={restaurant} commandes={aPreparer} plafond={PLAFOND} />
+  return (
+    <TableauCuisine
+      restaurantId={restaurant}
+      commandes={aPreparer}
+      plafond={PLAFOND}
+      postes={listePostes}
+      posteActif={posteActif}
+    />
+  )
 }

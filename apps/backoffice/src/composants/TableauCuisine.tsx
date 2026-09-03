@@ -15,7 +15,9 @@
  */
 
 import { useEffect, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { destinationSure } from '../serveur/redirection.js'
 import { marquerPrete, retirerPrete } from '../app/[restaurant]/cuisine/actions.js'
 
 export interface CommandeCuisine {
@@ -55,10 +57,15 @@ export function TableauCuisine({
   restaurantId,
   commandes,
   plafond,
+  postes,
+  posteActif,
 }: {
   restaurantId: string
   commandes: CommandeCuisine[]
   plafond: number
+  /** Postes de préparation de l'établissement — Cuisine, Bar… */
+  postes: { id: string; nom: string }[]
+  posteActif: string | null
 }) {
   const router = useRouter()
   const [enCours, demarrer] = useTransition()
@@ -108,6 +115,32 @@ export function TableauCuisine({
           Mise à jour automatique toutes les {PERIODE_MS / 1000} secondes. Une
           commande sort de cet écran quand la caisse l'encaisse ou l'annule.
         </p>
+
+        {/*
+          La caisse émet DÉJÀ un bon par poste (Cuisine, Bar). Ce filtre rend
+          la même séparation à l'écran : le barman ne trie plus les pizzas à
+          l'œil pour trouver ses cafés. « Tous les postes » reste le défaut —
+          dans un snack à un seul écran, c'est ce qu'on veut.
+        */}
+        {postes.length > 1 && (
+          <nav className="onglets-postes" aria-label="Poste de préparation">
+            <Link
+              href={destinationSure(`/${restaurantId}/cuisine`)}
+              className={posteActif === null ? 'actif' : ''}
+            >
+              Tous les postes
+            </Link>
+            {postes.map((p) => (
+              <Link
+                key={p.id}
+                href={destinationSure(`/${restaurantId}/cuisine?poste=${p.id}`)}
+                className={posteActif === p.id ? 'actif' : ''}
+              >
+                {p.nom}
+              </Link>
+            ))}
+          </nav>
+        )}
       </header>
 
       {erreur && <p className="message erreur">{erreur}</p>}

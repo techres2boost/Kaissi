@@ -290,6 +290,28 @@ export function creerServeur({
     }
   })
 
+  // ── POST /sync/shifts ────────────────────────────────────────────────
+  // Route ADDITIVE : un POS plus ancien ne l'appelle pas, un POS plus récent
+  // encaisse normalement si elle manque. Les ventes n'en dépendent jamais.
+  app.post('/sync/shifts', async (c) => {
+    const appareil = c.get('appareil')
+    let corps: unknown
+    try {
+      corps = await c.req.json()
+    } catch {
+      const erreur: ReponseErreur = {
+        erreur: 'requete_invalide',
+        message: 'Corps JSON illisible.',
+      }
+      return c.json(erreur, 400)
+    }
+    try {
+      return c.json(await service.shifts(appareil, corps as never))
+    } catch (erreur) {
+      return reponseErreur(c, erreur)
+    }
+  })
+
   // ── GET /sync/pull ───────────────────────────────────────────────────
   app.get('/sync/pull', async (c) => {
     const appareil = c.get('appareil')

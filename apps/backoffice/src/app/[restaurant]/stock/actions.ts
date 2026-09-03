@@ -150,3 +150,38 @@ export async function enregistrerMouvement(
     return 'Mouvement enregistré.'
   })
 }
+
+/**
+ * Retire un produit de la carte de la caisse, ou l'y remet.
+ *
+ * ⚑ C'est le SEUL mécanisme par lequel un produit disparaît du POS pour cause
+ * de rupture, et il est délibérément MANUEL.
+ *
+ * Le stock calculé, lui, ne retire jamais rien tout seul. Hors ligne, la
+ * quantité que la tablette connaît peut avoir des heures : la laisser
+ * masquer un produit reviendrait à refuser de vendre une pizza qui est en
+ * cuisine — le pire des deux mondes (règle du dépôt : « le stock n'est jamais
+ * autoritaire hors ligne »). Une décision humaine, elle, est vraie au moment
+ * où elle est prise : « on n'a plus de pâte, arrête la Margherita ».
+ *
+ * Le chemin est celui du catalogue : `products.is_available` est journalisé
+ * dans `change_log` (migration 0005), donc toutes les tablettes l'apprennent
+ * à leur prochaine synchronisation, sans rien réinstaller.
+ */
+export async function basculerDisponibilite(
+  restaurantId: string,
+  produitId: string,
+  disponible: boolean,
+): Promise<Resultat> {
+  return agir(restaurantId, async (supabase) => {
+    const { error } = await supabase
+      .from('products')
+      .update({ is_available: disponible })
+      .eq('id', produitId)
+      .eq('restaurant_id', restaurantId)
+    if (error) throw new Error(error.message)
+    return disponible
+      ? 'Produit remis en vente. Les caisses le retrouveront à leur prochaine synchronisation.'
+      : 'Produit marqué en rupture. Il disparaîtra des caisses à leur prochaine synchronisation.'
+  })
+}

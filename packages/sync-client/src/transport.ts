@@ -39,9 +39,32 @@ export interface ReponsePull {
   readonly encore: boolean
 }
 
+/** Un service de caisse tel que la tablette le remonte. */
+export interface ShiftSynchronise {
+  readonly id: string
+  readonly employeId: string | null
+  readonly ouvertA: string
+  readonly fondDeCaisseMillimes: number
+  readonly fermeA: string | null
+  readonly compteMillimes: number | null
+  readonly attenduMillimes: number | null
+  readonly ecartMillimes: number | null
+}
+
+export interface ReponseShifts {
+  readonly enregistres: readonly string[]
+}
+
 export interface Transport {
   push(batchId: string, evenements: readonly EvenementCommande[]): Promise<ReponsePush>
   pull(depuisCatalogue: number, depuisEvenements: number, taillePage?: number): Promise<ReponsePull>
+  /**
+   * FACULTATIF : remontée des services de caisse.
+   *
+   * Absent des transports de test, et absent des serveurs antérieurs — d'où
+   * l'optionalité. Les ventes ne dépendent jamais de cette route.
+   */
+  shifts?(shifts: readonly ShiftSynchronise[]): Promise<ReponseShifts>
 }
 
 /**
@@ -125,6 +148,13 @@ export function transportHttp(options: OptionsTransport): Transport {
           evenements,
         }),
       })) as ReponsePush
+    },
+
+    async shifts(shifts) {
+      return (await appeler('/sync/shifts', {
+        method: 'POST',
+        body: JSON.stringify({ protocolVersion: VERSION_PROTOCOLE, shifts }),
+      })) as ReponseShifts
     },
 
     async pull(depuisCatalogue, depuisEvenements, taillePage = 500) {

@@ -195,6 +195,23 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .carte-produit:active { background: var(--surface-2); }
 .carte-produit:disabled { opacity: 0.4; }
+/*
+  Rupture déclarée au back-office : le produit reste VISIBLE et cliquable —
+  le clic sert à expliquer. Le griser sans un mot laissait le caissier
+  chercher une panne là où il y a une décision de gestion.
+*/
+.carte-produit.rupture {
+  opacity: 0.55;
+  border-style: dashed;
+  background: var(--surface-2);
+}
+.carte-produit .mention-rupture {
+  color: var(--alerte);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.8em;
+}
 .carte-produit .nom { font-weight: 600; line-height: 1.25; }
 .carte-produit .prix {
   color: var(--accent);

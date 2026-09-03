@@ -148,12 +148,24 @@ export type Produit = {
   updated_at: Horodatage
 }
 
-/** Une ligne de la ventilation de TVA, telle qu'imprimée en pied de ticket. */
+/**
+ * Une ligne de la ventilation de TVA, telle que le projecteur l'écrit dans
+ * `orders.tax_breakdown`.
+ *
+ * ⚑ Les noms de champs sont ceux de `VentilationTaxe` de `@kaissi/domain` —
+ * c'est ce type-là qui est sérialisé tel quel par la reprojection (serveur
+ * comme POS). En particulier la base s'appelle `baseHtMillimes`, PAS
+ * `baseMillimes` : ce dernier n'existe que dans la vue d'impression du
+ * ticket (`packages/domain/src/ticket.ts`), qui renomme le champ. Les
+ * confondre rendait `undefined`, et `millimes(undefined)` fait tomber la
+ * page entière.
+ */
 export type LigneVentilation = {
   tauxTaxeId: string
   nom: string
   tauxBp: number
-  baseMillimes: Millimes
+  incluse: boolean
+  baseHtMillimes: Millimes
   taxeMillimes: Millimes
 }
 

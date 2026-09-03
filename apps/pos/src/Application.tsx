@@ -125,6 +125,8 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
         <Bandeau
           reseau={reseau}
           shift={null}
+          vue={vue.nom}
+          onSalle={() => setVue({ nom: 'salle' })}
           onVerrouiller={() => definirEmploye(null)}
           onDiagnostic={() => setVue({ nom: 'diagnostic' })}
           onCloturer={() => setVue({ nom: 'cloture' })}
@@ -143,6 +145,8 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
       <Bandeau
         reseau={reseau}
         shift={shift}
+        vue={vue.nom}
+        onSalle={() => setVue({ nom: 'salle' })}
         onVerrouiller={() => definirEmploye(null)}
         onDiagnostic={() =>
           setVue((v) => (v.nom === 'diagnostic' ? { nom: 'salle' } : { nom: 'diagnostic' }))
@@ -243,6 +247,8 @@ function BandeauSimple({ reseau }: { reseau: { connecte: boolean; type: string }
 function Bandeau({
   reseau,
   shift,
+  vue,
+  onSalle,
   onVerrouiller,
   onDiagnostic,
   onCloturer,
@@ -251,6 +257,8 @@ function Bandeau({
 }: {
   reseau: { connecte: boolean; type: string }
   shift: Shift | null
+  vue: Vue['nom']
+  onSalle: () => void
   onVerrouiller: () => void
   onDiagnostic: () => void
   onCloturer: () => void
@@ -325,6 +333,28 @@ function Bandeau({
             {!sync ? '⇅ local' : resumeSync.rejetes > 0 ? `⚠ ${resumeSync.rejetes}` : `⇅ ${resumeSync.enAttente}`}
           </button>
         )}
+
+        {/*
+          Retour à la salle, toujours à la même place. Depuis Diagnostic ou
+          l'écran de synchronisation, il n'y avait aucun chemin de retour
+          évident : le caissier rechargeait la page.
+        */}
+        {vue !== 'salle' && (
+          <button type="button" className="lien" onClick={onSalle}>
+            Salle
+          </button>
+        )}
+
+        {/*
+          Accès PERMANENT à l'écran de synchronisation. Le badge ci-dessus ne
+          s'affiche que s'il a quelque chose à dire — donc, terminal appairé
+          et outbox vide, il disparaît, et avec lui le seul chemin vers cet
+          écran. C'est exactement quand tout va bien qu'on cherche à vérifier
+          que tout va bien.
+        */}
+        <button type="button" className="lien" onClick={onSync}>
+          Sync
+        </button>
 
         <button type="button" className="lien" onClick={onDiagnostic}>
           Diagnostic

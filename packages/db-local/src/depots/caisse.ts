@@ -109,7 +109,10 @@ export function depotCaisse(db: AdaptateurSqlite) {
       await db.executer(
         `UPDATE shifts
          SET closed_at = ?, counted_millimes = ?, expected_millimes = ?,
-             variance_millimes = ?, closing_note = ?
+             variance_millimes = ?, closing_note = ?,
+             -- Le shift repart au serveur : il porte maintenant son écart,
+             -- qui est LE chiffre pour lequel on tient une caisse.
+             pushed_at = NULL
          WHERE id = ? AND closed_at IS NULL`,
         [
           new Date().toISOString(),
@@ -121,6 +124,61 @@ export function depotCaisse(db: AdaptateurSqlite) {
           id,
         ],
       )
+    },
+
+    /**
+     * Services de caisse à remonter au serveur.
+     *
+     * `pushed_at IS NULL` = jamais accusé, ou modifié depuis. Un shift part
+     * donc DEUX fois : à son ouverture, puis à sa clôture. C'est voulu — le
+     * gérant voit la caisse ouverte pendant le service, pas seulement après.
+     */
+    async shiftsAPousser(limite = 50): Promise<
+      {
+        id: string
+        employeId: string | null
+        ouvertA: string
+        fondDeCaisseMillimes: number
+        fermeA: string | null
+        compteMillimes: number | null
+        attenduMillimes: number | null
+        ecartMillimes: number | null
+      }[]
+    > {
+      const lignes = await db.lire<{
+        id: string
+        employee_id: string | null
+        opened_at: string
+        opening_float_millimes: number
+        closed_at: string | null
+        counted_millimes: number | null
+        expected_millimes: number | null
+        variance_millimes: number | null
+      }>(
+        `SELECT id, employee_id, opened_at, opening_float_millimes, closed_at,
+                counted_millimes, expected_millimes, variance_millimes
+         FROM shifts WHERE pushed_at IS NULL ORDER BY opened_at LIMIT ?`,
+        [limite],
+      )
+      return lignes.map((l) => ({
+        id: l.id,
+        employeId: l.employee_id,
+        ouvertA: l.opened_at,
+        fondDeCaisseMillimes: l.opening_float_millimes,
+        fermeA: l.closed_at,
+        compteMillimes: l.counted_millimes,
+        attenduMillimes: l.expected_millimes,
+        ecartMillimes: l.variance_millimes,
+      }))
+    },
+
+    /** Marque poussé ce que le serveur a explicitement accusé, et rien d'autre. */
+    async marquerShiftsPousses(ids: readonly string[]): Promise<void> {
+      if (ids.length === 0) return
+      const maintenant = new Date().toISOString()
+      for (const id of ids) {
+        await db.executer('UPDATE shifts SET pushed_at = ? WHERE id = ?', [maintenant, id])
+      }
     },
 
     async ajouterMouvement(m: {

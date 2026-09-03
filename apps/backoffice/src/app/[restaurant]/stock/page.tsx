@@ -14,6 +14,7 @@
  */
 
 import { formaterTND, margeProduit, millimes } from '@kaissi/domain'
+import { montant } from '../../../serveur/montant.js'
 import { etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { etatStock, type EtatStock } from '../../../serveur/rapports.js'
@@ -30,6 +31,8 @@ export interface ProduitStock {
   margeMillimes: number
   margeBp: number | null
   suivi: boolean
+  /** `false` = retiré de la carte de la caisse (rupture déclarée). */
+  enVente: boolean
   quantite: number | null
   seuil: number | null
   vendue: number
@@ -49,7 +52,9 @@ export default async function PageStock({
   const [produitsRes, categoriesRes, stockRes] = await Promise.all([
     supabase
       .from('products')
-      .select('id, name, category_id, base_price_millimes, cost_per_unit, track_stock, archived_at')
+      .select(
+        'id, name, category_id, base_price_millimes, cost_per_unit, track_stock, is_available, archived_at',
+      )
       .eq('restaurant_id', restaurant)
       .is('archived_at', null)
       .order('position', { ascending: true }),
@@ -74,7 +79,7 @@ export default async function PageStock({
 
   const produits: ProduitStock[] = (produitsRes.data ?? []).map((p) => {
     const stock = stocks.get(p.id)
-    const marge = margeProduit(millimes(p.base_price_millimes), p.cost_per_unit)
+    const marge = margeProduit(montant(p.base_price_millimes), p.cost_per_unit)
     return {
       id: p.id,
       nom: p.name,
@@ -84,6 +89,7 @@ export default async function PageStock({
       margeMillimes: marge.margeMillimes,
       margeBp: marge.margeBp,
       suivi: stock !== undefined,
+      enVente: p.is_available,
       quantite: stock ? Number(stock.qty_on_hand) : null,
       seuil: stock?.min_qty === null || stock?.min_qty === undefined ? null : Number(stock.min_qty),
       vendue: stock ? Number(stock.qty_vendue) : 0,

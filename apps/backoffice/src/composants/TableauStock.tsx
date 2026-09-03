@@ -11,7 +11,12 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formaterPourcentage, formaterTND, millimes } from '@kaissi/domain'
-import { activerSuivi, arreterSuivi, enregistrerMouvement } from '../app/[restaurant]/stock/actions.js'
+import {
+  activerSuivi,
+  arreterSuivi,
+  basculerDisponibilite,
+  enregistrerMouvement,
+} from '../app/[restaurant]/stock/actions.js'
 import type { ProduitStock } from '../app/[restaurant]/stock/page.js'
 
 const LIBELLE_ETAT: Record<string, string> = {
@@ -67,6 +72,7 @@ export function TableauStock({
             <th className="nombre">Stock</th>
             <th className="nombre">Seuil</th>
             <th>État</th>
+            <th>En vente</th>
             <th />
           </tr>
         </thead>
@@ -96,6 +102,26 @@ export function TableauStock({
                   <span className={`etiquette etat-${p.etat}`}>{LIBELLE_ETAT[p.etat]}</span>
                 </td>
                 <td>
+                  {/*
+                    Le seul geste qui fait disparaître un produit de la caisse.
+                    Il est manuel PAR CONSTRUCTION : une quantité calculée peut
+                    dater d'avant le dernier réassort, une décision humaine non.
+                  */}
+                  <button
+                    type="button"
+                    className={p.enVente ? 'discret' : 'discret alerte'}
+                    disabled={enCours}
+                    onClick={() => agir(() => basculerDisponibilite(restaurantId, p.id, !p.enVente))}
+                    title={
+                      p.enVente
+                        ? 'Retirer ce produit de la carte des caisses'
+                        : 'Remettre ce produit en vente sur les caisses'
+                    }
+                  >
+                    {p.enVente ? 'En vente' : 'En rupture'}
+                  </button>
+                </td>
+                <td>
                   <button
                     type="button"
                     className="discret"
@@ -108,7 +134,7 @@ export function TableauStock({
 
               {ouvert === p.id && (
                 <tr key={`${p.id}-edition`} className="ligne-edition">
-                  <td colSpan={9}>
+                  <td colSpan={10}>
                     <div className="grille deux">
                       <form
                         action={(donnees) =>

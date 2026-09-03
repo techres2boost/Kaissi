@@ -9,7 +9,7 @@
  */
 
 import type { EvenementCommande } from '@kaissi/domain'
-import type { ChangementCatalogue } from './protocole.js'
+import type { ChangementCatalogue, ShiftSynchronise } from './protocole.js'
 
 export interface AppareilAuthentifie {
   readonly deviceId: string
@@ -120,6 +120,17 @@ export interface DepotSync {
     evenements: readonly EvenementCommande[],
     batchId: string,
   ): Promise<ResultatInsertion>
+
+  /**
+   * Écrit les services de caisse remontés par un terminal.
+   *
+   * Upsert sur l'identifiant, généré par la tablette : renvoyer le même shift
+   * n'en crée pas un second. Rend les identifiants réellement écrits.
+   */
+  enregistrerShifts(
+    appareil: AppareilAuthentifie,
+    shifts: readonly ShiftSynchronise[],
+  ): Promise<readonly string[]>
 
   /** Consigne les rejets, pour qu'ils remontent au gérant. */
   consignerRejets(

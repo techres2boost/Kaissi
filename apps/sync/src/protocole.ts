@@ -118,6 +118,48 @@ export interface ReponsePull {
   readonly protocolVersion: number
 }
 
+// ─── POST /sync/shifts ──────────────────────────────────────────────────────
+
+/**
+ * Remontée des services de caisse (shifts).
+ *
+ * Pourquoi une route à part, et non un événement de commande : un shift n'est
+ * pas une vente. Il n'a ni projection, ni total, ni TVA — c'est un état de
+ * caisse que le back-office LIT (écran « Journée »), et que rien ne rejoue.
+ * Le passer par `order_events` obligerait à lui inventer une commande.
+ *
+ * Idempotent par construction : l'identifiant du shift est un UUIDv7 généré
+ * par la tablette (règle 2), et l'écriture est un `insert … on conflict (id)
+ * do update`. Renvoyer dix fois le même shift n'en crée qu'un.
+ *
+ * ⚑ Route ADDITIVE : un serveur antérieur répond 404, et le POS doit
+ * continuer à synchroniser ses ventes malgré cela. Les ventes ne dépendent
+ * jamais de cette route.
+ */
+export interface ShiftSynchronise {
+  readonly id: string
+  /** L'employé qui a pris le poste. `null` si inconnu du serveur. */
+  readonly employeId: string | null
+  readonly ouvertA: string
+  readonly fondDeCaisseMillimes: number
+  readonly fermeA: string | null
+  readonly compteMillimes: number | null
+  readonly attenduMillimes: number | null
+  /** Compté − attendu. PEUT être négatif : c'est tout son intérêt. */
+  readonly ecartMillimes: number | null
+}
+
+export interface RequeteShifts {
+  readonly protocolVersion: number
+  readonly shifts: readonly ShiftSynchronise[]
+}
+
+export interface ReponseShifts {
+  /** Identifiants effectivement écrits — l'appareil peut les marquer poussés. */
+  readonly enregistres: readonly string[]
+  readonly protocolVersion: number
+}
+
 // ─── Erreurs de transport ───────────────────────────────────────────────────
 
 export type CodeErreur =

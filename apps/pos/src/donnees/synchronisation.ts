@@ -113,6 +113,21 @@ export function depotLocalSync(
       })
     },
 
+    /**
+     * Services de caisse restant à remonter.
+     *
+     * Le back-office lit `kaissi.shifts` pour son écran « Journée » ; sans
+     * cette remontée, la table « Caisses » y reste vide même après une
+     * prise de poste et une clôture — le gérant ne voit jamais son écart.
+     */
+    async shiftsAPousser(limite) {
+      return contexte.caisse.shiftsAPousser(limite)
+    },
+
+    async accuserShifts(ids) {
+      await contexte.caisse.marquerShiftsPousses(ids)
+    },
+
     async lireCurseur(cle) {
       const brut = await contexte.etat.lire(
         cle === 'catalogue' ? 'last_catalog_seq' : 'last_event_seq',

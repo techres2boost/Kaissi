@@ -7,7 +7,8 @@
  */
 
 import Link from 'next/link'
-import { formaterPourcentage, formaterTND, millimes } from '@kaissi/domain'
+import { formaterPourcentage, formaterTND } from '@kaissi/domain'
+import { montant } from '../../../serveur/montant.js'
 import { etablissementObligatoire } from '../../../serveur/session.js'
 import { journeeCourante, libelleJournee } from '../../../serveur/journee.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
@@ -77,7 +78,7 @@ export default async function PageTickets({
 
       <section className="bloc">
         <h2>
-          {ventes.tickets.length} ticket(s) · {formaterTND(millimes(totalPeriode))}
+          {ventes.tickets.length} ticket(s) · {formaterTND(montant(totalPeriode))}
         </h2>
         {ventes.tickets.length === 0 ? (
           <p className="vide">Aucun ticket encaissé sur cette période.</p>
@@ -100,7 +101,7 @@ export default async function PageTickets({
                   <td>{heure(t.closeA)}</td>
                   <td>{t.vendeur}</td>
                   <td className="nombre">{t.nombreArticles}</td>
-                  <td className="nombre">{formaterTND(millimes(t.totalMillimes))}</td>
+                  <td className="nombre">{formaterTND(montant(t.totalMillimes))}</td>
                   <td>
                     <Link
                       href={{
@@ -222,12 +223,12 @@ async function DetailTicket({
                   {l.note && <small className="detail"> « {l.note} »</small>}
                 </td>
                 <td className="nombre">{l.qty}</td>
-                <td className="nombre">{formaterTND(millimes(l.line_gross_millimes))}</td>
+                <td className="nombre">{formaterTND(montant(l.line_gross_millimes))}</td>
                 <td className="nombre">
-                  {remise > 0 ? `− ${formaterTND(millimes(remise))}` : '—'}
+                  {remise > 0 ? `− ${formaterTND(montant(remise))}` : '—'}
                 </td>
-                <td className="nombre">{formaterTND(millimes(l.line_total_millimes))}</td>
-                <td className="nombre">{formaterTND(millimes(l.line_tax_millimes))}</td>
+                <td className="nombre">{formaterTND(montant(l.line_total_millimes))}</td>
+                <td className="nombre">{formaterTND(montant(l.line_tax_millimes))}</td>
               </tr>
             )
           })}
@@ -237,25 +238,25 @@ async function DetailTicket({
       <div className="grille deux" style={{ marginTop: '1rem' }}>
         <dl className="lignes-chiffres">
           <dt>Sous-total</dt>
-          <dd>{formaterTND(millimes(commande.subtotal_millimes))}</dd>
+          <dd>{formaterTND(montant(commande.subtotal_millimes))}</dd>
           <dt>Remises</dt>
-          <dd>− {formaterTND(millimes(commande.discount_millimes))}</dd>
+          <dd>− {formaterTND(montant(commande.discount_millimes))}</dd>
           <dt>TVA</dt>
-          <dd>{formaterTND(millimes(commande.tax_millimes))}</dd>
+          <dd>{formaterTND(montant(commande.tax_millimes))}</dd>
           {commande.service_millimes > 0 && (
             <>
               <dt>Service</dt>
-              <dd>{formaterTND(millimes(commande.service_millimes))}</dd>
+              <dd>{formaterTND(montant(commande.service_millimes))}</dd>
             </>
           )}
           {commande.stamp_duty_millimes > 0 && (
             <>
               <dt>Timbre</dt>
-              <dd>{formaterTND(millimes(commande.stamp_duty_millimes))}</dd>
+              <dd>{formaterTND(montant(commande.stamp_duty_millimes))}</dd>
             </>
           )}
           <dt className="fort">Total</dt>
-          <dd className="fort">{formaterTND(millimes(commande.total_millimes))}</dd>
+          <dd className="fort">{formaterTND(montant(commande.total_millimes))}</dd>
         </dl>
 
         <div>
@@ -278,9 +279,9 @@ async function DetailTicket({
                       {LIBELLE_PAIEMENT[p.type] ?? p.type}
                       {p.voided_at && <span className="etiquette inactif"> annulé</span>}
                     </td>
-                    <td className="nombre">{formaterTND(millimes(p.amount_millimes))}</td>
+                    <td className="nombre">{formaterTND(montant(p.amount_millimes))}</td>
                     <td className="nombre">
-                      {p.change_millimes > 0 ? formaterTND(millimes(p.change_millimes)) : '—'}
+                      {p.change_millimes > 0 ? formaterTND(montant(p.change_millimes)) : '—'}
                     </td>
                   </tr>
                 ))}
@@ -305,8 +306,8 @@ async function DetailTicket({
               <td>
                 {v.nom} ({formaterPourcentage(v.tauxBp)} %)
               </td>
-              <td className="nombre">{formaterTND(millimes(v.baseMillimes))}</td>
-              <td className="nombre">{formaterTND(millimes(v.taxeMillimes))}</td>
+              <td className="nombre">{formaterTND(montant(v.baseHtMillimes))}</td>
+              <td className="nombre">{formaterTND(montant(v.taxeMillimes))}</td>
             </tr>
           ))}
         </tbody>

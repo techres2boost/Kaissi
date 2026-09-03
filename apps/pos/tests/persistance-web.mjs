@@ -79,12 +79,24 @@ await etape('commande sur la table 3 avec un Coca', async () => {
 
 await etape('RECHARGEMENT COMPLET de la page', async () => {
   await page.reload({ waitUntil: 'networkidle' })
-  await prendrePoste()
+})
+
+await etape('le POSTE est repris — aucun PIN à retaper', async () => {
+  // Le PIN TRACE, il ne protège pas : redemander un code après un simple F5
+  // faisait retaper un PIN en plein coup de feu, alors que le shift, lui,
+  // était déjà repris. Le verrouillage EXPLICITE reste le geste du
+  // changement de service.
+  await page.waitForSelector('.grille-tables', { timeout: 20000 })
+  const pin = await page.$('text=Prise de poste')
+  if (pin) throw new Error('le terminal redemande un PIN après un simple rechargement')
+  const employe = await page.textContent('.bandeau .employe')
+  if (!employe?.includes('Salma')) {
+    throw new Error(`le bandeau n'affiche pas l'employé repris : ${employe}`)
+  }
 })
 
 await etape('la caisse est TOUJOURS ouverte — le shift a survécu', async () => {
   // Si le shift avait disparu, l'application redemanderait le fond de caisse.
-  await page.waitForSelector('.grille-tables', { timeout: 20000 })
   const ouverture = await page.$('text=Ouverture de caisse')
   if (ouverture) throw new Error('la caisse redemande un fond : le shift a été perdu')
 })

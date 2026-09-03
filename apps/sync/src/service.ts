@@ -26,8 +26,11 @@ import {
   type RejetEvenement,
   type RequetePull,
   type RequetePush,
+  type RequeteShifts,
   type ReponsePull,
   type ReponsePush,
+  type ReponseShifts,
+  type ShiftSynchronise,
 } from './protocole.js'
 
 const TYPES_CONNUS = new Set([
@@ -331,5 +334,47 @@ export class ServiceSync {
       encore,
       protocolVersion: VERSION_PROTOCOLE,
     }
+  }
+
+  /**
+   * Remontée des services de caisse.
+   *
+   * Volontairement TOLÉRANTE : un shift mal formé est ignoré, pas rejeté en
+   * bloc. Un shift n'est pas de l'argent qui change de main — c'est une
+   * information de gestion. Faire échouer toute la requête priverait le
+   * gérant des shifts corrects du même lot, et l'appareil réessaierait
+   * indéfiniment le même mauvais.
+   */
+  async shifts(
+    appareil: AppareilAuthentifie,
+    requete: RequeteShifts,
+  ): Promise<ReponseShifts> {
+    if (!protocoleSupporte(requete.protocolVersion)) {
+      throw new ErreurSync(
+        'protocole_non_supporte',
+        `Protocole v${requete.protocolVersion} non supporté. Mettez à jour l'application.`,
+        426,
+      )
+    }
+    const brut = Array.isArray(requete.shifts) ? requete.shifts : []
+    if (brut.length > TAILLE_LOT_MAX) {
+      throw new ErreurSync(
+        'requete_invalide',
+        `Lot de ${brut.length} services : le maximum est ${TAILLE_LOT_MAX}.`,
+        413,
+      )
+    }
+    const recevables = brut.filter(
+      (s): s is ShiftSynchronise =>
+        typeof s === 'object' &&
+        s !== null &&
+        estUuid((s as ShiftSynchronise).id) &&
+        typeof (s as ShiftSynchronise).ouvertA === 'string',
+    )
+    const enregistres =
+      recevables.length === 0
+        ? []
+        : await this.depot.enregistrerShifts(appareil, recevables)
+    return { enregistres, protocolVersion: VERSION_PROTOCOLE }
   }
 }

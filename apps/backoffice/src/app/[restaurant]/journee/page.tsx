@@ -12,9 +12,9 @@ import {
   additionner,
   formaterPourcentage,
   formaterTND,
-  millimes,
   type Millimes,
 } from '@kaissi/domain'
+import { montant } from '../../../serveur/montant.js'
 import { etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import {
@@ -24,11 +24,17 @@ import {
   libelleJournee,
 } from '../../../serveur/journee.js'
 
+/**
+ * Ventilation de TVA telle qu'elle est STOCKÉE dans `orders.tax_breakdown` :
+ * la sérialisation directe de `VentilationTaxe` de `@kaissi/domain`. La base
+ * s'y appelle `baseHtMillimes` ; `baseMillimes` n'existe que dans la vue
+ * d'impression du ticket, qui renomme le champ.
+ */
 interface LigneVentilation {
   tauxTaxeId: string
   nom: string
   tauxBp: number
-  baseMillimes: number
+  baseHtMillimes: number
   taxeMillimes: number
 }
 
@@ -40,7 +46,7 @@ const LIBELLE_PAIEMENT: Record<string, string> = {
 }
 
 function somme(valeurs: readonly number[]): Millimes {
-  return additionner(...valeurs.map((v) => millimes(Number(v) || 0)))
+  return additionner(...valeurs.map((v) => montant(v)))
 }
 
 export default async function PageJournee({
@@ -114,13 +120,13 @@ export default async function PageJournee({
     for (const ligne of (commande.tax_breakdown ?? []) as LigneVentilation[]) {
       const existant = parTaux.get(ligne.tauxTaxeId)
       if (existant) {
-        existant.baseMillimes += Number(ligne.baseMillimes) || 0
-        existant.taxeMillimes += Number(ligne.taxeMillimes) || 0
+        existant.baseHtMillimes += montant(ligne.baseHtMillimes)
+        existant.taxeMillimes += montant(ligne.taxeMillimes)
       } else {
         parTaux.set(ligne.tauxTaxeId, {
           ...ligne,
-          baseMillimes: Number(ligne.baseMillimes) || 0,
-          taxeMillimes: Number(ligne.taxeMillimes) || 0,
+          baseHtMillimes: montant(ligne.baseHtMillimes),
+          taxeMillimes: montant(ligne.taxeMillimes),
         })
       }
     }
@@ -214,10 +220,10 @@ export default async function PageJournee({
           ) : (
             <table>
               <tbody>
-                {[...parMoyen.entries()].map(([type, montant]) => (
+                {[...parMoyen.entries()].map(([type, cumul]) => (
                   <tr key={type}>
                     <td>{LIBELLE_PAIEMENT[type] ?? type}</td>
-                    <td className="nombre">{formaterTND(millimes(montant))}</td>
+                    <td className="nombre">{formaterTND(montant(cumul))}</td>
                   </tr>
                 ))}
                 <tr className="total-ligne">
@@ -230,7 +236,7 @@ export default async function PageJournee({
           {encaisse !== chiffreAffaires && parMoyen.size > 0 && (
             <p className="message avertissement" style={{ marginTop: '0.85rem' }}>
               L&apos;encaissé diffère du chiffre d&apos;affaires de{' '}
-              {formaterTND(millimes(encaisse - chiffreAffaires))}. C&apos;est normal si des
+              {formaterTND(montant(encaisse - chiffreAffaires))}. C&apos;est normal si des
               commandes sont encore partiellement payées, ou si un paiement a été saisi sur
               une commande d&apos;une autre journée.
             </p>
@@ -262,14 +268,14 @@ export default async function PageJournee({
                   <td>
                     {ligne.nom} — {formaterPourcentage(ligne.tauxBp)} %
                   </td>
-                  <td className="nombre">{formaterTND(millimes(ligne.baseMillimes))}</td>
-                  <td className="nombre">{formaterTND(millimes(ligne.taxeMillimes))}</td>
+                  <td className="nombre">{formaterTND(montant(ligne.baseHtMillimes))}</td>
+                  <td className="nombre">{formaterTND(montant(ligne.taxeMillimes))}</td>
                 </tr>
               ))}
               <tr className="total-ligne">
                 <td>Total</td>
                 <td className="nombre">
-                  {formaterTND(somme(ventilation.map((l) => l.baseMillimes)))}
+                  {formaterTND(somme(ventilation.map((l) => l.baseHtMillimes)))}
                 </td>
                 <td className="nombre">
                   {formaterTND(somme(ventilation.map((l) => l.taxeMillimes)))}
@@ -314,24 +320,24 @@ export default async function PageJournee({
                     <td>{heure(shift.opened_at as string)}</td>
                     <td>{heure(shift.closed_at as string | null)}</td>
                     <td className="nombre">
-                      {formaterTND(millimes(Number(shift.opening_float_millimes) || 0))}
+                      {formaterTND(montant(Number(shift.opening_float_millimes) || 0))}
                     </td>
                     <td className="nombre">
                       {shift.counted_millimes === null
                         ? '—'
-                        : formaterTND(millimes(Number(shift.counted_millimes)))}
+                        : formaterTND(montant(Number(shift.counted_millimes)))}
                     </td>
                     <td className="nombre">
                       {shift.expected_millimes === null
                         ? '—'
-                        : formaterTND(millimes(Number(shift.expected_millimes)))}
+                        : formaterTND(montant(Number(shift.expected_millimes)))}
                     </td>
                     <td
                       className={`nombre ecart ${
                         ecart === null ? '' : ecart < 0 ? 'negatif' : ecart > 0 ? 'positif' : 'nul'
                       }`}
                     >
-                      {ecart === null ? '—' : formaterTND(millimes(ecart))}
+                      {ecart === null ? '—' : formaterTND(montant(ecart))}
                     </td>
                   </tr>
                 )
