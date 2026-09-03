@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -67,6 +67,42 @@ function cspWasm(actif: boolean): Plugin {
 }
 
 /**
+ * Cible web : tamponne le service worker avec la version du build.
+ *
+ * Sans ce tampon, `sw.js` est IDENTIQUE d'un déploiement à l'autre. Or un
+ * navigateur ne réinstalle un service worker que si son contenu a changé :
+ * l'ancien restait donc actif indéfiniment, avec son cache au nom constant
+ * et sa coque figée. Une caisse a tourné plusieurs jours sur un bundle
+ * périmé, hors de portée de tout correctif.
+ *
+ * Le tampon est écrit APRÈS la copie de `publicDir` — sinon Vite l'écraserait
+ * avec le fichier source.
+ */
+function versionnerServiceWorker(actif: boolean, version: string): Plugin {
+  return {
+    name: 'kaissi-sw-version',
+    apply: 'build',
+    closeBundle() {
+      if (!actif) return
+      const chemin = new URL('./dist/sw.js', import.meta.url)
+      try {
+        const source = readFileSync(chemin, 'utf8')
+        writeFileSync(chemin, source.replace('__VERSION_BUILD__', version))
+      } catch (erreur) {
+        // Le service worker est un confort hors ligne, pas le produit : on
+        // ne fait pas échouer un build pour lui. Mais on le DIT, parce qu'un
+        // service worker non versionné est exactement la panne qu'on vient
+        // de corriger.
+        this.warn(
+          `sw.js non versionné (${String(erreur)}) — la coque hors ligne ` +
+            'risque de rester figée sur cette version.',
+        )
+      }
+    },
+  }
+}
+
+/**
  * Cible web : déclare le manifeste d'application.
  *
  * Injecté ici plutôt qu'écrit dans `index.html` : un manifeste embarqué dans
@@ -101,8 +137,20 @@ export default defineConfig(({ command, mode }) => {
   const cible = process.env['VITE_CIBLE'] === 'web' ? 'web' : 'android'
   const wasm = cible === 'web' || command === 'serve' || mode === 'development'
 
+  // Empreinte de CE build : le commit s'il existe, sinon l'horodatage. Elle
+  // nomme le cache du service worker, donc elle DOIT changer à chaque
+  // déploiement — c'est ce qui permet à une correction d'atteindre la caisse.
+  const versionBuild =
+    (process.env['VERCEL_GIT_COMMIT_SHA'] ?? process.env['GIT_COMMIT'] ?? '').slice(0, 7) ||
+    String(Date.now())
+
   return {
-    plugins: [react(), cspWasm(wasm), manifesteWeb(cible === 'web')],
+    plugins: [
+      react(),
+      cspWasm(wasm),
+      manifesteWeb(cible === 'web'),
+      versionnerServiceWorker(cible === 'web', versionBuild),
+    ],
     // Le service worker et le manifeste ne concernent QUE la cible web :
     // hors d'elle, `publicDir` est éteint pour ne rien glisser dans l'APK.
     publicDir: cible === 'web' ? 'public-web' : false,

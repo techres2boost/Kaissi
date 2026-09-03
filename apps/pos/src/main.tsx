@@ -26,10 +26,41 @@ if (!racine) throw new Error('Élément racine introuvable dans index.html')
  * faire échouer ici la rendrait inutilisable pour une raison secondaire.
  */
 if (CIBLE_WEB && 'serviceWorker' in navigator) {
+  /*
+   * Une NOUVELLE version prend la main → on recharge, une seule fois.
+   *
+   * Sans cela, l'onglet déjà ouvert continue d'exécuter le bundle qu'il a
+   * chargé au démarrage, même après l'installation d'un service worker plus
+   * récent. Sur une tablette de caisse, l'onglet n'est jamais fermé : la
+   * correction n'arriverait qu'au prochain redémarrage de la tablette, donc
+   * peut-être jamais.
+   *
+   * `avaitUnControleur` évite un rechargement gratuit à la PREMIÈRE visite,
+   * où `clients.claim()` déclenche aussi cet évènement alors que la page
+   * exécute déjà la bonne version.
+   */
+  const avaitUnControleur = Boolean(navigator.serviceWorker.controller)
+  let rechargementEnCours = false
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!avaitUnControleur || rechargementEnCours) return
+    rechargementEnCours = true
+    window.location.reload()
+  })
+
   window.addEventListener('load', () => {
-    void navigator.serviceWorker.register('./sw.js').catch((erreur: unknown) => {
-      console.warn("Coque hors ligne indisponible :", erreur)
-    })
+    void navigator.serviceWorker
+      .register('./sw.js')
+      .then((enregistrement) => {
+        // Le navigateur ne cherche une mise à jour qu'à la navigation, et au
+        // plus une fois par jour. Une caisse dont l'onglet reste ouvert une
+        // semaine ne naviguerait jamais : on le lui demande explicitement au
+        // démarrage, puis toutes les heures.
+        void enregistrement.update()
+        setInterval(() => void enregistrement.update(), 60 * 60 * 1000)
+      })
+      .catch((erreur: unknown) => {
+        console.warn("Coque hors ligne indisponible :", erreur)
+      })
   })
 }
 
