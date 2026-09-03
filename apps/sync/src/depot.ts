@@ -40,6 +40,19 @@ export interface DemandeEnrolement {
   readonly libelle: string
   /** Laissé vide : le serveur attribue le prochain préfixe libre. */
   readonly prefixe?: string
+  /**
+   * Identifiant STABLE de l'installation du POS, tiré par le terminal à son
+   * premier démarrage et conservé dans sa base locale.
+   *
+   * C'est lui qui rend l'appairage IDEMPOTENT : sans lui, chaque mise en
+   * service crée un appareil de plus, les événements déjà en attente dans
+   * l'outbox portent l'ancien `device_id` et sont refusés pour toujours en
+   * « appareil_etranger » — des ventes qui n'arrivent jamais.
+   *
+   * Absent : on retombe sur l'ancien comportement (appareil neuf), pour les
+   * outils en ligne de commande et les terminaux antérieurs à la 0021.
+   */
+  readonly installationId?: string
 }
 
 export interface AppareilEnrole {
@@ -50,6 +63,11 @@ export interface AppareilEnrole {
   readonly prefixe: string
   /** En CLAIR. Ne sera plus jamais lisible ensuite. */
   readonly jeton: string
+  /**
+   * `true` si le terminal a RETROUVÉ son identité au lieu d'en recevoir une
+   * neuve. Le POS le dit à l'écran : « ce terminal était déjà connu ».
+   */
+  readonly reprise: boolean
 }
 
 export interface DepotSync {
@@ -142,6 +160,19 @@ export interface DepotSync {
 
   /** Reprojette une commande côté serveur depuis son journal. */
   reprojeter(restaurantId: string, orderIds: readonly string[]): Promise<void>
+
+  /**
+   * Commandes dont les événements sont arrivés mais dont la projection
+   * manque, parmi les `fenetre` derniers événements reçus, au plus `plafond`.
+   *
+   * Sert au balayage d'auto-réparation du démarrage (`reparation.ts`). La
+   * fenêtre porte sur `server_seq` — le curseur du protocole, indexé et
+   * indépendant de toute horloge — jamais sur une durée.
+   */
+  projectionsOrphelines(
+    fenetre: number,
+    plafond: number,
+  ): Promise<{ restaurantId: string; orderId: string }[]>
 
   fermer(): Promise<void>
 }

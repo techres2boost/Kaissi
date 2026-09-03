@@ -12,6 +12,7 @@ import { DepotPostgres } from './depot-postgres.js'
 import { creerServeur } from './serveur.js'
 import { formaterErreurBase } from './diagnostic-base.js'
 import { configurationPg, hoteDe } from './connexion.js'
+import { reparerProjectionsOrphelines } from './reparation.js'
 
 export * from './protocole.js'
 export * from './depot.js'
@@ -19,6 +20,7 @@ export * from './service.js'
 export * from './jeton.js'
 export { DepotPostgres } from './depot-postgres.js'
 export { creerServeur } from './serveur.js'
+export * from './reparation.js'
 
 /** Démarrage autonome. Ignoré quand le module est importé par un test. */
 export async function demarrer(): Promise<void> {
@@ -178,6 +180,21 @@ export async function demarrer(): Promise<void> {
       `\n    Laisse ce terminal OUVERT. Vérifie dans un autre : ` +
       `curl http://127.0.0.1:${port}/sante\n`,
   )
+
+  // Balayage d'auto-réparation — APRÈS l'ouverture du port, jamais avant.
+  //
+  // Une projection perdue est une vente invisible au back-office alors que
+  // ses événements sont bien arrivés. Elle est toujours reconstructible :
+  // c'est ce que le journal d'événements achète. Il ne reste qu'à ne pas
+  // exiger qu'un humain s'en aperçoive et lance une commande — un
+  // restaurateur ne le fera jamais, et il aura raison.
+  //
+  // Volontairement non attendu : la caisse doit pouvoir se synchroniser
+  // pendant que ça tourne, et la sonde de santé de l'hébergeur ne doit pas
+  // expirer — un redémarrage relancerait le balayage, en boucle.
+  if (process.env['SYNC_REPARATION'] !== '0') {
+    void reparerProjectionsOrphelines(depot)
+  }
 
   const arreter = (signal: string) => {
     console.log(`${signal} reçu, arrêt en cours…`)

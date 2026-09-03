@@ -223,6 +223,20 @@ Un serveur en salle change cinq fois par service ; la tablette reste
 authentifiée en continu. Confondre les deux mène soit à des reconnexions
 permanentes, soit à une traçabilité inexistante.
 
+**La remise en service d'un terminal ne crée jamais un terminal de plus.**
+Le POS conserve un `installation_id` dans sa base locale et l'envoie à
+l'appairage ; le serveur reconnaît l'installation et rend le MÊME appareil —
+même préfixe de tickets, jeton simplement renouvelé (migration 0021). Sans
+cela, les événements déjà en attente dans l'outbox portent l'ancien
+`device_id` et sont refusés « appareil_etranger » : un rejet ne se réessaie
+jamais tout seul, donc ces ventes n'arrivent JAMAIS. Une révocation, elle,
+reste définitive : l'index unique est partiel sur `revoked_at is null`.
+
+L'adresse du serveur de synchronisation vit dans `apps/pos/deploiement.json`,
+versionnée, lue à la fois par `vite.config.ts` et par la garde du mode avion.
+Le gérant n'a donc rien d'autre à saisir que son e-mail et son mot de passe.
+Ce n'est pas un `server.url` : aucun code ne vient de cette adresse.
+
 ---
 
 ## Arborescence
@@ -275,7 +289,9 @@ pnpm db:test && pnpm --filter @kaissi/sync test && pnpm db:test:stop
 # Le plugin Java d'impression compile — un JDK suffit, aucun SDK Android
 pnpm verifier:natif
 
-# Appairer un terminal : le jeton n'est affiché QU'UNE FOIS
+# Appairer un terminal en ligne de commande — DÉPANNAGE seulement.
+# En clientèle, le gérant saisit ses identifiants sur la tablette : le jeton
+# ne se recopie plus à la main (POST /appairage).
 node apps/sync/scripts/appairer.mjs --restaurant <uuid> --prefixe P1
 ```
 

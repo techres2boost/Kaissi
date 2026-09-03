@@ -88,26 +88,45 @@ const HOTES_AUTORISES = [
 ]
 
 /*
- * L'adresse de synchronisation CONFIGURÉE au build, si elle existe.
+ * L'adresse de synchronisation DÉCLARÉE pour ce déploiement, si elle existe.
  *
  * Ce n'est pas une entorse à la règle, et il faut le dire précisément :
  * la promesse du mode avion est que le CODE de l'application vive dans le
  * paquet, pour qu'elle s'ouvre sans réseau. Une adresse de synchronisation
  * est une DONNÉE — personne ne la contacte au démarrage, et le POS
  * fonctionne entièrement sans elle. La confondre avec une dépendance de
- * CDN interdisait la seule façon propre de pré-remplir l'adresse : la
- * saisir à la main sur chaque terminal.
+ * CDN interdisait la seule façon propre de pré-remplir l'adresse, et
+ * condamnait à la saisir à la main sur chaque terminal.
  *
- * On n'autorise QUE l'hôte réellement configuré, jamais une plage : une
+ * La source de vérité est `deploiement.json`, celle que lit aussi
+ * `vite.config.ts` : la garde et le build ne peuvent pas diverger.
+ * `VITE_URL_SYNC` l'emporte, comme au build.
+ *
+ * On n'autorise QUE l'hôte réellement déclaré, jamais une plage : une
  * URL distante arrivée par accident reste refusée.
  */
-const urlSync = (process.env['VITE_URL_SYNC'] ?? '').trim()
-if (urlSync) {
+function urlSyncDeclaree() {
+  const posee = (process.env['VITE_URL_SYNC'] ?? '').trim()
+  if (posee) return { source: 'la variable VITE_URL_SYNC', valeur: posee }
   try {
-    HOTES_AUTORISES.push(new URL(urlSync).hostname.toLowerCase())
+    const brut = readFileSync(join(racine, 'deploiement.json'), 'utf8')
+    const valeur = JSON.parse(brut).urlSync
+    return typeof valeur === 'string' && valeur.trim()
+      ? { source: 'apps/pos/deploiement.json', valeur: valeur.trim() }
+      : null
+  } catch {
+    return null
+  }
+}
+
+const declaree = urlSyncDeclaree()
+if (declaree) {
+  try {
+    HOTES_AUTORISES.push(new URL(declaree.valeur).hostname.toLowerCase())
   } catch {
     console.error(
-      `\n✗ VITE_URL_SYNC n'est pas une URL valide : « ${urlSync} »\n` +
+      `\n✗ L'adresse de synchronisation déclarée dans ${declaree.source} n'est ` +
+        `pas une URL valide : « ${declaree.valeur} »\n` +
         '  Attendu : https://mon-serveur-de-sync.example\n',
     )
     process.exit(1)

@@ -199,18 +199,77 @@ export class DepotPostgres implements DepotSync {
         `kaissi:prefixe:${demande.restaurantId}`,
       ])
 
-      const prefixe = demande.prefixe ?? (await prochainPrefixeLibre(client, demande.restaurantId))
-
-      const deviceId = randomUUID()
       const jeton = `kdev_${randomBytes(32).toString('base64url')}`
       const empreinte = createHash('sha256').update(jeton, 'utf8').digest('hex')
+
+      // ── Ce terminal est-il DÉJÀ connu ? ───────────────────────────────
+      //
+      // C'est toute la différence entre « une caisse » et « une caisse de
+      // plus à chaque connexion ». On ne cherche que parmi les appareils
+      // ACTIFS : une révocation est définitive, se réappairer ne l'annule
+      // pas (l'index unique de la 0021 est partiel pour la même raison).
+      const { rows: connus } = demande.installationId
+        ? await client.query<{ id: string; ticket_prefix: string }>(
+            `select id, ticket_prefix from kaissi.devices
+              where restaurant_id = $1 and installation_id = $2
+                and revoked_at is null`,
+            [demande.restaurantId, demande.installationId],
+          )
+        : { rows: [] }
+
+      const connu = connus[0]
+      if (connu) {
+        // On fait tourner le jeton et RIEN d'autre.
+        //
+        // Le `label` n'est PAS réécrit : le gérant a pu renommer l'appareil
+        // en « Caisse bar » depuis le back-office, et le POS envoie toujours
+        // le même libellé générique. Écraser son choix à chaque reconnexion
+        // rendrait le renommage impossible à conserver.
+        //
+        // Le préfixe de tickets ne bouge pas non plus : c'est ce qui garantit
+        // qu'une même caisse ne se remette pas à numéroter à partir de 1.
+        await client.query(
+          `update kaissi.devices
+              set token_hash = $2, protocol_version = 1, updated_at = now()
+            where id = $1`,
+          [connu.id, empreinte],
+        )
+        await client.query(
+          `insert into kaissi.device_pairings
+             (organization_id, restaurant_id, device_id, token_hash)
+           values ($1,$2,$3,$4)`,
+          [resto.organization_id, demande.restaurantId, connu.id, empreinte],
+        )
+        await client.query('commit')
+
+        return {
+          deviceId: connu.id,
+          restaurantId: demande.restaurantId,
+          organizationId: resto.organization_id,
+          nomEtablissement: resto.nom,
+          prefixe: connu.ticket_prefix,
+          jeton,
+          reprise: true,
+        }
+      }
+
+      const prefixe = demande.prefixe ?? (await prochainPrefixeLibre(client, demande.restaurantId))
+      const deviceId = randomUUID()
 
       await client.query(
         `insert into kaissi.devices
            (id, organization_id, restaurant_id, label, type, ticket_prefix,
-            token_hash, protocol_version)
-         values ($1,$2,$3,$4,'pos',$5,$6,1)`,
-        [deviceId, resto.organization_id, demande.restaurantId, demande.libelle, prefixe, empreinte],
+            token_hash, protocol_version, installation_id)
+         values ($1,$2,$3,$4,'pos',$5,$6,1,$7)`,
+        [
+          deviceId,
+          resto.organization_id,
+          demande.restaurantId,
+          demande.libelle,
+          prefixe,
+          empreinte,
+          demande.installationId ?? null,
+        ],
       )
       await client.query(
         `insert into kaissi.device_pairings
@@ -227,6 +286,7 @@ export class DepotPostgres implements DepotSync {
         nomEtablissement: resto.nom,
         prefixe,
         jeton,
+        reprise: false,
       }
     } catch (erreur) {
       await client.query('rollback').catch(() => {})
@@ -524,6 +584,33 @@ export class DepotPostgres implements DepotSync {
       [restaurantId],
     )
     return rows.map((l) => l.order_id)
+  }
+
+  async projectionsOrphelines(
+    fenetre: number,
+    plafond: number,
+  ): Promise<{ restaurantId: string; orderId: string }[]> {
+    // `not exists` plutôt qu'une jointure externe suivie d'un `is null` :
+    // l'anti-jointure s'arrête au premier enregistrement trouvé, là où la
+    // jointure matérialise la paire avant de la jeter.
+    //
+    // La borne est calculée à partir du MAXIMUM courant de `server_seq`, et
+    // non d'une valeur mémorisée : le service peut redémarrer sur une autre
+    // machine, un autre conteneur, ou après des semaines d'arrêt.
+    const { rows } = await this.pool.query<{ restaurant_id: string; order_id: string }>(
+      `with borne as (
+         select greatest(coalesce(max(server_seq), 0) - $1, 0) as depuis
+           from kaissi.order_events
+       )
+       select distinct e.restaurant_id, e.order_id
+         from kaissi.order_events e, borne
+        where e.server_seq > borne.depuis
+          and not exists (select 1 from kaissi.orders o where o.id = e.order_id)
+        order by e.restaurant_id, e.order_id
+        limit $2`,
+      [fenetre, plafond],
+    )
+    return rows.map((l) => ({ restaurantId: l.restaurant_id, orderId: l.order_id }))
   }
 
   async reprojeter(restaurantId: string, orderIds: readonly string[]): Promise<void> {

@@ -15,7 +15,8 @@ import { Client } from 'pg'
 import { DepotPostgres } from '../src/depot-postgres.js'
 import { creerServeur } from '../src/serveur.js'
 import { empreinteDe } from '../src/jeton.js'
-import { DEMO_ORG, DEMO_RESTO, URL_TEST, nettoyer } from './aide.js'
+import { uuidV7 } from '@kaissi/domain'
+import { DEMO_ORG, DEMO_RESTO, EMPLOYE_DEMO, URL_TEST, ev, nettoyer } from './aide.js'
 
 const depot = new DepotPostgres({ connectionString: URL_TEST, ssl: false })
 const AUTH = { url: 'https://faux.supabase.co', cleAnon: 'anon-de-test' }
@@ -181,5 +182,129 @@ describe('POST /appairage', () => {
     })
     expect(r.status).toBe(501)
     expect(((await r.json()) as any).erreur).toBe('appairage_indisponible')
+  })
+})
+
+/**
+ * Le terminal qu'on remet en service ne doit pas devenir un terminal de plus.
+ *
+ * Défaut constaté sur la base de production : UNE tablette, CINQ appareils —
+ * P1 à P5, créés en une demi-heure. Chaque clic sur « Ré-appairer » créait un
+ * appareil neuf, parce que rien ne reliait la deuxième mise en service à la
+ * première.
+ *
+ * Ce n'était pas qu'une nuisance d'affichage. Les événements déjà en attente
+ * dans l'outbox portaient l'ANCIEN `device_id` ; le nouveau jeton ne les
+ * couvrait pas, et le serveur les refusait « appareil_etranger ». Un rejet ne
+ * se réessaie jamais tout seul : ces ventes n'arrivaient JAMAIS.
+ */
+describe('POST /appairage — un terminal garde son identité', () => {
+  const INSTALLATION = '01930000-0000-7000-8000-0000000009c1'
+  const identifiants = { email: 'gerant@kaissi.tn', motDePasse: 'bonMotDePasse' }
+
+  it('rend le MÊME appareil et le MÊME préfixe à la remise en service', async () => {
+    const un = await appairer({ ...identifiants, installationId: INSTALLATION })
+    const deux = await appairer({ ...identifiants, installationId: INSTALLATION })
+
+    expect(deux.statut).toBe(200)
+    expect(deux.corps.deviceId).toBe(un.corps.deviceId)
+    // Le préfixe ne repart pas : sinon la même caisse renumérote ses tickets
+    // à partir de 1 et deux tickets différents finissent identiques.
+    expect(deux.corps.prefixe).toBe(un.corps.prefixe)
+    // Le serveur le DIT, pour que l'écran puisse le dire aussi.
+    expect(un.corps.reprise).toBe(false)
+    expect(deux.corps.reprise).toBe(true)
+
+    // Une seule ligne d'appareil, pas deux.
+    const { rows } = await sql(
+      'select count(*)::int as n from kaissi.devices where restaurant_id = $1',
+      [DEMO_RESTO],
+    )
+    expect(rows[0].n).toBe(1)
+
+    // Le jeton, lui, tourne : le précédent ne vaut plus rien.
+    expect(deux.corps.jeton).not.toBe(un.corps.jeton)
+    const ancien = await app.request('http://test/sync/pull?taillePage=1', {
+      headers: { authorization: `Bearer ${un.corps.jeton}` },
+    })
+    expect(ancien.status).toBe(401)
+    const nouveau = await app.request('http://test/sync/pull?taillePage=1', {
+      headers: { authorization: `Bearer ${deux.corps.jeton}` },
+    })
+    expect(nouveau.status).toBe(200)
+  })
+
+  it("laisse partir une vente restée en attente à travers une remise en service", async () => {
+    // LE symptôme de production, reproduit de bout en bout.
+    const un = await appairer({ ...identifiants, installationId: INSTALLATION })
+    const orderId = uuidV7()
+    const appareil = {
+      id: un.corps.deviceId as string,
+      jetonClair: un.corps.jeton as string,
+      prefixe: un.corps.prefixe as string,
+    }
+
+    // La vente est CRÉÉE avant la remise en service : elle attend dans
+    // l'outbox, signée par l'appareil du moment.
+    const enAttente = [
+      ev(appareil, orderId, 'order.opened', {
+        type: 'takeaway',
+        ouvertePar: EMPLOYE_DEMO,
+        numeroTicket: `${appareil.prefixe}-000001`,
+      }),
+    ]
+
+    const deux = await appairer({ ...identifiants, installationId: INSTALLATION })
+
+    const reponse = await app.request('http://test/sync/push', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${deux.corps.jeton}`,
+      },
+      body: JSON.stringify({
+        protocolVersion: 1,
+        batchId: uuidV7(),
+        evenements: enAttente,
+      }),
+    })
+    const corps = (await reponse.json()) as any
+
+    expect(reponse.status).toBe(200)
+    // Sans identité stable, cette ligne portait « appareil_etranger » — et la
+    // vente ne revenait jamais.
+    expect(corps.rejetes).toEqual([])
+    expect(corps.acceptes).toHaveLength(1)
+  })
+
+  it('sans identifiant d’installation, crée bien un appareil neuf', async () => {
+    // Compatibilité : les terminaux antérieurs à la 0021 et le script en
+    // ligne de commande n'en envoient pas. On ne casse pas leur appairage.
+    const un = await appairer(identifiants)
+    const deux = await appairer(identifiants)
+    expect(deux.corps.deviceId).not.toBe(un.corps.deviceId)
+  })
+
+  it('une révocation reste DÉFINITIVE : la même installation repart à neuf', async () => {
+    // Sinon, une tablette volée reviendrait dans le parc dès que quelqu'un
+    // connaît les identifiants du gérant — et l'écran « Appareils » du
+    // back-office deviendrait un bouton sans effet.
+    const un = await appairer({ ...identifiants, installationId: INSTALLATION })
+    await sql('update kaissi.devices set revoked_at = now() where id = $1', [un.corps.deviceId])
+
+    const deux = await appairer({ ...identifiants, installationId: INSTALLATION })
+    expect(deux.corps.deviceId).not.toBe(un.corps.deviceId)
+    expect(deux.corps.reprise).toBe(false)
+    // Et le préfixe du révoqué n'est pas recyclé.
+    expect(deux.corps.prefixe).not.toBe(un.corps.prefixe)
+  })
+
+  it('refuse un identifiant d’installation mal formé, avec son nom', async () => {
+    // La colonne est un `uuid` : sans ce contrôle, Postgres renvoyait une
+    // erreur de conversion, donc un 500 qui n'apprend rien.
+    const { statut, corps } = await appairer({ ...identifiants, installationId: 'bonjour' })
+    expect(statut).toBe(400)
+    expect(corps.erreur).toBe('requete_invalide')
+    expect(corps.message).toContain("identifiant d'installation")
   })
 })

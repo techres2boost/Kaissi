@@ -22,6 +22,12 @@ export type CleEtat =
   // Appairage de l'appareil (Phase 2). Sans elles, la sync reste éteinte.
   | 'url_sync'
   | 'jeton_appareil'
+  // Identifiant STABLE de cette installation du POS, tiré une seule fois au
+  // premier démarrage. À la différence de `device_id`, il ne vient PAS du
+  // serveur et ne change JAMAIS : c'est lui qui permet au serveur de
+  // reconnaître ce terminal quand on le remet en service, au lieu de lui
+  // créer un appareil de plus (migration Postgres 0021).
+  | 'installation_id'
 
 export function depotEtat(db: AdaptateurSqlite) {
   return {

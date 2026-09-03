@@ -1,0 +1,33 @@
+{
+  "$commentaire": [
+    "Adresse de l'API de synchronisation de CE déploiement.",
+    "",
+    "C'est le seul réglage d'installation du POS, et il est ici — dans le",
+    "dépôt — plutôt que dans le tableau de bord d'un hébergeur, pour trois",
+    "raisons :",
+    "",
+    "  • le gérant n'a RIEN à saisir sur la tablette. L'écran de mise en",
+    "    service ne demande plus qu'un e-mail et un mot de passe, comme",
+    "    n'importe quelle application ;",
+    "  • le build est reproductible : le même commit produit le même bundle",
+    "    sur Vercel, sur un poste de développement ou dans la CI. Une variable",
+    "    posée dans une seule des trois interfaces produisait, elle, trois",
+    "    builds différents — et c'est exactement ce qui a fait perdre une",
+    "    demi-journée ;",
+    "  • la garde du mode avion lit CE fichier. L'hôte déclaré ici est le seul",
+    "    autorisé dans le bundle : une URL distante arrivée par accident reste",
+    "    refusée.",
+    "",
+    "Ce n'est PAS un `server.url` : le bundle ne charge aucun code depuis",
+    "cette adresse, la caisse s'ouvre et encaisse sans elle. C'est une",
+    "donnée, pré-remplie par confort — le gérant peut la corriger dans",
+    "l'écran de mise en service, et son choix est conservé sur le terminal.",
+    "",
+    "Aucun secret ici : cette adresse est publique, c'est celle que la",
+    "tablette appelle. Les identifiants, eux, ne quittent jamais le gérant.",
+    "",
+    "La variable d'environnement VITE_URL_SYNC, si elle est posée, l'emporte",
+    "— pour construire un bundle de recette sans toucher au dépôt."
+  ],
+  "urlSync": "https://kaissi-production.up.railway.app"
+}

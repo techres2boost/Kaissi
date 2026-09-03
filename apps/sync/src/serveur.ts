@@ -30,6 +30,9 @@ import {
 type VariablesKaissi = { appareil: AppareilAuthentifie }
 type ContexteKaissi = Context<{ Variables: VariablesKaissi }>
 
+/** Forme d'un UUID, toutes versions confondues. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export interface OptionsServeur {
   readonly depot: DepotSync
   /** Origines autorisées. Le POS empaqueté n'en a pas besoin ; le
@@ -137,11 +140,25 @@ export function creerServeur({
       const corps: ReponseErreur = { erreur: 'requete_invalide', message: 'Corps JSON illisible.' }
       return c.json(corps, 400)
     }
-    const { email, motDePasse, restaurantId, libelle } = (brut ?? {}) as Record<string, unknown>
+    const { email, motDePasse, restaurantId, libelle, installationId } = (brut ?? {}) as Record<
+      string,
+      unknown
+    >
     if (typeof email !== 'string' || typeof motDePasse !== 'string' || !email || !motDePasse) {
       const corps: ReponseErreur = {
         erreur: 'requete_invalide',
         message: 'E-mail et mot de passe sont requis.',
+      }
+      return c.json(corps, 400)
+    }
+
+    // L'identifiant d'installation part vers une colonne `uuid` : une valeur
+    // mal formée provoquerait une erreur de conversion Postgres, donc un 500
+    // qui ne dit rien. On la refuse ici, avec son nom.
+    if (installationId !== undefined && !UUID.test(String(installationId))) {
+      const corps: ReponseErreur = {
+        erreur: 'requete_invalide',
+        message: "L'identifiant d'installation doit être un UUID.",
       }
       return c.json(corps, 400)
     }
@@ -186,6 +203,7 @@ export function creerServeur({
       const enrole = await depot.enrolerAppareil({
         restaurantId: choisi.restaurantId,
         libelle: typeof libelle === 'string' && libelle.trim() ? libelle.trim() : 'Terminal',
+        ...(typeof installationId === 'string' ? { installationId } : {}),
       })
 
       return c.json({
@@ -195,6 +213,7 @@ export function creerServeur({
         organizationId: enrole.organizationId,
         nomEtablissement: enrole.nomEtablissement,
         prefixe: enrole.prefixe,
+        reprise: enrole.reprise,
       })
     } catch (erreur) {
       if (erreur instanceof ErreurAuth) {

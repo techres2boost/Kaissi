@@ -7,6 +7,18 @@
  * toujours être refaite — c'est précisément ce que cette architecture
  * achète, et ce script est l'outil qui l'encaisse.
  *
+ * ── À lire avant de le lancer ─────────────────────────────────────────────
+ *
+ * Le SERVICE fait déjà ce travail tout seul à chaque démarrage
+ * (`src/reparation.ts`) : il balaie les derniers événements reçus et
+ * reconstruit les projections manquantes. Un redéploiement suffit donc à
+ * rattraper un trou, et c'est le chemin normal — on ne demande pas à un
+ * restaurateur de lancer une commande contre sa base de production.
+ *
+ * Ce script reste utile pour ce que le balayage ne fait PAS : rejouer
+ * l'historique ENTIER (`--tout`), plus ancien que la fenêtre de démarrage,
+ * après un changement de calcul des totaux.
+ *
  * À quoi il sert :
  *   • réparer des commandes dont les événements sont arrivés mais dont la
  *     projection a échoué (voir le correctif « une reprojection ratée

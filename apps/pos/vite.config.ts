@@ -1,5 +1,33 @@
+import { readFileSync } from 'node:fs'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+
+/**
+ * Adresse de synchronisation de ce déploiement.
+ *
+ * Lue dans `deploiement.json`, versionné, plutôt que dans une variable posée
+ * sur un tableau de bord : le gérant n'a alors plus rien à saisir sur la
+ * tablette, et le même commit produit le même bundle partout.
+ *
+ * `VITE_URL_SYNC` l'emporte quand elle est posée — un bundle de recette se
+ * construit sans modifier le dépôt.
+ *
+ * `scripts/verifier-mode-avion.mjs` lit la MÊME source pour décider quel hôte
+ * a le droit d'apparaître dans le bundle. Une seule vérité, pas deux.
+ */
+function urlSyncDuDeploiement(): string {
+  const posee = (process.env['VITE_URL_SYNC'] ?? '').trim()
+  if (posee) return posee
+  try {
+    const fichier = new URL('./deploiement.json', import.meta.url)
+    const { urlSync } = JSON.parse(readFileSync(fichier, 'utf8')) as { urlSync?: unknown }
+    return typeof urlSync === 'string' ? urlSync.trim() : ''
+  } catch {
+    // Fichier absent ou illisible : le POS demandera l'adresse à l'écran.
+    // Ce n'est jamais une raison d'empêcher un build de sortir.
+    return ''
+  }
+}
 
 /**
  * Deux cibles, deux moteurs SQLite, deux politiques de sécurité.
@@ -94,6 +122,9 @@ export default defineConfig(({ command, mode }) => {
         (process.env['VERCEL_GIT_COMMIT_SHA'] ?? process.env['GIT_COMMIT'] ?? '').slice(0, 7),
       ),
       'import.meta.env.VITE_BUILD_DATE': JSON.stringify(new Date().toISOString()),
+      // Pré-remplit l'adresse du serveur de synchronisation. Voir
+      // `deploiement.json` : c'est une DONNÉE, pas un `server.url`.
+      'import.meta.env.VITE_URL_SYNC': JSON.stringify(urlSyncDuDeploiement()),
     },
     // Chemins RELATIFS : indispensable pour un chargement depuis le schéma
     // interne de Capacitor.

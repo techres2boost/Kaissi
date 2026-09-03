@@ -17,6 +17,7 @@ import type { EnregistrementOutbox } from '@kaissi/db-local'
 import type { ResumeSync } from '@kaissi/sync-client'
 import { useApp } from '../etat/contexte.js'
 import { expliquerEchecReseau } from '../donnees/diagnostic-reseau.js'
+import { identifiantInstallation } from '../donnees/installation.js'
 import { URL_SYNC_PAR_DEFAUT } from '../config.js'
 
 const LIBELLES_ETAT: Record<ResumeSync['etat'], string> = {
@@ -282,13 +283,20 @@ export function EcranSync() {
 // ─── Appairage ──────────────────────────────────────────────────────────────
 
 /**
- * Saisie du jeton d'appareil.
+ * Mise en service du terminal — e-mail et mot de passe, rien d'autre.
  *
- * Le jeton est fourni par le gérant, généré côté serveur
- * (`apps/sync/scripts/appairer.mjs`). Tant qu'il n'est pas saisi, la caisse
- * fonctionne parfaitement — simplement en local. C'est le mode des Phases
- * 0 et 1, et il reste un repli valide si le serveur est indisponible le
- * jour de l'installation.
+ * Aucun jeton à recopier : le gérant se connecte avec SON compte de
+ * back-office, et le serveur remet au terminal son identité d'appareil.
+ * L'adresse du serveur est déjà pré-remplie (`deploiement.json`).
+ *
+ * Cette étape ne se refait pas. L'identifiant d'installation conservé
+ * localement fait que la même tablette, si on la remet en service, RETROUVE
+ * son appareil au lieu d'en créer un de plus — donc son préfixe de tickets,
+ * et surtout la validité des ventes encore en attente d'envoi.
+ *
+ * Tant qu'elle n'est pas faite, la caisse fonctionne parfaitement — en
+ * local. C'est un repli valide si le serveur est indisponible le jour de
+ * l'installation.
  */
 function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
   const { app } = useApp()
@@ -315,6 +323,14 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
     setMessage(null)
     const base = url.replace(/\/+$/, '')
     try {
+      // L'identité d'INSTALLATION, tirée une seule fois et conservée ici.
+      //
+      // C'est elle qui fait qu'une remise en service retrouve le MÊME
+      // appareil au lieu d'en créer un de plus — et donc que les ventes
+      // encore en attente dans l'outbox restent valides. Sans elle, elles
+      // seraient refusées « appareil_etranger », définitivement.
+      const installationId = await identifiantInstallation(app.etat)
+
       // DÉLAI MAXIMAL, comme le transport de synchronisation (15 s).
       //
       // Sans lui, une requête qui reste en suspens — serveur en cours de
@@ -329,6 +345,7 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
           email: email.trim(),
           motDePasse,
           restaurantId,
+          installationId,
           libelle: 'Terminal',
         }),
         signal: AbortSignal.timeout(15_000),

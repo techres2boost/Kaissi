@@ -370,39 +370,79 @@ de validation pour une première publication.
 
 ---
 
-## 5. Appairer une tablette
+## 5. Mettre une tablette en service
 
-Sans appairage, la caisse fonctionne en local. L'appairage ajoute la
-synchronisation entre terminaux.
+Sans mise en service, la caisse fonctionne en local. Cette étape ajoute la
+synchronisation entre terminaux et l'accès au back-office.
 
-### 5.1 Générer un jeton
+### 5.1 Ce que fait le gérant — et c'est tout
 
-Depuis ta machine, avec la `DATABASE_URL` de production :
+Sur la tablette : bandeau du haut → **⇅ local** → **e-mail et mot de passe du
+gérant**, les mêmes que pour le back-office.
 
-```bash
-export DATABASE_URL='postgresql://…'
-node apps/sync/scripts/appairer.mjs \
-  --restaurant 01930000-0000-7000-8000-000000000002 \
-  --libelle "Caisse 1" \
-  --prefixe P1
+C'est fini. Aucun jeton à générer, aucune commande à lancer, aucune adresse à
+saisir : l'adresse du serveur est déjà dans l'application (§5.2), et le
+préfixe de tickets est attribué par le serveur.
+
+Le compte doit être `admin` ou `gerant` de l'établissement — un caissier ne
+décide pas quelle tablette rejoint la caisse. On les rattache avec
+`pnpm sync:acces`, une fois, à l'installation.
+
+> **Cette étape ne se refait pas.** Le terminal garde un identifiant
+> d'installation dans sa base locale (migration 0021). S'il se remet en
+> service — nouveau mot de passe, jeton révoqué, doute du gérant — le serveur
+> le RECONNAÎT et lui rend le même appareil, le même préfixe de tickets, et
+> laisse partir les ventes encore en attente d'envoi.
+>
+> Avant la 0021, chaque mise en service créait un appareil de plus. Une
+> tablette a fini avec cinq identités en production, et les ventes encore
+> dans son outbox portaient l'ancien identifiant : refusées
+> « appareil_etranger », donc **jamais arrivées au back-office**.
+
+### 5.2 L'adresse du serveur — une ligne, une fois, dans le dépôt
+
+`apps/pos/deploiement.json` :
+
+```json
+{ "urlSync": "https://TON-DOMAINE-RAILWAY" }
 ```
 
-Le jeton s'affiche **une seule fois**. Note-le.
+C'est le SEUL réglage d'installation du POS. Il est dans le dépôt, et pas
+dans le tableau de bord d'un hébergeur, pour que le même commit produise le
+même bundle sur Vercel, en local et dans la CI — une variable posée dans une
+seule des trois interfaces produisait trois builds différents.
 
-Un préfixe **différent par terminal** (`P1`, `P2`, `P3`) : c'est ce qui évite
-que deux tablettes hors ligne émettent le même numéro de ticket.
+`vite.config.ts` et `scripts/verifier-mode-avion.mjs` lisent ce fichier. La
+garde du mode avion n'autorise QUE l'hôte déclaré ici : une URL distante
+arrivée par accident dans le bundle reste refusée.
 
-### 5.2 Saisir sur la tablette
+Ce n'est pas un `server.url` — le bundle ne charge aucun code depuis cette
+adresse, et la caisse s'ouvre et encaisse sans elle.
 
-Sur la tablette : bandeau du haut → **⇅ local** → formulaire d'appairage.
+### 5.3 Le script en ligne de commande reste là
 
-- **Adresse** : `https://TON-DOMAINE-RAILWAY`
-- **Jeton** : `kdev_…`
+`pnpm sync:appairer --restaurant <uuid> --prefixe P1` fonctionne toujours. Il
+sert au dépannage et aux tests, pas à l'installation chez un client.
 
-La tablette **vérifie le jeton avant de l'enregistrer** : si l'appairage
-échoue, tu le sais tout de suite, pas en plein service.
+### 5.4 Une vente qui n'apparaît pas au back-office
 
-### 5.3 Révoquer un appareil perdu
+Elle n'est pas perdue. `order_events` est la source de vérité ; `orders` n'en
+est qu'une projection, et une projection se reconstruit.
+
+**Il n'y a rien à faire.** Le service balaie les derniers événements reçus à
+chaque démarrage et reconstruit les projections manquantes : un
+redéploiement Railway suffit. `SYNC_REPARATION=0` l'éteint, si un jour on en
+a besoin.
+
+Pour rejouer l'historique ENTIER — plus ancien que la fenêtre de démarrage,
+après un changement de calcul des totaux — le script reste là, à réserver aux
+heures creuses :
+
+```bash
+pnpm sync:reprojeter --restaurant <uuid> --tout
+```
+
+### 5.5 Révoquer un appareil perdu
 
 ```sql
 select kaissi.revoquer_appareil(
