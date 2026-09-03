@@ -223,6 +223,17 @@ Un serveur en salle change cinq fois par service ; la tablette reste
 authentifiée en continu. Confondre les deux mène soit à des reconnexions
 permanentes, soit à une traçabilité inexistante.
 
+**Le préfixe de tickets vient du SERVEUR, et le POS l'adopte.** C'est ce qui
+empêche deux appareils hors ligne d'émettre le même numéro. Un terminal qui
+garde le préfixe de sa graine locale produit des collisions avec le voisin ;
+`unique (restaurant_id, ticket_number)` refuse alors la projection, et la
+vente n'apparaît JAMAIS au back-office alors que ses événements sont arrivés.
+Vu en production. Corollaire côté serveur : une collision de numéro ne fait
+pas échouer une projection — le numéro est désambiguïsé (`P1-000002~25f8`),
+l'original reste dans le journal, et la collision est inscrite dans
+`orders.exceptions`. **Perdre une vente coûte infiniment plus cher qu'un
+numéro suffixé.**
+
 **La remise en service d'un terminal ne crée jamais un terminal de plus.**
 Le POS conserve un `installation_id` dans sa base locale et l'envoie à
 l'appairage ; le serveur reconnaît l'installation et rend le MÊME appareil —

@@ -357,6 +357,7 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
         restaurantId?: string
         organizationId?: string
         nomEtablissement?: string
+        prefixe?: string
         choix?: { restaurantId: string; nom: string }[]
         message?: string
       } | null
@@ -394,6 +395,18 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
       await app.etat.ecrire('device_id', corps.deviceId)
       if (corps.restaurantId) await app.etat.ecrire('restaurant_id', corps.restaurantId)
       if (corps.organizationId) await app.etat.ecrire('organization_id', corps.organizationId)
+      // Le PRÉFIXE DE TICKETS aussi — et c'est loin d'être un détail.
+      //
+      // Sans cette ligne, chaque terminal gardait le « P1 » de la graine de
+      // démonstration, quel que soit le préfixe que le serveur lui attribuait.
+      // Deux tablettes émettaient donc toutes les deux P1-000002, la
+      // contrainte d'unicité refusait la seconde, et sa vente n'apparaissait
+      // JAMAIS au back-office — alors que ses événements étaient bien arrivés.
+      //
+      // C'est exactement ce que le préfixe existe pour empêcher : deux
+      // appareils hors ligne ne doivent pas pouvoir produire le même numéro.
+      // Encore fallait-il l'appliquer.
+      if (corps.prefixe) await app.etat.ecrire('ticket_prefix', corps.prefixe)
 
       // Le device_id est lu UNE fois au montage du contexte, puis figé dans la
       // session de caisse. S'il vient de changer, un simple rafraîchir ne

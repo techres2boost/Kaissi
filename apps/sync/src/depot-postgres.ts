@@ -638,6 +638,27 @@ export class DepotPostgres implements DepotSync {
 
         await client.query('begin')
         try {
+          // Un numéro de ticket DÉJÀ PRIS ne fait pas disparaître la vente.
+          //
+          // C'est le défaut qui a rendu deux ventes réelles invisibles au
+          // back-office : deux terminaux numérotaient tous les deux en « P1 »,
+          // la contrainte d'unicité refusait le second, et la projection
+          // entière échouait — silencieusement, puisque les événements, eux,
+          // étaient bien arrivés.
+          //
+          // La contrainte est juste : deux tickets ne doivent pas porter le
+          // même numéro. C'est la conséquence qui était fausse. Perdre une
+          // vente coûte infiniment plus cher qu'un numéro désambiguïsé, et le
+          // numéro d'origine reste intact dans le journal, qui fait foi.
+          const { numero, collision } = await numeroTicketLibre(
+            client,
+            etat.restaurantId,
+            etat.id,
+            etat.numeroTicket,
+            etat.deviceProprietaireId,
+          )
+          const exceptions = collision ? [...etat.exceptions, collision] : etat.exceptions
+
           await client.query(
             `insert into kaissi.orders (
                id, organization_id, restaurant_id, table_id, device_id, opened_by,
@@ -673,11 +694,11 @@ export class DepotPostgres implements DepotSync {
             [
               etat.id, etat.organizationId, etat.restaurantId, etat.tableId,
               etat.deviceProprietaireId, etat.ouvertePar, etat.closePar,
-              etat.type, etat.statut, etat.couverts, etat.numeroTicket,
+              etat.type, etat.statut, etat.couverts, numero,
               totaux.sousTotalMillimes, totaux.totalRemisesMillimes,
               totaux.taxeMillimes, totaux.serviceMillimes,
               totaux.timbreFiscalMillimes, totaux.totalMillimes, totalVerse(etat),
-              JSON.stringify(totaux.ventilationTaxes), JSON.stringify(etat.exceptions),
+              JSON.stringify(totaux.ventilationTaxes), JSON.stringify(exceptions),
               etat.ouverteA ?? new Date().toISOString(), etat.envoyeeA, etat.closeA,
               etat.annuleeA, etat.annuleeMotif, etat.derniereSeqServeur ?? 0,
               etat.nombreEvenements,
@@ -811,4 +832,78 @@ async function prochainPrefixeLibre(
     if (!pris.has(candidat)) return candidat
   }
   throw new Error("Plus aucun préfixe de ticket disponible pour cet établissement.")
+}
+
+/**
+ * Rend un numéro de ticket qui n'entre en collision avec AUCUNE autre vente.
+ *
+ * ── Pourquoi ceci existe ──────────────────────────────────────────────────
+ *
+ * `unique (restaurant_id, ticket_number)` est une bonne contrainte : deux
+ * tickets ne doivent pas porter le même numéro. Mais elle s'appliquait à une
+ * PROJECTION, et faire échouer une projection revient à faire disparaître
+ * une vente du back-office alors que ses événements sont bien arrivés.
+ *
+ * C'est arrivé en production : deux terminaux numérotaient tous les deux en
+ * « P1 » — le POS n'adoptait pas le préfixe attribué par le serveur — et les
+ * ventes du second n'ont jamais été projetées. Le journal, lui, les avait.
+ *
+ * La cause est corrigée côté POS. Ceci est la ceinture : quelle que soit la
+ * raison d'une collision future — une tablette restaurée depuis une
+ * sauvegarde, un préfixe saisi deux fois à la main — une vente ne doit PAS
+ * se perdre pour un numéro.
+ *
+ * ── Ce que ça produit ─────────────────────────────────────────────────────
+ *
+ * `P1-000002` déjà pris devient `P1-000002~25f8`, où le suffixe est le début
+ * de l'identifiant de l'appareil : déterministe, donc la même vente
+ * reprojetée deux fois donne le même numéro, et lisible, donc on voit d'un
+ * coup d'œil que quelque chose s'est passé.
+ *
+ * Le numéro D'ORIGINE n'est jamais perdu : il reste dans `order_events`, qui
+ * fait foi, et la collision est enregistrée dans `orders.exceptions` — que le
+ * back-office indexe déjà (`orders_exceptions_idx`).
+ */
+async function numeroTicketLibre(
+  client: PoolClient,
+  restaurantId: string,
+  orderId: string,
+  numero: string | null,
+  deviceId: string | null,
+): Promise<{ numero: string | null; collision: Record<string, unknown> | null }> {
+  if (!numero) return { numero: null, collision: null }
+
+  const prisPar = async (candidat: string) => {
+    const { rows } = await client.query<{ id: string }>(
+      `select id from kaissi.orders
+        where restaurant_id = $1 and ticket_number = $2 and id <> $3
+        limit 1`,
+      [restaurantId, candidat, orderId],
+    )
+    return rows[0]?.id ?? null
+  }
+
+  const occupant = await prisPar(numero)
+  if (!occupant) return { numero, collision: null }
+
+  // Le suffixe vient de l'APPAREIL, pas d'un compteur : deux reprojections
+  // de la même vente doivent donner le même numéro, sinon chaque balayage
+  // renommerait le ticket et l'historique deviendrait illisible.
+  const base = `${numero}~${(deviceId ?? 'inconnu').replace(/-/g, '').slice(0, 4)}`
+  let candidat = base
+  // Borne : sans elle, une base corrompue ferait tourner ce service en rond.
+  for (let n = 2; n <= 50 && (await prisPar(candidat)) !== null; n += 1) {
+    candidat = `${base}-${n}`
+  }
+
+  return {
+    numero: candidat,
+    collision: {
+      type: 'numero_ticket_en_collision',
+      numeroDOrigine: numero,
+      numeroRetenu: candidat,
+      dejaPortePar: occupant,
+      deviceId,
+    },
+  }
 }

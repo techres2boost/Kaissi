@@ -23,6 +23,7 @@ import { DepotPostgres } from '../src/depot-postgres.js'
 import { creerServeur } from '../src/serveur.js'
 import { planifierReparation, reparerProjectionsOrphelines } from '../src/reparation.js'
 import {
+  DEMO_RESTO,
   EMPLOYE_DEMO,
   ESPECES,
   TVA_19,
@@ -50,13 +51,17 @@ async function sql(texte: string, valeurs: unknown[] = []) {
 }
 
 /** Une vente complète : ouverture, une ligne, encaissement, clôture. */
-async function encaisser(a: AppareilTest, prixMillimes: Millimes): Promise<string> {
+async function encaisser(
+  a: AppareilTest,
+  prixMillimes: Millimes,
+  numeroTicket?: string,
+): Promise<string> {
   const orderId = uuidV7()
   const evenements = [
     ev(a, orderId, 'order.opened', {
       type: 'takeaway',
       ouvertePar: EMPLOYE_DEMO,
-      numeroTicket: `${a.prefixe}-${orderId.slice(-6)}`,
+      numeroTicket: numeroTicket ?? `${a.prefixe}-${orderId.slice(-6)}`,
     }),
     ev(a, orderId, 'line.added', {
       ligneId: uuidV7(),
@@ -234,5 +239,85 @@ describe('planification du balayage', () => {
 
     const apres = await sql('select 1 from kaissi.orders where id = $1', [orderId])
     expect(apres.rowCount).toBe(0)
+  })
+})
+
+/**
+ * Une collision de numéro de ticket ne fait JAMAIS disparaître une vente.
+ *
+ * ── Le vrai symptôme de production ────────────────────────────────────────
+ *
+ * Ce que le serveur a fini par dire de lui-même, une fois le balayage en
+ * ligne :
+ *
+ *   ⚠ Le balayage des projections a échoué : duplicate key value violates
+ *     unique constraint "orders_restaurant_id_ticket_number_key"
+ *
+ * Deux terminaux numérotaient tous les deux en « P1 » — le POS n'adoptait
+ * pas le préfixe attribué par le serveur — et les ventes du second n'ont
+ * jamais été projetées. Ni erreur visible à la caisse, ni ligne au
+ * back-office : leurs événements étaient pourtant tous arrivés.
+ *
+ * La contrainte est juste, et on la garde : deux tickets ne doivent pas
+ * porter le même numéro. C'est la CONSÉQUENCE qui était fausse.
+ */
+describe('collision de numéro de ticket', () => {
+  it('projette quand même la vente, avec un numéro désambiguïsé', async () => {
+    const a = await creerAppareil('P1')
+    const b = await creerAppareil('P2')
+
+    // Les deux appareils émettent LE MÊME numéro : c'est le bogue du POS,
+    // reproduit tel quel.
+    const premiere = await encaisser(a, millimes(15), 'P1-000002')
+    const seconde = await encaisser(b, millimes(20), 'P1-000002')
+
+    const lignes = await sql(
+      'select id, ticket_number, total_millimes, exceptions from kaissi.orders where id = any($1)',
+      [[premiere, seconde]],
+    )
+    // LES DEUX ventes existent. C'est tout ce qui compte.
+    expect(lignes.rowCount).toBe(2)
+
+    const parId = new Map(lignes.rows.map((l) => [l.id, l]))
+    expect(parId.get(premiere).ticket_number).toBe('P1-000002')
+
+    const doublon = parId.get(seconde)
+    expect(doublon.ticket_number).not.toBe('P1-000002')
+    expect(doublon.ticket_number).toContain('P1-000002~')
+    // Le montant est intact : on renomme un ticket, on ne touche pas à l'argent.
+    expect(Number(doublon.total_millimes)).toBe(millimes(20))
+
+    // La collision est DITE, pas avalée — le back-office indexe déjà les
+    // commandes qui portent une exception.
+    const exception = doublon.exceptions.find(
+      (x: { type: string }) => x.type === 'numero_ticket_en_collision',
+    )
+    expect(exception).toBeTruthy()
+    expect(exception.numeroDOrigine).toBe('P1-000002')
+  })
+
+  it('donne le MÊME numéro à chaque reprojection', async () => {
+    // Un suffixe tiré d'un compteur renommerait le ticket à chaque balayage,
+    // et l'historique deviendrait illisible. Il vient donc de l'appareil.
+    const a = await creerAppareil('P1')
+    const b = await creerAppareil('P2')
+    await encaisser(a, millimes(15), 'P1-000002')
+    const seconde = await encaisser(b, millimes(20), 'P1-000002')
+
+    const avant = await sql('select ticket_number from kaissi.orders where id = $1', [seconde])
+    await depot.reprojeter(DEMO_RESTO, [seconde])
+    const apres = await sql('select ticket_number from kaissi.orders where id = $1', [seconde])
+
+    expect(apres.rows[0].ticket_number).toBe(avant.rows[0].ticket_number)
+  })
+
+  it('laisse le numéro intact quand il n’y a aucune collision', async () => {
+    const a = await creerAppareil('P1')
+    const orderId = await encaisser(a, millimes(15), 'P1-000007')
+    const ligne = await sql('select ticket_number, exceptions from kaissi.orders where id = $1', [
+      orderId,
+    ])
+    expect(ligne.rows[0].ticket_number).toBe('P1-000007')
+    expect(ligne.rows[0].exceptions).toEqual([])
   })
 })
