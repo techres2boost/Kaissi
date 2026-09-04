@@ -226,6 +226,26 @@ describe('de bout en bout : la vente qui vide le stock retire le produit', () =>
     // Deux unités en stock, on en vend deux : c'est le cycle complet, du
     // push de la tablette jusqu'au réglage de catalogue qui lui reviendra.
     await poserStock(produit, 2, true, "timestamptz '2026-01-01T00:00:00Z'")
+    /*
+     * La référence se pose AU-DESSUS de ce qui a déjà été vendu.
+     *
+     * `stock_actuel` compte toutes les ventes depuis le comptage, et le
+     * comptage est ici volontairement ancien (janvier) pour que la vente de
+     * ce test — horodatée par l'événement, donc dans le passé — soit
+     * comptée. Il attrape du même coup les commandes laissées par les
+     * autres fichiers de test sur ce même produit : sans cette correction,
+     * ce test mesurait l'historique du voisin et échouait selon l'ordre
+     * d'exécution, ce qui est le pire des échecs — il n'apprend rien, et on
+     * finit par l'ignorer.
+     */
+    const { rows: dejaVendu } = await client.query<{ qty_vendue: string }>(
+      'select qty_vendue from kaissi.stock_actuel where product_id = $1',
+      [produit],
+    )
+    await client.query(
+      'update kaissi.stock_items set qty_reference = 2 + $2 where product_id = $1',
+      [produit, Number(dejaVendu[0]?.qty_vendue ?? 0)],
+    )
     // Un préfixe propre à ce test : `devices` est unique par (restaurant,
     // préfixe), et un test qui échoue en cours de route laisserait sinon un
     // terminal derrière lui — le suivant échouerait alors pour une raison

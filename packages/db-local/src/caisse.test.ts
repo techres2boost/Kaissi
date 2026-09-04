@@ -19,6 +19,7 @@ import { depotCatalogue } from './depots/catalogue.js'
 import { depotEmployes } from './depots/employes.js'
 import { depotImpression, TENTATIVES_MAX } from './depots/impression.js'
 import { depotStations } from './depots/stations.js'
+import { depotJournal } from './depots/journal.js'
 
 let db: AdaptateurSqlite
 let config: ConfigCalcul
@@ -354,6 +355,107 @@ describe('commandes ouvertes et occupation des tables', () => {
     ]
     await projeterCommande(db, journal, config)
     expect(await depotCaisse(db).commandeDeTable(tables[0]!.id)).toBeNull()
+  })
+})
+
+describe('« prêt » annoncé par la cuisine', () => {
+  /*
+   * Le marqueur descend par le CATALOGUE (Postgres 0029) et n'est jamais
+   * écrit par la caisse. Ces tests portent donc sur ce que la caisse en
+   * fait : allumer le bon badge, et surtout l'ÉTEINDRE quand la cuisine
+   * retire son « prêt ».
+   *
+   * Le retrait est ce qui se casse en premier : côté serveur, il aurait été
+   * naturel de supprimer la ligne — et une suppression ne descend pas. Le
+   * badge serait resté allumé pour toujours sur un plat qui ne l'est pas.
+   */
+  async function commandeALaTable(): Promise<{ orderId: string; tableId: string }> {
+    const tables = await depotCatalogue(db).tables()
+    const taxes = await depotCatalogue(db).tauxTaxes()
+    const orderId = uuidV7()
+    await projeterCommande(
+      db,
+      [
+        ev(orderId, 'order.opened', {
+          type: 'dine_in',
+          tableId: tables[0]!.id,
+          ouvertePar: 'emp-1',
+        }),
+        ev(orderId, 'line.added', {
+          ligneId: uuidV7(),
+          produitId: 'p',
+          designation: 'Pizza',
+          quantite: 1,
+          prixBaseMillimes: millimes(14_500),
+          modificateursMillimes: millimes(0),
+          tauxTaxeId: taxes[0]!.id,
+        }),
+      ],
+      config,
+    )
+    return { orderId, tableId: tables[0]!.id }
+  }
+
+  it('reste éteint tant que la cuisine n’a rien annoncé', async () => {
+    await commandeALaTable()
+    const [commande] = await depotCaisse(db).commandesOuvertes()
+    expect(commande!.preteA).toBeNull()
+  })
+
+  it('s’allume quand le marqueur arrive', async () => {
+    const { orderId } = await commandeALaTable()
+    await db.executer(
+      `INSERT INTO kitchen_ready (order_id, restaurant_id, ready_at) VALUES (?, ?, ?)`,
+      [orderId, 'resto', '2026-09-04T19:30:00.000Z'],
+    )
+    const [commande] = await depotCaisse(db).commandesOuvertes()
+    expect(commande!.preteA).toBe('2026-09-04T19:30:00.000Z')
+  })
+
+  it('s’ÉTEINT quand la cuisine retire son « prêt »', async () => {
+    const { orderId } = await commandeALaTable()
+    await db.executer(
+      `INSERT INTO kitchen_ready (order_id, restaurant_id, ready_at) VALUES (?, ?, ?)`,
+      [orderId, 'resto', '2026-09-04T19:30:00.000Z'],
+    )
+    // Le serveur MET À JOUR la ligne, il ne la supprime pas : c'est ce qui
+    // permet au retrait de descendre jusqu'ici.
+    await db.executer(`UPDATE kitchen_ready SET cleared_at = ? WHERE order_id = ?`, [
+      '2026-09-04T19:32:00.000Z',
+      orderId,
+    ])
+    const [commande] = await depotCaisse(db).commandesOuvertes()
+    expect(commande!.preteA).toBeNull()
+  })
+
+  it('ne suit pas la reprojection : un article ajouté n’efface pas le « prêt »', async () => {
+    // La raison d'être de la table à part. `orders` est réécrite en entier à
+    // chaque événement ; une colonne « prête » y aurait disparu ici, en
+    // silence, au pire moment.
+    const { orderId } = await commandeALaTable()
+    await db.executer(
+      `INSERT INTO kitchen_ready (order_id, restaurant_id, ready_at) VALUES (?, ?, ?)`,
+      [orderId, 'resto', '2026-09-04T19:30:00.000Z'],
+    )
+    const taxes = await depotCatalogue(db).tauxTaxes()
+    await projeterCommande(
+      db,
+      [
+        ...(await depotJournal(db).journalDe(orderId)),
+        ev(orderId, 'line.added', {
+          ligneId: uuidV7(),
+          produitId: 'p',
+          designation: 'Coca',
+          quantite: 1,
+          prixBaseMillimes: millimes(3_000),
+          modificateursMillimes: millimes(0),
+          tauxTaxeId: taxes[0]!.id,
+        }),
+      ],
+      config,
+    )
+    const [commande] = await depotCaisse(db).commandesOuvertes()
+    expect(commande!.preteA).toBe('2026-09-04T19:30:00.000Z')
   })
 })
 

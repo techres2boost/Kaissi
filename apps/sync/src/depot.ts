@@ -211,6 +211,24 @@ export interface DepotSync {
   ): Promise<{ restaurantId: string; orderId: string }[]>
 
   /**
+   * Retire du journal de catalogue les marqueurs « prêt » devenus inutiles.
+   *
+   * Ils y descendent par le même canal que le catalogue (0029), et c'est ce
+   * qui rend la fonction gratuite en protocole — mais un « prêt » est
+   * VOLUMINEUX comparé à un changement de prix : plusieurs centaines par
+   * jour et par établissement, contre quelques-uns par semaine.
+   *
+   * Sans purge, un terminal neuf rejouerait des années de plats servis avant
+   * d'atteindre le catalogue courant. Un marqueur de plus de quelques jours
+   * n'apprend plus rien à personne : une tablette restée hors ligne aussi
+   * longtemps n'a que faire d'un plateau prêt la semaine dernière.
+   *
+   * Ne touche QUE `kitchen_ready` : purger le catalogue ferait manquer un
+   * changement de prix à un appareil en retard, ce qui est tout autre chose.
+   */
+  purgerJournalPrets(jours: number): Promise<number>
+
+  /**
    * Produits en alerte pour lesquels rien n'a ENCORE été annoncé.
    *
    * Une alerte ouverte de niveau égal ou supérieur masque le produit : sans

@@ -549,6 +549,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--rayon);
 }
 .grille-tables .table.occupee { border-color: var(--accent); background: rgba(224, 163, 63, 0.09); }
+/*
+ * La tuile ENTIÈRE change quand le plat est prêt.
+ *
+ * La pastille seule suppose qu'on lise chaque tuile ; en service on traverse
+ * la grille du regard. Le contour, lui, se voit sans être lu — et il reste
+ * doublé du mot « Prêt », parce que la couleur seule n'est pas une
+ * information pour tout le monde.
+ */
+.grille-tables .table.prete { border-color: var(--ok); background: rgba(143, 255, 188, 0.1); }
 .grille-tables .numero { font-size: 1.4rem; font-weight: 800; }
 .grille-tables .places, .grille-tables .libre-libelle { color: var(--texte-2); font-size: 0.72rem; }
 .grille-tables .montant {
@@ -561,6 +570,30 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .badge.envoyee { background: rgba(63, 191, 143, 0.15); color: var(--ok); }
 .badge.ouverte { background: rgba(224, 163, 63, 0.15); color: var(--accent); }
+/*
+ * « Prêt » est PLEIN, là où les autres états sont teintés.
+ *
+ * Pas une teinte de plus : la palette n'en a pas une qui se distingue de la
+ * menthe d'« Envoyée » pour tout le monde — un daltonisme deutan les
+ * confondrait. C'est le REMPLISSAGE qui tranche, et il tranche pour tous.
+ */
+.badge.pret { background: var(--ok); color: var(--fond); font-weight: 700; }
+
+/* ── Bandeau « prêt à servir » ───────────────────────────────────────────── */
+.bandeau-prets {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem;
+  padding: 0.6rem 1rem; margin: 0 1rem;
+  border-radius: var(--rayon);
+  background: rgba(143, 255, 188, 0.12);
+  border: 1px solid rgba(143, 255, 188, 0.4);
+}
+.bandeau-prets strong { color: var(--ok); font-size: 0.85rem; letter-spacing: 0.02em; }
+.bandeau-prets button {
+  background: var(--ok); color: var(--fond); font-weight: 700;
+  border: none; border-radius: 999px;
+  /* La cible reste tactile : on la vise en marchant, une assiette en main. */
+  padding: 0.45rem 0.9rem; min-height: 40px;
+}
 
 .liste-commandes { flex: 1; min-height: 0; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
 .liste-commandes button {

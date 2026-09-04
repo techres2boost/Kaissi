@@ -24,6 +24,15 @@ export interface CommandeOuverte {
   nombreArticles: number
   ouverteA: string
   envoyeeA: string | null
+  /**
+   * Horodatage du « prêt » annoncé par la cuisine, ou `null`.
+   *
+   * Descendu par le catalogue (Postgres 0029, migration locale 007) : c'est
+   * ce qui évite au serveur en salle de repasser devant la cuisine « au cas
+   * où ». `null` couvre deux cas qu'on ne peut pas distinguer et qu'on n'a
+   * pas besoin de distinguer : pas encore prêt, ou pas encore synchronisé.
+   */
+  preteA: string | null
 }
 
 export interface LigneRapportProduit {
@@ -292,13 +301,20 @@ export function depotCaisse(db: AdaptateurSqlite) {
         articles: number | null
         opened_at: string
         sent_at: string | null
+        ready_at: string | null
       }>(
         `SELECT o.id, o.table_id, t.label AS table_label, o.type, o.status,
                 o.ticket_number, o.total_millimes, o.opened_at, o.sent_at,
+                k.ready_at,
                 (SELECT SUM(qty) FROM order_items i
                   WHERE i.order_id = o.id AND i.voided_at IS NULL) AS articles
          FROM orders o
          LEFT JOIN tables t ON t.id = o.table_id
+         -- Jointure EXTERNE et filtrée sur cleared_at : un « prêt » retiré
+         -- par la cuisine reste en base pour que le retrait descende, mais
+         -- il ne doit plus rien allumer en salle.
+         LEFT JOIN kitchen_ready k
+                ON k.order_id = o.id AND k.cleared_at IS NULL
          WHERE o.status IN ('ouverte','envoyee')
          ORDER BY o.opened_at`,
       )
@@ -313,6 +329,7 @@ export function depotCaisse(db: AdaptateurSqlite) {
         nombreArticles: l.articles ?? 0,
         ouverteA: l.opened_at,
         envoyeeA: l.sent_at,
+        preteA: l.ready_at,
       }))
     },
 

@@ -704,6 +704,49 @@ correctif, cette URL affichait le chiffre d'affaires. Essaie aussi
 
 ---
 
+### B bis. « Prêt » arrive jusqu'au serveur en salle
+
+C'était la limite n°1 de la section 10 : la cuisine cliquait « Prêt », et le
+marqueur restait au back-office. Le serveur en salle repassait donc devant la
+cuisine « au cas où » — exactement ce que l'écran devait supprimer.
+
+1. Sur la caisse : ouvre une commande sur la **table 3**, envoie-la en
+   cuisine, puis **synchronise**.
+2. Back-office → **Préparation** (ou le compte cuisine) → clique **Prêt** sur
+   cette commande.
+3. Sur la caisse : **synchronise** à nouveau, puis reviens à l'écran
+   **Salle**.
+
+**Attendu** : un bandeau **« Prêt à servir · Table 3 »** en haut de l'écran,
+la tuile de la table 3 **cerclée de vert clair**, et son badge qui affiche
+**« Prêt »** au lieu de « Envoyée ». Touche le bandeau : la commande s'ouvre.
+
+4. Au back-office, **retire** le « prêt » (bouton *Annuler*), puis
+   synchronise la caisse.
+
+**Attendu** : le bandeau et le contour **disparaissent**.
+
+> **C'est ce quatrième point qui a demandé le plus de soin.** Retirer un
+> « prêt » supprimait la ligne — et une suppression, vue de la tablette, ne
+> ressemble à rien : rien ne descend, et le badge serait resté allumé pour
+> toujours sur un plat qui ne l'est pas. Le retrait MARQUE donc la ligne au
+> lieu de l'effacer. C'est la règle 6 appliquée à un marqueur : une
+> annulation ajoute une information, elle n'en retire jamais.
+
+> **Par où ça descend.** Par le **catalogue** — le canal qui porte déjà les
+> prix, avec son curseur `seq` bigserial (RÈGLE 4, jamais un horodatage). Un
+> troisième flux aurait voulu sa route, son curseur et sa dégradation
+> silencieuse pour un simple booléen ; ici la caisse ne fait qu'appliquer,
+> exactement comme pour un changement de prix. Une version ancienne du POS
+> ignore poliment l'entité qu'elle ne connaît pas.
+
+> **Ce qui a besoin du réseau, et ce qui n'en a pas besoin.** Ce badge en a
+> besoin, comme l'écran de cuisine. Son absence ne coûte rien : sans
+> synchronisation, on retombe sur l'écran d'avant — et **la caisse continue
+> d'encaisser**, hors ligne, sans rien attendre de personne.
+
+---
+
 ### C. L'historique du stock, avec le fournisseur
 
 1. Back-office → **Stock** → déplie un produit (**Ajuster**).
@@ -1266,11 +1309,11 @@ Trois limites que la démonstration met en évidence. Elles sont assumées, pas
 oubliées : chacune est écrite ici pour qu'on la choisisse, plutôt que de la
 découvrir en clientèle.
 
-**1. « Prêt » ne prévient pas le serveur en salle.** Le marqueur reste sur
-l'écran de cuisine. Le porter jusqu'à la tablette demande un canal de descente
-dédié : `kitchen_ready` n'est ni un événement de commande, ni du référentiel,
-et la règle 4 interdit un curseur horodaté — il lui faut son propre
-`bigserial`, plus un badge sur l'écran de salle. C'est le prochain chantier.
+**1. ~~« Prêt » ne prévient pas le serveur en salle.~~ — FAIT.** Le marqueur
+descend désormais jusqu'à la tablette, par le canal du catalogue et son
+curseur `seq` bigserial (RÈGLE 4). Voir **§5 bis B bis** pour l'essayer. Il
+lui faut le réseau, comme à l'écran de cuisine — et son absence ne coûte
+rien : on retombe exactement sur l'écran d'avant.
 
 **2. Aucun écran ne crée de remboursement.** La lecture est complète, pas
 l'écriture. Aujourd'hui, une erreur se répare **avant** l'encaissement, par

@@ -866,6 +866,16 @@ export class DepotPostgres implements DepotSync {
     }
   }
 
+  async purgerJournalPrets(jours: number): Promise<number> {
+    const { rowCount } = await this.pool.query(
+      `delete from kaissi.change_log
+        where entity_type = 'kitchen_ready'
+          and created_at < now() - ($1 || ' days')::interval`,
+      [String(jours)],
+    )
+    return rowCount ?? 0
+  }
+
   // ── Alertes de stock (0028) ───────────────────────────────────────────────
   //
   // Ces quatre lectures ne passent PAS par `sousIdentite` : elles balaient

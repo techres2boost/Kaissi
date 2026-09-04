@@ -94,8 +94,14 @@ export function depotLocalSync(
           const table = TABLES_MIROIR[c.entite]
           if (!table) continue // entité que cette version ne connaît pas encore
 
+          // La clé n'est pas toujours `id` : `kitchen_ready` est identifiée
+          // par la COMMANDE qui est prête. Le serveur journalise cet
+          // identifiant-là dans `entity_id`, et c'est celui-ci qui sert de
+          // clé de conflit — sans quoi chaque « prêt » créerait une ligne.
+          const cle = table.cle ?? 'id'
+
           if (c.operation === 'delete') {
-            await db.executer(`DELETE FROM ${table.nom} WHERE id = ?`, [c.entiteId])
+            await db.executer(`DELETE FROM ${table.nom} WHERE ${cle} = ?`, [c.entiteId])
             continue
           }
           if (!c.donnees) continue
@@ -106,7 +112,7 @@ export function depotLocalSync(
           const majSet = colonnes.map((col) => `${col} = excluded.${col}`).join(', ')
           await db.executer(
             `INSERT INTO ${table.nom} (${colonnes.join(', ')}) VALUES (${marques})
-             ON CONFLICT (id) DO UPDATE SET ${majSet}`,
+             ON CONFLICT (${cle}) DO UPDATE SET ${majSet}`,
             valeurs,
           )
         }
@@ -156,7 +162,10 @@ export function depotLocalSync(
  * local ne connaît pas encore. Les ignorer est exactement ce que demande le
  * support N−2 du protocole.
  */
-const TABLES_MIROIR: Record<string, { nom: string; colonnes: string[] }> = {
+const TABLES_MIROIR: Record<
+  string,
+  { nom: string; colonnes: string[]; /** Clé primaire, `id` par défaut. */ cle?: string }
+> = {
   tax_rates: {
     nom: 'tax_rates',
     colonnes: ['id', 'organization_id', 'restaurant_id', 'name', 'rate_bp',
@@ -216,6 +225,24 @@ const TABLES_MIROIR: Record<string, { nom: string; colonnes: string[] }> = {
     nom: 'employees',
     colonnes: ['id', 'organization_id', 'restaurant_id', 'full_name', 'role',
                'pin_hash', 'permissions', 'is_active', 'archived_at'],
+  },
+  /*
+   * « Commande prête », posé par la cuisine (Postgres 0029).
+   *
+   * Ce n'est pas du référentiel — c'est le seul marqueur transactionnel qui
+   * descende par ce canal. Il y passe justement parce que le canal existe :
+   * un troisième flux aurait voulu son curseur, sa route et sa dégradation
+   * silencieuse, pour un booléen. Ici, la caisse ne fait qu'appliquer, comme
+   * pour un changement de prix.
+   *
+   * `cleared_at` est ce qui distingue « plus prêt » de « jamais reçu » : le
+   * serveur MET À JOUR la ligne au lieu de la supprimer, sinon le retrait ne
+   * descendrait pas et le badge resterait allumé.
+   */
+  kitchen_ready: {
+    nom: 'kitchen_ready',
+    cle: 'order_id',
+    colonnes: ['order_id', 'organization_id', 'restaurant_id', 'ready_at', 'cleared_at'],
   },
 }
 

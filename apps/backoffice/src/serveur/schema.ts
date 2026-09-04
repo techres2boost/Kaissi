@@ -341,6 +341,13 @@ export type CuisinePrete = {
   restaurant_id: Uuid
   ready_at: Horodatage
   ready_by: Uuid | null
+  /**
+   * Retrait d'un « prêt » posé par erreur (0029). La ligne RESTE marquée
+   * plutôt que supprimée : une suppression ne descendrait pas jusqu'à la
+   * tablette du serveur, dont le badge resterait allumé.
+   */
+  cleared_at: Horodatage | null
+  cleared_by: Uuid | null
 }
 
 export type Paiement = {

@@ -94,7 +94,14 @@ export default async function PageCuisine({
       .order('name', { ascending: true }),
     ids.length === 0
       ? { data: [] }
-      : supabase.from('kitchen_ready').select('order_id, ready_at').in('order_id', ids),
+      : supabase
+          .from('kitchen_ready')
+          .select('order_id, ready_at')
+          // `cleared_at is null` : un « prêt » retiré reste en base pour que
+          // le retrait descende jusqu'aux tablettes (0029), mais il ne doit
+          // plus rien allumer ici.
+          .is('cleared_at', null)
+          .in('order_id', ids),
   ])
 
   const libelleTable = new Map((tables.data ?? []).map((t) => [t.id, t.label]))

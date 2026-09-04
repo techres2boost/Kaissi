@@ -59,6 +59,11 @@ export interface OptionsReparation {
   readonly plafond?: number
   /** Injectable : le balayage doit rester silencieux dans les tests. */
   readonly journaliser?: (message: string) => void
+  /**
+   * Âge au-delà duquel un marqueur « prêt » sort du journal de catalogue
+   * (0029). 0 ou négatif : aucune purge.
+   */
+  readonly retentionPretsJours?: number
 }
 
 export interface ResultatReparation {
@@ -81,8 +86,31 @@ export async function reparerProjectionsOrphelines(
   const fenetre = options.fenetre ?? FENETRE_DEFAUT
   const plafond = options.plafond ?? PLAFOND_DEFAUT
   const dire = options.journaliser ?? ((m: string) => console.log(m))
+  const retentionPrets = options.retentionPretsJours ?? RETENTION_PRETS_JOURS
 
   try {
+    /*
+     * Au passage : on allège le journal de catalogue de ses vieux « prêt ».
+     *
+     * Ils y descendent par le canal du catalogue (0029), ce qui rend la
+     * fonction gratuite en protocole — mais ils sont bien plus nombreux
+     * qu'un changement de prix. Sans purge, un terminal neuf rejouerait des
+     * années de plats servis avant d'atteindre le catalogue courant.
+     *
+     * Jamais bloquant, et jamais fatal : perdre un balayage de projections
+     * parce qu'un ménage a échoué serait un remède pire que le mal.
+     */
+    if (retentionPrets > 0) {
+      try {
+        const purges = await depot.purgerJournalPrets(retentionPrets)
+        if (purges > 0) {
+          dire(`  🧹 ${purges} marqueur(s) « prêt » retiré(s) du journal de catalogue.`)
+        }
+      } catch (erreur) {
+        console.warn('[sync] purge des marqueurs « prêt » impossible', erreur)
+      }
+    }
+
     const orphelines = await depot.projectionsOrphelines(fenetre, plafond)
     if (orphelines.length === 0) return { examinees: 0, reparees: 0 }
 
@@ -123,6 +151,15 @@ export async function reparerProjectionsOrphelines(
     return { examinees: 0, reparees: 0, erreur: message }
   }
 }
+
+/**
+ * Durée de vie d'un marqueur « prêt » dans le journal de catalogue.
+ *
+ * Sept jours : une tablette restée hors ligne plus longtemps n'a que faire
+ * d'un plateau prêt la semaine dernière — le service est fini depuis
+ * longtemps, et la commande encaissée.
+ */
+export const RETENTION_PRETS_JOURS = 7
 
 /** Intervalle par défaut entre deux balayages, en minutes. */
 export const INTERVALLE_DEFAUT_MINUTES = 30

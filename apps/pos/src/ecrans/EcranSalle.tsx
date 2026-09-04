@@ -30,6 +30,15 @@ export function EcranSalle({ onOuvrirCommande, onNouvelleCommande }: Props) {
 
   const parTable = new Map(ouvertes.filter((c) => c.tableId).map((c) => [c.tableId!, c]))
   const aEmporter = ouvertes.filter((c) => !c.tableId)
+  /*
+   * Ce que la cuisine a annoncé PRÊT.
+   *
+   * C'est l'information que le serveur en salle n'avait pas : il repassait
+   * devant la cuisine « au cas où ». Le marqueur descend par le catalogue
+   * (migration 0029), donc il exige le réseau — mais son absence ne coûte
+   * rien : on retombe exactement sur l'écran d'avant.
+   */
+  const pretes = ouvertes.filter((c) => c.preteA !== null)
 
   return (
     <div className="salle">
@@ -64,6 +73,25 @@ export function EcranSalle({ onOuvrirCommande, onNouvelleCommande }: Props) {
         </button>
       </div>
 
+      {/*
+        Le bandeau, et pas seulement les badges.
+        
+        Une pastille sur une tuile suppose qu'on REGARDE la grille. En plein
+        service on ne la regarde pas : on la traverse. Le bandeau dit d'un
+        coup ce qui attend d'être servi, et il disparaît dès qu'il n'y a plus
+        rien — un bandeau permanent redevient du décor en deux jours.
+      */}
+      {pretes.length > 0 && (
+        <div className="bandeau-prets">
+          <strong>Prêt à servir</strong>
+          {pretes.map((c) => (
+            <button key={c.id} type="button" onClick={() => onOuvrirCommande(c.id)}>
+              {c.tableLabel ? `Table ${c.tableLabel}` : (c.numeroTicket ?? 'À emporter')}
+            </button>
+          ))}
+        </div>
+      )}
+
       {vue === 'salle' ? (
         <div className="grille-tables">
           {tables.map((t) => {
@@ -72,7 +100,9 @@ export function EcranSalle({ onOuvrirCommande, onNouvelleCommande }: Props) {
               <button
                 key={t.id}
                 type="button"
-                className={`table ${commande ? 'occupee' : 'libre'}`}
+                className={`table ${commande ? 'occupee' : 'libre'} ${
+                  commande?.preteA ? 'prete' : ''
+                }`}
                 onClick={() =>
                   commande ? onOuvrirCommande(commande.id) : onNouvelleCommande(t.id)
                 }
@@ -84,8 +114,18 @@ export function EcranSalle({ onOuvrirCommande, onNouvelleCommande }: Props) {
                     <span className="montant">
                       {formaterTND(millimes(commande.totalMillimes), { symbole: false })}
                     </span>
-                    <span className={`badge ${commande.statut}`}>
-                      {libelleStatut(commande.statut as StatutCommande)}
+                    {/*
+                      « Prêt » REMPLACE le statut au lieu de s'ajouter à lui.
+                      Sur une tuile de cette taille, « Envoyée » et « Prêt »
+                      côte à côte se lisent moins vite qu'un seul mot — et
+                      c'est « Prêt » qui appelle un geste.
+                    */}
+                    <span
+                      className={`badge ${commande.preteA ? 'pret' : commande.statut}`}
+                    >
+                      {commande.preteA
+                        ? 'Prêt'
+                        : libelleStatut(commande.statut as StatutCommande)}
                     </span>
                   </>
                 ) : (
@@ -107,8 +147,8 @@ export function EcranSalle({ onOuvrirCommande, onNouvelleCommande }: Props) {
                 <small>{c.numeroTicket ?? ''}</small>
               </span>
               <span className="articles">{c.nombreArticles} art.</span>
-              <span className={`badge ${c.statut}`}>
-                {libelleStatut(c.statut as StatutCommande)}
+              <span className={`badge ${c.preteA ? 'pret' : c.statut}`}>
+                {c.preteA ? 'Prêt' : libelleStatut(c.statut as StatutCommande)}
               </span>
               <span className="montant">{formaterTND(millimes(c.totalMillimes))}</span>
             </button>
@@ -126,8 +166,8 @@ export function EcranSalle({ onOuvrirCommande, onNouvelleCommande }: Props) {
                 <span className="montant">
                   {formaterTND(millimes(c.totalMillimes), { symbole: false })}
                 </span>
-                <span className={`badge ${c.statut}`}>
-                  {libelleStatut(c.statut as StatutCommande)}
+                <span className={`badge ${c.preteA ? 'pret' : c.statut}`}>
+                  {c.preteA ? 'Prêt' : libelleStatut(c.statut as StatutCommande)}
                 </span>
               </button>
             ))}
