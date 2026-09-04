@@ -85,6 +85,230 @@ export async function creerCategorie(
   })
 }
 
+/**
+ * Renomme une catégorie et lui donne son POSTE de préparation.
+ *
+ * Le poste est porté ici, et non sur chaque produit (migration 0025) : les
+ * boissons vont au bar, les plats à la cuisine, et un produit ajouté demain
+ * dans « Boissons » en hérite sans que personne y pense. Réglé une fois par
+ * catégorie, il ne peut plus être oublié à la création d'un produit — un
+ * oubli qui rendait la ligne invisible sur TOUS les écrans de préparation,
+ * et ne se voyait qu'en plein service.
+ */
+export async function modifierCategorie(
+  restaurantId: string,
+  categorieId: string,
+  stationsAutorisees: readonly string[],
+  _precedent: Resultat | null,
+  donnees: FormData,
+): Promise<Resultat> {
+  return agir(restaurantId, async ({ supabase }) => {
+    const nom = texteObligatoire(donnees, 'nom', 'Le nom de la catégorie', 100)
+    const { error } = await supabase
+      .from('categories')
+      .update({
+        name: nom,
+        station_id: choixFacultatif(donnees, 'station', 'Le poste', stationsAutorisees),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', categorieId)
+      .eq('restaurant_id', restaurantId)
+    if (error) throw new Error(messageBase(error.message, error.code))
+    return `Catégorie « ${nom} » enregistrée.`
+  })
+}
+
+/**
+ * Déplace une ligne d'un cran dans la grille, en ÉCHANGEANT deux positions.
+ *
+ * ── Pourquoi des flèches et non un champ « position » ─────────────────────
+ *
+ * Le formulaire demandait un nombre. Un gérant qui veut mettre « Pizza » en
+ * premier doit alors deviner quel entier est libre, et renuméroter tout ce
+ * qui suit — un travail d'informaticien pour un geste qui devrait prendre
+ * une seconde. Et deux lignes finissaient régulièrement sur le même numéro,
+ * où l'ordre devenait celui du hasard.
+ *
+ * On échange donc les positions des deux voisines. L'ordre reste total, sans
+ * trou et sans doublon, quoi qu'on clique.
+ */
+/**
+ * Cherche la voisine et échange les deux positions.
+ *
+ * Écrit DEUX fois — une pour les catégories, une pour les produits — plutôt
+ * qu'une fois avec un nom de table en paramètre. La version générique
+ * compilait mal, et pour une bonne raison : `category_id` n'existe pas sur
+ * `categories`, et le schéma typé écrit à la main a raison de le refuser.
+ * Deux fonctions courtes valent mieux qu'une abstraction qui ment.
+ */
+async function deplacerLigne(
+  supabase: Awaited<ReturnType<typeof supabaseServeur>>,
+  restaurantId: string,
+  id: string,
+  sens: 'haut' | 'bas',
+  table: 'categories',
+): Promise<string>
+async function deplacerLigne(
+  supabase: Awaited<ReturnType<typeof supabaseServeur>>,
+  restaurantId: string,
+  id: string,
+  sens: 'haut' | 'bas',
+  table: 'products',
+): Promise<string>
+async function deplacerLigne(
+  supabase: Awaited<ReturnType<typeof supabaseServeur>>,
+  restaurantId: string,
+  id: string,
+  sens: 'haut' | 'bas',
+  table: 'categories' | 'products',
+): Promise<string> {
+  const position =
+    table === 'categories'
+      ? await positionCategorie(supabase, restaurantId, id, sens)
+      : await positionProduit(supabase, restaurantId, id, sens)
+  if (!position) return 'Déjà à cette extrémité.'
+
+  const maintenant = new Date().toISOString()
+  // Les deux écritures, dans l'ordre. Un échec entre les deux laisserait
+  // deux lignes sur la même position : l'ordre deviendrait celui du hasard,
+  // sans rien casser d'autre. Un clic de plus le répare.
+  for (const [cible, valeur] of [
+    [id, position.voisinePosition],
+    [position.voisineId, position.courantePosition],
+  ] as const) {
+    const { error } =
+      table === 'categories'
+        ? await supabase
+            .from('categories')
+            .update({ position: valeur, updated_at: maintenant })
+            .eq('id', cible)
+            .eq('restaurant_id', restaurantId)
+        : await supabase
+            .from('products')
+            .update({ position: valeur, updated_at: maintenant })
+            .eq('id', cible)
+            .eq('restaurant_id', restaurantId)
+    if (error) throw new Error(messageBase(error.message, error.code))
+  }
+  return sens === 'haut' ? 'Déplacé vers le haut.' : 'Déplacé vers le bas.'
+}
+
+interface Voisine {
+  courantePosition: number
+  voisineId: string
+  voisinePosition: number
+}
+
+async function positionCategorie(
+  supabase: Awaited<ReturnType<typeof supabaseServeur>>,
+  restaurantId: string,
+  id: string,
+  sens: 'haut' | 'bas',
+): Promise<Voisine | null> {
+  const { data: courante, error } = await supabase
+    .from('categories')
+    .select('position')
+    .eq('id', id)
+    .eq('restaurant_id', restaurantId)
+    .maybeSingle()
+  if (error) throw new Error(messageBase(error.message, error.code))
+  if (!courante) throw new Error('Catégorie introuvable — rechargez la page.')
+
+  const base = supabase
+    .from('categories')
+    .select('id, position')
+    .eq('restaurant_id', restaurantId)
+    .is('archived_at', null)
+
+  const { data: voisine, error: e2 } =
+    sens === 'haut'
+      ? await base
+          .lt('position', courante.position)
+          .order('position', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : await base
+          .gt('position', courante.position)
+          .order('position', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+  if (e2) throw new Error(messageBase(e2.message, e2.code))
+  if (!voisine) return null
+  return {
+    courantePosition: courante.position,
+    voisineId: voisine.id,
+    voisinePosition: voisine.position,
+  }
+}
+
+async function positionProduit(
+  supabase: Awaited<ReturnType<typeof supabaseServeur>>,
+  restaurantId: string,
+  id: string,
+  sens: 'haut' | 'bas',
+): Promise<Voisine | null> {
+  const { data: courant, error } = await supabase
+    .from('products')
+    .select('position, category_id')
+    .eq('id', id)
+    .eq('restaurant_id', restaurantId)
+    .maybeSingle()
+  if (error) throw new Error(messageBase(error.message, error.code))
+  if (!courant) throw new Error('Produit introuvable — rechargez la page.')
+
+  // Un produit s'ordonne DANS sa catégorie : échanger avec un produit d'une
+  // autre catégorie mélangerait deux grilles sans que rien ne le signale.
+  const base = supabase
+    .from('products')
+    .select('id, position')
+    .eq('restaurant_id', restaurantId)
+    .is('archived_at', null)
+  const memeCategorie =
+    courant.category_id === null
+      ? base.is('category_id', null)
+      : base.eq('category_id', courant.category_id)
+
+  const { data: voisin, error: e2 } =
+    sens === 'haut'
+      ? await memeCategorie
+          .lt('position', courant.position)
+          .order('position', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : await memeCategorie
+          .gt('position', courant.position)
+          .order('position', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+  if (e2) throw new Error(messageBase(e2.message, e2.code))
+  if (!voisin) return null
+  return {
+    courantePosition: courant.position,
+    voisineId: voisin.id,
+    voisinePosition: voisin.position,
+  }
+}
+
+export async function deplacerCategorie(
+  restaurantId: string,
+  categorieId: string,
+  sens: 'haut' | 'bas',
+): Promise<Resultat> {
+  return agir(restaurantId, ({ supabase }) =>
+    deplacerLigne(supabase, restaurantId, categorieId, sens, 'categories'),
+  )
+}
+
+export async function deplacerProduit(
+  restaurantId: string,
+  produitId: string,
+  sens: 'haut' | 'bas',
+): Promise<Resultat> {
+  return agir(restaurantId, ({ supabase }) =>
+    deplacerLigne(supabase, restaurantId, produitId, sens, 'products'),
+  )
+}
+
 export async function archiverCategorie(
   restaurantId: string,
   categorieId: string,
@@ -173,6 +397,48 @@ export async function enregistrerProduit(
     const { error } = await supabase.from('products').insert({ id: uuidV7(), ...champs })
     if (error) throw new Error(messageBase(error.message, error.code))
     return `« ${nom} » créé. Les tablettes le recevront à leur prochaine synchronisation.`
+  })
+}
+
+/**
+ * Sort une catégorie ou un produit de l'archive.
+ *
+ * Archiver n'est pas supprimer — l'historique des ventes garde la référence —
+ * mais c'était jusqu'ici sans retour : une catégorie archivée par erreur ne
+ * pouvait plus être remise, et il fallait la recréer, avec un nouvel
+ * identifiant, donc en coupant l'historique en deux.
+ *
+ * Un produit désarchivé revient VOLONTAIREMENT hors vente : le remettre à
+ * la carte est une seconde décision, et il a peut-être été archivé parce
+ * qu'on ne le sert plus.
+ */
+export async function desarchiverCategorie(
+  restaurantId: string,
+  categorieId: string,
+): Promise<Resultat> {
+  return agir(restaurantId, async ({ supabase }) => {
+    const { error } = await supabase
+      .from('categories')
+      .update({ archived_at: null, updated_at: new Date().toISOString() })
+      .eq('id', categorieId)
+      .eq('restaurant_id', restaurantId)
+    if (error) throw new Error(messageBase(error.message, error.code))
+    return 'Catégorie remise.'
+  })
+}
+
+export async function desarchiverProduit(
+  restaurantId: string,
+  produitId: string,
+): Promise<Resultat> {
+  return agir(restaurantId, async ({ supabase }) => {
+    const { error } = await supabase
+      .from('products')
+      .update({ archived_at: null, is_available: false, updated_at: new Date().toISOString() })
+      .eq('id', produitId)
+      .eq('restaurant_id', restaurantId)
+    if (error) throw new Error(messageBase(error.message, error.code))
+    return 'Produit remis, hors vente. Remettez-le à la carte quand il est disponible.'
   })
 }
 

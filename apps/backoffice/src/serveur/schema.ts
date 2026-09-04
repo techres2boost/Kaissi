@@ -107,6 +107,13 @@ export type Categorie = {
    */
   station_id: Uuid | null
   archived_at: Horodatage | null
+  /**
+   * Colonne bien présente en base (0003), mais absente de ce type jusqu'ici.
+   * `categories` n'a PAS de déclencheur `touche_updated_at` : l'horodatage
+   * doit être posé explicitement à chaque écriture, ce qui suppose de
+   * pouvoir l'écrire.
+   */
+  updated_at: Horodatage
 }
 
 export type Station = {

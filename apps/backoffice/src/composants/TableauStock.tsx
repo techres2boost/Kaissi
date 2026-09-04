@@ -73,7 +73,7 @@ export function TableauStock({
             <th className="nombre">Stock</th>
             <th className="nombre">Seuil</th>
             <th>État</th>
-            <th>En vente</th>
+            <th>Stock</th>
             <th />
           </tr>
         </thead>

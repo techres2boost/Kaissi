@@ -23,11 +23,17 @@ export default async function PageCatalogue({
   ecranReserve(etablissement, 'gestion')
   const supabase = await supabaseServeur()
 
-  const [{ data: categories }, { data: stations }, { data: taux }, { data: produits, error }] =
-    await Promise.all([
+  const [
+    { data: categories },
+    { data: stations },
+    { data: taux },
+    { data: produits, error },
+    { data: categoriesArchivees },
+    { data: produitsArchives },
+  ] = await Promise.all([
       supabase
         .from('categories')
-        .select('id, name, position')
+        .select('id, name, position, station_id')
         .eq('restaurant_id', restaurant)
         .is('archived_at', null)
         .order('position'),
@@ -51,11 +57,27 @@ export default async function PageCatalogue({
         .eq('restaurant_id', restaurant)
         .is('archived_at', null)
         .order('position'),
+      // L'ARCHIVE — sans elle, « archiver » était un geste sans retour, et
+      // rien ne montrait ce qu'on avait rangé.
+      supabase
+        .from('categories')
+        .select('id, name, position, station_id')
+        .eq('restaurant_id', restaurant)
+        .not('archived_at', 'is', null)
+        .order('name'),
+      supabase
+        .from('products')
+        .select(
+          'id, name, description, category_id, station_id, tax_rate_id, base_price_millimes, cost_per_unit, position, is_available',
+        )
+        .eq('restaurant_id', restaurant)
+        .not('archived_at', 'is', null)
+        .order('name'),
     ])
 
   return (
     <>
-      <h1>Catalogue</h1>
+      <h1>Menu</h1>
       <p className="sous-titre">
         {etablissement.gestionnaire
           ? 'Une modification part vers les tablettes à leur prochaine synchronisation — pas instantanément.'
@@ -79,6 +101,7 @@ export default async function PageCatalogue({
           id: c.id as string,
           nom: c.name as string,
           position: (c.position as number) ?? 0,
+          stationId: (c.station_id as string | null) ?? null,
         }))}
         stations={(stations ?? []).map((s) => ({ id: s.id as string, nom: s.name as string }))}
         taux={(taux ?? []).map((t) => ({
@@ -101,6 +124,25 @@ export default async function PageCatalogue({
           // `null` reste `null` : « coût non saisi » et « coût nul » sont deux
           // états différents, et les rapports comptent le premier pour dire
           // que la marge est surestimée.
+          coutUnitaire: p.cost_per_unit === null ? null : Number(p.cost_per_unit),
+          position: (p.position as number) ?? 0,
+          disponible: Boolean(p.is_available),
+        }))}
+        archivees={(categoriesArchivees ?? []).map((c) => ({
+          id: c.id as string,
+          nom: c.name as string,
+          position: (c.position as number) ?? 0,
+          stationId: (c.station_id as string | null) ?? null,
+        }))}
+        produitsArchives={(produitsArchives ?? []).map((p) => ({
+          id: p.id as string,
+          nom: p.name as string,
+          description: (p.description as string | null) ?? '',
+          categorieId: (p.category_id as string | null) ?? '',
+          stationId: (p.station_id as string | null) ?? '',
+          tauxId: p.tax_rate_id as string,
+          prixMillimes: Number(p.base_price_millimes) || 0,
+          prixAffiche: formaterTND(millimes(Number(p.base_price_millimes) || 0)),
           coutUnitaire: p.cost_per_unit === null ? null : Number(p.cost_per_unit),
           position: (p.position as number) ?? 0,
           disponible: Boolean(p.is_available),

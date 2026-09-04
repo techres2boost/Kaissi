@@ -6,7 +6,12 @@ import {
   archiverProduit,
   basculerDisponibilite,
   creerCategorie,
+  deplacerCategorie,
+  deplacerProduit,
+  desarchiverCategorie,
+  desarchiverProduit,
   enregistrerProduit,
+  modifierCategorie,
   type Resultat,
 } from '../app/[restaurant]/catalogue/actions.js'
 import { pourChampMontant } from '../serveur/formulaire.js'
@@ -35,6 +40,8 @@ export interface Categorie {
   id: string
   nom: string
   position: number
+  /** Poste de préparation de TOUS ses produits — `null` : non réglé. */
+  stationId: string | null
 }
 export interface Station {
   id: string
@@ -61,6 +68,65 @@ export interface Produit {
   disponible: boolean
 }
 
+/**
+ * Une ligne de catégorie modifiable : son nom et son POSTE.
+ *
+ * Un formulaire par ligne plutôt qu'un écran d'édition séparé : régler le
+ * poste de six catégories doit prendre six clics, pas six allers-retours.
+ * Le formulaire s'enregistre au changement du menu déroulant — le geste le
+ * plus fréquent — et le nom au moment où on quitte le champ.
+ */
+function LigneCategorie({
+  restaurantId,
+  categorie,
+  stations,
+}: {
+  restaurantId: string
+  categorie: Categorie
+  stations: Station[]
+}) {
+  const [resultat, action] = useActionState(
+    modifierCategorie.bind(
+      null,
+      restaurantId,
+      categorie.id,
+      stations.map((s) => s.id),
+    ),
+    null as Resultat | null,
+  )
+
+  return (
+    <form action={action} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+      <input
+        name="nom"
+        defaultValue={categorie.nom}
+        aria-label={`Nom de la catégorie ${categorie.nom}`}
+        style={{ maxWidth: '12rem' }}
+      />
+      <select
+        name="station"
+        defaultValue={categorie.stationId ?? ''}
+        aria-label={`Poste de ${categorie.nom}`}
+        // Le changement VAUT validation : sans cela, un gérant choisit « Bar »,
+        // change de page, et le réglage n'a jamais été enregistré — sans que
+        // rien ne le lui dise.
+        onChange={(e) => e.currentTarget.form?.requestSubmit()}
+      >
+        <option value="">— non réglé —</option>
+        {stations.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.nom}
+          </option>
+        ))}
+      </select>
+      <button type="submit" className="discret">
+        Enregistrer
+      </button>
+      {resultat?.erreur && <span className="ecart negatif">{resultat.erreur}</span>}
+    </form>
+  )
+}
+
 export function EditeurCatalogue({
   restaurantId,
   modifiable,
@@ -68,6 +134,8 @@ export function EditeurCatalogue({
   stations,
   taux,
   produits,
+  archivees,
+  produitsArchives,
 }: {
   restaurantId: string
   modifiable: boolean
@@ -75,6 +143,9 @@ export function EditeurCatalogue({
   stations: Station[]
   taux: Taux[]
   produits: Produit[]
+  /** Ce qui a été archivé, pour pouvoir le remettre. */
+  archivees: Categorie[]
+  produitsArchives: Produit[]
 }) {
   const [enEdition, setEnEdition] = useState<Produit | null>(null)
   const [nouveau, setNouveau] = useState(false)
@@ -94,6 +165,22 @@ export function EditeurCatalogue({
 
   const formulaireOuvert = nouveau || enEdition !== null
   const cible = enEdition
+
+  /**
+   * Où se place un NOUVEAU produit : à la fin.
+   *
+   * `max + 1` et non `produits.length` : après quelques archivages, la
+   * longueur de la liste retombe sous la plus grande position existante, et
+   * deux produits se retrouveraient sur le même nombre.
+   */
+  const positionSuivante = produits.reduce((max, p) => Math.max(max, p.position), 0) + 1
+
+  /** Les produits de la même catégorie, dans l'ordre affiché. */
+  const memeCategorie = (produit: Produit) =>
+    produits.filter((p) => p.categorieId === produit.categorieId)
+  const rangDansCategorie = (produit: Produit) =>
+    memeCategorie(produit).findIndex((p) => p.id === produit.id)
+  const tailleCategorie = (produit: Produit) => memeCategorie(produit).length
 
   return (
     <>
@@ -184,49 +271,61 @@ export function EditeurCatalogue({
                   ))}
                 </select>
               </div>
-              <div className="champ">
-                <label htmlFor="taux">Taux de TVA</label>
-                <select
-                  id="taux"
+              {/*
+                Un SEUL taux dans l'établissement : on ne pose pas la question.
+                Un menu déroulant à une entrée n'est pas un choix, c'est une
+                étape de plus à chaque produit — et une occasion de se tromper
+                le jour où un second taux apparaîtra sans qu'on y prenne garde.
+                Le taux part quand même, en champ caché : le serveur le valide
+                comme avant, rien n'est relâché.
+              */}
+              {taux.length <= 1 ? (
+                <input
+                  type="hidden"
                   name="taux"
-                  defaultValue={cible?.tauxId ?? taux.find((t) => t.defaut)?.id ?? ''}
-                  required
-                >
-                  {taux.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.libelle}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  value={cible?.tauxId ?? taux.find((t) => t.defaut)?.id ?? taux[0]?.id ?? ''}
+                />
+              ) : (
+                <div className="champ">
+                  <label htmlFor="taux">Taux de TVA</label>
+                  <select
+                    id="taux"
+                    name="taux"
+                    defaultValue={cible?.tauxId ?? taux.find((t) => t.defaut)?.id ?? ''}
+                    required
+                  >
+                    {taux.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.libelle}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
-            <div className="champs deux">
-              <div className="champ">
-                <label htmlFor="station">Station de préparation</label>
-                <select id="station" name="station" defaultValue={cible?.stationId ?? ''}>
-                  <option value="">— aucune, pas de bon de cuisine —</option>
-                  {stations.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.nom}
-                    </option>
-                  ))}
-                </select>
-                <p className="indication">
-                  Décide sur quelle imprimante part le bon. Sans station, le produit ne
-                  génère aucun bon — ce qui est correct pour une boisson servie au bar.
-                </p>
-              </div>
-              <div className="champ">
-                <label htmlFor="position">Position dans la grille</label>
-                <input
-                  id="position"
-                  name="position"
-                  inputMode="numeric"
-                  defaultValue={String(cible?.position ?? 0)}
-                />
-              </div>
-            </div>
+            {/*
+              Ni POSTE ni POSITION ici — et c'est le fond du changement.
+
+              Le poste appartient à la CATÉGORIE (migration 0025) : le
+              demander produit par produit, c'est demander à un gérant de s'en
+              souvenir à chaque création, et il ne s'en souviendra pas. Un
+              produit sans poste n'apparaît sur AUCUN écran de préparation, et
+              cela ne se voit qu'en plein service. Réglé une fois pour
+              « Boissons », il vaut pour tout ce qu'on y mettra ensuite.
+
+              La position se règle avec les flèches de la liste. Un champ
+              numérique obligeait à deviner quel entier est libre et à
+              renuméroter le reste à la main — et deux produits finissaient
+              régulièrement sur le même nombre, où l'ordre devenait celui du
+              hasard. La position d'un produit existant est conservée telle
+              quelle ; un nouveau se place à la fin.
+            */}
+            <input
+              type="hidden"
+              name="position"
+              value={String(cible?.position ?? positionSuivante)}
+            />
 
             <div className="champ">
               <label htmlFor="description">Description</label>
@@ -240,7 +339,7 @@ export function EditeurCatalogue({
                 type="checkbox"
                 defaultChecked={cible ? cible.disponible : true}
               />
-              <label htmlFor="disponible">En vente</label>
+              <label htmlFor="disponible">Disponible à la vente</label>
             </div>
 
             <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -301,6 +400,31 @@ export function EditeurCatalogue({
                   </td>
                   {modifiable && (
                     <td style={{ whiteSpace: 'nowrap' }}>
+                      {/*
+                        L'ordre se règle ici, d'un cran à la fois, DANS la
+                        catégorie du produit. Les flèches sont grisées aux
+                        extrémités de sa propre catégorie, pas de la liste
+                        entière : un produit ne se mélange pas à une autre
+                        grille.
+                      */}
+                      <button
+                        type="button"
+                        className="discret"
+                        disabled={rangDansCategorie(produit) === 0}
+                        title="Monter"
+                        onClick={() => void deplacerProduit(restaurantId, produit.id, 'haut')}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="discret"
+                        disabled={rangDansCategorie(produit) === tailleCategorie(produit) - 1}
+                        title="Descendre"
+                        onClick={() => void deplacerProduit(restaurantId, produit.id, 'bas')}
+                      >
+                        ↓
+                      </button>
                       <button
                         type="button"
                         className="discret"
@@ -352,19 +476,68 @@ export function EditeurCatalogue({
 
       <section className="carte">
         <h2>Catégories</h2>
+        <p className="indication">
+          Le <strong>poste de préparation</strong> se règle ici, pas produit par
+          produit : tout ce que contient « Boissons » part au bar, y compris ce
+          que vous y ajouterez dans six mois. Une catégorie sans poste
+          n’apparaît sur aucun écran de préparation.
+        </p>
         {categories.length === 0 ? (
           <p className="vide">Aucune catégorie — les produits apparaîtront tous ensemble.</p>
         ) : (
           <table>
+            <thead>
+              <tr>
+                <th>Catégorie</th>
+                <th>Poste de préparation</th>
+                <th className="nombre">Produits</th>
+                {modifiable && <th />}
+              </tr>
+            </thead>
             <tbody>
-              {categories.map((categorie) => (
+              {categories.map((categorie, rang) => (
                 <tr key={categorie.id}>
-                  <td>{categorie.nom}</td>
+                  <td>
+                    {modifiable ? (
+                      <LigneCategorie
+                        restaurantId={restaurantId}
+                        categorie={categorie}
+                        stations={stations}
+                      />
+                    ) : (
+                      categorie.nom
+                    )}
+                  </td>
+                  <td>
+                    {categorie.stationId === null ? (
+                      <span className="etiquette inactif">non réglé</span>
+                    ) : (
+                      (stations.find((s) => s.id === categorie.stationId)?.nom ?? '—')
+                    )}
+                  </td>
                   <td className="nombre">
-                    {produits.filter((p) => p.categorieId === categorie.id).length} produit(s)
+                    {produits.filter((p) => p.categorieId === categorie.id).length}
                   </td>
                   {modifiable && (
-                    <td style={{ textAlign: 'right' }}>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <button
+                        type="button"
+                        className="discret"
+                        disabled={rang === 0}
+                        title="Monter"
+                        onClick={() => void deplacerCategorie(restaurantId, categorie.id, 'haut')}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="discret"
+                        disabled={rang === categories.length - 1}
+                        title="Descendre"
+                        onClick={() => void deplacerCategorie(restaurantId, categorie.id, 'bas')}
+                      >
+                        ↓
+                      </button>
                       <button
                         type="button"
                         className="discret danger"
@@ -386,22 +559,100 @@ export function EditeurCatalogue({
 
         {modifiable && (
           <form action={actionCategorie} style={{ marginTop: '1rem' }}>
-            <div className="champs deux">
-              <div className="champ">
-                <label htmlFor="nom-categorie">Nouvelle catégorie</label>
-                <input id="nom-categorie" name="nom" placeholder="Desserts" required />
-              </div>
-              <div className="champ">
-                <label htmlFor="position-categorie">Position</label>
-                <input id="position-categorie" name="position" inputMode="numeric" defaultValue="0" />
-              </div>
+            <div className="champ">
+              <label htmlFor="nom-categorie">Nouvelle catégorie</label>
+              <input id="nom-categorie" name="nom" placeholder="Desserts" required />
+              <p className="indication">
+                Elle se place à la fin ; les flèches la déplacent ensuite. Son
+                poste de préparation se choisit sur sa ligne.
+              </p>
             </div>
+            {/* La position ne se saisit plus : elle se règle avec les flèches. */}
+            <input
+              type="hidden"
+              name="position"
+              value={String(categories.reduce((m, c) => Math.max(m, c.position), 0) + 1)}
+            />
             <button type="submit" disabled={categorieEnCours}>
               {categorieEnCours ? 'Création…' : 'Créer la catégorie'}
             </button>
           </form>
         )}
       </section>
+
+      {modifiable && (archivees.length > 0 || produitsArchives.length > 0) && (
+        <section className="carte">
+          <h2>Archive</h2>
+          {/*
+            Archiver n'est pas supprimer — l'historique des ventes garde la
+            référence — mais c'était jusqu'ici SANS RETOUR. Une catégorie
+            archivée par erreur ne pouvait plus être remise : il fallait la
+            recréer, avec un nouvel identifiant, donc en coupant l'historique
+            en deux. Et rien ne montrait ce qui avait été archivé.
+          */}
+          <p className="indication">
+            Rien n’est supprimé : les commandes déjà passées mentionnent
+            toujours ces lignes. Un produit remis revient <strong>hors
+            vente</strong> — le remettre à la carte est une seconde décision.
+          </p>
+
+          {archivees.length > 0 && (
+            <table>
+              <thead>
+                <tr>
+                  <th>Catégorie archivée</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {archivees.map((c) => (
+                  <tr key={c.id}>
+                    <td>{c.nom}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button
+                        type="button"
+                        className="discret"
+                        onClick={() => void desarchiverCategorie(restaurantId, c.id)}
+                      >
+                        Remettre
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+
+          {produitsArchives.length > 0 && (
+            <table style={{ marginTop: '1rem' }}>
+              <thead>
+                <tr>
+                  <th>Produit archivé</th>
+                  <th className="nombre">Prix</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {produitsArchives.map((p) => (
+                  <tr key={p.id}>
+                    <td>{p.nom}</td>
+                    <td className="nombre">{p.prixAffiche}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button
+                        type="button"
+                        className="discret"
+                        onClick={() => void desarchiverProduit(restaurantId, p.id)}
+                      >
+                        Remettre
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      )}
     </>
   )
 }
