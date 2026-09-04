@@ -272,6 +272,27 @@ export type StockItem = {
   updated_at: Horodatage
 }
 
+/**
+ * L'abonnement d'un NAVIGATEUR aux notifications (migration 0028).
+ *
+ * Ni `p256dh` ni `auth` ne sont des secrets de compte : ce sont les clés de
+ * chiffrement de CE canal, fournies par le navigateur. RLS les réserve tout
+ * de même à leur propriétaire — un caissier n'a pas à lire le canal du
+ * gérant.
+ */
+export type AbonnementPush = {
+  id: Uuid
+  organization_id: Uuid
+  restaurant_id: Uuid
+  user_id: Uuid
+  endpoint: string
+  p256dh: string
+  auth: string
+  alertes_stock: boolean
+  created_at: Horodatage
+  updated_at: Horodatage
+}
+
 export type MouvementStock = {
   id: Uuid
   organization_id: Uuid
@@ -433,6 +454,7 @@ export type Database = {
       stock_items: Table<StockItem>
       stock_movements: Table<MouvementStock>
       stock_actuel: Table<StockActuel>
+      push_subscriptions: Table<AbonnementPush>
       /**
        * Le JOURNAL — lu pour reconstruire un ticket à l'identique du POS.
        * En insertion seule côté base : le back-office n'y écrit jamais.

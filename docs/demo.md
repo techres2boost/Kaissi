@@ -868,6 +868,94 @@ racontent pas la même histoire.
 
 ---
 
+### E quater. Les alertes de rupture vont CHERCHER le gérant (§3)
+
+Jusqu'ici, la rupture était écrite sur l'écran Stock — et personne ne consulte
+un écran de stock en plein service. On s'apercevait qu'il n'y avait plus
+d'Ojja quand un client en commandait une.
+
+Deux canaux, chacun facultatif : **notification** sur le téléphone ou
+l'ordinateur, et **e-mail**. Rien de tout cela n'est nécessaire pour que le
+reste marche.
+
+**Ce que l'exploitant fait UNE fois — pas le client, et jamais sur la tablette**
+
+1. Dans un terminal, à la racine du dépôt :
+
+```bash
+pnpm sync:cles
+```
+
+Il imprime trois lignes. Colle `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` et
+`VAPID_SUBJECT` dans **Railway → Variables** (le service de synchronisation),
+et la **même** `VAPID_PUBLIC_KEY` dans **Vercel → Environment Variables** (le
+back-office). Pour l'e-mail, ajoute `RESEND_API_KEY` et `URL_BACKOFFICE` côté
+Railway.
+
+> Ces clés identifient **Kaissi**, pas un restaurant : elles valent pour tous
+> les établissements, et on ne les régénère que si la clé privée a fuité — les
+> abonnements existants deviendraient tous invalides.
+
+**Ce que le gérant fait, sur son téléphone ou son poste**
+
+2. **Configuration → Stock**. Sous le titre : **« 🔔 M'alerter des ruptures
+   sur ce navigateur »**. Clique, puis accepte la demande du navigateur.
+
+**Attendu** : le bouton devient *« Alertes actives sur ce navigateur —
+désactiver »*.
+
+3. Refais-le **sur son téléphone**, avec le même compte.
+
+**Attendu** : les deux fonctionnent. Un abonnement vaut pour un
+**navigateur**, pas pour une personne : couper celui du comptoir ne doit pas
+taire celui de la poche.
+
+**Voir une alerte arriver**
+
+4. Mets un produit à **0** (Stock → *Compter*), ou vends-en le dernier.
+
+**Attendu** : dans le quart d'heure, une notification **« Rupture — ‹produit›
+»**, et un e-mail aux gérants et administrateurs. Cliquer dessus ouvre
+directement l'écran **Stock** — pas l'accueil.
+
+> Pour ne pas attendre pendant une démonstration : `SYNC_ALERTES_MINUTES=1`
+> sur Railway, le temps de l'essai.
+
+5. **Laisse le produit à zéro** et attends le tour suivant.
+
+**Attendu** : **plus rien.** Une alerte part **une seule fois**. Une alerte
+qui revient toutes les quinze minutes se coupe — et on coupe alors aussi les
+vraies.
+
+6. Fais une **réception** de ce produit, puis remets-le à zéro.
+
+**Attendu** : une nouvelle alerte. C'est la clôture à la réception qui
+autorise la suivante ; sans elle, un produit alerté une fois ne le serait
+plus jamais.
+
+7. Mets **trois** produits à zéro d'un coup.
+
+**Attendu** : **une seule** notification — « 3 ruptures de stock », les trois
+noms dans le corps. Vingt vibrations à la suite le jour d'un inventaire, ce
+sont vingt notifications qu'on balaie.
+
+8. Connecte-toi en **caissier** et regarde ta boîte.
+
+**Attendu** : rien. Seuls **gérants et administrateurs** reçoivent : un
+caissier ne commande pas les réapprovisionnements.
+
+**Les cas qui n'alertent pas, et c'est voulu**
+
+| Situation | Alerte ? | Pourquoi |
+|---|---|---|
+| Produit avec **« Rupture auto » décochée** | non | Ce comptage n'est qu'indicatif ; alerter dessus ferait exactement le bruit que ce réglage sert à éteindre. |
+| Produit **sans seuil**, quantité 4 | non | Rien n'a été franchi. |
+| Produit déjà en rupture qui tombe à **−3** | non | Le négatif est le cas normal d'une vente hors ligne arrivée après coup, pas une nouvelle information. |
+| Produit passé de **« faible » à zéro** | **oui** | Ce sont deux nouvelles différentes. |
+| **Aucune clé VAPID** configurée | pas d'envoi | L'écran Stock, lui, continue de tout montrer : rien ne dépend d'un fournisseur tiers. |
+
+---
+
 ### F. Les exports
 
 Sur **Ventes**, **Tableau de bord**, **Tickets** et **Stock**, une rangée
@@ -938,10 +1026,15 @@ deux — et dériverait en silence.
 
 #### Le seuil d'alerte
 
-C'est **la quantité en dessous de laquelle il faut recommander**. Rien de
-plus : **aucun e-mail, aucune notification, aucun envoi**. Il ne fait que
-changer la pastille **État** et faire remonter le produit dans « À
-réapprovisionner », en haut de l'écran Stock.
+C'est **la quantité en dessous de laquelle il faut recommander**. Il change
+la pastille **État** et fait remonter le produit dans « À réapprovisionner »,
+en haut de l'écran Stock.
+
+Il **déclenche aussi** une notification et un e-mail à l'encadrement, si les
+clés VAPID et le fournisseur d'e-mail ont été configurés — voir **§5 bis E
+quater**. Sans cette configuration, rien n'est envoyé et l'écran reste la
+seule source : c'est délibéré, aucune fonction de gestion ne dépend d'un
+fournisseur tiers.
 
 L'état se calcule ainsi, dans cet ordre :
 

@@ -70,6 +70,31 @@ export interface AppareilEnrole {
   readonly reprise: boolean
 }
 
+/**
+ * Un produit qui vient de franchir un seuil de stock.
+ *
+ * Le type vit ICI plutôt que dans `alertes.ts` : c'est une forme rendue par
+ * le dépôt, et la frontière d'accès aux données est ce fichier.
+ */
+export interface ProduitEnAlerte {
+  readonly restaurantId: string
+  readonly organizationId: string
+  readonly productId: string
+  readonly nom: string
+  /** `rupture` : quantité ≤ 0. `faible` : au seuil `min_qty` ou en dessous. */
+  readonly niveau: 'rupture' | 'faible'
+  readonly qty: number
+  readonly seuil: number | null
+}
+
+/** L'abonnement d'un NAVIGATEUR aux notifications (migration 0028). */
+export interface AbonnementPush {
+  readonly id: string
+  readonly endpoint: string
+  readonly p256dh: string
+  readonly auth: string
+}
+
 export interface DepotSync {
   /**
    * Ouvre une connexion et exécute une requête triviale.
@@ -184,6 +209,46 @@ export interface DepotSync {
     fenetre: number,
     plafond: number,
   ): Promise<{ restaurantId: string; orderId: string }[]>
+
+  /**
+   * Produits en alerte pour lesquels rien n'a ENCORE été annoncé.
+   *
+   * Une alerte ouverte de niveau égal ou supérieur masque le produit : sans
+   * cela, le balayage réenverrait la même alerte toutes les demi-heures, et
+   * une alerte répétée est une alerte qu'on coupe. Une aggravation, elle,
+   * passe : un produit signalé « faible » qui tombe à zéro doit le dire.
+   *
+   * Le plafond borne UN passage. Un premier inventaire peut mettre deux
+   * cents références sous le seuil d'un coup ; les suivantes attendent le
+   * balayage d'après, et le back-office les montre toutes de toute façon.
+   */
+  produitsEnAlerte(plafond: number): Promise<readonly ProduitEnAlerte[]>
+
+  /**
+   * Clôt les alertes dont le motif a disparu, et rend leur nombre.
+   *
+   * C'est cette clôture qui AUTORISE la suivante : sans elle, un produit
+   * alerté une fois ne le serait plus jamais.
+   */
+  cloreAlertesResolues(): Promise<number>
+
+  /** Journalise une alerte annoncée, et les canaux par lesquels elle est partie. */
+  enregistrerAlerte(produit: ProduitEnAlerte, canaux: string): Promise<void>
+
+  /** Canaux de notification actifs pour un établissement. */
+  abonnementsPush(restaurantId: string): Promise<readonly AbonnementPush[]>
+
+  /** Retire un canal que le navigateur a révoqué (404 ou 410). */
+  supprimerAbonnement(endpoint: string): Promise<void>
+
+  /**
+   * Adresses de l'encadrement — `admin` et `gerant` seuls.
+   *
+   * Un caissier n'a pas à recevoir les alertes de stock : il ne commande pas
+   * les réapprovisionnements, et une alerte qui ne s'adresse à personne se
+   * range dans les indésirables.
+   */
+  emailsGestionnaires(restaurantId: string): Promise<readonly string[]>
 
   fermer(): Promise<void>
 }

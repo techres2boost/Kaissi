@@ -21,6 +21,7 @@ import { etatStock, type EtatStock } from '../../../serveur/rapports.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
 import { HistoriqueStock, type Mouvement } from '../../../composants/HistoriqueStock.js'
 import { TableauStock } from '../../../composants/TableauStock.js'
+import { BoutonNotifications } from '../../../composants/BoutonNotifications.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -171,6 +172,16 @@ export default async function PageStock({
           d’encaisser : une quantité négative signale une réception oubliée,
           pas une erreur à corriger dans l’urgence.
         </p>
+        {/*
+          La clé PUBLIQUE seulement — la privée reste au service de
+          synchronisation, qui est le seul à envoyer. Elle est lue à
+          l'EXÉCUTION (la page est `force-dynamic`) : la poser sur
+          l'hébergeur n'oblige donc pas à reconstruire le back-office.
+        */}
+        <BoutonNotifications
+          restaurant={restaurant}
+          clePublique={process.env['VAPID_PUBLIC_KEY']?.trim() || null}
+        />
       </header>
 
       <div className="cartes-kpi">

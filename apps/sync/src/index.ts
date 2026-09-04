@@ -13,6 +13,7 @@ import { creerServeur } from './serveur.js'
 import { formaterErreurBase } from './diagnostic-base.js'
 import { configurationPg, hoteDe } from './connexion.js'
 import { planifierReparation, INTERVALLE_DEFAUT_MINUTES } from './reparation.js'
+import { planifierAlertesStock, INTERVALLE_ALERTES_MINUTES } from './alertes.js'
 
 export * from './protocole.js'
 export * from './depot.js'
@@ -21,6 +22,7 @@ export * from './jeton.js'
 export { DepotPostgres } from './depot-postgres.js'
 export { creerServeur } from './serveur.js'
 export * from './reparation.js'
+export * from './alertes.js'
 
 /** Démarrage autonome. Ignoré quand le module est importé par un test. */
 export async function demarrer(): Promise<void> {
@@ -203,6 +205,25 @@ export async function demarrer(): Promise<void> {
     )
     planifierReparation(depot, {
       ...(Number.isFinite(minutes) ? { intervalleMinutes: minutes } : {}),
+    })
+  }
+
+  /*
+   * Alertes de stock — la rupture va chercher le gérant.
+   *
+   * Même régime que la réparation : après l'ouverture du port, non attendu,
+   * et coupable par une variable d'environnement. Aucune clé VAPID ni
+   * fournisseur d'e-mail configuré ? Le balayage tourne quand même et tient
+   * le journal des alertes, que le back-office affiche — on ne fait pas
+   * dépendre l'écran d'un fournisseur tiers.
+   */
+  if (process.env['SYNC_ALERTES'] !== '0') {
+    const minutesAlertes = Number.parseInt(
+      process.env['SYNC_ALERTES_MINUTES'] || String(INTERVALLE_ALERTES_MINUTES),
+      10,
+    )
+    planifierAlertesStock(depot, {
+      ...(Number.isFinite(minutesAlertes) ? { intervalleMinutes: minutesAlertes } : {}),
     })
   }
 

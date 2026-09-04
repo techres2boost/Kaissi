@@ -25,11 +25,13 @@ import {
 } from '@kaissi/domain'
 import { estUuid } from '@kaissi/domain'
 import type {
+  AbonnementPush,
   AppareilAuthentifie,
   AppareilEnrole,
   DemandeEnrolement,
   DepotSync,
   EtablissementEnrolable,
+  ProduitEnAlerte,
   ResultatInsertion,
 } from './depot.js'
 import type { ChangementCatalogue, ShiftSynchronise } from './protocole.js'
@@ -862,6 +864,170 @@ export class DepotPostgres implements DepotSync {
     } finally {
       client.release()
     }
+  }
+
+  // ── Alertes de stock (0028) ───────────────────────────────────────────────
+  //
+  // Ces quatre lectures ne passent PAS par `sousIdentite` : elles balaient
+  // TOUS les établissements, et il n'y a précisément aucun appareil au nom de
+  // qui les faire. C'est le même régime que `projectionsOrphelines` — un
+  // travail de service, jamais déclenché par une requête d'appareil, et donc
+  // jamais un chemin par lequel un restaurant pourrait lire un autre.
+
+  async produitsEnAlerte(plafond: number): Promise<readonly ProduitEnAlerte[]> {
+    const { rows } = await this.pool.query<{
+      restaurant_id: string
+      organization_id: string
+      product_id: string
+      name: string
+      niveau: 'rupture' | 'faible'
+      qty_on_hand: string
+      min_qty: string | null
+    }>(
+      `with etat as (
+         select s.restaurant_id, s.organization_id, s.product_id, p.name,
+                s.qty_on_hand, s.min_qty,
+                case when s.qty_on_hand <= 0 then 'rupture' else 'faible' end as niveau
+           from kaissi.stock_actuel s
+           join kaissi.stock_items i on i.product_id = s.product_id
+           join kaissi.products    p on p.id         = s.product_id
+          where p.archived_at is null
+            -- auto_rupture coupé veut dire « ce comptage n'est qu'indicatif ».
+            -- Alerter dessus produirait exactement le bruit que ce réglage
+            -- sert à éteindre.
+            and i.auto_rupture
+            and (s.qty_on_hand <= 0
+                 or (s.min_qty is not null and s.qty_on_hand <= s.min_qty))
+       )
+       select restaurant_id, organization_id, product_id, name, niveau,
+              qty_on_hand, min_qty
+         from etat e
+        where not exists (
+                select 1
+                  from kaissi.stock_alerts a
+                 where a.product_id = e.product_id
+                   and a.resolue_a is null
+                   -- Une alerte ouverte de niveau ÉGAL ou SUPÉRIEUR masque le
+                   -- produit. Une aggravation, elle, passe : « faible » puis
+                   -- zéro sont deux nouvelles différentes.
+                   and (a.niveau = e.niveau or a.niveau = 'rupture')
+              )
+        order by e.restaurant_id, e.niveau, e.name
+        limit $1`,
+      [plafond],
+    )
+    return rows.map((l) => ({
+      restaurantId: l.restaurant_id,
+      organizationId: l.organization_id,
+      productId: l.product_id,
+      nom: l.name,
+      niveau: l.niveau,
+      // `numeric` revient en CHAÎNE avec le pilote pg — il refuse de perdre
+      // de la précision à notre place. 0,25 kg existe (RÈGLE 1).
+      qty: Number(l.qty_on_hand),
+      seuil: l.min_qty === null ? null : Number(l.min_qty),
+    }))
+  }
+
+  async cloreAlertesResolues(): Promise<number> {
+    // Le motif a disparu : le stock est repassé au-dessus du seuil, ou le
+    // seuil lui-même a été retiré.
+    const remontees = await this.pool.query(
+      `update kaissi.stock_alerts a
+          set resolue_a = now()
+         from kaissi.stock_actuel s
+        where a.resolue_a is null
+          and s.product_id = a.product_id
+          and ((a.niveau = 'rupture' and s.qty_on_hand > 0)
+            or (a.niveau = 'faible'
+                and (s.min_qty is null or s.qty_on_hand > s.min_qty)))`,
+    )
+    // Le suivi de stock a été arrêté, ou le produit supprimé de la carte :
+    // laisser l'alerte ouverte la rendrait ÉTERNELLE — plus rien ne pourrait
+    // jamais la fermer, et le produit ne serait plus jamais alerté.
+    const orphelines = await this.pool.query(
+      `update kaissi.stock_alerts a
+          set resolue_a = now()
+        where a.resolue_a is null
+          and not exists (
+                select 1 from kaissi.stock_actuel s
+                 where s.product_id = a.product_id
+              )`,
+    )
+    return (remontees.rowCount ?? 0) + (orphelines.rowCount ?? 0)
+  }
+
+  async enregistrerAlerte(produit: ProduitEnAlerte, canaux: string): Promise<void> {
+    const client = await this.pool.connect()
+    try {
+      await client.query('begin')
+      // La clôture d'abord : l'index unique partiel n'admet QU'UNE alerte
+      // ouverte par produit. C'est le cas d'une aggravation — le « faible »
+      // cède la place au « rupture », et l'historique garde les deux.
+      await client.query(
+        `update kaissi.stock_alerts
+            set resolue_a = now()
+          where product_id = $1 and resolue_a is null`,
+        [produit.productId],
+      )
+      await client.query(
+        `insert into kaissi.stock_alerts
+           (organization_id, restaurant_id, product_id, niveau, qty, canaux)
+         values ($1, $2, $3, $4, $5, $6)`,
+        [
+          produit.organizationId,
+          produit.restaurantId,
+          produit.productId,
+          produit.niveau,
+          produit.qty,
+          canaux,
+        ],
+      )
+      await client.query('commit')
+    } catch (erreur) {
+      await client.query('rollback').catch(() => undefined)
+      throw erreur
+    } finally {
+      client.release()
+    }
+  }
+
+  async abonnementsPush(restaurantId: string): Promise<readonly AbonnementPush[]> {
+    const { rows } = await this.pool.query<AbonnementPush>(
+      `select id, endpoint, p256dh, auth
+         from kaissi.push_subscriptions
+        where restaurant_id = $1 and alertes_stock
+        order by created_at`,
+      [restaurantId],
+    )
+    return rows
+  }
+
+  async supprimerAbonnement(endpoint: string): Promise<void> {
+    await this.pool.query(
+      `delete from kaissi.push_subscriptions where endpoint = $1`,
+      [endpoint],
+    )
+  }
+
+  async emailsGestionnaires(restaurantId: string): Promise<readonly string[]> {
+    const { rows } = await this.pool.query<{ email: string }>(
+      `select distinct u.email
+         from kaissi.memberships m
+         join kaissi.users u on u.id = m.user_id
+        where m.restaurant_id = $1
+          and m.revoked_at is null
+          and m.role in ('admin', 'gerant')
+          -- Un employé suspendu ou parti ne reçoit plus rien : son adresse
+          -- peut avoir été rendue, et l'alerte parlerait d'un stock qui ne le
+          -- regarde plus.
+          and u.status = 'actif'
+          and u.archived_at is null
+          and btrim(u.email) <> ''
+        order by u.email`,
+      [restaurantId],
+    )
+    return rows.map((l) => l.email)
   }
 
   async fermer(): Promise<void> {
