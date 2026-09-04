@@ -9,7 +9,7 @@
  */
 
 import { formaterPourcentage, formaterTND, millimes } from '@kaissi/domain'
-import { etablissementObligatoire } from '../../../serveur/session.js'
+import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { EditeurCatalogue } from '../../../composants/EditeurCatalogue.js'
 
@@ -20,6 +20,7 @@ export default async function PageCatalogue({
 }) {
   const { restaurant } = await params
   const { etablissement } = await etablissementObligatoire(restaurant)
+  ecranReserve(etablissement, 'gestion')
   const supabase = await supabaseServeur()
 
   const [{ data: categories }, { data: stations }, { data: taux }, { data: produits, error }] =

@@ -102,7 +102,7 @@ export function depotCatalogue(db: AdaptateurSqlite) {
     },
 
     async produits(categorieId?: string): Promise<ProduitLocal[]> {
-      const filtre = categorieId ? 'AND category_id = ?' : ''
+      const filtre = categorieId ? 'AND p.category_id = ?' : ''
       const lignes = await db.lire<{
         id: string
         category_id: string | null
@@ -116,12 +116,27 @@ export function depotCatalogue(db: AdaptateurSqlite) {
         is_available: number
         unavailable_reason: string | null
       }>(
-        `SELECT id, category_id, station_id, tax_rate_id, name, description,
-                base_price_millimes, color, position, is_available,
-                unavailable_reason
-         FROM products
-         WHERE archived_at IS NULL ${filtre}
-         ORDER BY position, name`,
+        // Le POSTE vient de la CATÉGORIE, le produit ne sert que de repli.
+        //
+        // Depuis la migration locale 005 (et la Postgres 0025), les boissons
+        // vont au bar et les plats à la cuisine parce que leur CATÉGORIE le
+        // dit — un produit ajouté demain en hérite sans que personne y pense.
+        // `p.station_id` reste consulté pour les données antérieures, qui
+        // n'ont pas de poste sur leur catégorie : sans ce repli, des lignes
+        // déjà en service disparaîtraient de l'écran de préparation.
+        //
+        // L'ordre est le MÊME côté serveur. Deux ordres différents feraient
+        // apparaître une ligne au bar sur la tablette et en cuisine au
+        // back-office.
+        `SELECT p.id, p.category_id,
+                COALESCE(c.station_id, p.station_id) AS station_id,
+                p.tax_rate_id, p.name, p.description,
+                p.base_price_millimes, p.color, p.position, p.is_available,
+                p.unavailable_reason
+         FROM products p
+         LEFT JOIN categories c ON c.id = p.category_id
+         WHERE p.archived_at IS NULL ${filtre}
+         ORDER BY p.position, p.name`,
         categorieId ? [categorieId] : [],
       )
       return lignes.map((l) => ({

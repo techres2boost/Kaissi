@@ -120,21 +120,25 @@ export async function installerGraine(db: AdaptateurSqlite): Promise<boolean> {
       )
     }
 
-    for (const [cid, nom, pos, couleur] of [
+    // Le POSTE est porté par la CATÉGORIE (migrations locale 005 et
+    // Postgres 0025) : les boissons partent au bar, tout le reste en
+    // cuisine. Un produit ajouté plus tard dans « Boissons » en hérite sans
+    // que personne ait à y penser.
+    for (const [cid, nom, pos, couleur, station] of [
       // Déclinaisons de la palette Res2Boost : quatre valeurs distinctes du
       // même vert, plus l'or pour les desserts. Les catégories doivent se
       // distinguer d'un coup d'œil SANS jurer avec la marque — quatre teintes
       // vives et sans rapport transformaient l'écran en sapin de Noël.
-      [CAT_PLATS, 'Plats', 1, '#7EC694'],
-      [CAT_SNACKS, 'Snacks', 2, '#9BE3AE'],
-      [CAT_BOISSONS, 'Boissons', 3, '#4E9E77'],
-      [CAT_DESSERTS, 'Desserts', 4, '#C9A86B'],
+      [CAT_PLATS, 'Plats', 1, '#7EC694', ST_CUISINE],
+      [CAT_SNACKS, 'Snacks', 2, '#9BE3AE', ST_CUISINE],
+      [CAT_BOISSONS, 'Boissons', 3, '#4E9E77', ST_BAR],
+      [CAT_DESSERTS, 'Desserts', 4, '#C9A86B', ST_CUISINE],
     ] as const) {
       await db.executer(
         `INSERT INTO categories
-           (id, organization_id, restaurant_id, name, position, color)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [cid, DEMO_ORG, DEMO_RESTO, nom, pos, couleur],
+           (id, organization_id, restaurant_id, name, position, color, station_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [cid, DEMO_ORG, DEMO_RESTO, nom, pos, couleur, station],
       )
     }
 

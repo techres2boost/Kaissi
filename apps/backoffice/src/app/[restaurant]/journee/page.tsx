@@ -15,7 +15,7 @@ import {
   type Millimes,
 } from '@kaissi/domain'
 import { montant } from '../../../serveur/montant.js'
-import { etablissementObligatoire } from '../../../serveur/session.js'
+import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import {
   bornesJourneeCommerciale,
@@ -59,6 +59,7 @@ export default async function PageJournee({
   const { restaurant } = await params
   const { j } = await searchParams
   const { etablissement } = await etablissementObligatoire(restaurant)
+  ecranReserve(etablissement, 'exploitation')
   const supabase = await supabaseServeur()
 
   const { data: fiche } = await supabase

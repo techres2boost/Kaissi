@@ -37,7 +37,7 @@ export async function marquerPrete(
       { onConflict: 'order_id', ignoreDuplicates: true },
     )
     if (error) return { erreur: error.message }
-    revalidatePath(`/${restaurantId}/cuisine`)
+    revalidatePath(`/${restaurantId}/preparation`)
     return {}
   } catch (erreur) {
     if (erreur && typeof erreur === 'object' && 'digest' in erreur) throw erreur
@@ -64,7 +64,7 @@ export async function retirerPrete(
       .eq('order_id', orderId)
       .eq('restaurant_id', restaurantId)
     if (error) return { erreur: error.message }
-    revalidatePath(`/${restaurantId}/cuisine`)
+    revalidatePath(`/${restaurantId}/preparation`)
     return {}
   } catch (erreur) {
     if (erreur && typeof erreur === 'object' && 'digest' in erreur) throw erreur

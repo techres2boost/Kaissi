@@ -1,5 +1,10 @@
 /**
- * Écran de cuisine — « commandes à préparer ».
+ * Écran de PRÉPARATION — « lignes à préparer », cuisine ou bar.
+ *
+ * Un seul écran, deux publics : il se filtre sur le POSTE. Un rôle de
+ * préparation y est épinglé au sien et n'en sort pas ; l'encadrement garde
+ * le sélecteur, parce qu'un gérant a de bonnes raisons de voir ce que chaque
+ * poste voit.
  *
  * Il remplace le bon de cuisine papier tant que l'impression est éteinte.
  * Ce qu'il montre vient de la synchronisation : le POS écrit `order.sent`,
@@ -39,7 +44,7 @@ export default async function PageCuisine({
 }) {
   const { restaurant } = await params
   const { poste } = await searchParams
-  await etablissementObligatoire(restaurant)
+  const { etablissement } = await etablissementObligatoire(restaurant)
   const supabase = await supabaseServeur()
 
   const { data: commandes, error } = await supabase
@@ -97,7 +102,28 @@ export default async function PageCuisine({
   // Bar). Sans ce filtre ici, le barman lisait les pizzas et le cuisinier
   // les cafés — les deux faisaient le tri à l'œil sur le même écran.
   const listePostes = (postes.data ?? []).map((s) => ({ id: s.id, nom: s.name }))
-  const posteActif = listePostes.some((s) => s.id === poste) ? (poste as string) : null
+
+  /*
+   * Un rôle de PRÉPARATION est ÉPINGLÉ à son poste.
+   *
+   * Le barman ne choisit pas de regarder la cuisine : il n'a rien à y faire,
+   * et un sélecteur en haut de son écran est une invitation à s'y perdre en
+   * plein coup de feu. L'encadrement, lui, garde le sélecteur — un gérant a
+   * de bonnes raisons de voir ce que chaque poste voit.
+   *
+   * Le poste vient de l'appartenance (migration 0025). À défaut, on retombe
+   * sur la station dont le NOM correspond au rôle : c'est le cas du petit
+   * établissement qui n'a rien réglé, et il n'a alors rien à régler.
+   */
+  const posteEpingle = etablissement.preparation
+    ? (etablissement.stationId ??
+       listePostes.find(
+         (s) => s.nom.trim().toLowerCase() === etablissement.role.toLowerCase(),
+       )?.id ??
+       null)
+    : null
+
+  const posteActif = posteEpingle ?? (listePostes.some((s) => s.id === poste) ? (poste as string) : null)
   const preteA = new Map((pretes.data ?? []).map((p) => [p.order_id, p.ready_at]))
 
   const parCommande = new Map<string, CommandeCuisine['lignes'][number][]>()
@@ -138,8 +164,17 @@ export default async function PageCuisine({
       restaurantId={restaurant}
       commandes={aPreparer}
       plafond={PLAFOND}
-      postes={listePostes}
+      // Épinglé : aucun sélecteur. Le titre porte alors le nom du poste,
+      // pour que l'écran dise de lui-même à qui il s'adresse.
+      postes={posteEpingle ? [] : listePostes}
       posteActif={posteActif}
+      titre={
+        posteEpingle
+          ? (etablissement.stationNom ??
+             listePostes.find((s) => s.id === posteEpingle)?.nom ??
+             'Préparation')
+          : 'Préparation'
+      }
     />
   )
 }

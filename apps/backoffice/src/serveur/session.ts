@@ -14,7 +14,20 @@
 import { redirect } from 'next/navigation'
 import { supabaseServeur } from './supabase.js'
 
-export type RoleMembre = 'admin' | 'gerant' | 'caissier' | 'serveur' | 'cuisine'
+export type RoleMembre = 'admin' | 'gerant' | 'caissier' | 'serveur' | 'cuisine' | 'bar'
+
+/**
+ * Les rôles qui PRÉPARENT : cuisine et bar.
+ *
+ * Ils ne voient aucun montant, nulle part. Ce n'est pas une préférence
+ * d'affichage : celui qui prépare n'encaisse pas, et le chiffre d'affaires
+ * n'a rien à faire sur un écran posé au passe, visible de la salle.
+ */
+const ROLES_PREPARATION: readonly RoleMembre[] = ['cuisine', 'bar']
+
+export function estPreparation(role: RoleMembre): boolean {
+  return ROLES_PREPARATION.includes(role)
+}
 
 export interface Etablissement {
   id: string
@@ -33,6 +46,22 @@ export interface Etablissement {
    * RLS (migration 0024) autant qu'ici.
    */
   administrateur: boolean
+  /**
+   * Vrai pour `cuisine` et `bar` : ce membre PRÉPARE, il n'encaisse pas.
+   *
+   * Il n'a qu'un seul écran, et aucun montant n'y figure. Le back-office ne
+   * lui propose donc rien d'autre — pas même « Journée », qui affiche le
+   * fond de caisse et l'écart.
+   */
+  preparation: boolean
+  /**
+   * Poste tenu, pour un rôle de préparation. Nul : ce membre voit toutes les
+   * lignes du service, ce qui reste correct dans un établissement à un seul
+   * poste.
+   */
+  stationId: string | null
+  /** Nom du poste, pour le titre de l'écran. */
+  stationNom: string | null
 }
 
 export interface SessionBackoffice {
@@ -94,7 +123,7 @@ export async function sessionObligatoire(): Promise<SessionBackoffice> {
   const { data, error } = moi
     ? await supabase
         .from('memberships')
-        .select('role, organization_id, restaurant_id, restaurants(name)')
+        .select('role, organization_id, restaurant_id, station_id, stations(name), restaurants(name)')
         .eq('user_id', moi.id as string)
         .is('revoked_at', null)
     : { data: [], error: null }
@@ -111,6 +140,8 @@ export async function sessionObligatoire(): Promise<SessionBackoffice> {
     const role = ligne.role as RoleMembre
     const restaurant = ligne.restaurants as { name: string } | { name: string }[] | null
     const nom = Array.isArray(restaurant) ? restaurant[0]?.name : restaurant?.name
+    const station = ligne.stations as { name: string } | { name: string }[] | null
+    const stationNom = Array.isArray(station) ? station[0]?.name : station?.name
     return {
       id: ligne.restaurant_id as string,
       organizationId: ligne.organization_id as string,
@@ -118,6 +149,9 @@ export async function sessionObligatoire(): Promise<SessionBackoffice> {
       role,
       gestionnaire: ROLES_GESTIONNAIRES.includes(role),
       administrateur: role === 'admin',
+      preparation: estPreparation(role),
+      stationId: (ligne.station_id as string | null) ?? null,
+      stationNom: stationNom ?? null,
     }
   })
 
@@ -149,6 +183,39 @@ export async function etablissementObligatoire(
   const etablissement = session.etablissements.find((e) => e.id === restaurantId)
   if (!etablissement) redirect('/')
   return { session, etablissement }
+}
+
+/**
+ * Interdit un écran à qui n'a rien à y faire, en REDIRIGEANT.
+ *
+ * ── Pourquoi ce garde-fou a dû être ajouté ────────────────────────────────
+ *
+ * La navigation masquait déjà les onglets qu'un rôle ne doit pas voir. Mais
+ * masquer un lien n'interdit rien : les pages `ventes`, `tickets` et
+ * `tableau-bord` ne vérifiaient AUCUN rôle. Un cuisinier qui tapait l'URL —
+ * ou qui suivait un lien collé dans une conversation — lisait le chiffre
+ * d'affaires de l'établissement.
+ *
+ * Ce n'est pas la seule barrière et ce n'est pas la principale : RLS reste
+ * ce qui protège les données entre CLIENTS. Mais RLS ne dit pas quel écran
+ * un membre légitime de CE restaurant a le droit d'ouvrir — ce cloisonnement
+ * là est applicatif, par nature (voir aussi `memberships_lecture`).
+ *
+ * On redirige plutôt qu'on n'affiche une erreur : l'intéressé arrive sur son
+ * écran, ce qui est utile, au lieu d'un mur qui ne l'est pas.
+ *
+ *   • `exploitation` — tout sauf la préparation. Un caissier a de bonnes
+ *     raisons de consulter la journée ; un cuisinier, non.
+ *   • `gestion` — encadrement seul : carte, stock, rapports, équipe.
+ */
+export function ecranReserve(
+  etablissement: Etablissement,
+  niveau: 'exploitation' | 'gestion',
+): void {
+  if (etablissement.preparation) redirect(`/${etablissement.id}/preparation`)
+  if (niveau === 'gestion' && !etablissement.gestionnaire) {
+    redirect(`/${etablissement.id}/journee`)
+  }
 }
 
 /** Refuse une action d'encadrement, avec un motif affichable. */

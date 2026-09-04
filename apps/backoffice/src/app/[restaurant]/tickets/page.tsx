@@ -9,7 +9,7 @@
 import Link from 'next/link'
 import { formaterPourcentage, formaterTND } from '@kaissi/domain'
 import { montant } from '../../../serveur/montant.js'
-import { etablissementObligatoire } from '../../../serveur/session.js'
+import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { journeeCourante, libelleJournee } from '../../../serveur/journee.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { chargerFiche, chargerVentes, resoudrePeriode } from '../../../serveur/ventes.js'
@@ -43,7 +43,8 @@ export default async function PageTickets({
 }) {
   const { restaurant } = await params
   const { du, au, ticket } = await searchParams
-  await etablissementObligatoire(restaurant)
+  const { etablissement } = await etablissementObligatoire(restaurant)
+  ecranReserve(etablissement, 'gestion')
 
   const fiche = await chargerFiche(restaurant)
   const periode = resoudrePeriode(fiche, du, au)

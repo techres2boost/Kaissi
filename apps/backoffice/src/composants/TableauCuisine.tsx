@@ -18,7 +18,7 @@ import { useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { destinationSure } from '../serveur/redirection.js'
-import { marquerPrete, retirerPrete } from '../app/[restaurant]/cuisine/actions.js'
+import { marquerPrete, retirerPrete } from '../app/[restaurant]/preparation/actions.js'
 
 export interface CommandeCuisine {
   id: string
@@ -59,6 +59,7 @@ export function TableauCuisine({
   plafond,
   postes,
   posteActif,
+  titre,
 }: {
   restaurantId: string
   commandes: CommandeCuisine[]
@@ -66,6 +67,13 @@ export function TableauCuisine({
   /** Postes de préparation de l'établissement — Cuisine, Bar… */
   postes: { id: string; nom: string }[]
   posteActif: string | null
+  /**
+   * Titre de l'écran — le NOM DU POSTE quand il est épinglé.
+   *
+   * Un barman qui lit « Cuisine » en haut de son écran doute, à raison, de
+   * regarder le bon. Le titre doit dire de lui-même à qui l'écran s'adresse.
+   */
+  titre: string
 }) {
   const router = useRouter()
   const [enCours, demarrer] = useTransition()
@@ -109,7 +117,7 @@ export function TableauCuisine({
     <section className="cuisine">
       <header className="cuisine-entete">
         <h1>
-          Cuisine <span className="compteur">{enAttente.length}</span>
+          {titre} <span className="compteur">{enAttente.length}</span>
         </h1>
         <p className="note">
           Mise à jour automatique toutes les {PERIODE_MS / 1000} secondes. Une
@@ -125,7 +133,7 @@ export function TableauCuisine({
         {postes.length > 1 && (
           <nav className="onglets-postes" aria-label="Poste de préparation">
             <Link
-              href={destinationSure(`/${restaurantId}/cuisine`)}
+              href={destinationSure(`/${restaurantId}/preparation`)}
               className={posteActif === null ? 'actif' : ''}
             >
               Tous les postes
@@ -133,7 +141,7 @@ export function TableauCuisine({
             {postes.map((p) => (
               <Link
                 key={p.id}
-                href={destinationSure(`/${restaurantId}/cuisine?poste=${p.id}`)}
+                href={destinationSure(`/${restaurantId}/preparation?poste=${p.id}`)}
                 className={posteActif === p.id ? 'actif' : ''}
               >
                 {p.nom}

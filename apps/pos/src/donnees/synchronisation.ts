@@ -165,7 +165,7 @@ const TABLES_MIROIR: Record<string, { nom: string; colonnes: string[] }> = {
   categories: {
     nom: 'categories',
     colonnes: ['id', 'organization_id', 'restaurant_id', 'name', 'position',
-               'color', 'archived_at'],
+               'color', 'station_id', 'archived_at'],
   },
   stations: {
     nom: 'stations',

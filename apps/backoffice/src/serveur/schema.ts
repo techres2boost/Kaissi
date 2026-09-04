@@ -87,6 +87,8 @@ export type Appartenance = {
   user_id: Uuid
   restaurant_id: Uuid
   role: string
+  /** Poste tenu par un rôle de préparation (migration 0025). */
+  station_id: Uuid | null
   permissions: Record<string, unknown> | null
   revoked_at: Horodatage | null
   updated_at: Horodatage
@@ -99,6 +101,11 @@ export type Categorie = {
   name: string
   position: number
   color: string | null
+  /**
+   * Poste de préparation de TOUS les produits de la catégorie (0025).
+   * `products.station_id` ne sert plus que de repli pour l'existant.
+   */
+  station_id: Uuid | null
   archived_at: Horodatage | null
 }
 
@@ -354,6 +361,13 @@ export type Database = {
             columns: ['restaurant_id']
             isOneToOne: false
             referencedRelation: 'restaurants'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'memberships_station_id_fkey'
+            columns: ['station_id']
+            isOneToOne: false
+            referencedRelation: 'stations'
             referencedColumns: ['id']
           },
         ]

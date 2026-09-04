@@ -15,7 +15,7 @@
 
 import { formaterTND, margeProduit, millimes } from '@kaissi/domain'
 import { montant } from '../../../serveur/montant.js'
-import { etablissementObligatoire } from '../../../serveur/session.js'
+import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { etatStock, type EtatStock } from '../../../serveur/rapports.js'
 import { TableauStock } from '../../../composants/TableauStock.js'
@@ -51,6 +51,7 @@ export default async function PageStock({
 }) {
   const { restaurant } = await params
   const { etablissement } = await etablissementObligatoire(restaurant)
+  ecranReserve(etablissement, 'gestion')
   const supabase = await supabaseServeur()
 
   const [produitsRes, categoriesRes, stockRes, suiviRes] = await Promise.all([

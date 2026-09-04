@@ -14,12 +14,12 @@ export default async function RacineEtablissement({
 }) {
   const { restaurant } = await params
   const { etablissement } = await etablissementObligatoire(restaurant)
-  // Chacun sur SON écran : la cuisine sur ses commandes, l'encadrement sur
-  // les chiffres, et un caissier sur la journée — le seul rapport qui le
-  // concerne, puisqu'il n'a pas accès au reste.
+  // Chacun sur SON écran : la préparation (cuisine, bar) sur ses lignes,
+  // l'encadrement sur les chiffres, et un caissier sur la journée — le seul
+  // rapport qui le concerne, puisqu'il n'a pas accès au reste.
   redirect(
-    etablissement.role === 'cuisine'
-      ? `/${restaurant}/cuisine`
+    etablissement.preparation
+      ? `/${restaurant}/preparation`
       : etablissement.gestionnaire
         ? `/${restaurant}/tableau-bord`
         : `/${restaurant}/journee`,

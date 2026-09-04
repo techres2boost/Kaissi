@@ -12,7 +12,7 @@
  */
 
 import { formaterPourcentage } from '@kaissi/domain'
-import { etablissementObligatoire } from '../../../serveur/session.js'
+import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { ListeEmployes } from '../../../composants/ListeEmployes.js'
 
@@ -32,6 +32,7 @@ export default async function PageEmployes({
 }) {
   const { restaurant } = await params
   const { session, etablissement } = await etablissementObligatoire(restaurant)
+  ecranReserve(etablissement, 'gestion')
   const supabase = await supabaseServeur()
 
   const { data, error } = await supabase
