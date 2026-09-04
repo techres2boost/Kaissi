@@ -141,7 +141,7 @@ et l'ancienne valeur reste visible dans le journal.
 `apps/pos/src/config.ts` porte `IMPRESSION_ACTIVE`, faux par défaut. Tant
 qu'il l'est : rien n'entre en file, la boucle de drainage ne tourne pas, le
 ticket client et le bon de cuisine s'affichent À L'ÉCRAN, et la cuisine lit
-ses commandes au back-office (`/‹resto›/cuisine`).
+ses commandes au back-office (`/‹resto›/preparation`).
 
 Le module d'impression reste **écrit, testé et importé** —
 `pnpm pos:build:impression` le rallume (ou `pos:build:web:impression`).
@@ -235,6 +235,35 @@ de mes établissements — l'écran « Employés » en dépend. Une requête sur
 `memberships` sans `where user_id = moi` ne rend donc pas mon rôle, mais ceux
 de toute l'équipe. Ce filtre-là est applicatif, par nature.
 
+### Cuisine et bar PRÉPARENT — ils ne voient aucun montant
+
+Deux rôles (`cuisine`, `bar`), un seul écran chacun : `/‹resto›/preparation`,
+épinglé sur leur poste. Pas même « Journée », qui affiche le fond de caisse
+et l'écart. Celui qui prépare n'encaisse pas.
+
+**Masquer un onglet n'interdit rien.** Le refus est côté serveur
+(`ecranReserve()`), parce que les pages `ventes`, `tickets` et `tableau-bord`
+ne vérifiaient aucun rôle : une URL tapée à la main rendait le chiffre
+d'affaires. RLS protège entre CLIENTS ; elle ne dit pas quel écran un membre
+légitime de CE restaurant peut ouvrir — ce cloisonnement est applicatif, par
+nature, comme le filtre sur `memberships`. **Les exports passent par le même
+garde** : un export sans garde rendrait ce qu'on vient de retirer de l'écran.
+
+Le poste tenu vient de `memberships.station_id`, jamais du NOM de la station :
+renommer « Bar » en « Comptoir » viderait l'écran sans rien expliquer.
+
+### Le poste de préparation appartient à la CATÉGORIE
+
+`categories.station_id` (migration 0025) est la source de vérité ;
+`products.station_id` n'est plus qu'un repli pour l'existant. La résolution
+est « catégorie d'abord, produit ensuite », dans le **même ordre** côté POS
+(migration locale 005) et côté serveur — deux ordres différents feraient
+apparaître une ligne au bar sur la tablette et en cuisine au back-office.
+
+Le porter sur le produit obligeait à s'en souvenir à chaque création. Un
+produit sans poste n'apparaît sur AUCUN écran de préparation, et cela ne se
+voit qu'en plein service.
+
 ### Trois identités distinctes, jamais confondues
 
 **Un gérant exploite, un administrateur distribue les pouvoirs.** C'est la
@@ -253,6 +282,16 @@ devant un client qui attend, un administrateur fait le travail d'un gérant.
 Un serveur en salle change cinq fois par service ; la tablette reste
 authentifiée en continu. Confondre les deux mène soit à des reconnexions
 permanentes, soit à une traçabilité inexistante.
+
+**La caisse porte le nom de qui l'a FERMÉE.** `shifts.user_id` dit qui a
+ouvert, `shifts.closed_by` (migration 0027) qui a COMPTÉ. Devant un écart, le
+nom qui compte est celui de la personne qui a vu les billets ; afficher celui
+de l'ouverture met en cause quelqu'un qui était parti depuis quatre heures.
+Nul pour les services clos avant la 0027 — « — » dit la vérité, recopier
+`user_id` inventerait une donnée fausse qui aurait l'air juste. L'upsert
+utilise `coalesce` : une tablette antérieure à la migration locale 006 renvoie
+le même service sans ce champ, et l'écraser par nul effacerait un nom déjà
+remonté.
 
 **Le préfixe de tickets vient du SERVEUR, et le POS l'adopte.** C'est ce qui
 empêche deux appareils hors ligne d'émettre le même numéro. Un terminal qui

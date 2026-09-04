@@ -13,6 +13,7 @@ import { ecranReserve, etablissementObligatoire } from '../../../serveur/session
 import { journeeCourante, libelleJournee } from '../../../serveur/journee.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { chargerFiche, chargerVentes, resoudrePeriode } from '../../../serveur/ventes.js'
+import { BoutonsExport } from '../../../composants/BoutonsExport.js'
 import { SelecteurPeriode } from '../../../composants/SelecteurPeriode.js'
 
 export const dynamic = 'force-dynamic'
@@ -74,6 +75,15 @@ export default async function PageTickets({
       </header>
 
       <SelecteurPeriode du={periode.du} au={periode.au} aujourdhui={aujourdhui} />
+
+      {/* Les bornes affichées sont recopiées dans le lien : sans elles, on
+          regarde septembre et on télécharge la semaine en cours. */}
+      <BoutonsExport
+        restaurantId={restaurant}
+        exports={[{ quoi: 'tickets', libelle: 'Tickets' }]}
+        du={periode.du}
+        au={periode.au}
+      />
 
       {ticket && <DetailTicket restaurantId={restaurant} orderId={ticket} periode={periode} />}
 

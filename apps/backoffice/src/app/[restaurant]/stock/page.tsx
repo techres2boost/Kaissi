@@ -18,6 +18,7 @@ import { montant } from '../../../serveur/montant.js'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { etatStock, type EtatStock } from '../../../serveur/rapports.js'
+import { BoutonsExport } from '../../../composants/BoutonsExport.js'
 import { HistoriqueStock, type Mouvement } from '../../../composants/HistoriqueStock.js'
 import { TableauStock } from '../../../composants/TableauStock.js'
 
@@ -219,6 +220,14 @@ export default async function PageStock({
           </ul>
         </section>
       )}
+
+      <BoutonsExport
+        restaurantId={restaurant}
+        exports={[
+          { quoi: 'stock', libelle: 'État du stock' },
+          { quoi: 'mouvements', libelle: 'Historique des mouvements' },
+        ]}
+      />
 
       <TableauStock restaurantId={restaurant} produits={produits} />
 

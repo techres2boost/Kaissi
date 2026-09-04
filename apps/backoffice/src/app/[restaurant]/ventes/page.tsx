@@ -18,6 +18,7 @@ import {
   ventilerParPaiement,
   ventilerParProduit,
 } from '../../../serveur/rapports.js'
+import { BoutonsExport } from '../../../composants/BoutonsExport.js'
 import { SelecteurPeriode } from '../../../composants/SelecteurPeriode.js'
 import { TableauVentilation } from '../tableau-bord/page.js'
 
@@ -65,6 +66,15 @@ export default async function PageVentes({
       </header>
 
       <SelecteurPeriode du={periode.du} au={periode.au} aujourdhui={aujourdhui} />
+
+      {/* Les bornes affichées sont recopiées dans le lien : sans elles, on
+          regarde septembre et on télécharge la semaine en cours. */}
+      <BoutonsExport
+        restaurantId={restaurant}
+        exports={[{ quoi: 'ventes', libelle: 'Résumé' }, { quoi: 'articles', libelle: 'Par article' }, { quoi: 'categories', libelle: 'Par catégorie' }, { quoi: 'employes', libelle: 'Par employé' }, { quoi: 'paiements', libelle: 'Paiements' }]}
+        du={periode.du}
+        au={periode.au}
+      />
 
       <section className="bloc">
         <h2>Récapitulatif</h2>

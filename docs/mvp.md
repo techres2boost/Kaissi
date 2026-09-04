@@ -22,7 +22,7 @@ catalogue → commande → paiement → vente → cuisine → ticket
 | 🔐 Connexion / rôles | PIN sur la tablette · e-mail au back-office | **fait** |
 | 📦 Catalogue (produits, catégories, prix, TVA) | back-office `/‹resto›/catalogue` | **fait** |
 | 🛒 Caisse (commande, panier, remises, paiement) | POS | **fait** |
-| 👨‍🍳 Cuisine (« commandes à préparer ») | back-office `/‹resto›/cuisine` | **fait** |
+| 👨‍🍳 Cuisine (« commandes à préparer ») | back-office `/‹resto›/preparation` | **fait** |
 | 🧾 Ticket | affiché à l'écran du POS | **fait** |
 | 📈 Administration (journée, clôture, employés) | back-office | **fait** |
 | 📊 Stock, coûts et marges | back-office — voir [`gestion.md`](gestion.md) | **fait** |
@@ -97,7 +97,7 @@ manuels, et décrément automatique à la vente. Tout est dans
 | Poste | Application | Identité | Ce qu'il voit |
 |---|---|---|---|
 | **Caissier / serveur** | POS (tablette ou navigateur) | PIN à 4 chiffres, validé **hors ligne** | Salle, commande, encaissement, clôture |
-| **Cuisine** | back-office, `/‹resto›/cuisine` | compte e-mail, rôle `cuisine` | Uniquement les commandes à préparer — aucun montant |
+| **Cuisine** | back-office, `/‹resto›/preparation` | compte e-mail, rôle `cuisine` | Uniquement les commandes à préparer — aucun montant |
 | **Gérant / admin** | back-office | compte e-mail, rôle `gerant` ou `admin` | Journée, catalogue, employés, cuisine |
 
 Le rôle décide de la page d'arrivée : un cuisinier qui se connecte atterrit
@@ -552,7 +552,7 @@ Fais un vrai service de bout en bout, dans cet ordre :
 
 1. **Caisse** : PIN → ouverture de caisse → commande sur une table →
    *Cuisine*.
-2. **Cuisine** (autre écran, back-office `/cuisine`) : la commande apparaît
+2. **Cuisine** (autre écran, back-office `/preparation`) : la commande apparaît
    en moins de 30 secondes. Clique **Prêt**.
 3. **Caisse** : encaisse. Le ticket s'affiche.
 4. **Back-office → Journée** : la vente y figure, avec sa TVA ventilée.

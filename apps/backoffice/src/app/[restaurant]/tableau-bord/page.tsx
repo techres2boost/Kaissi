@@ -16,6 +16,7 @@ import {
   ventilerParCategorie,
   ventilerParProduit,
 } from '../../../serveur/rapports.js'
+import { BoutonsExport } from '../../../composants/BoutonsExport.js'
 import { SelecteurPeriode } from '../../../composants/SelecteurPeriode.js'
 
 export const dynamic = 'force-dynamic'
@@ -62,6 +63,15 @@ export default async function PageTableauBord({
       </header>
 
       <SelecteurPeriode du={periode.du} au={periode.au} aujourdhui={aujourdhui} />
+
+      {/* Les bornes affichées sont recopiées dans le lien : sans elles, on
+          regarde septembre et on télécharge la semaine en cours. */}
+      <BoutonsExport
+        restaurantId={restaurant}
+        exports={[{ quoi: 'ventes', libelle: 'Résumé' }, { quoi: 'articles', libelle: 'Par article' }, { quoi: 'categories', libelle: 'Par catégorie' }]}
+        du={periode.du}
+        au={periode.au}
+      />
 
       {periode.tronquee && (
         <p className="message avertissement">

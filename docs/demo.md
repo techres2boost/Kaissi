@@ -313,7 +313,7 @@ Trois colonnes, une ligne **par taux** :
 Les taux **diffèrent selon le produit**, pas selon le client : en Tunisie, la
 restauration, les boissons et certains produits n'ont pas le même taux. Un
 ticket avec une pizza et un Coca produit donc **deux lignes**, une par taux.
-Le catalogue porte le taux de chaque produit (**Catalogue** → colonne TVA).
+Le menu porte le taux de chaque produit (**Menu** → fiche produit).
 
 Le **total** de la colonne *Base HT* — les `22,158 TND` de ton écran — est
 donc **le CA hors taxe de la journée, toutes lignes confondues**. À ne pas
@@ -371,8 +371,12 @@ un signal, et c'est pour cela que le nom figure sur la ligne.
 
 ### 4.5 — Stock
 
-Quatre cartes en tête : produits suivis, ruptures, stock faible, **valeur du
+Quatre cartes en tête : produits comptés, ruptures, stock faible, **valeur du
 stock** (quantités × coût d'achat).
+
+> **Il n'y a plus de « suivi » à activer.** Saisir une quantité suffit : le
+> bouton dit *Saisir le stock*, puis *Ajuster*. Trois notions — suivre,
+> compter, ne plus suivre — pour une seule question, combien en reste-t-il.
 
 Puis « À réapprovisionner », et le tableau complet : prix, coût, **marge par
 produit**, stock, seuil, **état** et **En vente**.
@@ -395,25 +399,27 @@ le comptage : 2 vendu(s) »*.
 > ventes synchronisées. Vérifie que l'écran **Sync** de la caisse annonce
 > « À jour ».
 
-### 4.6 — Cuisine
+### 4.6 — Préparation (cuisine et bar)
+
+> L'adresse a changé : c'est **`/‹resto›/preparation`**, plus `/cuisine`.
+> Un même écran sert les deux postes, filtré sur le poste.
 
 À faire **entre l'envoi et l'encaissement du ticket 3**.
 
 L'écran affiche les commandes **envoyées et pas encore encaissées**, les plus
 anciennes d'abord, avec l'attente en minutes qui passe à l'orange à 10 min et
-au rouge à 20. Aucun montant : la cuisine prépare, elle n'encaisse pas.
+au rouge à 20. Aucun montant : celui qui prépare n'encaisse pas.
 
 Clique **Prêt** → le bon grisonne. Encaisse le ticket à la caisse → il
 disparaît de l'écran.
 
 **Les onglets de poste** — *Tous les postes · Cuisine · Bar* — apparaissent
-dès qu'il y a plus d'un poste de préparation. La caisse émet déjà **un bon par
-poste** : la pizza part en Cuisine, le Coca au Bar. L'écran mélangeait les
-deux, et le barman triait les pizzas à l'œil pour trouver ses cafés. Le poste
-d'un produit se règle au **Catalogue**.
+dès qu'il y a plus d'un poste, **et seulement pour l'encadrement**. Un gérant
+a de bonnes raisons de voir ce que chaque poste voit ; un barman, non — son
+écran est épinglé sur le sien, et son titre porte le nom du poste.
 
-> « Tous les postes » reste le défaut : dans un snack à un seul écran, c'est
-> ce qu'on veut.
+Le poste se règle désormais **sur la CATÉGORIE**, au Menu (§4.7) : toutes les
+boissons partent au bar, y compris celles que tu ajouteras dans six mois.
 
 > Cet écran a besoin du **réseau** (il lit le serveur). La caisse, elle,
 > encaisse hors ligne. Si la cuisine perd Internet elle perd l'affichage, pas
@@ -562,11 +568,183 @@ antérieures cessent d'être soustraites, et le produit revient en carte.
 
 ---
 
-## 6. Gérer le catalogue et le stock
+## 5 bis. Tester les nouveautés — pas à pas
+
+Chaque bloc se teste **seul**, dans l'ordre que tu veux. Le résultat attendu
+est écrit : si tu ne l'obtiens pas, c'est un bug, dis-le-moi.
+
+---
+
+### A. Le poste de préparation suit la catégorie
+
+1. Back-office → **Menu** → section **Catégories**.
+2. Chaque ligne porte un menu **Poste de préparation**. Vérifie :
+   *Boissons → Bar*, *Plats → Cuisine*.
+3. Si une catégorie affiche **« non réglé »** (ce sera le cas de « Pizza »),
+   choisis son poste. **Le choix s'enregistre au changement du menu**, sans
+   bouton — un message de confirmation apparaît.
+4. Ouvre la fiche d'un produit (**Modifier**) : il n'y a **plus** de champ
+   « Station de préparation ». C'est voulu — le poste vient de la catégorie.
+
+**Attendu** : sur la caisse, après synchronisation, envoyer une commande
+mixte (une pizza + un Coca) fait apparaître la pizza sur l'écran Cuisine et
+le Coca sur l'écran Bar — jamais les deux au même endroit.
+
+> **Pourquoi ce changement.** Le poste était sur le produit : il fallait s'en
+> souvenir à chaque création, et un produit sans poste n'apparaît sur **aucun**
+> écran de préparation — ce qui ne se voit qu'en plein service.
+
+---
+
+### B. Un écran séparé pour la cuisine et pour le bar
+
+**Préparer un compte de bar** (une fois) :
+
+1. Back-office → **Employés** → donne le rôle **bar** à quelqu'un.
+2. Ce compte doit pouvoir se connecter : s'il n'a pas encore d'accès, lance
+   `pnpm sync:acces` depuis ton poste.
+
+**Tester** :
+
+3. Connecte-toi avec ce compte. Tu atterris **directement** sur
+   `/‹resto›/preparation`.
+4. **Vérifie la barre du haut** : un seul onglet, « Préparation ». Ni Ventes,
+   ni Tickets, ni Journée.
+5. **Le titre porte le nom du poste** — « Bar », pas « Cuisine ».
+6. **Le test qui compte** : tape à la main l'adresse
+   `https://‹ton-back-office›/‹resto›/ventes`.
+
+**Attendu** : tu es **renvoyé sur l'écran de préparation**. Avant ce
+correctif, cette URL affichait le chiffre d'affaires.
+
+> Si le poste n'est pas reconnu, c'est que l'appartenance n'a pas de station.
+> Le repli cherche une station dont le **nom** correspond au rôle (« Bar »).
+> Dis-le-moi si tu veux l'interface de rattachement explicite.
+
+---
+
+### C. L'historique du stock, avec le fournisseur
+
+1. Back-office → **Stock** → déplie un produit (**Ajuster**).
+2. Formulaire **Mouvement** : quantité `12`, motif **Réception**,
+   fournisseur `Sfax Primeurs`, note `Facture 128`. Enregistre.
+3. Descends jusqu'à **Historique des mouvements**.
+
+**Attendu** : une ligne avec **date et heure en deux colonnes**, le produit,
+**`+12`**, « Réception », « Sfax Primeurs », la note, et **ton nom**.
+
+4. Refais un mouvement en **Perte / casse**, quantité `3`.
+
+**Attendu** : la ligne affiche **`−3`** en rouge. Tu saisis toujours un
+nombre **positif** : le signe découle du motif.
+
+5. Ouvre le menu **Motif** : il n'y a plus que deux entrées.
+
+> **« Correction » a disparu de la saisie**, volontairement : entre une
+> réception et une perte, un troisième motif attirait tout ce qu'on n'avait
+> pas envie de qualifier. Pour repartir d'un comptage propre, c'est le
+> formulaire de gauche (*Recompter le stock*) qu'il faut utiliser.
+> Les anciennes lignes « Correction » restent visibles dans l'historique.
+
+**Ce qui n'y est PAS** : les ventes. Elles ne sont pas recopiées ici — le
+stock les déduit directement des commandes. La colonne « Depuis le comptage :
+N vendu(s) » répond déjà à cette question.
+
+---
+
+### D. Ordre du menu, archive, TVA
+
+**Ordre (§10 de ta liste)**
+
+1. **Menu** → section Catégories → clique **↑** sur une catégorie.
+
+**Attendu** : elle échange sa place avec celle du dessus. Les flèches sont
+grisées aux extrémités. Il n'y a **plus de champ « Position »** à remplir.
+
+2. Même chose sur une ligne de produit. Les flèches d'un produit le déplacent
+   **dans sa catégorie** — jamais au milieu d'une autre.
+
+**Archive (§11)**
+
+3. Archive un produit (**Archiver**).
+4. Descends : une section **Archive** apparaît en bas de l'écran Menu.
+5. Clique **Remettre**.
+
+**Attendu** : le produit revient dans la liste, **hors vente**. C'est
+volontaire — il a peut-être été archivé parce qu'on ne le sert plus ; le
+remettre à la carte est une seconde décision (bouton **Remettre** de la ligne).
+
+**TVA (§12)**
+
+6. Ouvre la fiche d'un produit.
+
+**Attendu** : s'il n'y a **qu'un seul taux** dans l'établissement, le menu
+« Taux de TVA » **n'apparaît pas**. Le taux part quand même — un menu à une
+seule entrée n'est pas un choix. Ajoute un second taux et le menu revient.
+
+---
+
+### E. Qui a FERMÉ la caisse
+
+> Il faut une caisse **ouverte par une personne** et **fermée par une autre**.
+
+1. Sur la caisse : prise de poste avec **Ahmed**, fond de caisse `50`.
+2. Encaisse un ticket.
+3. **Verrouille** (bouton en haut à droite), puis reprends avec **Salma**.
+4. **Clôturer** : saisis le comptage, valide.
+5. Synchronise (l'écran Sync doit dire « À jour »).
+6. Back-office → **Journée**, tableau **Caisses**.
+
+**Attendu** : **« Ouverte par » = Ahmed**, **« Fermée par » = Salma**.
+
+> Devant un écart, le nom qui compte est celui de la personne qui a **vu les
+> billets**. Afficher celui de l'ouverture met en cause quelqu'un qui était
+> parti depuis quatre heures.
+>
+> Les caisses **déjà clôturées avant cette mise à jour** affichent « — » dans
+> « Fermée par ». C'est la vérité : l'information n'a jamais été enregistrée.
+> Elle n'est pas remplacée par le nom de l'ouverture, qui serait faux.
+
+---
+
+### F. Les exports
+
+Sur **Ventes**, **Tableau de bord**, **Tickets** et **Stock**, une rangée
+« Exporter : … » apparaît sous le sélecteur de période.
+
+1. **Ventes** → clique **Par article**.
+
+**Attendu** : un fichier `ventes-par-article-‹resto›-‹du›_‹au›.csv` se
+télécharge. Ouvre-le dans Excel : les colonnes sont **séparées**, les accents
+corrects (« Crème brûlée », pas « CrÃ¨me »), et tu as *Article, Quantité, CA,
+CA (TND), Marge, Marge %, Part du CA*.
+
+2. **Change la période** à l'écran, puis réexporte.
+
+**Attendu** : le fichier suit la période affichée. C'est le piège classique —
+on regarde septembre et on télécharge la semaine en cours.
+
+3. **Stock** → **Historique des mouvements**.
+
+**Attendu** : le CSV contient les mouvements du bloc C, fournisseur compris.
+
+4. Le test qui compte pour le cloisonnement : connecte-toi en **cuisine** ou
+   **bar** et ouvre `/‹resto›/export/ventes`.
+
+**Attendu** : **redirigé**, aucun fichier. Un export sans garde rendrait
+exactement ce qu'on vient de retirer de l'écran.
+
+> **Deux colonnes de montant par ligne**, et c'est voulu : « 24,500 TND » se
+> lit, « 24,500 » s'additionne dans le tableur. N'en donner qu'une oblige soit
+> à retaper les chiffres, soit à lire « 24500 » partout.
+
+---
+
+## 6. Gérer le menu et le stock
 
 ### Changer un prix ou un coût
 
-Back-office → **Catalogue** → modifier un produit.
+Back-office → **Menu** → modifier un produit.
 
 - **Prix de vente** et **Coût d'achat** se saisissent en **dinars** (`15` et
   `9`), jamais en millimes.
@@ -751,18 +929,26 @@ administrateur fait le travail d'un gérant.
 > Un **gérant** exploite l'établissement. Un **administrateur** décide qui
 > d'autre obtient ce pouvoir.
 
-| | admin | gérant | caissier | serveur | cuisine |
-|---|:---:|:---:|:---:|:---:|:---:|
-| Encaisser, ouvrir et clôturer la caisse | ✓ | ✓ | ✓ | — | — |
-| Ouvrir une commande, envoyer en cuisine | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Remise | illimitée | illimitée | 10 % | 5 % | — |
-| Annuler une commande, forcer un prix, rembourser | ✓ | ✓ | — | — | — |
-| Tableau de bord, ventes, marges | ✓ | ✓ | — | — | — |
-| Catalogue, stock, prix, coûts | ✓ | ✓ | — | — | — |
-| Embaucher un caissier, un serveur, un cuisinier | ✓ | ✓ | — | — | — |
-| **Nommer un gérant ou un administrateur** | **✓** | — | — | — | — |
-| **Rétrograder ou révoquer un gérant** | **✓** | — | — | — | — |
-| Écran de cuisine | ✓ | ✓ | — | — | ✓ |
+| | admin | gérant | caissier | serveur | cuisine | bar |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| Encaisser, ouvrir et clôturer la caisse | ✓ | ✓ | ✓ | — | — | — |
+| Ouvrir une commande, envoyer en préparation | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Remise | illimitée | illimitée | 10 % | 5 % | — | — |
+| Annuler une commande, forcer un prix, rembourser | ✓ | ✓ | — | — | — | — |
+| Tableau de bord, ventes, marges | ✓ | ✓ | — | — | — | — |
+| Menu, stock, prix, coûts | ✓ | ✓ | — | — | — | — |
+| Journée (fond de caisse, écart) | ✓ | ✓ | ✓ | ✓ | — | — |
+| Embaucher un caissier, un serveur, un cuisinier | ✓ | ✓ | — | — | — | — |
+| **Nommer un gérant ou un administrateur** | **✓** | — | — | — | — | — |
+| **Rétrograder ou révoquer un gérant** | **✓** | — | — | — | — | — |
+| Écran de préparation | ✓ | ✓ | — | — | ✓ | ✓ |
+
+**Cuisine et bar n'ont QU'UN écran, le leur.** Pas même « Journée », qui
+affiche le fond de caisse et l'écart : celui qui prépare n'encaisse pas.
+
+Et ce n'est pas qu'un onglet masqué — la vérification est **côté serveur**.
+Une URL tapée à la main (`/‹resto›/ventes`) renvoie un rôle de préparation
+sur son propre écran. Jusqu'ici, elle rendait le chiffre d'affaires.
 
 La ligne était mal placée jusqu'ici : un gérant ne pouvait pas créer
 d'administrateur, mais il pouvait créer un **gérant** — qui voit tout
