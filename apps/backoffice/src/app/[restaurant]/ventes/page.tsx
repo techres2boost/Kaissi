@@ -15,10 +15,12 @@ import {
   calculerIndicateurs,
   ventilerParCategorie,
   ventilerParEmploye,
+  ventilerParJournee,
   ventilerParPaiement,
   ventilerParProduit,
 } from '../../../serveur/rapports.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
+import { CourbeJournaliere } from '../../../composants/CourbeJournaliere.js'
 import { SelecteurPeriode } from '../../../composants/SelecteurPeriode.js'
 import { TableauVentilation } from '../tableau-bord/page.js'
 
@@ -75,6 +77,16 @@ export default async function PageVentes({
         du={periode.du}
         au={periode.au}
       />
+
+      <section className="bloc">
+        <h2>Évolution jour par jour</h2>
+        <CourbeJournaliere
+          jours={ventilerParJournee(ventes.commandes, fiche.timezone, fiche.bascule, {
+            du: periode.du,
+            au: periode.au,
+          })}
+        />
+      </section>
 
       <section className="bloc">
         <h2>Récapitulatif</h2>

@@ -60,6 +60,7 @@ const GROUPES = [
     titre: 'Rapports',
     onglets: [
       { chemin: 'ventes', libelle: 'Ventes', icone: '🧾', gestionnaire: true },
+      { chemin: 'articles', libelle: 'Par article', icone: '🍽️', gestionnaire: true },
       { chemin: 'tickets', libelle: 'Tickets', icone: '🎫', gestionnaire: true },
     ],
   },

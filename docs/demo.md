@@ -581,7 +581,7 @@ Le menu est passé **à gauche**, en colonne, groupé :
 
 - en haut, sans titre : **Tableau de bord · Préparation · Journée** — les
   écrans du quotidien ;
-- **Rapports** : Ventes · Tickets ;
+- **Rapports** : Ventes · **Par article** · Tickets ;
 - **Configuration** : Menu · Stock · Employés.
 
 Une rangée d'onglets marchait à cinq entrées. À neuf, elle passait à la
@@ -748,6 +748,66 @@ seule entrée n'est pas un choix. Ajoute un second taux et le menu revient.
 > Les caisses **déjà clôturées avant cette mise à jour** affichent « — » dans
 > « Fermée par ». C'est la vérité : l'information n'a jamais été enregistrée.
 > Elle n'est pas remplacée par le nom de l'ouverture, qui serait faux.
+
+---
+
+### E bis. Ventes par article, et les graphiques
+
+**Menu latéral → Rapports → Par article** (`/‹resto›/articles`).
+
+1. Choisis une période d'au moins **trois jours** (sinon le graphique
+   journalier te dit, à raison, qu'une seule journée ne fait pas une
+   évolution).
+
+**Attendu, dans l'ordre de l'écran** :
+
+- quatre cartes : articles vendus, **ce qui rapporte le plus**, CA net,
+  marge brute ;
+- **Évolution jour par jour** — une colonne par journée. Survole une
+  colonne : tu obtiens le jour, le montant et le nombre de tickets ;
+- **Classement des articles** — une barre par article, la plus longue en
+  haut, avec quantité, CA, marge et part du CA ;
+- le même classement **par catégorie**.
+
+2. **Le test qui compte** : bascule sur **« Par quantité »**.
+
+**Attendu** : le classement **change d'ordre**, et la carte du haut passe de
+« Rapporte le plus » à « Le plus vendu ». Ce ne sont pas les mêmes articles —
+on vend cent cafés et douze couscous : trier par quantité désigne le café,
+trier par chiffre d'affaires désigne le couscous. La décision commerciale
+n'est pas la même, donc l'écran refuse de choisir à ta place.
+
+3. Le choix est dans l'**URL** : recharge la page, il tient. Copie le lien à
+   quelqu'un, il voit la même chose.
+
+4. Ferme un jour (n'encaisse rien) et regarde le graphique.
+
+**Attendu** : la journée apparaît quand même, à zéro — un trait fin sur la
+ligne de base. Un graphique qui saute les jours creux resserre les colonnes
+et fait disparaître le lundi de fermeture : on lirait une semaine régulière
+là où il y a un trou.
+
+5. **Le piège du soir** : encaisse un ticket **après minuit** (entre minuit
+   et 4 h).
+
+**Attendu** : il compte pour la **soirée de la veille**, pas pour le jour
+suivant — exactement comme l'écran Journée. Grouper sur la date de calendrier
+couperait chaque service en deux à minuit, et le samedi soir paraîtrait
+moitié moins bon qu'il ne l'a été.
+
+> **Une seule couleur, et c'est délibéré.** La longueur de la barre porte
+> déjà la grandeur ; colorer chaque article n'ajouterait rien. Le validateur
+> de palette rejette d'ailleurs la menthe de la marque et l'olive atténuée
+> comme deux séries : écart perceptuel 6,8 en deutéranopie, 9,2 même en
+> vision normale, sous le plancher de 15. Deux articles voisins seraient
+> indiscernables pour une partie des lecteurs.
+>
+> Et le premier n'est pas coloré différemment : la couleur suivrait le RANG,
+> qui change à chaque changement de période, et l'œil apprendrait une
+> association fausse.
+
+L'écran **Ventes** porte le même graphique journalier, au-dessus du
+récapitulatif financier.
 
 ---
 

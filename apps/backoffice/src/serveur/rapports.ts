@@ -31,6 +31,10 @@ import {
   type Marge,
   type Millimes,
 } from '@kaissi/domain'
+// La bascule de journée commerciale vit dans UN seul module : deux
+// définitions du « jour » dans un même produit garantissent deux chiffres
+// différents pour la même soirée.
+import { journeeCourante, journeeDecalee } from './journee.js'
 
 /** Une ligne vendue, telle que les rapports la lisent. */
 export interface LigneVendue {
@@ -225,6 +229,64 @@ export function ventilerParPaiement(
       nombre: montants.length,
     }))
     .sort((a, b) => b.montantMillimes - a.montantMillimes)
+}
+
+export interface JourneeCA {
+  readonly journee: string
+  readonly caMillimes: Millimes
+  readonly tickets: number
+}
+
+/**
+ * Regroupe les commandes par JOURNÉE COMMERCIALE.
+ *
+ * ── Le piège, et il coûte cher ────────────────────────────────────────────
+ *
+ * Une vente encaissée à 1 h du matin appartient à la soirée de la VEILLE.
+ * Grouper sur la date de calendrier couperait chaque service en deux à
+ * minuit : le samedi soir paraîtrait moitié moins bon qu'il ne l'a été, et
+ * le dimanche matin inexplicablement bon. C'est la même bascule que l'écran
+ * Journée, et elle doit rester la même partout — deux définitions du « jour »
+ * dans un même produit garantissent deux chiffres différents pour la même
+ * soirée.
+ *
+ * Les journées SANS vente sont rendues à zéro, pas omises. Un graphique qui
+ * saute les jours creux resserre les colonnes et fait disparaître le lundi
+ * de fermeture : on lirait une semaine régulière là où il y a un trou.
+ */
+export function ventilerParJournee(
+  commandes: readonly CommandeVendue[],
+  fuseau: string,
+  bascule: string,
+  bornes: { du: string; au: string },
+): JourneeCA[] {
+  const cumul = new Map<string, { total: number[]; tickets: number }>()
+
+  for (const c of commandes) {
+    if (!c.closeA) continue
+    const journee = journeeCourante(fuseau, bascule, new Date(c.closeA))
+    const seau = cumul.get(journee) ?? { total: [], tickets: 0 }
+    seau.total.push(c.totalMillimes)
+    seau.tickets += 1
+    cumul.set(journee, seau)
+  }
+
+  const jours: JourneeCA[] = []
+  // Borne de sécurité : une période absurde (« du 2020 au 2030 ») produirait
+  // des milliers de colonnes et figerait la page. `resoudrePeriode` rabote
+  // déjà la demande, ceci ne fait qu'empêcher la boucle infinie si un jour
+  // ce n'était plus le cas.
+  for (let jour = bornes.du, garde = 0; garde < 400; garde += 1) {
+    const seau = cumul.get(jour)
+    jours.push({
+      journee: jour,
+      caMillimes: sommeMillimes(seau?.total ?? []),
+      tickets: seau?.tickets ?? 0,
+    })
+    if (jour === bornes.au) break
+    jour = journeeDecalee(jour, 1)
+  }
+  return jours
 }
 
 /** L'état d'un produit au regard de son seuil — ce que la pastille affiche. */

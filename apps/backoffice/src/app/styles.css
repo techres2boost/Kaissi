@@ -384,3 +384,86 @@ button.danger { color: var(--danger); }
   overflow-x: auto;
   max-width: 100%;
 }
+
+/* ── Graphiques ────────────────────────────────────────────────────────────
+   Une SEULE teinte, la menthe de la marque. La longueur — ou la hauteur —
+   porte déjà la grandeur : colorer chaque barre différemment n'ajouterait
+   aucune information, et le validateur de palette refuse de toute façon la
+   menthe et l'olive comme deux séries (écart perceptuel 6,8 en deutéranopie,
+   9,2 même en vision normale, sous le plancher de 15). Deux articles voisins
+   seraient indiscernables pour une partie des lecteurs. */
+
+.classement td, .classement th { vertical-align: middle; }
+.classement .rang { width: 2.5rem; color: var(--attenue); font-variant-numeric: tabular-nums; }
+/* 32 % et non 40 : à 40, les colonnes chiffrées se serraient au point que
+   « 83,500 TND » passait à la ligne, et « 37,4 % » se coupait entre le
+   nombre et le signe. Un chiffre sur deux lignes ne se compare plus. */
+.classement .colonne-barre { width: 32%; min-width: 10rem; }
+/* Les colonnes de chiffres ne s'enroulent JAMAIS : on les lit en colonne,
+   et une valeur qui se casse en deux rompt l'alignement de toute la pile. */
+.classement td.nombre, .classement th.nombre { white-space: nowrap; }
+
+.barre-piste {
+  position: relative;
+  display: flex; align-items: center;
+  height: 1.5rem;
+  background: var(--panneau-clair);
+  border-radius: 4px;          /* extrémité arrondie, ancrée à la ligne de base */
+  overflow: hidden;
+}
+.barre-valeur {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  min-width: 2px;              /* une valeur minuscule reste visible */
+}
+/* PAS d'étiquette dans la barre.
+   Première version : le montant était posé à droite de la piste. Sur écran
+   étroit, une barre longue passait dessous et le texte ivoire se retrouvait
+   sur la menthe — contraste insuffisant, illisible précisément sur les
+   premières lignes, celles qu'on regarde.
+   Le chiffre est DÉJÀ dans la colonne « CA » juste à côté : le répéter dans
+   la barre était une redondance qui coûtait sa lisibilité. La barre porte la
+   comparaison, la colonne porte la valeur. */
+
+/* Le nom garde de la place : sans minimum, « Pizza Quatre Fromages » se
+   hachait sur cinq lignes dans le tableau défilant. */
+.classement td:nth-child(2) { min-width: 9rem; }
+
+.graphique-jours { display: flex; flex-direction: column; gap: 0.5rem; }
+/* `stretch` et non `flex-end` : chaque colonne doit occuper toute la
+   hauteur, sinon la piste — qui vaut « 100 % de son parent » — se résout
+   contre une hauteur automatique, donc zéro. Les barres étaient purement et
+   simplement invisibles, ce qui ne s'est vu qu'en regardant le rendu. */
+.colonnes {
+  display: flex; align-items: stretch; gap: 2px;   /* 2px : l'écart de surface */
+  height: 9rem;
+}
+.colonne { flex: 1 1 0; display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.colonne-piste { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+.colonne-valeur {
+  width: 100%;
+  /* Bornée : sur un grand écran, sept colonnes pleine largeur forment une
+     bande continue plutôt que des grandeurs qu'on compare. */
+  max-width: 3.5rem;
+  margin: 0 auto;
+  background: var(--accent);
+  border-radius: 4px 4px 0 0;  /* arrondi côté valeur, ancré à la base */
+}
+.colonne-piste:hover .colonne-valeur { background: var(--accent-clair); }
+.colonne-jour {
+  flex: 0 0 auto; text-align: center;
+  font-size: 0.72rem; color: var(--attenue);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+
+.entete-bloc { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+
+.bascule { display: flex; gap: 0.25rem; }
+.bascule a {
+  padding: 0.25rem 0.7rem; border-radius: 999px;
+  font-size: 0.82rem; text-decoration: none; color: var(--attenue);
+  border: 1px solid var(--bordure);
+}
+.bascule a:hover { color: var(--texte); }
+.bascule a.actif { background: var(--accent); color: var(--fond); border-color: var(--accent); font-weight: 650; }
