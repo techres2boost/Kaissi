@@ -18,6 +18,8 @@ export interface Employe {
   aUnPin: boolean
   plafondRemise: string
   administrable: boolean
+  /** Poste tenu, pour un rôle de préparation. `null` : tous les postes. */
+  posteId: string | null
 }
 
 /**
@@ -32,20 +34,38 @@ const ROLES = [
   { valeur: 'gerant', libelle: 'Gérant — remises sans limite', cles: true },
   { valeur: 'caissier', libelle: 'Caissier — remises jusqu’à 10 %', cles: false },
   { valeur: 'serveur', libelle: 'Serveur — remises jusqu’à 5 %', cles: false },
-  { valeur: 'cuisine', libelle: 'Cuisine — pas de caisse', cles: false },
+  { valeur: 'cuisine', libelle: 'Cuisine — écran de préparation seul', cles: false },
+  { valeur: 'bar', libelle: 'Bar — écran de préparation seul', cles: false },
 ]
+
+/**
+ * Les rôles qui tiennent un POSTE.
+ *
+ * Le champ n'apparaît que pour eux : proposer un poste à un caissier
+ * poserait une question qui n'a pas de réponse, et un formulaire qui pose
+ * des questions inutiles finit par ne plus être lu.
+ */
+const ROLES_DE_PREPARATION: readonly string[] = ['cuisine', 'bar']
+
+/** Un poste de préparation de l'établissement — Cuisine, Bar… */
+export interface Poste {
+  id: string
+  nom: string
+}
 
 export function ListeEmployes({
   restaurantId,
   modifiable,
   administrateur,
   employes,
+  postes,
 }: {
   restaurantId: string
   modifiable: boolean
   /** Seul un administrateur peut accorder un rôle qui donne les clés. */
   administrateur: boolean
   employes: Employe[]
+  postes: Poste[]
 }) {
   const [cible, setCible] = useState<Employe | null>(null)
   const [embaucheOuverte, setEmbaucheOuverte] = useState(false)
@@ -56,6 +76,7 @@ export function ListeEmployes({
         <FormulaireEmbauche
           restaurantId={restaurantId}
           administrateur={administrateur}
+          postes={postes}
           ouvert={embaucheOuverte}
           ouvrir={() => setEmbaucheOuverte(true)}
           fermer={() => setEmbaucheOuverte(false)}
@@ -143,6 +164,7 @@ export function ListeEmployes({
           restaurantId={restaurantId}
           administrateur={administrateur}
           employe={cible}
+          postes={postes}
           fermer={() => setCible(null)}
         />
       )}
@@ -154,19 +176,22 @@ function PanneauEmploye({
   restaurantId,
   administrateur,
   employe,
+  postes,
   fermer,
 }: {
   restaurantId: string
   administrateur: boolean
   employe: Employe
+  postes: Poste[]
   fermer: () => void
 }) {
   const [resultatPin, actionPin, pinEnCours] = useActionState(
     reinitialiserPin.bind(null, restaurantId, employe.id),
     null as Resultat | null,
   )
+  const [roleChoisi, setRoleChoisi] = useState(employe.role)
   const [resultatRole, actionRole, roleEnCours] = useActionState(
-    changerRole.bind(null, restaurantId, employe.id),
+    changerRole.bind(null, restaurantId, employe.id, postes.map((p) => p.id)),
     null as Resultat | null,
   )
 
@@ -238,7 +263,14 @@ function PanneauEmploye({
           <Message resultat={resultatRole} />
           <div className="champ">
             <label htmlFor={`role-${employe.id}`}>Rôle dans cet établissement</label>
-            <select id={`role-${employe.id}`} name="role" defaultValue={employe.role}>
+            <select
+              id={`role-${employe.id}`}
+              name="role"
+              defaultValue={employe.role}
+              // Le champ POSTE apparaît et disparaît avec le rôle : on suit
+              // donc la sélection en cours, pas seulement la valeur enregistrée.
+              onChange={(e) => setRoleChoisi(e.currentTarget.value)}
+            >
               {ROLES.filter((r) => administrateur || !r.cles).map((role) => (
                 <option key={role.valeur} value={role.valeur}>
                   {role.libelle}
@@ -246,6 +278,14 @@ function PanneauEmploye({
               ))}
             </select>
           </div>
+
+          <ChampPoste
+            id={`poste-${employe.id}`}
+            role={roleChoisi}
+            postes={postes}
+            valeur={employe.posteId}
+          />
+
           <button type="submit" disabled={roleEnCours}>
             {roleEnCours ? 'Enregistrement…' : 'Changer le rôle'}
           </button>
@@ -261,6 +301,62 @@ function PanneauEmploye({
   )
 }
 
+/**
+ * Le poste tenu — visible SEULEMENT pour un rôle qui prépare.
+ *
+ * ── Pourquoi ce champ existe ──────────────────────────────────────────────
+ *
+ * Sans lui, le poste se devinait en comparant le rôle au NOM de la station.
+ * Cela marche jusqu'au jour où quelqu'un renomme « Bar » en « Comptoir » :
+ * l'écran du barman se vide, et rien n'explique pourquoi. Le rendre explicite
+ * transforme un mystère en réglage.
+ *
+ * « Tous les postes » reste un choix valide : dans un snack à un seul écran,
+ * c'est ce qu'on veut, et l'imposer obligerait à créer des postes fictifs.
+ */
+function ChampPoste({
+  id,
+  role,
+  postes,
+  valeur,
+}: {
+  id: string
+  role: string
+  postes: Poste[]
+  valeur?: string | null
+}) {
+  if (!ROLES_DE_PREPARATION.includes(role)) return null
+
+  if (postes.length === 0) {
+    return (
+      <p className="indication">
+        Aucun poste de préparation n’est défini pour cet établissement. Cette
+        personne verra <strong>toutes</strong> les lignes du service — ce qui
+        est correct s’il n’y a qu’un écran.
+      </p>
+    )
+  }
+
+  return (
+    <div className="champ">
+      <label htmlFor={id}>Poste tenu</label>
+      <select id={id} name="poste" defaultValue={valeur ?? ''}>
+        <option value="">— tous les postes —</option>
+        {postes.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.nom}
+          </option>
+        ))}
+      </select>
+      <p className="indication">
+        Son écran de préparation n’affichera que les lignes de ce poste, et son
+        titre en portera le nom. « Tous les postes » convient à un
+        établissement qui n’a qu’un seul écran.
+      </p>
+    </div>
+  )
+}
+
 function Message({ resultat }: { resultat: Resultat | null }) {
   if (!resultat) return null
   return (
@@ -273,18 +369,21 @@ function Message({ resultat }: { resultat: Resultat | null }) {
 function FormulaireEmbauche({
   restaurantId,
   administrateur,
+  postes,
   ouvert,
   ouvrir,
   fermer,
 }: {
   restaurantId: string
   administrateur: boolean
+  postes: Poste[]
   ouvert: boolean
   ouvrir: () => void
   fermer: () => void
 }) {
+  const [roleChoisi, setRoleChoisi] = useState('serveur')
   const [resultat, action, enCours] = useActionState(
-    embaucher.bind(null, restaurantId),
+    embaucher.bind(null, restaurantId, postes.map((p) => p.id)),
     null as Resultat | null,
   )
 
@@ -318,7 +417,12 @@ function FormulaireEmbauche({
           </div>
           <div className="champ">
             <label htmlFor="role-embauche">Rôle</label>
-            <select id="role-embauche" name="role" defaultValue="serveur">
+            <select
+              id="role-embauche"
+              name="role"
+              defaultValue="serveur"
+              onChange={(e) => setRoleChoisi(e.currentTarget.value)}
+            >
               {ROLES.filter((r) => administrateur || !r.cles).map((role) => (
                 <option key={role.valeur} value={role.valeur}>
                   {role.libelle}
@@ -327,6 +431,8 @@ function FormulaireEmbauche({
             </select>
           </div>
         </div>
+
+        <ChampPoste id="poste-embauche" role={roleChoisi} postes={postes} />
 
         <div className="champs deux">
           <div className="champ">

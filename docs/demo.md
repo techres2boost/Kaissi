@@ -575,13 +575,33 @@ est écrit : si tu ne l'obtiens pas, c'est un bug, dis-le-moi.
 
 ---
 
+### 0. La navigation a changé de forme
+
+Le menu est passé **à gauche**, en colonne, groupé :
+
+- en haut, sans titre : **Tableau de bord · Préparation · Journée** — les
+  écrans du quotidien ;
+- **Rapports** : Ventes · Tickets ;
+- **Configuration** : Menu · Stock · Employés.
+
+Une rangée d'onglets marchait à cinq entrées. À neuf, elle passait à la
+ligne, la page sautait d'une hauteur d'onglet selon le rôle de qui regarde,
+et « Employés » se retrouvait collé à « Ventes » sans rapport entre les deux.
+
+Sur téléphone, un bouton **☰ Menu** apparaît en haut : la colonne se
+superpose au contenu et se ferme en cliquant à côté. Elle ne **pousse** pas
+la page — sinon on perd sa place à chaque ouverture.
+
+---
+
 ### A. Le poste de préparation suit la catégorie
 
 1. Back-office → **Menu** → section **Catégories**.
 2. Chaque ligne porte un menu **Poste de préparation**. Vérifie :
    *Boissons → Bar*, *Plats → Cuisine*.
-3. Si une catégorie affiche **« non réglé »** (ce sera le cas de « Pizza »),
-   choisis son poste. **Le choix s'enregistre au changement du menu**, sans
+3. Toutes tes catégories ont déjà un poste — j'ai rattaché **Pizza** à la
+   Cuisine sur ta base. Si une nouvelle affiche **« non réglé »**, choisis
+   son poste. **Le choix s'enregistre au changement du menu**, sans
    bouton — un message de confirmation apparaît.
 4. Ouvre la fiche d'un produit (**Modifier**) : il n'y a **plus** de champ
    « Station de préparation ». C'est voulu — le poste vient de la catégorie.
@@ -598,28 +618,52 @@ le Coca sur l'écran Bar — jamais les deux au même endroit.
 
 ### B. Un écran séparé pour la cuisine et pour le bar
 
-**Préparer un compte de bar** (une fois) :
+**Un compte de bar est déjà prêt sur ta base** :
 
-1. Back-office → **Employés** → donne le rôle **bar** à quelqu'un.
-2. Ce compte doit pouvoir se connecter : s'il n'a pas encore d'accès, lance
-   `pnpm sync:acces` depuis ton poste.
+| | |
+|---|---|
+| Adresse | `bar@kaissi.tn` |
+| Mot de passe | `BarYiCbMPdJZZ5T!` |
+| Rôle | `bar` |
+| Poste rattaché | **Bar** |
+
+> Change ce mot de passe quand tu auras fini de tester : il a circulé dans
+> une conversation.
 
 **Tester** :
 
-3. Connecte-toi avec ce compte. Tu atterris **directement** sur
-   `/‹resto›/preparation`.
-4. **Vérifie la barre du haut** : un seul onglet, « Préparation ». Ni Ventes,
-   ni Tickets, ni Journée.
-5. **Le titre porte le nom du poste** — « Bar », pas « Cuisine ».
+1. Ouvre le back-office dans une **fenêtre privée** (pour ne pas perdre ta
+   session de gérant) et connecte-toi avec ce compte.
+2. Tu atterris **directement** sur `/‹resto›/preparation`.
+3. **La colonne de gauche ne contient qu'une entrée** : « Préparation ». Ni
+   Ventes, ni Tickets, ni Journée — ni même le sélecteur d'établissement.
+4. **Le titre porte le nom du poste** — « Bar », pas « Cuisine ».
+5. Sur la caisse, envoie une commande **mixte** (une pizza + un Coca).
+
+**Attendu** : l'écran du bar montre **le Coca seul**. La pizza n'y est pas.
+
 6. **Le test qui compte** : tape à la main l'adresse
    `https://‹ton-back-office›/‹resto›/ventes`.
 
 **Attendu** : tu es **renvoyé sur l'écran de préparation**. Avant ce
-correctif, cette URL affichait le chiffre d'affaires.
+correctif, cette URL affichait le chiffre d'affaires. Essaie aussi
+`/‹resto›/export/ventes` — même refus, aucun fichier.
 
-> Si le poste n'est pas reconnu, c'est que l'appartenance n'a pas de station.
-> Le repli cherche une station dont le **nom** correspond au rôle (« Bar »).
-> Dis-le-moi si tu veux l'interface de rattachement explicite.
+**Rattacher quelqu'un d'autre à un poste** :
+
+7. Reviens en gérant → **Employés** → clique sur un employé.
+8. Choisis le rôle **Cuisine** ou **Bar** : un champ **« Poste tenu »**
+   apparaît juste en dessous. Choisis-en un, enregistre.
+
+> Le champ n'apparaît **que** pour ces deux rôles : proposer un poste à un
+> caissier poserait une question sans réponse. Et changer le rôle vers un
+> rôle qui ne prépare pas **efface** le poste — garder celui d'un ancien
+> cuisinier devenu caissier laisserait une donnée que plus rien n'utilise.
+>
+> « Tous les postes » reste un choix valide : dans un snack à un seul écran,
+> c'est ce qu'on veut. Si tu laisses vide sur un rôle de préparation, le
+> message de confirmation te le **dit** au lieu de te laisser deviner
+> pourquoi l'écran montre tout.
 
 ---
 

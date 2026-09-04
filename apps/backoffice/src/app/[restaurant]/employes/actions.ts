@@ -12,6 +12,7 @@ import { supabaseServeur } from '../../../serveur/supabase.js'
 import { uuidV7 } from '@kaissi/domain'
 import {
   choix,
+  choixFacultatif,
   ErreurSaisie,
   texteFacultatif,
   texteObligatoire,
@@ -22,7 +23,17 @@ export interface Resultat {
   succes?: string
 }
 
-const ROLES = ['gerant', 'caissier', 'serveur', 'cuisine'] as const
+const ROLES = ['gerant', 'caissier', 'serveur', 'cuisine', 'bar'] as const
+
+/**
+ * Les rôles qui PRÉPARENT — ce sont les seuls à tenir un poste.
+ *
+ * Attacher un poste à un caissier n'aurait pas de sens : il ne va jamais sur
+ * l'écran de préparation. Le champ ne lui est donc pas proposé, et le
+ * serveur remet le poste à nul si le rôle cesse d'en tenir un — sinon une
+ * appartenance garderait la trace d'un poste que plus rien n'utilise.
+ */
+const ROLES_DE_PREPARATION: readonly string[] = ['cuisine', 'bar']
 
 /**
  * Les rôles qui donnent accès à l'argent et à la configuration.
@@ -109,6 +120,8 @@ export async function reinitialiserPin(
 export async function changerRole(
   restaurantId: string,
   employeId: string,
+  /** Postes de l'établissement — la valeur reçue est vérifiée contre eux. */
+  postesAutorises: readonly string[],
   _precedent: Resultat | null,
   donnees: FormData,
 ): Promise<Resultat> {
@@ -117,14 +130,41 @@ export async function changerRole(
     if (ROLES_QUI_DONNENT_LES_CLES.includes(role)) {
       exigerAdministrateur(etablissement, `Accorder le rôle « ${role} »`)
     }
+
+    /*
+     * Le POSTE part avec le rôle, dans la MÊME écriture.
+     *
+     * Deux formulaires — l'un pour le rôle, l'autre pour le poste — laissent
+     * un état intermédiaire où quelqu'un est « bar » sans poste : son écran
+     * se vide, et rien ne dit pourquoi. Une seule écriture rend l'état
+     * impossible.
+     *
+     * Un rôle qui ne prépare pas repart à nul : garder le poste d'un ancien
+     * cuisinier devenu caissier laisserait une donnée que plus rien
+     * n'utilise, et qui reviendrait le jour où on le repasse en cuisine.
+     */
+    const poste = ROLES_DE_PREPARATION.includes(role)
+      ? choixFacultatif(donnees, 'poste', 'Le poste', postesAutorises)
+      : null
+
     const { count, error } = await supabase
       .from('memberships')
-      .update({ role, updated_at: new Date().toISOString() }, { count: 'exact' })
+      .update(
+        { role, station_id: poste, updated_at: new Date().toISOString() },
+        { count: 'exact' },
+      )
       .eq('user_id', employeId)
       .eq('restaurant_id', restaurantId)
 
     if (error) throw new Error(error.message)
     exigerUneLigne(count, 'Le changement de rôle')
+    if (ROLES_DE_PREPARATION.includes(role) && poste === null) {
+      return (
+        `Rôle changé en « ${role} », mais AUCUN poste n’est choisi. ` +
+        'Son écran affichera toutes les lignes du service — choisissez ' +
+        'un poste pour ne lui montrer que les siennes.'
+      )
+    }
     return `Rôle changé en « ${role} ». Le plafond de remise associé s’applique dès la synchronisation.`
   })
 }
@@ -185,6 +225,8 @@ function hachageDuPin(donnees: FormData, champPin: string, champConfirmation: st
  */
 export async function embaucher(
   restaurantId: string,
+  /** Postes de l'établissement — la valeur reçue est vérifiée contre eux. */
+  postesAutorises: readonly string[],
   _precedent: Resultat | null,
   donnees: FormData,
 ): Promise<Resultat> {
@@ -220,6 +262,11 @@ export async function embaucher(
       user_id: employeId,
       restaurant_id: restaurantId,
       role,
+      // Le poste, pour un rôle qui prépare. Nul sinon : garder le poste d'un
+      // caissier laisserait une donnée que plus rien n'utilise.
+      station_id: ROLES_DE_PREPARATION.includes(role)
+        ? choixFacultatif(donnees, 'poste', 'Le poste', postesAutorises)
+        : null,
     })
     if (erreurRole) {
       // Sans rôle, l'employé serait invisible ET inatteignable : les politiques

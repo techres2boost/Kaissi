@@ -23,6 +23,7 @@ const PLAFOND_PAR_ROLE: Record<string, number> = {
   caissier: 1000,
   serveur: 500,
   cuisine: 0,
+  bar: 0,
 }
 
 export default async function PageEmployes({
@@ -35,11 +36,22 @@ export default async function PageEmployes({
   ecranReserve(etablissement, 'gestion')
   const supabase = await supabaseServeur()
 
-  const { data, error } = await supabase
-    .from('memberships')
-    .select('role, revoked_at, permissions, users(id, full_name, email, status, pin_hash)')
-    .eq('restaurant_id', restaurant)
-    .is('revoked_at', null)
+  const [{ data, error }, { data: stations }] = await Promise.all([
+    supabase
+      .from('memberships')
+      .select(
+        'role, revoked_at, permissions, station_id, users(id, full_name, email, status, pin_hash)',
+      )
+      .eq('restaurant_id', restaurant)
+      .is('revoked_at', null),
+    // Les postes de préparation, pour le champ « Poste tenu ».
+    supabase
+      .from('stations')
+      .select('id, name')
+      .eq('restaurant_id', restaurant)
+      .is('archived_at', null)
+      .order('position'),
+  ])
 
   const employes = (data ?? [])
     .map((ligne) => {
@@ -65,6 +77,7 @@ export default async function PageEmployes({
         // Un gérant n'administre pas un administrateur : la politique RLS le
         // refuse, autant ne pas proposer les boutons.
         administrable: ligne.role !== 'admin' && u.id !== session.employeId,
+        posteId: (ligne.station_id as string | null) ?? null,
       }
     })
     .filter((e): e is NonNullable<typeof e> => e !== null)
@@ -86,6 +99,7 @@ export default async function PageEmployes({
         modifiable={etablissement.gestionnaire}
         administrateur={etablissement.administrateur}
         employes={employes}
+        postes={(stations ?? []).map((s) => ({ id: s.id as string, nom: s.name as string }))}
       />
 
     </>
