@@ -1,0 +1,261 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Kaissi — construction des paquets de magasin (Google Play, App Store)
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# ── Ce qui est repris de Digital_Fidelity, et ce qui ne l'est pas ──────────
+#
+# Repris : Codemagic, Capacitor, le groupe de variables `ios_signing` avec
+# les MÊMES noms (ASC_ISSUER_ID, ASC_KEY_ID, ASC_PRIVATE_KEY,
+# CERTIFICATE_PRIVATE_KEY) — le groupe déjà rempli pour Stampi se réutilise
+# tel quel, il n'y a rien à ressaisir.
+#
+# NON repris : le `server.url` de `native/capacitor.config.js` et la TWA
+# Android de PWABuilder. Ce n'est pas un oubli et ce n'est pas une préférence
+# d'architecture : pour Stampi, une coque qui charge le site en direct est un
+# BON choix — un `git push` met l'application à jour sans repasser par les
+# magasins. Pour une CAISSE, c'est disqualifiant : quand la connexion tombe,
+# la WebView n'a plus rien à charger et l'application NE S'OUVRE PAS. Ce
+# n'est pas un problème de données, c'est que le code lui-même viendrait du
+# réseau. La règle est écrite dans CLAUDE.md, vérifiée à chaque build par
+# `verifier-mode-avion.mjs`, et expliquée en entier dans docs/stores.md.
+#
+# Le résultat visé est pourtant EXACTEMENT le même : l'application dans les
+# deux magasins, et le site web conservé à côté. Kaissi y arrive autrement —
+# son bundle est déjà empaqueté dans le paquet, sur les deux plateformes.
+#
+# ── Pourquoi aucun déclencheur sur `push` ─────────────────────────────────
+#
+# Digital_Fidelity construit à chaque push sur `main`. Ici, non : chaque
+# construction iOS brûle un numéro de build chez Apple, et chaque envoi
+# Android brûle un `versionCode` que Play ne rend JAMAIS. Publier est une
+# décision, pas un effet de bord d'un commit. On lance donc à la main :
+# Codemagic → Start new build → workflow.
+# ═══════════════════════════════════════════════════════════════════════════
+
+definitions:
+  scripts:
+    - &installer
+      name: Installer le monorepo
+      script: |
+        # `corepack` plutôt qu'un `npm i -g pnpm` : la version de pnpm est
+        # figée dans package.json (packageManager), et une version
+        # différente réécrit le lockfile en silence.
+        corepack enable
+        corepack prepare --activate
+        pnpm install --frozen-lockfile
+
+    - &construire
+      name: Construire le bundle du POS et vérifier le MODE AVION
+      script: |
+        # `pos:build` enchaîne : vérification des types, build Vite, puis
+        # `verifier-mode-avion.mjs`. Ce dernier ÉCHOUE si un `server.url`,
+        # une ressource distante ou une clé Supabase se sont glissés dans le
+        # paquet. C'est le garde-fou qui rend la règle exécutable : sans lui,
+        # « jamais de server.url » ne serait qu'un commentaire.
+        pnpm pos:build
+
+workflows:
+  # ─────────────────────────────────────────────────────────────────────────
+  # ANDROID — Google Play (App Bundle signé)
+  # ─────────────────────────────────────────────────────────────────────────
+  pos-android:
+    name: Kaissi POS — Android (AAB pour Google Play)
+    max_build_duration: 45
+    instance_type: linux_x2
+    environment:
+      # Groupe à créer dans Codemagic si l'on veut la publication
+      # automatique sur la piste interne (GCLOUD_SERVICE_ACCOUNT_CREDENTIALS).
+      # Absent, le build produit quand même l'AAB en artefact.
+      groups:
+        - google_play
+      android_signing:
+        # Référence de keystore à téléverser une fois dans Codemagic
+        # (Teams → Code signing identities → Android keystores).
+        #
+        # ⚠ Perdre ce keystore, c'est ne plus JAMAIS pouvoir mettre à jour
+        #   l'application déjà installée sur les tablettes des clients.
+        #   Google ne le régénère pas. Sauvegarde-le ailleurs qu'ici.
+        - kaissi_keystore
+      node: 20.11.0
+      java: 17
+
+    scripts:
+      - *installer
+      - *construire
+
+      - name: Écrire keystore.properties
+        script: |
+          # Le build Gradle lit ses identifiants de signature dans
+          # `apps/pos/android/keystore.properties`, jamais dans le dépôt
+          # (.gitignore). Sans ce fichier, seul le build de debug marche —
+          # c'est voulu : une machine qui n'a pas les secrets ne doit pas
+          # pouvoir signer une version de production.
+          cat > apps/pos/android/keystore.properties <<PROPS
+          storeFile=$CM_KEYSTORE_PATH
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          keyPassword=$CM_KEY_PASSWORD
+          PROPS
+          echo "Signature de production : keystore.properties écrit."
+
+      - name: Synchroniser Capacitor (Android)
+        script: |
+          cd apps/pos
+          npx cap sync android
+
+      - name: Construire l'App Bundle
+        script: |
+          cd apps/pos/android
+          # `bundleRelease` et non `assembleRelease` : Play n'accepte plus
+          # d'APK pour une nouvelle application depuis août 2021.
+          #
+          # Le versionCode vient de apps/pos/package.json (voir
+          # app/build.gradle) : « 0.2.0 » → 200. Play REFUSE un envoi dont le
+          # code n'est pas strictement supérieur au précédent, et un numéro
+          # brûlé est brûlé — monte la version dans package.json avant de
+          # publier, jamais après.
+          ./gradlew bundleRelease
+
+    artifacts:
+      - apps/pos/android/app/build/outputs/**/*.aab
+      - apps/pos/android/app/build/outputs/**/mapping.txt
+
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        # Piste INTERNE, jamais la production directe. Un binaire de caisse
+        # s'installe d'abord sur une tablette d'essai : une mise à jour
+        # automatique qui casse l'encaissement se voit en plein service, chez
+        # le client, et pas ici.
+        track: internal
+        submit_as_draft: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # iOS — App Store Connect (IPA signé)
+  # ─────────────────────────────────────────────────────────────────────────
+  pos-ios:
+    name: Kaissi POS — iOS (IPA pour l'App Store)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      groups:
+        # MÊME groupe que Stampi : les identifiants App Store Connect sont
+        # ceux du compte développeur, pas ceux d'une application.
+        - ios_signing
+      vars:
+        XCODE_WORKSPACE: "apps/pos/ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+        APP_ID: "tn.res2boost.kaissi"
+        # À renseigner APRÈS avoir créé la fiche dans App Store Connect
+        # (l'« Apple ID » à dix chiffres de l'application). Laissé vide, le
+        # numéro de build retombe sur le compteur de Codemagic — la première
+        # construction n'échoue donc pas faute d'une fiche qui n'existe pas
+        # encore.
+        APP_STORE_APPLE_ID: ""
+      node: 20.11.0
+      xcode: latest
+      cocoapods: default
+
+    scripts:
+      - *installer
+      - *construire
+
+      - name: Synchroniser Capacitor (iOS)
+        script: |
+          cd apps/pos
+          # `cap sync` recopie le bundle DANS le projet iOS et régénère la
+          # section Pods du Podfile. Ce dernier point compte avec pnpm : les
+          # chemins des pods contiennent la version des paquets
+          # (node_modules/.pnpm/@capacitor+ios@…), donc un Podfile versionné
+          # devient faux à la première mise à jour. Régénéré ici, il est
+          # toujours juste.
+          npx cap sync ios
+
+      - name: Installer les CocoaPods
+        script: |
+          cd apps/pos/ios/App
+          pod install
+
+      - name: Préparer le trousseau
+        script: keychain initialize
+
+      - name: Vérifier la clé App Store Connect
+        script: |
+          # Échoue tôt et en clair. Le 401 d'Apple ne dit JAMAIS quelle clé a
+          # été présentée : une clé révoquée ou un Key ID mal recopié coûte
+          # sinon une heure de recherche.
+          manquantes=""
+          [ -z "$ASC_ISSUER_ID" ] && manquantes="$manquantes ASC_ISSUER_ID"
+          [ -z "$ASC_KEY_ID" ] && manquantes="$manquantes ASC_KEY_ID"
+          [ -z "$ASC_PRIVATE_KEY" ] && manquantes="$manquantes ASC_PRIVATE_KEY"
+          [ -z "$CERTIFICATE_PRIVATE_KEY" ] && manquantes="$manquantes CERTIFICATE_PRIVATE_KEY"
+          if [ -n "$manquantes" ]; then
+            echo "ERREUR : variables absentes du groupe ios_signing :$manquantes"
+            echo "Elles sont les mêmes que pour Stampi — le groupe se réutilise tel quel."
+            exit 1
+          fi
+          echo "Key ID présenté à Apple : $ASC_KEY_ID"
+
+      - name: Récupérer ou créer les fichiers de signature
+        script: |
+          # Apple ne conserve QUE la partie publique d'un certificat de
+          # distribution : la clé privée reste sur la machine qui l'a
+          # demandé. Sans CERTIFICATE_PRIVATE_KEY, Codemagic télécharge un
+          # certificat avec lequel il n'a rien pour signer, et répond
+          # « Cannot save Signing Certificates without certificate private key ».
+          app-store-connect fetch-signing-files "$APP_ID" \
+            --issuer-id "$ASC_ISSUER_ID" \
+            --key-id "$ASC_KEY_ID" \
+            --private-key "@env:ASC_PRIVATE_KEY" \
+            --type IOS_APP_STORE \
+            --certificate-key "@env:CERTIFICATE_PRIVATE_KEY" \
+            --create
+
+      - name: Ajouter les certificats au trousseau
+        script: keychain add-certificates
+
+      - name: Appliquer les profils de signature
+        script: xcode-project use-profiles
+
+      - name: Poser les numéros de version
+        script: |
+          # UNE seule source de vérité pour le numéro de version, la même que
+          # côté Android : apps/pos/package.json. Deux numéros saisis à la
+          # main divergent, et on s'en aperçoit dans la fiche du magasin.
+          VERSION=$(node -p "require('./apps/pos/package.json').version")
+          cd apps/pos/ios/App
+          agvtool new-marketing-version "$VERSION"
+
+          if [ -n "$APP_STORE_APPLE_ID" ]; then
+            DERNIER=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" \
+              --issuer-id "$ASC_ISSUER_ID" \
+              --key-id "$ASC_KEY_ID" \
+              --private-key "@env:ASC_PRIVATE_KEY")
+            agvtool new-version -all $(($DERNIER + 1))
+          else
+            # Première construction : la fiche n'existe pas encore, donc
+            # aucun build à interroger. Le compteur de Codemagic fait
+            # l'affaire — il est monotone, ce qui est tout ce qu'Apple exige.
+            echo "APP_STORE_APPLE_ID vide — numéro de build = $BUILD_NUMBER."
+            echo "Renseigne-le dans ce fichier dès que la fiche existe."
+            agvtool new-version -all "$BUILD_NUMBER"
+          fi
+
+      - name: Construire l'IPA
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        api_key: $ASC_PRIVATE_KEY
+        key_id: $ASC_KEY_ID
+        issuer_id: $ASC_ISSUER_ID
+        # TestFlight seulement, jamais la revue directe : une caisse se
+        # vérifie sur un vrai appareil avant d'être proposée à Apple.
+        submit_to_testflight: false

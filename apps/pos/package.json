@@ -15,36 +15,40 @@
     "preview:web": "node scripts/vite-cible.mjs web preview --port 4173",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "cap:sync": "pnpm build && cap sync android",
+    "cap:sync:ios": "pnpm build && cap sync ios",
     "android:add": "cap add android",
     "android:open": "cap open android",
     "android": "pnpm cap:sync && cap run android",
+    "ios:add": "cap add ios",
+    "ios:open": "cap open ios",
     "verifier:avion": "node scripts/verifier-mode-avion.mjs",
     "verifier:natif": "node scripts/verifier-plugin-natif.mjs",
     "test:parcours": "node tests/parcours-caisse.mjs",
     "test:persistance": "node tests/persistance-web.mjs"
   },
   "dependencies": {
-    "@kaissi/domain": "workspace:*",
-    "@kaissi/db-local": "workspace:*",
-    "@capacitor/core": "^7.0.1",
+    "@capacitor-community/sqlite": "^7.0.0",
     "@capacitor/android": "^7.0.1",
     "@capacitor/app": "^7.0.0",
+    "@capacitor/core": "^7.0.1",
+    "@capacitor/ios": "^7.6.9",
     "@capacitor/network": "^7.0.0",
-    "@capacitor-community/sqlite": "^7.0.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
+    "@kaissi/db-local": "workspace:*",
+    "@kaissi/domain": "workspace:*",
     "@kaissi/printing": "workspace:*",
-    "@kaissi/sync-client": "workspace:*"
+    "@kaissi/sync-client": "workspace:*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.0.1",
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
-    "@vitejs/plugin-react": "^4.3.4",
-    "typescript": "^5.7.3",
-    "vite": "^6.0.11",
-    "sql.js": "^1.12.0",
     "@types/sql.js": "^1.4.9",
-    "playwright": "^1.50.1"
+    "@vitejs/plugin-react": "^4.3.4",
+    "playwright": "^1.50.1",
+    "sql.js": "^1.12.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.11"
   }
 }

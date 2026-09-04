@@ -75,6 +75,9 @@ importers:
       '@capacitor/core':
         specifier: ^7.0.1
         version: 7.6.8
+      '@capacitor/ios':
+        specifier: ^7.6.9
+        version: 7.6.9(@capacitor/core@7.6.8)
       '@capacitor/network':
         specifier: ^7.0.0
         version: 7.0.4(@capacitor/core@7.6.8)
@@ -328,6 +331,11 @@ packages:
 
   '@capacitor/core@7.6.8':
     resolution: {integrity: sha512-x1xfxvNcTSnj6OoYaAB0n0a0HRvi5f2YjcVnMLxpMhbHDgGDAzzN9z8cnPCYV+SKTvqGF1hezHm82Op32XaAGg==}
+
+  '@capacitor/ios@7.6.9':
+    resolution: {integrity: sha512-LANP81TfwuJk1zq9EuF+J5AJK71rKDgXB5XD+VFJQHC7BxSH4Dsma6DSMyrjFT03jtqc/0JTMEfSMBE7go3ZjA==}
+    peerDependencies:
+      '@capacitor/core': ^7.6.0
 
   '@capacitor/network@7.0.4':
     resolution: {integrity: sha512-fNhN3968AQWMnzasPJ0B8e+nyk7+R6V9PWIBQWSQRHrKndDgWRHpxkjEzJPgnJr3EjnKLjbwO+UYy+EwBlGs3A==}
@@ -2093,6 +2101,10 @@ snapshots:
   '@capacitor/core@7.6.8':
     dependencies:
       tslib: 2.8.1
+
+  '@capacitor/ios@7.6.9(@capacitor/core@7.6.8)':
+    dependencies:
+      '@capacitor/core': 7.6.8
 
   '@capacitor/network@7.0.4(@capacitor/core@7.6.8)':
     dependencies:

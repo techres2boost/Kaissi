@@ -45,6 +45,36 @@ controler(
     "du code distant et l'application ne s'ouvrirait plus sans réseau",
 )
 
+/*
+ * La MÊME vérification sur les configurations NATIVES déjà générées.
+ *
+ * `cap sync` écrit une copie JSON de la configuration dans chaque projet
+ * (android/app/src/main/assets/capacitor.config.json et
+ * ios/App/App/capacitor.config.json). Ce sont ELLES que lit l'application au
+ * démarrage. Un `server.url` ajouté à la main dans l'une des deux ne
+ * passerait pas par capacitor.config.ts, donc pas par le contrôle ci-dessus,
+ * et l'application chargerait du code distant sans que rien ne l'ait dit.
+ *
+ * Elles sont ignorées par git : absentes, il n'y a rien à contrôler.
+ */
+for (const relatif of [
+  'android/app/src/main/assets/capacitor.config.json',
+  'ios/App/App/capacitor.config.json',
+]) {
+  let natif
+  try {
+    natif = JSON.parse(readFileSync(join(racine, relatif), 'utf8'))
+  } catch {
+    continue
+  }
+  controler(
+    `${relatif} sans server.url`,
+    natif.server?.url === undefined,
+    `la configuration native embarquée porte un server.url (${natif.server?.url}) : ` +
+      "c'est ELLE que lit l'application au démarrage",
+  )
+}
+
 // ── 2. Le bundle doit exister ─────────────────────────────────────────────
 let fichiers = []
 try {

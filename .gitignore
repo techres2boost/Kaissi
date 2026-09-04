@@ -22,8 +22,12 @@ apps/pos/android/app/src/main/assets/public/
 apps/pos/android/app/src/main/assets/capacitor.config.json
 apps/pos/android/app/src/main/assets/capacitor.plugins.json
 apps/pos/android/capacitor-cordova-android-plugins/
-apps/pos/ios/
 apps/pos/dist/
+
+# Le projet iOS est versionné pour la MÊME raison que le projet Android : il
+# accueillera le plugin d'impression en Swift le jour où l'impression se
+# rallume, et le régénérer perdrait ce code. Ses artefacts de build, eux,
+# sont ignorés par apps/pos/ios/.gitignore, écrit par Capacitor.
 *.apk
 *.aab
 *.keystore
