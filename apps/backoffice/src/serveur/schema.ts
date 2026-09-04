@@ -122,6 +122,7 @@ export type Station = {
   restaurant_id: Uuid
   name: string
   position: number
+  updated_at: Horodatage
   archived_at: Horodatage | null
 }
 

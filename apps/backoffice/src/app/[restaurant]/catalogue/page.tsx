@@ -39,7 +39,7 @@ export default async function PageCatalogue({
         .order('position'),
       supabase
         .from('stations')
-        .select('id, name')
+        .select('id, name, position')
         .eq('restaurant_id', restaurant)
         .is('archived_at', null)
         .order('position'),
@@ -103,7 +103,11 @@ export default async function PageCatalogue({
           position: (c.position as number) ?? 0,
           stationId: (c.station_id as string | null) ?? null,
         }))}
-        stations={(stations ?? []).map((s) => ({ id: s.id as string, nom: s.name as string }))}
+        stations={(stations ?? []).map((s) => ({
+          id: s.id as string,
+          nom: s.name as string,
+          position: (s.position as number) ?? 0,
+        }))}
         taux={(taux ?? []).map((t) => ({
           id: t.id as string,
           nom: t.name as string,

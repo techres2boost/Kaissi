@@ -3,15 +3,18 @@
 import { useActionState, useState } from 'react'
 import {
   archiverCategorie,
+  archiverPoste,
   archiverProduit,
   basculerDisponibilite,
   creerCategorie,
   deplacerCategorie,
   deplacerProduit,
   desarchiverCategorie,
+  creerPoste,
   desarchiverProduit,
   enregistrerProduit,
   modifierCategorie,
+  renommerPoste,
   type Resultat,
 } from '../app/[restaurant]/catalogue/actions.js'
 import { pourChampMontant } from '../serveur/formulaire.js'
@@ -46,6 +49,8 @@ export interface Categorie {
 export interface Station {
   id: string
   nom: string
+  /** Rang d'affichage. Absent quand l'appelant n'en a pas besoin. */
+  position?: number
 }
 export interface Taux {
   id: string
@@ -124,6 +129,160 @@ function LigneCategorie({
       </button>
       {resultat?.erreur && <span className="ecart negatif">{resultat.erreur}</span>}
     </form>
+  )
+}
+
+/** Une ligne de poste : on le renomme sur place. */
+function LignePoste({
+  restaurantId,
+  poste,
+}: {
+  restaurantId: string
+  poste: Station
+}) {
+  const [resultat, action] = useActionState(
+    renommerPoste.bind(null, restaurantId, poste.id),
+    null as Resultat | null,
+  )
+  return (
+    <form action={action} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+      <input
+        name="nom"
+        defaultValue={poste.nom}
+        aria-label={`Nom du poste ${poste.nom}`}
+        style={{ maxWidth: '12rem' }}
+      />
+      <button type="submit" className="discret">
+        Renommer
+      </button>
+      {resultat?.erreur && <span className="ecart negatif">{resultat.erreur}</span>}
+    </form>
+  )
+}
+
+/**
+ * Les POSTES de préparation — cuisine, bar, pizzeria.
+ *
+ * Ils n'étaient créables nulle part : un restaurant qui voulait un troisième
+ * poste devait passer par la base. Or sans poste, la catégorie n'a rien à
+ * choisir, et ses lignes n'apparaissent sur AUCUN écran de préparation — ce
+ * qui ne se voit qu'en plein service.
+ *
+ * La section est ici, juste au-dessus des catégories, parce que c'est le même
+ * geste : on crée « Bar », puis on y rattache « Boissons », sans changer de
+ * page.
+ */
+function PostesPreparation({
+  restaurantId,
+  modifiable,
+  stations,
+  categories,
+}: {
+  restaurantId: string
+  modifiable: boolean
+  stations: Station[]
+  categories: Categorie[]
+}) {
+  const [resultat, action, enCours] = useActionState(
+    creerPoste.bind(null, restaurantId),
+    null as Resultat | null,
+  )
+
+  return (
+    <section className="carte">
+      <Message resultat={resultat} />
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem' }}>
+        <h2 style={{ marginBottom: 0 }}>Postes de préparation</h2>
+        <span className="etiquette">{stations.length}</span>
+      </div>
+      <p className="indication">
+        Un poste, c’est un écran : la cuisine voit le sien, le bar le sien. Un
+        employé de rôle « cuisine » ou « bar » est rattaché à un poste dans
+        <strong> Employés</strong>, et n’ouvre que celui-là.
+      </p>
+
+      {stations.length === 0 ? (
+        <p className="vide">
+          Aucun poste. Tant qu’il n’y en a pas, aucune catégorie ne peut être
+          rattachée, et rien n’apparaît sur les écrans de préparation.
+        </p>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>Poste</th>
+              <th className="nombre">Catégories</th>
+              {modifiable && <th />}
+            </tr>
+          </thead>
+          <tbody>
+            {stations.map((poste) => {
+              const rattachees = categories.filter((c) => c.stationId === poste.id)
+              return (
+                <tr key={poste.id}>
+                  <td>
+                    {modifiable ? (
+                      <LignePoste restaurantId={restaurantId} poste={poste} />
+                    ) : (
+                      poste.nom
+                    )}
+                  </td>
+                  <td className="nombre">
+                    {rattachees.length === 0 ? (
+                      <span className="etiquette inactif">aucune</span>
+                    ) : (
+                      rattachees.length
+                    )}
+                  </td>
+                  {modifiable && (
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <button
+                        type="button"
+                        className="discret danger"
+                        onClick={() => {
+                          if (confirm(`Archiver le poste « ${poste.nom} » ?`)) {
+                            void archiverPoste(restaurantId, poste.id)
+                          }
+                        }}
+                      >
+                        Archiver
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      )}
+
+      {modifiable && (
+        <form action={action} style={{ marginTop: '1rem' }}>
+          <div className="champ">
+            <label htmlFor="nom-poste">Nouveau poste</label>
+            <input id="nom-poste" name="nom" placeholder="Pizzeria" required maxLength={60} />
+            <p className="indication">
+              Le nom est libre et se change à tout moment : le rattachement des
+              employés et des catégories se fait par identifiant, jamais par le
+              nom. Renommer « Bar » en « Comptoir » ne vide donc aucun écran.
+            </p>
+          </div>
+          {/*
+            `max + 1`, et non `length + 1` : après un archivage, la longueur
+            de la liste retombe sous la plus grande position existante et deux
+            postes se retrouveraient sur le même rang.
+          */}
+          <input
+            type="hidden"
+            name="position"
+            value={String(stations.reduce((m, s) => Math.max(m, s.position ?? 0), 0) + 1)}
+          />
+          <button type="submit" disabled={enCours}>
+            {enCours ? 'Création…' : 'Créer le poste'}
+          </button>
+        </form>
+      )}
+    </section>
   )
 }
 
@@ -473,6 +632,13 @@ export function EditeurCatalogue({
           </table>
         )}
       </section>
+
+      <PostesPreparation
+        restaurantId={restaurantId}
+        modifiable={modifiable}
+        stations={stations}
+        categories={categories}
+      />
 
       <section className="carte">
         <h2>Catégories</h2>

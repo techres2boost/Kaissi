@@ -594,16 +594,53 @@ la page — sinon on perd sa place à chaque ouverture.
 
 ---
 
-### A. Le poste de préparation suit la catégorie
+### A. Les postes se créent au Menu, et la catégorie s'y rattache
 
-1. Back-office → **Menu** → section **Catégories**.
-2. Chaque ligne porte un menu **Poste de préparation**. Vérifie :
-   *Boissons → Bar*, *Plats → Cuisine*.
-3. Toutes tes catégories ont déjà un poste — j'ai rattaché **Pizza** à la
+**LES POSTES (nouveau)**
+
+1. Back-office → **Menu** → section **Postes de préparation**, en haut.
+
+**Attendu** : la liste des postes de l'établissement — *Cuisine*, *Bar* — avec
+le **nombre de catégories** rattachées à chacun.
+
+2. Crée un poste : `Pizzeria`. Puis renomme-le `Four à bois`.
+
+**Attendu** : les deux gestes marchent sans quitter la page, et le nouveau
+poste apparaît **immédiatement** dans le menu « Poste de préparation » des
+catégories, juste en dessous.
+
+3. Essaie d'**archiver** un poste auquel une catégorie est encore rattachée.
+
+**Attendu** : **refus**, avec le nom de ce qui bloque. C'est délibéré : la
+clé étrangère laisserait faire, et les catégories perdraient leur poste **en
+silence** — leurs lignes cesseraient d'apparaître sur les écrans de
+préparation, ce qui ne se voit qu'en plein service et ressemble alors à une
+panne.
+
+4. Archive « Four à bois » (rien ne s'y rattache).
+
+**Attendu** : il disparaît de la liste et des menus déroulants. Les commandes
+déjà préparées à ce poste gardent la référence — on archive, on ne supprime
+jamais.
+
+> **Pourquoi cet écran manquait.** Les postes venaient du jeu de données
+> initial. Un restaurant qui voulait un troisième écran — pizzeria, comptoir
+> — devait passer par la base. C'est exactement la configuration technique
+> qu'on veut faire disparaître : plus rien ici n'exige une ligne de commande.
+
+> **Renommer est sans danger.** Le rattachement d'un employé se fait par
+> `memberships.station_id`, jamais par le NOM : renommer « Bar » en
+> « Comptoir » ne vide aucun écran.
+
+**LA CATÉGORIE (§8)**
+
+5. Section **Catégories**, juste en dessous. Chaque ligne porte un menu
+   **Poste de préparation**. Vérifie : *Boissons → Bar*, *Plats → Cuisine*.
+6. Toutes tes catégories ont déjà un poste — j'ai rattaché **Pizza** à la
    Cuisine sur ta base. Si une nouvelle affiche **« non réglé »**, choisis
    son poste. **Le choix s'enregistre au changement du menu**, sans
    bouton — un message de confirmation apparaît.
-4. Ouvre la fiche d'un produit (**Modifier**) : il n'y a **plus** de champ
+7. Ouvre la fiche d'un produit (**Modifier**) : il n'y a **plus** de champ
    « Station de préparation ». C'est voulu — le poste vient de la catégorie.
 
 **Attendu** : sur la caisse, après synchronisation, envoyer une commande

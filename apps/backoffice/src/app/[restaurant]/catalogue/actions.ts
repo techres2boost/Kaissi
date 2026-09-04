@@ -469,3 +469,130 @@ export async function archiverProduit(restaurantId: string, produitId: string): 
     return 'Produit archivé. Les commandes passées le mentionnent toujours.'
   })
 }
+
+// ── Postes de préparation ───────────────────────────────────────────────────
+//
+// Ils n'étaient créables NULLE PART : le jeu de démonstration en posait deux,
+// et un restaurant qui voulait un troisième poste — « Pizzeria », « Comptoir »
+// — devait passer par la base. C'est exactement la configuration technique
+// qu'on veut faire disparaître : sans poste, la catégorie n'a rien à choisir,
+// et ses lignes n'apparaissent sur AUCUN écran de préparation.
+//
+// La table existe depuis la 0003, avec RLS et l'écriture réservée à
+// l'encadrement. Il ne manquait que l'écran.
+
+export async function creerPoste(
+  restaurantId: string,
+  _precedent: Resultat | null,
+  donnees: FormData,
+): Promise<Resultat> {
+  return agir(restaurantId, async ({ supabase, organizationId }) => {
+    const nom = texteObligatoire(donnees, 'nom', 'Le nom du poste', 60)
+    const { error } = await supabase.from('stations').insert({
+      // RÈGLE 2 : l'identifiant vient du client. `stations.id` n'a d'ailleurs
+      // aucune valeur par défaut en base — l'omettre échouerait.
+      id: uuidV7(),
+      organization_id: organizationId,
+      restaurant_id: restaurantId,
+      name: nom,
+      position: position(donnees, 'position'),
+    })
+    if (error) throw new Error(messageBase(error.message, error.code))
+    return `Poste « ${nom} » créé. Reste à lui rattacher des catégories.`
+  })
+}
+
+export async function renommerPoste(
+  restaurantId: string,
+  posteId: string,
+  _precedent: Resultat | null,
+  donnees: FormData,
+): Promise<Resultat> {
+  return agir(restaurantId, async ({ supabase }) => {
+    const nom = texteObligatoire(donnees, 'nom', 'Le nom du poste', 60)
+    /*
+     * Renommer est SANS danger, et ce n'est pas évident.
+     *
+     * Le rattachement d'un employé se fait par `memberships.station_id`,
+     * jamais par le NOM (règle du dépôt) : renommer « Bar » en « Comptoir »
+     * ne vide donc aucun écran. C'est précisément pour permettre ce geste
+     * que l'identifiant fait foi.
+     */
+    const { error } = await supabase
+      .from('stations')
+      .update({ name: nom, updated_at: new Date().toISOString() })
+      .eq('id', posteId)
+      .eq('restaurant_id', restaurantId)
+    if (error) throw new Error(messageBase(error.message, error.code))
+    return `Poste renommé « ${nom} ».`
+  })
+}
+
+/**
+ * Archive un poste — mais REFUSE tant que quelque chose s'y rattache.
+ *
+ * La clé étrangère est `on delete set null`, donc rien ne casserait
+ * techniquement. C'est bien le problème : les catégories rattachées
+ * perdraient leur poste en silence, et leurs lignes cesseraient d'apparaître
+ * sur les écrans de préparation — ce qui ne se voit qu'en plein service, et
+ * ressemble alors à une panne.
+ *
+ * On nomme donc ce qui bloque, et le gérant réaffecte d'abord. Deux clics de
+ * plus valent mieux qu'une cuisine qui ne reçoit plus rien.
+ */
+export async function archiverPoste(restaurantId: string, posteId: string): Promise<Resultat> {
+  return agir(restaurantId, async ({ supabase }) => {
+    const [categoriesRes, produitsRes, membresRes] = await Promise.all([
+      supabase
+        .from('categories')
+        .select('name')
+        .eq('restaurant_id', restaurantId)
+        .eq('station_id', posteId)
+        .is('archived_at', null),
+      supabase
+        .from('products')
+        .select('name')
+        .eq('restaurant_id', restaurantId)
+        .eq('station_id', posteId)
+        .is('archived_at', null),
+      supabase
+        .from('memberships')
+        .select('user_id')
+        .eq('restaurant_id', restaurantId)
+        .eq('station_id', posteId)
+        .is('revoked_at', null),
+    ])
+
+    const noms = [
+      ...(categoriesRes.data ?? []).map((c) => c.name),
+      ...(produitsRes.data ?? []).map((p) => p.name),
+    ]
+    if (noms.length > 0) {
+      throw new ErreurSaisie(
+        'poste',
+        `Ce poste sert encore à ${noms.length} élément(s) : ${noms.slice(0, 4).join(', ')}` +
+          `${noms.length > 4 ? '…' : ''}. Rattachez-les ailleurs d’abord — sinon leurs ` +
+          'lignes disparaîtraient des écrans de préparation sans rien dire.',
+      )
+    }
+    if ((membresRes.data ?? []).length > 0) {
+      throw new ErreurSaisie(
+        'poste',
+        `${membresRes.data!.length} employé(s) tiennent encore ce poste. Changez leur ` +
+          'poste dans « Employés » avant de l’archiver : le leur retirer viderait ' +
+          'leur écran sans explication.',
+      )
+    }
+
+    // Archivage et jamais suppression : les lignes de commande déjà projetées
+    // portent ce `station_id`, et l'historique ne doit pas perdre où le plat
+    // a été préparé.
+    const { error } = await supabase
+      .from('stations')
+      .update({ archived_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', posteId)
+      .eq('restaurant_id', restaurantId)
+    if (error) throw new Error(messageBase(error.message, error.code))
+    return 'Poste archivé.'
+  })
+}
