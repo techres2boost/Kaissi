@@ -105,11 +105,20 @@ export function depotCaisse(db: AdaptateurSqlite) {
       compteMillimes: number,
       attenduMillimes: number,
       note: string | null,
+      /**
+       * L'employé qui COMPTE la caisse — pas forcément celui qui a ouvert.
+       *
+       * Un caissier ouvre à midi, un serveur compte le soir. Devant un
+       * écart, le nom qui compte est celui de la personne qui a vu les
+       * billets ; afficher celui de l'ouverture met en cause quelqu'un qui
+       * était parti depuis quatre heures.
+       */
+      fermePar: string | null = null,
     ): Promise<void> {
       await db.executer(
         `UPDATE shifts
          SET closed_at = ?, counted_millimes = ?, expected_millimes = ?,
-             variance_millimes = ?, closing_note = ?,
+             variance_millimes = ?, closing_note = ?, closed_by = ?,
              -- Le shift repart au serveur : il porte maintenant son écart,
              -- qui est LE chiffre pour lequel on tient une caisse.
              pushed_at = NULL
@@ -121,6 +130,7 @@ export function depotCaisse(db: AdaptateurSqlite) {
           // L'écart PEUT être négatif : aucune borne à zéro.
           compteMillimes - attenduMillimes,
           note,
+          fermePar,
           id,
         ],
       )
@@ -140,6 +150,7 @@ export function depotCaisse(db: AdaptateurSqlite) {
         ouvertA: string
         fondDeCaisseMillimes: number
         fermeA: string | null
+        fermePar: string | null
         compteMillimes: number | null
         attenduMillimes: number | null
         ecartMillimes: number | null
@@ -151,12 +162,13 @@ export function depotCaisse(db: AdaptateurSqlite) {
         opened_at: string
         opening_float_millimes: number
         closed_at: string | null
+        closed_by: string | null
         counted_millimes: number | null
         expected_millimes: number | null
         variance_millimes: number | null
       }>(
         `SELECT id, employee_id, opened_at, opening_float_millimes, closed_at,
-                counted_millimes, expected_millimes, variance_millimes
+                closed_by, counted_millimes, expected_millimes, variance_millimes
          FROM shifts WHERE pushed_at IS NULL ORDER BY opened_at LIMIT ?`,
         [limite],
       )
@@ -166,6 +178,7 @@ export function depotCaisse(db: AdaptateurSqlite) {
         ouvertA: l.opened_at,
         fondDeCaisseMillimes: l.opening_float_millimes,
         fermeA: l.closed_at,
+        fermePar: l.closed_by,
         compteMillimes: l.counted_millimes,
         attenduMillimes: l.expected_millimes,
         ecartMillimes: l.variance_millimes,

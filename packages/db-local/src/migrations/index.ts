@@ -22,6 +22,7 @@ import { SQL_002 } from './002_phase1_caisse.js'
 import { SQL_003 } from './003_shifts_synchronises.js'
 import { SQL_004 } from './004_motif_de_rupture.js'
 import { SQL_005 } from './005_poste_par_categorie.js'
+import { SQL_006 } from './006_qui_a_ferme_la_caisse.js'
 
 export interface MigrationLocale {
   readonly version: number
@@ -35,6 +36,7 @@ export const MIGRATIONS: readonly MigrationLocale[] = [
   { version: 3, nom: 'shifts_synchronises', sql: SQL_003 },
   { version: 4, nom: 'motif_de_rupture', sql: SQL_004 },
   { version: 5, nom: 'poste_par_categorie', sql: SQL_005 },
+  { version: 6, nom: 'qui_a_ferme_la_caisse', sql: SQL_006 },
 ]
 
 /** Version cible : celle de la dernière migration connue de ce binaire. */

@@ -46,6 +46,8 @@ export interface ShiftSynchronise {
   readonly ouvertA: string
   readonly fondDeCaisseMillimes: number
   readonly fermeA: string | null
+  /** L'employé qui a COMPTÉ la caisse — pas forcément celui qui a ouvert. */
+  readonly fermePar?: string | null
   readonly compteMillimes: number | null
   readonly attenduMillimes: number | null
   readonly ecartMillimes: number | null

@@ -464,20 +464,32 @@ export class DepotPostgres implements DepotSync {
     await this.sousIdentite(appareil, async (client) => {
       for (const s of recevables) {
         await client.query(
+          // `closed_by` passe par le MÊME filtre que `user_id` : un employé
+          // inconnu du serveur devient nul plutôt que de faire échouer la
+          // clé étrangère — un service de caisse ne doit pas se perdre parce
+          // qu'un employé a été archivé entre-temps.
           `insert into kaissi.shifts
              (id, organization_id, restaurant_id, device_id, user_id, opened_at,
               opening_float_millimes, closed_at, counted_millimes,
-              expected_millimes, variance_millimes)
+              expected_millimes, variance_millimes, closed_by)
            values (
              $1, $2, $3, $4,
              (select u.id from kaissi.users u
                where u.id = $5::uuid and u.organization_id = $2),
-             $6, $7, $8, $9, $10, $11)
+             $6, $7, $8, $9, $10, $11,
+             (select u.id from kaissi.users u
+               where u.id = $12::uuid and u.organization_id = $2))
            on conflict (id) do update set
              closed_at         = excluded.closed_at,
              counted_millimes  = excluded.counted_millimes,
              expected_millimes = excluded.expected_millimes,
              variance_millimes = excluded.variance_millimes,
+             -- COALESCE : une tablette antérieure a la migration locale 006
+             -- renvoie le meme shift SANS closed_by. Ecraser par nul
+             -- effacerait une information deja remontee par une tablette a
+             -- jour. (Sans accents graves ici : ce SQL vit dans un littéral
+             -- gabarit, et un accent grave le fermerait au milieu.)
+             closed_by         = coalesce(excluded.closed_by, kaissi.shifts.closed_by),
              updated_at        = now()`,
           [
             s.id,
@@ -491,6 +503,7 @@ export class DepotPostgres implements DepotSync {
             s.compteMillimes === null ? null : Math.round(s.compteMillimes),
             s.attenduMillimes === null ? null : Math.round(s.attenduMillimes),
             s.ecartMillimes === null ? null : Math.round(s.ecartMillimes),
+            s.fermePar && estUuid(s.fermePar) ? s.fermePar : null,
           ],
         )
         ecrits.push(s.id)

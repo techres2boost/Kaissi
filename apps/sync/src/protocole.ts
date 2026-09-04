@@ -143,6 +143,14 @@ export interface ShiftSynchronise {
   readonly ouvertA: string
   readonly fondDeCaisseMillimes: number
   readonly fermeA: string | null
+  /**
+   * L'employé qui a COMPTÉ la caisse — pas forcément celui qui a ouvert.
+   *
+   * Facultatif : une tablette antérieure à la migration locale 006 ne
+   * l'envoie pas, et le champ doit rester absent plutôt que faussement
+   * rempli. Le back-office affiche alors « — », qui est la vérité.
+   */
+  readonly fermePar?: string | null
   readonly compteMillimes: number | null
   readonly attenduMillimes: number | null
   /** Compté − attendu. PEUT être négatif : c'est tout son intérêt. */

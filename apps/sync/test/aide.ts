@@ -115,4 +115,12 @@ export const TVA_07 = '01930000-0000-7000-8000-000000000012'
  */
 export const EMPLOYE_DEMO = '01930000-0000-7000-8000-000000000701'
 
+/**
+ * Un SECOND employé de démonstration (Karim, serveur — migration 0020).
+ *
+ * Indispensable dès qu'un test doit distinguer deux personnes : « ouvert par
+ * X, fermé par Y » ne prouve rien si X et Y sont le même.
+ */
+export const EMPLOYE_2 = '01930000-0000-7000-8000-000000000702'
+
 export const ESPECES = '01930000-0000-7000-8000-000000000500'

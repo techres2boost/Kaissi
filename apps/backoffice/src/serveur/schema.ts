@@ -345,6 +345,11 @@ export type Shift = {
   /** Compté − attendu. PEUT être négatif : c'est tout son intérêt. */
   variance_millimes: Millimes | null
   closing_note: string | null
+  /**
+   * Qui a COMPTÉ la caisse (0027) — distinct de `user_id`, qui l'a ouverte.
+   * Nul pour les services clos avant la migration, et pour ceux en cours.
+   */
+  closed_by: Uuid | null
 }
 
 /**
@@ -394,7 +399,19 @@ export type Database = {
       stock_items: Table<StockItem>
       stock_movements: Table<MouvementStock>
       stock_actuel: Table<StockActuel>
-      shifts: Table<Shift, [VersUtilisateur<'shifts_user_id_fkey'>]>
+      shifts: Table<
+        Shift,
+        [
+          VersUtilisateur<'shifts_user_id_fkey'>,
+          {
+            foreignKeyName: 'shifts_closed_by_fkey'
+            columns: ['closed_by']
+            isOneToOne: false
+            referencedRelation: 'users'
+            referencedColumns: ['id']
+          },
+        ]
+      >
     }
     Views: Aucun
     Functions: {

@@ -97,7 +97,11 @@ export default async function PageJournee({
   const { data: shifts } = await supabase
     .from('shifts')
     .select(
-      'id, opened_at, closed_at, opening_float_millimes, counted_millimes, expected_millimes, variance_millimes, closing_note, users(full_name)',
+      // DEUX noms, pas un. `users` désigne qui a OUVERT ; `fermeur` qui a
+      // COMPTÉ. L'alias est indispensable : deux jointures vers la même
+      // table sans alias se confondent, et PostgREST ne rendrait qu'une des
+      // deux — silencieusement.
+      'id, opened_at, closed_at, opening_float_millimes, counted_millimes, expected_millimes, variance_millimes, closing_note, users!shifts_user_id_fkey(full_name), fermeur:users!shifts_closed_by_fkey(full_name)',
     )
     .eq('restaurant_id', restaurant)
     .gte('opened_at', debut.toISOString())
@@ -295,8 +299,9 @@ export default async function PageJournee({
           <table>
             <thead>
               <tr>
-                <th>Employé</th>
+                <th>Ouverte par</th>
                 <th>Ouverture</th>
+                <th>Fermée par</th>
                 <th>Clôture</th>
                 <th className="nombre">Fond</th>
                 <th className="nombre">Compté</th>
@@ -307,6 +312,17 @@ export default async function PageJournee({
             <tbody>
               {(shifts ?? []).map((shift) => {
                 const utilisateur = shift.users as { full_name: string } | null
+                /*
+                 * Qui a COMPTÉ la caisse. Distinct de qui l'a ouverte : un
+                 * caissier ouvre à midi, un serveur compte le soir, et
+                 * devant un écart c'est le second qu'on interroge.
+                 *
+                 * « — » pour les services clos avant la migration 0027, et
+                 * pour ceux encore ouverts. On ne le remplace PAS par le nom
+                 * de l'ouverture : ce serait mettre en cause quelqu'un qui
+                 * n'a pas vu les billets.
+                 */
+                const fermeur = shift.fermeur as { full_name: string } | null
                 const ecart = shift.variance_millimes as number | null
                 const heure = (valeur: string | null) =>
                   valeur
@@ -319,6 +335,7 @@ export default async function PageJournee({
                   <tr key={shift.id as string}>
                     <td>{utilisateur?.full_name ?? '—'}</td>
                     <td>{heure(shift.opened_at as string)}</td>
+                    <td>{fermeur?.full_name ?? <span className="detail">—</span>}</td>
                     <td>{heure(shift.closed_at as string | null)}</td>
                     <td className="nombre">
                       {formaterTND(montant(Number(shift.opening_float_millimes) || 0))}

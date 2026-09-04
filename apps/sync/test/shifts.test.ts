@@ -13,7 +13,15 @@ import { uuidV7 } from '@kaissi/domain'
 import { Client } from 'pg'
 import { DepotPostgres } from '../src/depot-postgres.js'
 import { creerServeur } from '../src/serveur.js'
-import { creerAppareil, nettoyer, DEMO_RESTO, URL_TEST, type AppareilTest } from './aide.js'
+import {
+  creerAppareil,
+  nettoyer,
+  DEMO_RESTO,
+  EMPLOYE_DEMO,
+  EMPLOYE_2,
+  URL_TEST,
+  type AppareilTest,
+} from './aide.js'
 
 const depot = new DepotPostgres({ connectionString: URL_TEST, ssl: false })
 const app = creerServeur({ depot })
@@ -36,7 +44,7 @@ async function lire(id: string) {
   try {
     const { rows } = await client.query(
       `select restaurant_id, device_id, user_id, opening_float_millimes,
-              closed_at, counted_millimes, variance_millimes
+              closed_at, closed_by, counted_millimes, variance_millimes
          from kaissi.shifts where id = $1`,
       [id],
     )
@@ -93,6 +101,87 @@ describe('POST /sync/shifts', () => {
     expect(clos.closed_at).not.toBeNull()
     // L'écart PEUT être négatif : c'est tout son intérêt.
     expect(Number(clos.variance_millimes)).toBe(-200)
+  })
+
+  it('retient QUI A COMPTÉ la caisse, distinct de qui l a ouverte', async () => {
+    // Un caissier ouvre à midi, un serveur compte le soir. Devant un écart,
+    // le nom qui compte est celui de la personne qui a vu les billets :
+    // afficher celui de l'ouverture met en cause quelqu'un qui était parti.
+    const a = await creerAppareil('P1')
+    const id = uuidV7()
+
+    await envoyer(a, [{ ...shiftOuvert(id), employeId: EMPLOYE_DEMO }])
+    const ouvert = await lire(id)
+    expect(ouvert.user_id).toBe(EMPLOYE_DEMO)
+    expect(ouvert.closed_by).toBeNull()
+
+    await envoyer(a, [
+      {
+        ...shiftOuvert(id),
+        employeId: EMPLOYE_DEMO,
+        fermeA: '2026-09-03T23:30:00.000Z',
+        fermePar: EMPLOYE_2,
+        compteMillimes: 74_000,
+        attenduMillimes: 74_200,
+        ecartMillimes: -200,
+      },
+    ])
+    const clos = await lire(id)
+    expect(clos.user_id).toBe(EMPLOYE_DEMO)
+    expect(clos.closed_by).toBe(EMPLOYE_2)
+  })
+
+  it('n EFFACE pas le fermeur quand une vieille tablette repousse le service', async () => {
+    /*
+     * Une tablette antérieure à la migration locale 006 renvoie le MÊME
+     * service, sans `fermePar`. Sans le COALESCE de l'upsert, ce renvoi
+     * écraserait par nul une information déjà remontée par une tablette à
+     * jour — et le nom disparaîtrait du back-office sans que rien ne le dise.
+     */
+    const a = await creerAppareil('P1')
+    const id = uuidV7()
+    await envoyer(a, [
+      {
+        ...shiftOuvert(id),
+        fermeA: '2026-09-03T23:30:00.000Z',
+        fermePar: EMPLOYE_2,
+        compteMillimes: 74_000,
+        attenduMillimes: 74_000,
+        ecartMillimes: 0,
+      },
+    ])
+    expect((await lire(id)).closed_by).toBe(EMPLOYE_2)
+
+    // La même clôture, vue par une tablette qui ignore la colonne.
+    await envoyer(a, [
+      {
+        ...shiftOuvert(id),
+        fermeA: '2026-09-03T23:30:00.000Z',
+        compteMillimes: 74_000,
+        attenduMillimes: 74_000,
+        ecartMillimes: 0,
+      },
+    ])
+    expect((await lire(id)).closed_by).toBe(EMPLOYE_2)
+  })
+
+  it('IGNORE un fermeur inconnu du serveur plutôt que de perdre le service', async () => {
+    // Même règle que pour l'ouverture : un employé archivé entre-temps ne
+    // doit pas faire échouer la remontée d'un service de caisse.
+    const a = await creerAppareil('P1')
+    const id = uuidV7()
+    const reponse = await envoyer(a, [
+      {
+        ...shiftOuvert(id),
+        fermeA: '2026-09-03T23:30:00.000Z',
+        fermePar: '01930000-0000-7000-8000-0000000000ff',
+        compteMillimes: 1,
+        attenduMillimes: 1,
+        ecartMillimes: 0,
+      },
+    ])
+    expect(reponse.statut).toBe(200)
+    expect((await lire(id)).closed_by).toBeNull()
   })
 
   it('renvoyer dix fois le même service n en écrit qu un (RÈGLE 5)', async () => {

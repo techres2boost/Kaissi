@@ -135,7 +135,21 @@ export function EcranClotureShift({ shift, onFerme, onAnnuler }: PropsCloture) {
     if (!resume) return
     setEnCours(true)
     try {
-      await app.caisse.cloturerShift(shift.id, compte, resume.attenduMillimes, note || null)
+      /*
+       * On enregistre QUI COMPTE, et non qui a ouvert.
+       *
+       * Un caissier ouvre à midi, un serveur compte le soir : devant un
+       * écart, le nom qui compte est celui de la personne qui a vu les
+       * billets. Afficher celui de l'ouverture met en cause quelqu'un qui
+       * était parti depuis quatre heures.
+       */
+      await app.caisse.cloturerShift(
+        shift.id,
+        compte,
+        resume.attenduMillimes,
+        note || null,
+        employe?.id ?? null,
+      )
       await app.etat.ecrire('shift_courant', '')
 
       // Impression éteinte (MVP) : le rapport n'entre pas en file. Il reste
