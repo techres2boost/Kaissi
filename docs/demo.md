@@ -1245,13 +1245,24 @@ caisse, elle, encaisse hors ligne : c'est *elle* qui porte la promesse du
 produit. Porter la cuisine dans le POS la rendrait indépendante d'Internet à
 son tour.
 
-**4. L'application n'est pas encore sur les stores.** L'APK Capacitor existe
-et s'installe à la main, ce qui est plus rapide pour les premiers clients.
-Google Play demande surtout des choses qui ne sont pas du code — captures
-d'écran, politique de confidentialité, questionnaire Data safety. Tout est
-détaillé dans [`stores.md`](stores.md), y compris pourquoi une TWA Bubblewrap,
-qui convenait très bien à Digital Fidelity, est **disqualifiée** pour une
-caisse : dans une TWA, le code de l'application vient du réseau.
+**4. L'application n'est pas encore PUBLIÉE sur les stores** — mais tout ce
+qui est du code est fait. Le projet Android et le projet **iOS**
+(`apps/pos/ios/`) sont dans le dépôt, et `codemagic.yaml` construit les deux
+paquets signés, sur une machine macOS louée à l'heure : il n'y a pas de Mac à
+acheter.
+
+Ce qui reste n'est pas du développement : 25 $ chez Google, 99 $/an chez
+Apple, des captures d'écran, une politique de confidentialité et le
+questionnaire *Data safety*. Les deux constructions se lancent **à la main** —
+chaque build iOS brûle un numéro chez Apple, et chaque envoi Android un
+`versionCode` que Play ne rend jamais.
+
+Tout est détaillé dans [`stores.md`](stores.md), y compris pourquoi une TWA
+Bubblewrap et un `server.url` — le mécanisme de Digital Fidelity, qui
+convient très bien à Stampi — sont **disqualifiés** pour une caisse : le code
+de l'application viendrait du réseau, et sans connexion elle ne s'ouvrirait
+même pas. La garde du mode avion le vérifie à chaque construction, sur la
+configuration `.ts` **et** sur les configurations natives générées.
 
 Et une question ouverte, volontairement laissée telle quelle :
 
