@@ -281,6 +281,8 @@ export type MouvementStock = {
   qty_delta: number
   reason: string
   note: string | null
+  /** Nom du fournisseur, facultatif et libre (0026). */
+  supplier: string | null
   created_by: Uuid | null
   created_at: Horodatage
 }

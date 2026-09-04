@@ -18,6 +18,7 @@ import { montant } from '../../../serveur/montant.js'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { etatStock, type EtatStock } from '../../../serveur/rapports.js'
+import { HistoriqueStock, type Mouvement } from '../../../composants/HistoriqueStock.js'
 import { TableauStock } from '../../../composants/TableauStock.js'
 
 export const dynamic = 'force-dynamic'
@@ -54,7 +55,7 @@ export default async function PageStock({
   ecranReserve(etablissement, 'gestion')
   const supabase = await supabaseServeur()
 
-  const [produitsRes, categoriesRes, stockRes, suiviRes] = await Promise.all([
+  const [produitsRes, categoriesRes, stockRes, suiviRes, mouvementsRes] = await Promise.all([
     supabase
       .from('products')
       .select(
@@ -72,6 +73,20 @@ export default async function PageStock({
       .from('stock_items')
       .select('product_id, auto_rupture')
       .eq('restaurant_id', restaurant),
+    /*
+     * L'HISTORIQUE des mouvements manuels.
+     *
+     * Borné : au-delà de deux cents lignes, ce n'est plus un historique
+     * qu'on parcourt, c'est un export qu'on veut. Charger tout le passé
+     * d'un restaurant sur chaque affichage de l'écran Stock, pour des
+     * lignes que personne ne fera défiler, coûte sans rien rendre.
+     */
+    supabase
+      .from('stock_movements')
+      .select('id, product_id, qty_delta, reason, note, supplier, created_by, created_at')
+      .eq('restaurant_id', restaurant)
+      .order('created_at', { ascending: false })
+      .limit(200),
   ])
 
   if (produitsRes.error) {
@@ -113,6 +128,31 @@ export default async function PageStock({
     }
   })
 
+  // Les auteurs des mouvements, en une requête plutôt qu'une par ligne.
+  // La jointure imbriquée de PostgREST ferait l'affaire, mais elle devient
+  // illisible dès qu'on y ajoute un filtre, et il n'y a ici que deux cents
+  // lignes au plus.
+  const idsAuteurs = [
+    ...new Set((mouvementsRes.data ?? []).map((m) => m.created_by).filter((i): i is string => !!i)),
+  ]
+  const auteursRes =
+    idsAuteurs.length === 0
+      ? { data: [] }
+      : await supabase.from('users').select('id, full_name').in('id', idsAuteurs)
+  const auteurs = new Map((auteursRes.data ?? []).map((u) => [u.id, u.full_name]))
+  const nomProduit = new Map((produitsRes.data ?? []).map((p) => [p.id, p.name]))
+
+  const mouvements: Mouvement[] = (mouvementsRes.data ?? []).map((m) => ({
+    id: m.id,
+    produit: nomProduit.get(m.product_id) ?? 'Produit archivé',
+    delta: Number(m.qty_delta),
+    raison: m.reason,
+    note: m.note,
+    fournisseur: m.supplier,
+    auteur: m.created_by ? (auteurs.get(m.created_by) ?? null) : null,
+    creeA: m.created_at,
+  }))
+
   const ruptures = produits.filter((p) => p.etat === 'rupture')
   const faibles = produits.filter((p) => p.etat === 'faible')
   const suivis = produits.filter((p) => p.suivi)
@@ -134,11 +174,13 @@ export default async function PageStock({
 
       <div className="cartes-kpi">
         <div className="kpi">
-          <span className="kpi-libelle">Produits suivis</span>
+          <span className="kpi-libelle">Produits comptés</span>
           <span className="kpi-valeur">
             {suivis.length} <small>/ {produits.length}</small>
           </span>
-          <span className="kpi-aide">Le suivi s’active produit par produit.</span>
+          <span className="kpi-aide">
+            Saisir une quantité suffit : il n’y a pas de suivi à activer.
+          </span>
         </div>
         <div className={`kpi ${ruptures.length > 0 ? 'alerte' : ''}`}>
           <span className="kpi-libelle">En rupture</span>
@@ -179,6 +221,8 @@ export default async function PageStock({
       )}
 
       <TableauStock restaurantId={restaurant} produits={produits} />
+
+      <HistoriqueStock mouvements={mouvements} />
 
       <p className="indication">
         Établissement : {etablissement.nom}. Le coût d’achat se saisit au{' '}

@@ -87,11 +87,21 @@ async function realignerCarte(
 }
 
 /**
- * Active le suivi de stock d'un produit, ou le désactive.
+ * Enregistre le stock d'un produit : une quantité CONSTATÉE, à maintenant.
  *
- * Activer, c'est POSER UN COMPTAGE : une quantité constatée, à maintenant.
- * Les ventes antérieures sont réputées déjà déduites — sans quoi activer le
- * suivi un mardi soustrairait tout l'historique du restaurant d'un coup.
+ * ── Pourquoi il n'y a plus de « suivi » à activer ─────────────────────────
+ *
+ * L'écran demandait d'abord « suivre ce produit », puis d'en saisir la
+ * quantité, et proposait enfin d'« arrêter le suivi ». Trois notions pour
+ * une seule question : combien en reste-t-il ? Et la réponse « je ne le
+ * suis pas » n'apporte rien de plus que « je n'ai pas saisi de quantité ».
+ *
+ * Saisir une quantité suffit désormais. La rupture automatique (0023) fait
+ * le reste : à zéro, le produit sort de la carte tout seul.
+ *
+ * Les ventes ANTÉRIEURES au comptage sont réputées déjà déduites — sans
+ * quoi enregistrer un stock un mardi soustrairait tout l'historique du
+ * restaurant d'un coup.
  */
 export async function activerSuivi(
   restaurantId: string,
@@ -124,26 +134,6 @@ export async function activerSuivi(
   })
 }
 
-export async function arreterSuivi(
-  restaurantId: string,
-  produitId: string,
-): Promise<Resultat> {
-  return agir(restaurantId, async (supabase) => {
-    const { error } = await supabase.from('stock_items').delete().eq('product_id', produitId)
-    if (error) throw new Error(error.message)
-    // Le suivi s'arrête : la rupture automatique n'a plus de base pour
-    // maintenir ce produit hors carte, donc on l'y remet — sauf si le gérant
-    // l'avait retiré à la main, décision qui lui appartient.
-    await supabase
-      .from('products')
-      .update({ track_stock: false, is_available: true, unavailable_reason: null })
-      .eq('id', produitId)
-      .eq('unavailable_reason', 'stock')
-    await supabase.from('products').update({ track_stock: false }).eq('id', produitId)
-    return 'Suivi de stock désactivé pour ce produit.'
-  })
-}
-
 /**
  * Enregistre un mouvement manuel : réception, perte, correction.
  *
@@ -162,7 +152,19 @@ export async function enregistrerMouvement(
     if (delta === 0) {
       throw new ErreurSaisie('delta', 'Un mouvement de zéro ne change rien.')
     }
-    const raison = String(donnees.get('raison') ?? 'correction')
+    const raison = String(donnees.get('raison') ?? 'reception')
+    /*
+     * Deux motifs, plus « correction ».
+     *
+     * « Correction » a disparu de l'interface : entre une réception et une
+     * perte, un troisième motif fourre-tout attire tout ce qu'on n'a pas
+     * envie de qualifier, et l'historique perd exactement ce qu'on lui
+     * demande — savoir POURQUOI le stock a bougé.
+     *
+     * Il reste accepté ici, et dans la contrainte de la base : des lignes
+     * existantes le portent. Refuser une valeur que la table contient déjà
+     * rendrait l'historique illisible pour son propre passé.
+     */
     if (!['reception', 'perte', 'correction'].includes(raison)) {
       throw new ErreurSaisie('raison', 'Motif inconnu.')
     }
@@ -177,6 +179,10 @@ export async function enregistrerMouvement(
       qty_delta: signe,
       reason: raison,
       note: texteFacultatif(donnees, 'note'),
+      // Facultatif, et libre : « +12 le 3 septembre » ne se rapproche
+      // d'aucune facture ; « +12 le 3 septembre, Sfax Primeurs » se
+      // rapproche tout seul.
+      supplier: texteFacultatif(donnees, 'fournisseur'),
       created_by: employeId,
     })
     if (error) throw new Error(error.message)

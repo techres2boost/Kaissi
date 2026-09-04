@@ -13,7 +13,6 @@ import { useRouter } from 'next/navigation'
 import { formaterPourcentage, formaterTND, millimes } from '@kaissi/domain'
 import {
   activerSuivi,
-  arreterSuivi,
   basculerDisponibilite,
   basculerRuptureAuto,
   enregistrerMouvement,
@@ -148,7 +147,7 @@ export function TableauStock({
                     className="discret"
                     onClick={() => setOuvert(ouvert === p.id ? null : p.id)}
                   >
-                    {ouvert === p.id ? 'Fermer' : p.suivi ? 'Ajuster' : 'Suivre'}
+                    {ouvert === p.id ? 'Fermer' : p.suivi ? 'Ajuster' : 'Saisir le stock'}
                   </button>
                 </td>
               </tr>
@@ -162,11 +161,12 @@ export function TableauStock({
                           agir(() => activerSuivi(restaurantId, p.id, null, donnees))
                         }
                       >
-                        <h3>{p.suivi ? 'Recompter le stock' : 'Activer le suivi'}</h3>
+                        <h3>{p.suivi ? 'Recompter le stock' : 'Saisir le stock'}</h3>
                         <p className="indication">
                           Saisir la quantité <strong>constatée maintenant</strong>. Les
                           ventes antérieures sont réputées déjà déduites : sans cela,
-                          activer le suivi retrancherait tout l’historique d’un coup.
+                          le premier comptage retrancherait tout l’historique d’un coup.
+                          À zéro, le produit sort de la carte tout seul.
                         </p>
                         <div className="champs deux">
                           <label className="champ">
@@ -187,19 +187,15 @@ export function TableauStock({
                             />
                           </label>
                         </div>
+                        {/*
+                          Plus d'« arrêter le suivi » : trois notions — suivre,
+                          compter, ne plus suivre — pour une seule question,
+                          combien en reste-t-il. La rupture automatique fait le
+                          reste.
+                        */}
                         <button type="submit" className="principal" disabled={enCours}>
-                          {p.suivi ? 'Enregistrer le comptage' : 'Activer le suivi'}
+                          {p.suivi ? 'Enregistrer le comptage' : 'Enregistrer le stock'}
                         </button>
-                        {p.suivi && (
-                          <button
-                            type="button"
-                            className="discret danger"
-                            disabled={enCours}
-                            onClick={() => agir(() => arreterSuivi(restaurantId, p.id))}
-                          >
-                            Arrêter le suivi
-                          </button>
-                        )}
                       </form>
 
                       {p.suivi && (
@@ -221,17 +217,30 @@ export function TableauStock({
                             </label>
                             <label className="champ">
                               Motif
+                              {/*
+                                Deux motifs, pas trois. « Correction » attirait
+                                tout ce qu'on n'avait pas envie de qualifier, et
+                                l'historique perdait ce qu'on lui demande :
+                                POURQUOI le stock a bougé. Un recomptage se fait
+                                dans le formulaire de gauche, qui repose la
+                                référence — c'est le geste juste.
+                              */}
                               <select name="raison" defaultValue="reception">
                                 <option value="reception">Réception</option>
                                 <option value="perte">Perte / casse</option>
-                                <option value="correction">Correction</option>
                               </select>
                             </label>
                           </div>
-                          <label className="champ">
-                            Note (facultatif)
-                            <input name="note" placeholder="Livraison Sfax, facture 128" />
-                          </label>
+                          <div className="champs deux">
+                            <label className="champ">
+                              Fournisseur (facultatif)
+                              <input name="fournisseur" placeholder="Sfax Primeurs" />
+                            </label>
+                            <label className="champ">
+                              Note (facultatif)
+                              <input name="note" placeholder="Facture 128" />
+                            </label>
+                          </div>
                           <button type="submit" className="principal" disabled={enCours}>
                             Enregistrer le mouvement
                           </button>
