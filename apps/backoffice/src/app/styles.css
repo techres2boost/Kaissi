@@ -467,3 +467,23 @@ button.danger { color: var(--danger); }
 }
 .bascule a:hover { color: var(--texte); }
 .bascule a.actif { background: var(--accent); color: var(--fond); border-color: var(--accent); font-weight: 650; }
+
+/* ── Ticket tel qu'il s'imprime ────────────────────────────────────────────
+   Police à chasse fixe, obligatoire : le rendu ESC/POS aligne ses colonnes
+   en comptant des CARACTÈRES. Avec une police proportionnelle, les prix ne
+   tombent plus en face des libellés et le ticket devient illisible — alors
+   même que le contenu est juste. */
+.ticket-ecran {
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  white-space: pre;
+  overflow-x: auto;
+  background: var(--fond);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  padding: 1rem;
+  margin: 0.5rem 0;
+}
+.ticket-papier > summary { cursor: pointer; color: var(--attenue); font-size: 0.9rem; }
+.ticket-papier > summary:hover { color: var(--texte); }

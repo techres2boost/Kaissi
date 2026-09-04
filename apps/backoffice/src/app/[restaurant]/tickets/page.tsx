@@ -12,6 +12,7 @@ import { montant } from '../../../serveur/montant.js'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { journeeCourante, libelleJournee } from '../../../serveur/journee.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
+import { reconstruireTicket } from '../../../serveur/ticket.js'
 import { chargerFiche, chargerVentes, resoudrePeriode } from '../../../serveur/ventes.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
 import { SelecteurPeriode } from '../../../composants/SelecteurPeriode.js'
@@ -151,6 +152,10 @@ async function DetailTicket({
   periode: { du: string; au: string }
 }) {
   const supabase = await supabaseServeur()
+  // Le ticket TEL QUE LE POS le montre — reconstruit depuis le journal, par
+  // la même chaîne que la caisse. Chargé en parallèle du reste : il répond à
+  // une autre question, et l'une ne doit pas attendre l'autre.
+  const ticketPapier = await reconstruireTicket(restaurantId, orderId)
   const [commandeRes, lignesRes, paiementsRes] = await Promise.all([
     supabase
       .from('orders')
@@ -187,6 +192,45 @@ async function DetailTicket({
 
   return (
     <section className="bloc detail-ticket">
+      {/*
+        LE TICKET, tel que le client l'a en main.
+
+        Deux vues cohabitent volontairement, parce qu'elles répondent à deux
+        questions différentes : celle-ci dit « qu'y a-t-il sur son papier »,
+        le tableau qui suit dit « pourquoi ce montant » — avec les lignes
+        annulées, que le ticket ne montre pas.
+
+        Le rendu vient de la MÊME chaîne que la caisse : mêmes événements,
+        même code de mise en page ESC/POS. Le jour où l'imprimante sera
+        branchée, ce bloc n'aura pas à changer.
+      */}
+      <details open className="ticket-papier">
+        <summary>Ticket, tel qu’il s’imprime</summary>
+        {'erreur' in ticketPapier ? (
+          <p className="indication">
+            Ticket non reconstructible : {ticketPapier.erreur} Le détail
+            ci-dessous reste exact — il vient de la projection.
+          </p>
+        ) : (
+          <>
+            <pre className="ticket-ecran">{ticketPapier.apercu}</pre>
+            <p className="actions-export">
+              <a
+                href={`/${restaurantId}/export/ticket?commande=${orderId}`}
+                download
+                className="discret"
+              >
+                Exporter ce ticket
+              </a>
+              <span className="detail">
+                Fichier texte, à joindre à une réclamation ou à une pièce
+                comptable.
+              </span>
+            </p>
+          </>
+        )}
+      </details>
+
       <div className="detail-entete">
         <h2>Ticket {commande.ticket_number ?? '—'}</h2>
         <Link

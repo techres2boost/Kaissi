@@ -330,8 +330,42 @@ export type Paiement = {
   /** Ce que le client a TENDU, et ce qu'on lui a rendu. */
   received_millimes: Millimes
   change_millimes: Millimes
+  /**
+   * Le SERVICE de caisse pendant lequel l'encaissement a eu lieu (0004).
+   *
+   * C'est lui qui permet de rattacher une recette à une période SANS
+   * découper par fenêtre de temps — un découpage horaire rangerait une vente
+   * du bout de nuit dans le service suivant.
+   */
+  shift_id: Uuid | null
   voided_at: Horodatage | null
   created_at: Horodatage
+}
+
+export type EvenementJournal = {
+  event_id: Uuid
+  order_id: Uuid
+  organization_id: Uuid
+  restaurant_id: Uuid
+  device_id: Uuid
+  seq_device: number
+  /** Curseur SERVEUR, attribué à l'arrivée. L'ordre qui fait foi (RÈGLE 4). */
+  server_seq: number
+  type: string
+  payload: Record<string, unknown>
+  actor_user_id: Uuid | null
+  client_ts: Horodatage
+}
+
+export type MethodePaiement = {
+  id: Uuid
+  organization_id: Uuid
+  restaurant_id: Uuid
+  name: string
+  /** `cash` | `card` | `online` | `other`. */
+  type: string
+  is_active: boolean
+  archived_at: Horodatage | null
 }
 
 export type Shift = {
@@ -399,6 +433,12 @@ export type Database = {
       stock_items: Table<StockItem>
       stock_movements: Table<MouvementStock>
       stock_actuel: Table<StockActuel>
+      /**
+       * Le JOURNAL — lu pour reconstruire un ticket à l'identique du POS.
+       * En insertion seule côté base : le back-office n'y écrit jamais.
+       */
+      order_events: Table<EvenementJournal>
+      payment_methods: Table<MethodePaiement>
       shifts: Table<
         Shift,
         [

@@ -62,6 +62,7 @@ const GROUPES = [
       { chemin: 'ventes', libelle: 'Ventes', icone: '🧾', gestionnaire: true },
       { chemin: 'articles', libelle: 'Par article', icone: '🍽️', gestionnaire: true },
       { chemin: 'tickets', libelle: 'Tickets', icone: '🎫', gestionnaire: true },
+      { chemin: 'periodes', libelle: 'Périodes de travail', icone: '🕐', gestionnaire: true },
     ],
   },
   {

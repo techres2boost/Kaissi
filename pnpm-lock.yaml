@@ -26,6 +26,9 @@ importers:
       '@kaissi/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@kaissi/printing':
+        specifier: workspace:*
+        version: link:../../packages/printing
       '@supabase/ssr':
         specifier: ^0.12.5
         version: 0.12.5(@supabase/supabase-js@2.112.4)

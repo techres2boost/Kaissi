@@ -581,7 +581,7 @@ Le menu est passé **à gauche**, en colonne, groupé :
 
 - en haut, sans titre : **Tableau de bord · Préparation · Journée** — les
   écrans du quotidien ;
-- **Rapports** : Ventes · **Par article** · Tickets ;
+- **Rapports** : Ventes · **Par article** · Tickets · **Périodes de travail** ;
 - **Configuration** : Menu · Stock · Employés.
 
 Une rangée d'onglets marchait à cinq entrées. À neuf, elle passait à la
@@ -808,6 +808,63 @@ moitié moins bon qu'il ne l'a été.
 
 L'écran **Ventes** porte le même graphique journalier, au-dessus du
 récapitulatif financier.
+
+---
+
+### E ter. Le ticket tel qu'il s'imprime, et les périodes de travail
+
+**LE TICKET (§14)**
+
+1. **Rapports → Tickets** → clique **Détail** sur une vente.
+
+**Attendu** : tout en haut, un bloc **« Ticket, tel qu'il s'imprime »** — en
+police à chasse fixe, colonnes alignées, exactement ce que la caisse affiche
+au moment de l'encaissement.
+
+2. Compare avec l'écran de la caisse après un encaissement.
+
+**Attendu** : **le même texte, au caractère près.** Ce n'est pas une
+coïncidence : le back-office ne redessine pas le ticket, il rejoue les
+mêmes événements avec le même code de mise en page ESC/POS. Un second
+gabarit « pour le web » aurait divergé au premier changement, et le jour où
+un client conteste un montant on lui montrerait un document qui ne ressemble
+pas à celui qu'il a en main.
+
+3. Le tableau détaillé reste **en dessous** — il répond à une autre question :
+   *pourquoi* ce montant, lignes annulées comprises. Le ticket, lui, dit ce
+   qu'il y a sur le papier du client.
+
+4. Clique **Exporter ce ticket**.
+
+**Attendu** : un fichier `.txt`, à joindre à une réclamation ou à une pièce
+comptable.
+
+**LES PÉRIODES DE TRAVAIL (§17)**
+
+**Rapports → Périodes de travail** (`/‹resto›/periodes`).
+
+5. Choisis une période de plusieurs jours.
+
+**Attendu** : un service par ligne — **ouverte par**, ouverture, **fermée
+par**, clôture, durée, fond de caisse, **encaissé**, attendu, compté et
+**écart**. Trois cartes en tête : services, écart cumulé, caisses non justes.
+
+6. Fais une caisse volontairement fausse : compte 2 dinars de moins que
+   l'attendu.
+
+**Attendu** : l'écart s'affiche **en négatif**, en rouge. Il n'est jamais
+borné à zéro ni montré en valeur absolue — un manque et un excédent ne
+racontent pas la même histoire.
+
+> **Pourquoi cet écran, alors que « Journée » montre déjà les caisses.**
+> « Journée » est un rapport de JOUR, bon pour clôturer le soir. La question
+> « qui rend une caisse juste, et qui rend une caisse fausse ? » se lit sur
+> plusieurs semaines : un écart isolé ne dit rien, c'est sa RÉPÉTITION chez
+> la même personne qui parle.
+
+7. La colonne **Encaissé** vient de `payments.shift_id`, pas d'un découpage
+   horaire : une vente encaissée à 1 h du matin reste rattachée au service
+   qui l'a prise, et non au suivant.
 
 ---
 

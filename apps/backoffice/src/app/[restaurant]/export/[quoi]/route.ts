@@ -29,11 +29,24 @@ import {
   ventilerParProduit,
 } from '../../../../serveur/rapports.js'
 import { nomFichier, reponseCsv, versCsv, type Cellule } from '../../../../serveur/export-csv.js'
+import { reconstruireTicket } from '../../../../serveur/ticket.js'
 
 /** Un export est une photo d'un instant : jamais de rendu mis en cache. */
 export const dynamic = 'force-dynamic'
 
-const SUJETS = ['ventes', 'articles', 'categories', 'employes', 'paiements', 'tickets', 'stock', 'mouvements'] as const
+const SUJETS = [
+  'ventes',
+  'articles',
+  'categories',
+  'employes',
+  'paiements',
+  'tickets',
+  'stock',
+  'mouvements',
+  /** UN ticket, tel qu'il s'imprime — pas un tableau. */
+  'ticket',
+  'periodes',
+] as const
 type Sujet = (typeof SUJETS)[number]
 
 function estSujet(valeur: string): valeur is Sujet {
@@ -76,6 +89,31 @@ export async function GET(
     url.searchParams.get('du') ?? undefined,
     url.searchParams.get('au') ?? undefined,
   )
+
+  /*
+   * UN ticket : ni période, ni CSV.
+   *
+   * C'est un document, pas un tableau — un tableur n'a rien à en faire, et
+   * le découper en colonnes lui ferait perdre exactement ce qui en fait une
+   * pièce : sa mise en page. On rend donc le texte tel qu'il s'imprime.
+   */
+  if (quoi === 'ticket') {
+    const commande = url.searchParams.get('commande')
+    if (!commande) return new Response('Paramètre « commande » absent.', { status: 400 })
+    const rendu = await reconstruireTicket(restaurant, commande)
+    if ('erreur' in rendu) return new Response(rendu.erreur, { status: 404 })
+    return new Response(rendu.apercu, {
+      headers: {
+        'content-type': 'text/plain; charset=utf-8',
+        'content-disposition': `attachment; filename="${nomFichier(
+          'ticket',
+          etablissement.nom,
+          rendu.ticket.numeroTicket,
+        ).replace(/\.csv$/, '.txt')}"`,
+        'cache-control': 'no-store',
+      },
+    })
+  }
 
   // Le stock ne dépend pas d'une période : c'est un état, pas un flux.
   if (quoi === 'stock' || quoi === 'mouvements') {
@@ -206,6 +244,53 @@ export async function GET(
         ),
         nom('paiements'),
       )
+
+    case 'periodes': {
+      const supabase = await supabaseServeur()
+      const { data } = await supabase
+        .from('shifts')
+        .select(
+          'id, opened_at, closed_at, opening_float_millimes, counted_millimes, expected_millimes, variance_millimes, closing_note, users!shifts_user_id_fkey(full_name), fermeur:users!shifts_closed_by_fkey(full_name)',
+        )
+        .eq('restaurant_id', restaurant)
+        .gte('opened_at', periode.bornes.debut.toISOString())
+        .lt('opened_at', periode.bornes.fin.toISOString())
+        .order('opened_at', { ascending: false })
+
+      const nom = (v: unknown) => (v as { full_name: string } | null)?.full_name ?? ''
+      return reponseCsv(
+        versCsv(
+          [
+            'Ouverte par',
+            'Ouverture',
+            'Fermée par',
+            'Clôture',
+            'Fond',
+            'Attendu',
+            'Compté',
+            'Écart',
+            'Écart (TND)',
+            'Note',
+          ],
+          (data ?? []).map((s) => [
+            nom(s.users),
+            horodatage(s.opened_at, fiche.timezone),
+            nom(s.fermeur),
+            horodatage(s.closed_at, fiche.timezone),
+            tnd(Number(s.opening_float_millimes) || 0),
+            s.expected_millimes === null ? '' : tnd(Number(s.expected_millimes)),
+            s.counted_millimes === null ? '' : tnd(Number(s.counted_millimes)),
+            s.variance_millimes === null ? '' : tnd(Number(s.variance_millimes)),
+            // L'écart part AUSSI en nombre brut : c'est la colonne qu'on
+            // additionne et qu'on trie dans le tableur, et il peut être
+            // négatif — jamais borné, jamais en valeur absolue.
+            s.variance_millimes === null ? '' : brut(Number(s.variance_millimes)),
+            s.closing_note ?? '',
+          ]),
+        ),
+        nom('periodes-de-travail'),
+      )
+    }
 
     case 'tickets':
       return reponseCsv(
