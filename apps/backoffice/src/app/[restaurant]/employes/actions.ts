@@ -102,9 +102,23 @@ export async function reinitialiserPin(
   return agir(restaurantId, async (supabase) => {
     const pinHash = hachageDuPin(donnees, 'pin', 'confirmation')
 
+    /*
+     * `updated_at` n'est PAS écrit ici, et c'est la correction du bug
+     * « permission denied for table users ».
+     *
+     * La 0014 a remplacé le privilège de table par un privilège de COLONNE :
+     * un gérant peut écrire `full_name`, `phone`, `pin_hash`, `status` et
+     * `archived_at`, rien d'autre. Toucher `updated_at` faisait refuser
+     * l'écriture ENTIÈRE par Postgres — pas par RLS, par le privilège, d'où
+     * ce message qui ne parlait de rien de reconnaissable.
+     *
+     * La colonne n'a de toute façon pas à être écrite à la main : le
+     * déclencheur `users_updated_at` la pose (0002). L'écrire ici, c'était
+     * dupliquer une valeur que la base tient déjà.
+     */
     const { count, error } = await supabase
       .from('users')
-      .update({ pin_hash: pinHash, updated_at: new Date().toISOString() }, { count: 'exact' })
+      .update({ pin_hash: pinHash }, { count: 'exact' })
       .eq('id', employeId)
 
     if (error) throw new Error(error.message)
@@ -177,10 +191,10 @@ export async function changerStatut(
   return agir(restaurantId, async (supabase) => {
     const { count, error } = await supabase
       .from('users')
-      .update(
-        { status: suspendre ? 'suspendu' : 'actif', updated_at: new Date().toISOString() },
-        { count: 'exact' },
-      )
+      // Sans `updated_at` : privilège de COLONNE (0014), et le déclencheur
+      // `users_updated_at` s'en charge. Même cause que pour le PIN — c'est
+      // ce qui faisait échouer « Suspendre » sans que rien ne l'explique.
+      .update({ status: suspendre ? 'suspendu' : 'actif' }, { count: 'exact' })
       .eq('id', employeId)
 
     if (error) throw new Error(error.message)
@@ -282,5 +296,125 @@ export async function embaucher(
       "il n'est ni affiché ni conservé en clair. Les tablettes le recevront à leur " +
       'prochaine synchronisation.'
     )
+  })
+}
+
+// ── Accès au back-office ────────────────────────────────────────────────────
+//
+// Ces deux actions APPELLENT le service de synchronisation ; elles ne créent
+// rien elles-mêmes. C'est la conséquence directe de la règle du dépôt :
+// créer un compte Supabase exige la clé `service_role`, qui contourne RLS et
+// n'entre jamais dans le back-office — pas même dans ses variables
+// d'environnement. Elle vit dans le service, un process serveur que personne
+// ne télécharge.
+//
+// Ce que le back-office transmet, c'est le JETON de la session en cours. Le
+// service relit les droits EN BASE : il ne croit pas le back-office sur
+// parole, et un défaut ici ne peut donc pas ouvrir un accès chez un autre
+// client.
+
+/** Le jeton de la session en cours, pour parler au service en son nom. */
+async function jetonDeSession(): Promise<string> {
+  const supabase = await supabaseServeur()
+  const { data } = await supabase.auth.getSession()
+  const jeton = data.session?.access_token
+  if (!jeton) throw new ErreurSaisie('session', 'Session expirée — reconnectez-vous.')
+  return jeton
+}
+
+async function appelerService(
+  chemin: string,
+  charge: Record<string, unknown>,
+): Promise<{ message?: string }> {
+  const base = (process.env['URL_SYNC'] ?? '').replace(/\/+$/, '')
+  if (!base) {
+    throw new ErreurSaisie(
+      'service',
+      "L'adresse du service de synchronisation n'est pas configurée " +
+        '(apps/pos/deploiement.json, ou la variable URL_SYNC).',
+    )
+  }
+  let reponse: Response
+  try {
+    reponse = await fetch(`${base}${chemin}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${await jetonDeSession()}`,
+      },
+      body: JSON.stringify(charge),
+      // Un service qui ne répond pas ne doit pas laisser l'écran en attente
+      // indéfinie : le gérant doit savoir qu'il peut réessayer.
+      signal: AbortSignal.timeout(15_000),
+    })
+  } catch (erreur) {
+    throw new ErreurSaisie(
+      'service',
+      'Le service de synchronisation est injoignable. ' +
+        (erreur instanceof Error ? erreur.message : String(erreur)),
+    )
+  }
+
+  const corps = (await reponse.json().catch(() => null)) as {
+    message?: string
+    erreur?: string
+  } | null
+  if (!reponse.ok) {
+    throw new ErreurSaisie('service', corps?.message ?? `Le service a répondu ${reponse.status}.`)
+  }
+  return corps ?? {}
+}
+
+/**
+ * Ouvre à un employé l'accès au back-office.
+ *
+ * Le mot de passe est saisi par le gérant et communiqué de vive voix, comme
+ * le PIN : aucun envoi d'e-mail, donc aucune dépendance à une boîte que
+ * personne ne relève — le cas normal pour l'adresse d'un barman.
+ */
+export async function ouvrirAcces(
+  restaurantId: string,
+  employe: { id: string; nom: string; email: string; role: string },
+  _precedent: Resultat | null,
+  donnees: FormData,
+): Promise<Resultat> {
+  return agir(restaurantId, async () => {
+    const email = texteObligatoire(donnees, 'email', 'L’adresse e-mail', 200)
+    const motDePasse = texteObligatoire(donnees, 'motDePasse', 'Le mot de passe', 100)
+    const { message } = await appelerService('/admin/comptes', {
+      restaurantId,
+      email,
+      motDePasse,
+      nom: employe.nom,
+      role: employe.role,
+    })
+    return (
+      (message ?? 'Accès ouvert.') +
+      ' Communiquez le mot de passe de vive voix : il n’est ni affiché ni conservé ici.'
+    )
+  })
+}
+
+/**
+ * Change le mot de passe de back-office d'un employé.
+ *
+ * C'est la réponse à « j'ai perdu le mot de passe du cuisinier ». Le PIN est
+ * une autre identité, réinitialisée par le formulaire d'à côté : le PIN dit
+ * QUI agit sur un terminal, le mot de passe ouvre le back-office.
+ */
+export async function changerMotDePasseAcces(
+  restaurantId: string,
+  employeId: string,
+  _precedent: Resultat | null,
+  donnees: FormData,
+): Promise<Resultat> {
+  return agir(restaurantId, async () => {
+    const motDePasse = texteObligatoire(donnees, 'motDePasse', 'Le mot de passe', 100)
+    const { message } = await appelerService('/admin/mot-de-passe', {
+      restaurantId,
+      employeId,
+      motDePasse,
+    })
+    return message ?? 'Mot de passe changé.'
   })
 }

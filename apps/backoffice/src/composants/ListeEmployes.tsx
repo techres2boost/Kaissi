@@ -1,10 +1,12 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useState, useTransition } from 'react'
 import {
+  changerMotDePasseAcces,
   changerRole,
   changerStatut,
   embaucher,
+  ouvrirAcces,
   reinitialiserPin,
   type Resultat,
 } from '../app/[restaurant]/employes/actions.js'
@@ -16,6 +18,8 @@ export interface Employe {
   role: string
   statut: string
   aUnPin: boolean
+  /** A-t-il un compte pour OUVRIR le back-office ? Le PIN est autre chose. */
+  aUnCompte: boolean
   plafondRemise: string
   administrable: boolean
   /** Poste tenu, pour un rôle de préparation. `null` : tous les postes. */
@@ -69,6 +73,24 @@ export function ListeEmployes({
 }) {
   const [cible, setCible] = useState<Employe | null>(null)
   const [embaucheOuverte, setEmbaucheOuverte] = useState(false)
+  /*
+   * Le résultat de « Suspendre » était JETÉ.
+   *
+   * Le bouton appelait l'action sans rien faire de ce qu'elle rend : quand
+   * elle échouait — et elle échouait, faute d'un privilège de colonne — il
+   * ne se passait strictement rien à l'écran. Un bouton qui ne dit ni oui ni
+   * non est pire qu'un bouton absent : on le presse trois fois, puis on
+   * conclut que le logiciel est cassé, sans jamais savoir pourquoi.
+   */
+  const [message, setMessage] = useState<Resultat | null>(null)
+  const [enCours, demarrer] = useTransition()
+
+  const basculerStatut = (employe: Employe) => {
+    setMessage(null)
+    demarrer(async () => {
+      setMessage(await changerStatut(restaurantId, employe.id, employe.statut === 'actif'))
+    })
+  }
 
   return (
     <>
@@ -84,6 +106,7 @@ export function ListeEmployes({
       )}
 
       <section className="carte">
+        <Message resultat={message} />
         {employes.length === 0 ? (
           <p className="vide">Aucun employé rattaché à cet établissement.</p>
         ) : (
@@ -135,13 +158,8 @@ export function ListeEmployes({
                           <button
                             type="button"
                             className="discret"
-                            onClick={() =>
-                              void changerStatut(
-                                restaurantId,
-                                employe.id,
-                                employe.statut === 'actif',
-                              )
-                            }
+                            disabled={enCours}
+                            onClick={() => basculerStatut(employe)}
                           >
                             {employe.statut === 'actif' ? 'Suspendre' : 'Réactiver'}
                           </button>
@@ -297,7 +315,132 @@ function PanneauEmploye({
         </form>
         )}
       </div>
+
+      <AccesBackoffice
+        restaurantId={restaurantId}
+        administrateur={administrateur}
+        employe={employe}
+      />
     </section>
+  )
+}
+
+/**
+ * L'accès au BACK-OFFICE — e-mail et mot de passe.
+ *
+ * ── Pourquoi ce bloc existe ───────────────────────────────────────────────
+ *
+ * Il fallait jusqu'ici créer le compte dans le tableau de bord Supabase,
+ * PUIS lancer `pnpm sync:acces` dans un terminal. Aucun restaurateur ne fera
+ * ça, et il aura raison : ouvrir un écran à son cuisinier n'est pas une
+ * opération d'administrateur système.
+ *
+ * ── Ce que le back-office ne fait toujours pas ────────────────────────────
+ *
+ * Créer le compte lui-même. Cela exige la clé `service_role`, qui contourne
+ * RLS ; elle vit dans le service de synchronisation, jamais ici. Ce
+ * formulaire lui parle, avec le jeton de la session en cours, et c'est le
+ * service qui relit les droits en base. La règle du dépôt tient : la clé
+ * n'est jamais descendue d'un cran vers le navigateur.
+ */
+function AccesBackoffice({
+  restaurantId,
+  administrateur,
+  employe,
+}: {
+  restaurantId: string
+  administrateur: boolean
+  employe: Employe
+}) {
+  const [resultat, action, enCours] = useActionState(
+    employe.aUnCompte
+      ? changerMotDePasseAcces.bind(null, restaurantId, employe.id)
+      : ouvrirAcces.bind(null, restaurantId, {
+          id: employe.id,
+          nom: employe.nom,
+          email: employe.email,
+          role: employe.role,
+        }),
+    null as Resultat | null,
+  )
+
+  // Un gérant ne remet pas le mot de passe d'un pair ni d'un administrateur :
+  // ce serait prendre sa place. Le service le refuse aussi — l'écrire ici
+  // évite seulement de proposer un bouton qui va échouer.
+  if (!administrateur && ROLES_A_CLES.includes(employe.role)) {
+    return (
+      <section style={{ marginTop: '1rem' }}>
+        <h2 style={{ fontSize: '0.95rem' }}>Accès au back-office</h2>
+        <p className="indication">
+          Seul un administrateur peut ouvrir ou réinitialiser l’accès d’un
+          {' '}
+          {employe.role}.
+        </p>
+      </section>
+    )
+  }
+
+  return (
+    <form action={action} style={{ marginTop: '1rem' }}>
+      <h2 style={{ fontSize: '0.95rem' }}>Accès au back-office</h2>
+      <Message resultat={resultat} />
+
+      {employe.aUnCompte ? (
+        <p className="indication">
+          {employe.nom} se connecte déjà avec <strong>{employe.email}</strong>.
+          Mot de passe perdu ? Posez-en un nouveau ci-dessous.
+        </p>
+      ) : (
+        <div className="champ">
+          <label htmlFor={`email-${employe.id}`}>Adresse e-mail</label>
+          <input
+            id={`email-${employe.id}`}
+            name="email"
+            type="email"
+            defaultValue={employe.email}
+            required
+          />
+          <p className="indication">
+            C’est l’identifiant de connexion. Elle n’a pas besoin d’être relevée :
+            aucun e-mail n’est envoyé, le mot de passe se communique de vive voix.
+          </p>
+        </div>
+      )}
+
+      <div className="champ">
+        <label htmlFor={`mdp-${employe.id}`}>
+          {employe.aUnCompte ? 'Nouveau mot de passe' : 'Mot de passe'}
+        </label>
+        <input
+          id={`mdp-${employe.id}`}
+          name="motDePasse"
+          type="text"
+          autoComplete="off"
+          minLength={8}
+          required
+        />
+        <p className="indication">
+          Huit caractères au moins. Il est affiché en clair pendant que vous le
+          tapez — c’est voulu : il faut le dicter, et un mot de passe qu’on
+          recopie de travers n’ouvre rien.
+        </p>
+      </div>
+
+      <button type="submit" className="principal" disabled={enCours}>
+        {enCours
+          ? 'Envoi…'
+          : employe.aUnCompte
+            ? 'Changer le mot de passe'
+            : `Ouvrir l’accès (rôle « ${employe.role} »)`}
+      </button>
+      {!employe.aUnCompte && (
+        <p className="indication">
+          Le rôle donné à l’accès est celui de l’employé, ci-dessus. Un rôle de
+          préparation n’ouvre que son écran ; un caissier ou un serveur n’a en
+          général pas besoin de compte du tout — il tape un PIN sur la tablette.
+        </p>
+      )}
+    </form>
   )
 }
 

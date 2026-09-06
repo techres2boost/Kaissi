@@ -40,7 +40,7 @@ export default async function PageEmployes({
     supabase
       .from('memberships')
       .select(
-        'role, revoked_at, permissions, station_id, users(id, full_name, email, status, pin_hash)',
+        'role, revoked_at, permissions, station_id, users(id, full_name, email, status, pin_hash, auth_user_id)',
       )
       .eq('restaurant_id', restaurant)
       .is('revoked_at', null),
@@ -58,16 +58,21 @@ export default async function PageEmployes({
       const u = ligne.users as {
         id: string
         full_name: string
-        email: string
+        email: string | null
         status: string
         pin_hash: string | null
+        auth_user_id: string | null
       } | null
       if (!u) return null
       const surcharge = (ligne.permissions as Record<string, unknown> | null)?.['remise_max_bp']
       return {
         id: u.id,
-        nom: u.full_name || u.email,
-        email: u.email,
+        nom: u.full_name || u.email || '—',
+        email: u.email ?? '',
+        // A-t-il un compte pour OUVRIR le back-office ? C'est une identité
+        // distincte du PIN : le PIN dit qui agit sur un terminal, le compte
+        // ouvre les écrans de gestion.
+        aUnCompte: Boolean(u.auth_user_id),
         role: ligne.role as string,
         statut: u.status,
         aUnPin: Boolean(u.pin_hash),

@@ -23,7 +23,7 @@ import {
   type EvenementCommande,
   type PointsDeBase,
 } from '@kaissi/domain'
-import { estUuid } from '@kaissi/domain'
+import { estUuid, uuidV7 } from '@kaissi/domain'
 import type {
   AbonnementPush,
   AppareilAuthentifie,
@@ -861,6 +861,127 @@ export class DepotPostgres implements DepotSync {
           console.warn('[sync] rupture automatique non appliquée', erreur)
         }
       }
+    } finally {
+      client.release()
+    }
+  }
+
+  // ── Accès au back-office ─────────────────────────────────────────────────
+
+  async roleDansEtablissement(
+    authUserId: string,
+    restaurantId: string,
+  ): Promise<string | null> {
+    const { rows } = await this.pool.query<{ role: string }>(
+      `select m.role
+         from kaissi.memberships m
+         join kaissi.users u on u.id = m.user_id
+        where u.auth_user_id = $1
+          and m.restaurant_id = $2
+          and m.revoked_at is null
+          and u.status = 'actif'
+        limit 1`,
+      [authUserId, restaurantId],
+    )
+    return rows[0]?.role ?? null
+  }
+
+  async compteParEmail(email: string): Promise<{ id: string; email: string } | null> {
+    const { rows } = await this.pool.query<{ id: string; email: string }>(
+      'select id, email from auth.users where lower(email) = lower($1) limit 1',
+      [email],
+    )
+    return rows[0] ?? null
+  }
+
+  async compteDeLEmploye(
+    employeId: string,
+    restaurantId: string,
+  ): Promise<{ authUserId: string; email: string } | null> {
+    // Borné à l'établissement : sans ce filtre, connaître un identifiant
+    // suffirait à changer le mot de passe d'un employé d'un autre client.
+    const { rows } = await this.pool.query<{ auth_user_id: string | null; email: string | null }>(
+      `select u.auth_user_id, u.email
+         from kaissi.users u
+         join kaissi.memberships m on m.user_id = u.id
+        where u.id = $1 and m.restaurant_id = $2 and m.revoked_at is null
+        limit 1`,
+      [employeId, restaurantId],
+    )
+    const ligne = rows[0]
+    if (!ligne?.auth_user_id) return null
+    return { authUserId: ligne.auth_user_id, email: ligne.email ?? '' }
+  }
+
+  async rattacherAcces(demande: {
+    restaurantId: string
+    authUserId: string
+    email: string
+    nom: string
+    role: string
+  }): Promise<{ employeId: string; cree: boolean }> {
+    const client = await this.pool.connect()
+    try {
+      await client.query('begin')
+      const { rows: restos } = await client.query<{ organization_id: string }>(
+        'select organization_id from kaissi.restaurants where id = $1',
+        [demande.restaurantId],
+      )
+      const organizationId = restos[0]?.organization_id
+      if (!organizationId) throw new Error('Établissement introuvable.')
+
+      /*
+       * L'employé peut déjà exister de trois façons : relié à ce compte,
+       * embauché par le gérant avec la même adresse mais sans compte, ou pas
+       * du tout. Les trois mènent à la même ligne finale — sinon un employé
+       * embauché la veille se dédoublerait le jour où on lui ouvre un accès,
+       * et son historique de ventes se couperait en deux.
+       */
+      const { rows: existants } = await client.query<{ id: string; full_name: string }>(
+        `select id, full_name from kaissi.users
+          where organization_id = $1
+            and (auth_user_id = $2 or lower(email) = lower($3))
+          limit 1`,
+        [organizationId, demande.authUserId, demande.email],
+      )
+
+      let employeId: string
+      let cree = false
+      if (existants[0]) {
+        employeId = existants[0].id
+        await client.query(
+          `update kaissi.users
+              set auth_user_id = $1, email = $2, full_name = $3,
+                  status = 'actif', archived_at = null, updated_at = now()
+            where id = $4`,
+          [demande.authUserId, demande.email, demande.nom || existants[0].full_name, employeId],
+        )
+      } else {
+        // UUIDv7 et non v4 (RÈGLE 2) : triable par le temps, donc sans
+        // fragmentation d'index — c'est aussi ce que pose `pnpm sync:acces`.
+        employeId = uuidV7()
+        cree = true
+        await client.query(
+          `insert into kaissi.users
+             (id, organization_id, auth_user_id, email, full_name, status)
+           values ($1, $2, $3, $4, $5, 'actif')`,
+          [employeId, organizationId, demande.authUserId, demande.email, demande.nom],
+        )
+      }
+
+      await client.query(
+        `insert into kaissi.memberships (organization_id, user_id, restaurant_id, role)
+         values ($1, $2, $3, $4)
+         on conflict (user_id, restaurant_id) do update
+            set role = excluded.role, revoked_at = null, updated_at = now()`,
+        [organizationId, employeId, demande.restaurantId, demande.role],
+      )
+
+      await client.query('commit')
+      return { employeId, cree }
+    } catch (erreur) {
+      await client.query('rollback').catch(() => undefined)
+      throw erreur
     } finally {
       client.release()
     }

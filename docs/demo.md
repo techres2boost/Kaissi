@@ -7,8 +7,10 @@ tableau de bord, ventes, tickets, journée, stock, cuisine.
 
 > **Rien à installer, rien à `git pull`.** Tout tourne déjà sur Vercel et
 > Railway, qui se redéploient à chaque `push` sur `main`. Le dépôt local ne
-> sert que pour deux commandes d'exploitation : `pnpm sync:acces` (donner un
-> accès au back-office) et `pnpm sync:appairer` (appairer une caisse).
+> sert plus qu'au dépannage : `pnpm sync:acces` (le TOUT premier
+> administrateur, quand personne ne peut encore ouvrir le back-office) et
+> `pnpm sync:appairer` (appairer une caisse à la main). Les accès suivants —
+> cuisine, bar, comptable — se donnent depuis l'écran **Employés**.
 
 ---
 
@@ -1069,6 +1071,78 @@ exactement ce qu'on vient de retirer de l'écran.
 
 ---
 
+### G. Ouvrir un accès au back-office — sans terminal
+
+C'était la friction la plus visible : donner un écran à ton cuisinier
+demandait de créer le compte dans le tableau de bord Supabase, PUIS de lancer
+`pnpm sync:acces`. Deux outils d'administrateur système pour une décision de
+patron.
+
+**Ce que l'exploitant pose UNE fois** (toi, pas le client) : sur Railway,
+la variable `SUPABASE_SERVICE_ROLE_KEY` (Supabase → Project Settings → API →
+`service_role`). Sans elle, l'écran le dit en toutes lettres et
+`pnpm sync:acces` reste le chemin.
+
+**Ce que fait le gérant :**
+
+1. **Employés** → clique **Gérer** sur un employé.
+2. Bloc **Accès au back-office** : son adresse est préremplie, tape un mot de
+   passe (8 caractères au moins) → **Ouvrir l'accès**.
+
+**Attendu** : *« Compte créé. … peut se connecter au back-office dès
+maintenant. »* La personne se connecte immédiatement — aucun e-mail de
+confirmation à attendre, aucune boîte à relever.
+
+3. Le même employé, plus tard : le bloc affiche **« se connecte déjà avec … »**
+   et propose **Changer le mot de passe**. C'est la réponse à « j'ai perdu le
+   mot de passe du cuisinier ».
+
+4. Essaie, en **gérant**, d'ouvrir un accès avec le rôle **gérant**.
+
+**Attendu** : refus. *Un gérant exploite, un administrateur distribue* — la
+frontière est la même ici que dans RLS (migration 0024), sinon cette route
+serait le moyen de la contourner.
+
+> **Le PIN et le mot de passe ne sont pas la même chose**, et l'écran les
+> montre côte à côte pour que la différence saute aux yeux : le **PIN** dit
+> qui agit sur un terminal, le **mot de passe** ouvre le back-office. Un
+> serveur en salle n'a besoin que du premier.
+
+> **Où vit la clé qui crée les comptes.** Dans le service de synchronisation,
+> jamais dans le back-office ni dans l'APK. Le back-office l'appelle avec le
+> jeton de ta session, et le service relit tes droits **en base** — il ne
+> croit pas le navigateur sur parole.
+
+### H. Le PIN et « Suspendre » remarchent
+
+Deux boutons échouaient, pour la même raison invisible.
+
+1. **Employés → Gérer → Réinitialiser le PIN.**
+
+**Attendu** : *« Code PIN réinitialisé. »* Avant, un bandeau rouge
+« permission denied for table users » — et rien d'autre à quoi se raccrocher.
+
+2. **Suspendre**, puis **Réactiver**.
+
+**Attendu** : un message de confirmation à chaque fois, et l'étiquette d'état
+qui change.
+
+> **La cause était la même, et elle est instructive.** Un gérant n'a pas le
+> droit d'écrire *toutes* les colonnes de `users` — le privilège est posé
+> colonne par colonne (migration 0014), pour qu'il ne puisse pas changer un
+> e-mail ni déplacer quelqu'un vers une autre organisation. Le back-office
+> écrivait `updated_at` « en passant », qui n'est pas dans la liste : Postgres
+> refusait alors l'écriture **entière**, avec un message qui ne nommait ni la
+> colonne ni le mot « colonne ». La correction n'est pas d'élargir le
+> privilège — c'est de ne pas écrire cette colonne : un déclencheur la tient
+> déjà.
+>
+> Et « Suspendre » ne disait rien parce que son résultat était **jeté** :
+> un bouton qui ne répond ni oui ni non, on le presse trois fois avant de
+> conclure que le logiciel est cassé.
+
+---
+
 ## 6. Gérer le menu et le stock
 
 ### Changer un prix ou un coût
@@ -1297,9 +1371,13 @@ les accès. Tout le monde n'a pas besoin d'un compte back-office : un serveur
 tape un PIN sur la tablette, c'est tout.
 
 > Pour donner un accès back-office à quelqu'un qui n'en a pas encore (un
-> comptable, la cuisine), c'est `pnpm sync:acces` sur ton poste — créer un
-> compte Supabase exige une clé qui contourne RLS, et elle n'a rien à faire
-> dans une application web.
+> comptable, la cuisine), c'est **Employés → l'employé → « Ouvrir l'accès »**.
+> Voir **§5 bis G**.
+>
+> La clé qui crée un compte Supabase contourne RLS : elle n'a toujours rien à
+> faire dans une application web, et elle n'y est pas. Elle vit dans le
+> service de synchronisation, et le back-office lui parle avec le jeton de ta
+> session — c'est le service qui relit tes droits en base.
 
 ---
 

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 /**
  * Back-office Kaissi.
  *
@@ -7,8 +9,27 @@
  * deviendrait un aller-retour réseau, inutilisable en service.
  */
 
+/*
+ * L'adresse du service de synchronisation vient du MÊME fichier que celle
+ * du POS : `apps/pos/deploiement.json`, versionnée.
+ *
+ * Le back-office l'appelle pour une seule chose — ouvrir un accès et changer
+ * un mot de passe, deux gestes qui exigent la clé `service_role` et qui
+ * n'ont donc rien à faire ici. La déclarer une seconde fois, dans une
+ * variable d'hébergeur, c'est se garantir qu'un jour les deux ne pointeront
+ * plus au même endroit, et que personne ne saura laquelle fait foi.
+ *
+ * `URL_SYNC` reste prioritaire pour le développement local.
+ */
+const deploiement = JSON.parse(
+  readFileSync(new URL('../pos/deploiement.json', import.meta.url), 'utf8'),
+)
+
 /** @type {import('next').NextConfig} */
 const config = {
+  env: {
+    URL_SYNC: process.env.URL_SYNC || deploiement.urlSync || '',
+  },
   reactStrictMode: true,
   // Les paquets du monorepo sont consommés en SOURCE TypeScript.
   transpilePackages: ['@kaissi/domain'],

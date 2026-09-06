@@ -21,6 +21,16 @@ import {
   ErreurAuth,
   type ConfigAuth,
 } from './auth-supabase.js'
+import {
+  changerMotDePasse,
+  cleServiceDepuisEnvironnement,
+  creerCompteSupabase,
+  identifierParJeton,
+  ROLES_ACCES,
+  ROLES_QUI_DONNENT_LES_CLES,
+  verifierEmail,
+  verifierMotDePasse,
+} from './admin-comptes.js'
 
 /**
  * Variables portées par le contexte de requête.
@@ -43,6 +53,14 @@ export interface OptionsServeur {
   readonly auth?: ConfigAuth | null
   /** Injectable pour les tests : le seul appel réseau sortant du service. */
   readonly fetchAuth?: typeof fetch
+  /**
+   * Clé `service_role` de Supabase — pour CRÉER un compte de back-office.
+   *
+   * Elle ne vit QUE dans ce service : ni dans le back-office, ni dans l'APK.
+   * Absente, les routes `/admin/*` répondent 501 et `pnpm sync:acces` reste
+   * le chemin. Rien d'autre ne dépend d'elle.
+   */
+  readonly cleService?: string | null
 }
 
 export function creerServeur({
@@ -50,6 +68,7 @@ export function creerServeur({
   origines,
   auth = configAuthDepuisEnvironnement(),
   fetchAuth,
+  cleService = cleServiceDepuisEnvironnement(),
 }: OptionsServeur) {
   const service = new ServiceSync(depot)
   const app = new Hono<{ Variables: VariablesKaissi }>()
@@ -74,6 +93,7 @@ export function creerServeur({
   })
   app.use('/sync/*', corsKaissi)
   app.use('/appairage', corsKaissi)
+  app.use('/admin/*', corsKaissi)
 
   // ── Santé ────────────────────────────────────────────────────────────
   // Sans authentification : c'est ce que sonde l'hébergeur.
@@ -253,6 +273,205 @@ export function creerServeur({
     c.set('appareil', appareil)
     await next()
   })
+
+
+  // ── POST /admin/comptes ──────────────────────────────────────────────
+  //
+  // Ouvre un accès au back-office : crée le compte Supabase s'il n'existe
+  // pas, puis le relie à l'établissement avec un rôle. C'est ce que faisait
+  // « tableau de bord Supabase, PUIS pnpm sync:acces » — un enchaînement
+  // qu'aucun restaurateur ne fera.
+  //
+  // L'appelant s'identifie par le JETON de sa session back-office ; ses
+  // droits sont relus EN BASE. Le service parle à Postgres avec un rôle
+  // privilégié : RLS ne le filtre pas, donc c'est cette relecture-là qui
+  // décide, jamais une confiance faite au client.
+  app.post('/admin/comptes', async (c) => {
+    return adminSupabase(c, async ({ config, cle, appelant, corps }) => {
+      const restaurantId = String(corps['restaurantId'] ?? '')
+      if (!UUID.test(restaurantId)) {
+        throw new ErreurAuth("L'établissement doit être un UUID.", 401)
+      }
+      const roleAppelant = await depot.roleDansEtablissement(appelant.userId, restaurantId)
+      if (roleAppelant === null || !ROLES_QUI_DONNENT_LES_CLES.includes(roleAppelant)) {
+        throw new ErreurAuth(
+          "Votre rôle ne permet pas d'ouvrir un accès dans cet établissement.",
+          401,
+        )
+      }
+
+      const role = String(corps['role'] ?? '')
+      if (!(ROLES_ACCES as readonly string[]).includes(role)) {
+        throw new ErreurAuth(`Rôle inconnu « ${role} ».`, 401)
+      }
+      // Un gérant EXPLOITE, un administrateur DISTRIBUE (migration 0024).
+      // Sans ce contrôle, cette route contournerait la frontière que RLS
+      // pose ailleurs : un gérant se créerait un second gérant.
+      if (ROLES_QUI_DONNENT_LES_CLES.includes(role) && roleAppelant !== 'admin') {
+        throw new ErreurAuth(
+          `Seul un administrateur peut accorder le rôle « ${role} ».`,
+          401,
+        )
+      }
+
+      const email = verifierEmail(corps['email'])
+      const motDePasse = verifierMotDePasse(corps['motDePasse'])
+      const nom = String(corps['nom'] ?? '').trim() || email.split('@')[0]!
+
+      const cree = await creerCompteSupabase(config, cle, email, motDePasse, fetchAuth)
+      let authUserId = cree.authUserId
+      if (!authUserId) {
+        // L'adresse avait déjà un compte : on le retrouve pour le rattacher.
+        // Son mot de passe n'est PAS écrasé — on n'écrase pas silencieusement
+        // le mot de passe d'un compte qui appartient peut-être à quelqu'un
+        // d'autre. Le bouton « changer le mot de passe » est un geste à part.
+        const compte = await depot.compteParEmail(email)
+        if (!compte) {
+          throw new ErreurAuth(
+            'Cette adresse a déjà un compte Supabase, introuvable dans cette base. ' +
+              'Il appartient sans doute à un autre projet.',
+            500,
+          )
+        }
+        authUserId = compte.id
+      }
+
+      const { employeId, cree: employeCree } = await depot.rattacherAcces({
+        restaurantId,
+        authUserId,
+        email,
+        nom,
+        role,
+      })
+
+      return {
+        employeId,
+        email,
+        role,
+        compteCree: cree.nouveau,
+        employeCree,
+        message: cree.nouveau
+          ? `Compte créé. ${email} peut se connecter au back-office dès maintenant.`
+          : `Cette adresse avait déjà un compte : il est désormais rattaché à cet établissement (${role}).`,
+      }
+    })
+  })
+
+  // ── POST /admin/mot-de-passe ─────────────────────────────────────────
+  //
+  // « J'ai perdu le mot de passe du cuisinier. » Le PIN se réinitialise au
+  // back-office ; le MOT DE PASSE, lui, appartient à Supabase Auth et
+  // exigeait jusqu'ici le tableau de bord. Ce sont deux identités
+  // distinctes, et les confondre mène soit à des reconnexions permanentes,
+  // soit à une traçabilité inexistante.
+  app.post('/admin/mot-de-passe', async (c) => {
+    return adminSupabase(c, async ({ config, cle, appelant, corps }) => {
+      const restaurantId = String(corps['restaurantId'] ?? '')
+      const employeId = String(corps['employeId'] ?? '')
+      if (!UUID.test(restaurantId) || !UUID.test(employeId)) {
+        throw new ErreurAuth("L'établissement et l'employé doivent être des UUID.", 401)
+      }
+      const roleAppelant = await depot.roleDansEtablissement(appelant.userId, restaurantId)
+      if (roleAppelant === null || !ROLES_QUI_DONNENT_LES_CLES.includes(roleAppelant)) {
+        throw new ErreurAuth('Votre rôle ne permet pas de changer ce mot de passe.', 401)
+      }
+
+      const cible = await depot.compteDeLEmploye(employeId, restaurantId)
+      if (!cible) {
+        throw new ErreurAuth(
+          "Cet employé n'a pas de compte de back-office. Ouvrez-lui un accès plutôt.",
+          401,
+        )
+      }
+      // Un gérant ne remet pas le mot de passe d'un administrateur : ce
+      // serait prendre sa place. La frontière est la même que partout.
+      const roleCible = await depot.roleDansEtablissement(cible.authUserId, restaurantId)
+      if (roleCible && ROLES_QUI_DONNENT_LES_CLES.includes(roleCible) && roleAppelant !== 'admin') {
+        throw new ErreurAuth(
+          'Seul un administrateur peut changer le mot de passe d’un gérant ou d’un administrateur.',
+          401,
+        )
+      }
+
+      const motDePasse = verifierMotDePasse(corps['motDePasse'])
+      await changerMotDePasse(config, cle, cible.authUserId, motDePasse, fetchAuth)
+      return {
+        email: cible.email,
+        message: `Mot de passe changé. Communiquez-le à ${cible.email || 'l’intéressé'} de vive voix.`,
+      }
+    })
+  })
+
+  /**
+   * Enveloppe commune aux routes d'administration.
+   *
+   * Elle réunit ce qui doit être vrai AVANT toute écriture : la
+   * configuration Supabase présente, la clé de service présente, un jeton
+   * d'appelant valide, un corps JSON lisible. Chacune de ces quatre absences
+   * a son propre message — « non configuré » sans plus de détail envoie
+   * relire quatre réglages dont trois sont déjà bons.
+   */
+  async function adminSupabase(
+    c: ContexteKaissi,
+    travail: (contexte: {
+      config: ConfigAuth
+      cle: string
+      appelant: { userId: string; email: string }
+      corps: Record<string, unknown>
+    }) => Promise<unknown>,
+  ) {
+    if (!auth || !cleService) {
+      const absentes = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY'].filter(
+        (nom) => !(process.env[nom] ?? '').trim(),
+      )
+      const corps: ReponseErreur = {
+        erreur: 'administration_indisponible',
+        message:
+          "La gestion des accès n'est pas configurée sur ce serveur. " +
+          `Variable(s) absente(s) : ${absentes.join(', ')}. ` +
+          'En attendant, `pnpm sync:acces` reste le chemin.',
+      }
+      return c.json(corps, 501)
+    }
+
+    const jeton = jetonDepuisEntete(c.req.header('authorization'))
+    if (!jeton) {
+      const corps: ReponseErreur = {
+        erreur: 'jeton_absent',
+        message: 'Jeton de session absent.',
+      }
+      return c.json(corps, 401)
+    }
+
+    let brut: unknown
+    try {
+      brut = await c.req.json()
+    } catch {
+      const corps: ReponseErreur = { erreur: 'requete_invalide', message: 'Corps JSON illisible.' }
+      return c.json(corps, 400)
+    }
+
+    try {
+      const appelant = await identifierParJeton(auth, jeton, fetchAuth)
+      const resultat = await travail({
+        config: auth,
+        cle: cleService,
+        appelant,
+        corps: (brut ?? {}) as Record<string, unknown>,
+      })
+      return c.json(resultat as Record<string, unknown>)
+    } catch (erreur) {
+      if (erreur instanceof ErreurAuth) {
+        const corps: ReponseErreur = { erreur: 'acces_refuse', message: erreur.message }
+        return c.json(corps, erreur.statut)
+      }
+      const corps: ReponseErreur = {
+        erreur: 'erreur_serveur',
+        message: erreur instanceof Error ? erreur.message : 'Échec inattendu.',
+      }
+      return c.json(corps, 500)
+    }
+  }
 
   // ── GET /sync/appareil ───────────────────────────────────────────────
   // L'identité de l'appareil derrière le jeton. C'est ce que le POS lit au

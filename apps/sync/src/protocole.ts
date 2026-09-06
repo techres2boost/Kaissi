@@ -186,6 +186,12 @@ export type CodeErreur =
   | 'aucun_etablissement'
   /** Le compte n'est pas gérant de l'établissement demandé. */
   | 'etablissement_refuse'
+  // ── Gestion des accès au back-office (/admin/*) ─────────────────────────
+  /** Le serveur n'a pas SUPABASE_SERVICE_ROLE_KEY : `pnpm sync:acces` reste
+   *  le chemin, et rien d'autre n'en dépend. */
+  | 'administration_indisponible'
+  /** Jeton de session absent, expiré, ou rôle insuffisant. */
+  | 'acces_refuse'
 
 export interface ReponseErreur {
   readonly erreur: CodeErreur

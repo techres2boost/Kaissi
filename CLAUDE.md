@@ -221,13 +221,29 @@ Un coût **non saisi** n'est pas un coût nul : les rapports comptent ces lignes
 et le disent. Sans ce garde-fou, la marge s'afficherait à 100 % et paraîtrait
 juste.
 
-### Un compte de back-office se relie hors de l'application
+### La clé `service_role` ne descend jamais vers le navigateur — elle monte vers le service
 
 Créer un compte Supabase exige la clé `service_role`, qui contourne RLS : elle
-n'entre donc jamais dans le back-office. Le premier administrateur, et toute
-personne qui doit ouvrir le back-office ensuite (cuisine, comptable), passent
-par `pnpm sync:acces`, qui tourne sur le poste de l'exploitant avec la
-connexion PostgreSQL.
+n'entre donc **jamais** dans le back-office, ni dans ses variables
+d'environnement.
+
+Elle vit dans le **service de synchronisation** (`SUPABASE_SERVICE_ROLE_KEY`),
+qui porte déjà la chaîne PostgreSQL, ne s'exécute dans aucun navigateur et que
+personne ne télécharge. Les routes `POST /admin/comptes` et
+`POST /admin/mot-de-passe` s'appuient dessus ; le back-office les appelle avec
+le **jeton de session** de la personne connectée, et le service **relit ses
+droits en base** — il parle à Postgres avec un rôle privilégié, donc RLS ne le
+filtre pas, et c'est cette relecture qui décide. Un gérant ouvre un accès à sa
+cuisine ; seul un `admin` crée un `gerant` ou un `admin`.
+
+Sans cette clé, les routes répondent 501 et `pnpm sync:acces` reste le chemin
+— il sert toujours au tout premier administrateur, quand personne ne peut
+encore ouvrir le back-office.
+
+⚠ Ne crée **jamais** un compte `auth.users` en SQL : GoTrue lit ses colonnes de
+jetons dans des chaînes non nullables, et une valeur `NULL` (au lieu de `''`)
+fait échouer la connexion avec « E-mail ou mot de passe incorrect » — sans que
+rien, nulle part, ne dise pourquoi. Vu en production.
 
 Corollaire à ne pas oublier : **RLS ne dit pas qui je suis dans mon propre
 restaurant.** `memberships_lecture` rend, à dessein, toutes les appartenances

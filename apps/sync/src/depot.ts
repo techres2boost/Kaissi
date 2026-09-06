@@ -211,6 +211,40 @@ export interface DepotSync {
   ): Promise<{ restaurantId: string; orderId: string }[]>
 
   /**
+   * Rôle de cet utilisateur dans cet établissement, ou `null`.
+   *
+   * Le service parle à la base avec un rôle privilégié : RLS ne le filtre
+   * pas. C'est donc CETTE lecture qui décide, explicitement, si l'appelant a
+   * le droit d'ouvrir un accès — jamais une confiance faite au client.
+   */
+  roleDansEtablissement(authUserId: string, restaurantId: string): Promise<string | null>
+
+  /** Compte d'authentification portant cette adresse, s'il existe. */
+  compteParEmail(email: string): Promise<{ id: string; email: string } | null>
+
+  /** Compte d'authentification d'un employé, s'il en a un. */
+  compteDeLEmploye(
+    employeId: string,
+    restaurantId: string,
+  ): Promise<{ authUserId: string; email: string } | null>
+
+  /**
+   * Relie un compte d'authentification à un établissement.
+   *
+   * Rejouable : la même demande deux fois met le rôle à jour et lève une
+   * éventuelle révocation, au lieu d'échouer sur la clé d'unicité. C'est la
+   * logique de `pnpm sync:acces`, portée dans le service pour que personne
+   * n'ait plus besoin d'un terminal.
+   */
+  rattacherAcces(demande: {
+    restaurantId: string
+    authUserId: string
+    email: string
+    nom: string
+    role: string
+  }): Promise<{ employeId: string; cree: boolean }>
+
+  /**
    * Retire du journal de catalogue les marqueurs « prêt » devenus inutiles.
    *
    * Ils y descendent par le même canal que le catalogue (0029), et c'est ce
