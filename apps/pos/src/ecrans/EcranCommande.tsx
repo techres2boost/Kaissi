@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   calculerTotaux,
+  formaterPourcentage,
   formaterTND,
   millimes,
   pointsDeBase,
@@ -16,12 +17,14 @@ import {
   estModifiable,
   type EtatCommande,
   type Millimes,
+  type Remise,
   type TotauxCommande,
 } from '@kaissi/domain'
 import type {
   CategorieLocale,
   ModificateurLocal,
   ProduitLocal,
+  ReductionLocale,
   VarianteLocale,
 } from '@kaissi/db-local'
 import { rendreTicketCuisine } from '@kaissi/printing'
@@ -433,18 +436,23 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
 
       {remiseOuverte && (
         <ModaleRemise
+          reductions={app.reductions}
           onAnnuler={() => setRemiseOuverte(false)}
-          onValider={async (pourcent) => {
+          onValider={async (remise) => {
             setRemiseOuverte(false)
             await executer(
               (manager) =>
                 session.appliquerRemise(
                   employe,
                   orderId,
-                  { type: 'pourcentage', valeurBp: pointsDeBase(pourcent * 100) },
+                  remise,
                   manager ? { autorisePar: manager } : {},
                 ),
-              `Remise de ${pourcent} %`,
+              remise.motif
+                ? `Remise « ${remise.motif} »`
+                : remise.type === 'pourcentage'
+                  ? `Remise de ${formaterPourcentage(remise.valeurBp)} %`
+                  : `Remise de ${formaterTND(remise.valeurMillimes)}`,
             )
           }}
         />
@@ -628,26 +636,109 @@ function ModaleOptions({
 
 // ─── Remise ─────────────────────────────────────────────────────────────────
 
+/**
+ * Le choix d'une remise : les réductions de la maison, puis la saisie libre.
+ *
+ * ── Pourquoi le référentiel D'ABORD ───────────────────────────────────────
+ *
+ * Une remise saisie à la main ne dit que son montant. « 12 % sur la table 4 »
+ * ne se juge pas : happy hour, geste commercial, personnel de la maison, ce
+ * sont trois décisions différentes — et le rapport ne pouvait pas les
+ * distinguer. Choisir dans une liste nomme la décision, en un geste au lieu
+ * de deux.
+ *
+ * ── Pourquoi la saisie libre RESTE ────────────────────────────────────────
+ *
+ * Le geste commercial n'entre dans aucune case, et il se décide devant un
+ * client qui attend. Obliger à créer une réduction au back-office avant de
+ * l'accorder, c'est garantir qu'on la contournera — ou qu'on ne remisera
+ * plus du tout.
+ */
 function ModaleRemise({
+  reductions,
   onAnnuler,
   onValider,
 }: {
+  reductions: readonly ReductionLocale[]
   onAnnuler: () => void
-  onValider: (pourcent: number) => Promise<void>
+  onValider: (remise: Remise) => Promise<void>
 }) {
+  const [libre, setLibre] = useState(reductions.length === 0)
+
   return (
     <Modale titre="Remise sur la commande" onFermer={onAnnuler}>
       <p className="aide">
         Au-delà de votre plafond, le code d'un responsable sera demandé — et son
         nom restera dans le journal.
       </p>
-      <div className="options grand">
-        {[0, 5, 10, 15, 20, 25, 50].map((p) => (
-          <button key={p} type="button" onClick={() => void onValider(p)}>
-            {p} %
+
+      {!libre && (
+        <>
+          <div className="options grand">
+            {reductions.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() =>
+                  void onValider(
+                    r.type === 'montant'
+                      ? {
+                          type: 'montant',
+                          valeurMillimes: millimes(r.montantMillimes ?? 0),
+                          motif: r.nom,
+                          reductionId: r.id,
+                        }
+                      : {
+                          type: 'pourcentage',
+                          valeurBp: pointsDeBase(r.valeurBp ?? 0),
+                          motif: r.nom,
+                          reductionId: r.id,
+                        },
+                  )
+                }
+              >
+                <span className="nom-reduction">{r.nom}</span>
+                <span className="valeur-reduction">
+                  {r.type === 'montant'
+                    ? `− ${formaterTND(millimes(r.montantMillimes ?? 0))}`
+                    : `− ${formaterPourcentage(r.valeurBp ?? 0)} %`}
+                </span>
+              </button>
+            ))}
+          </div>
+          <button type="button" className="secondaire" onClick={() => setLibre(true)}>
+            Autre remise…
           </button>
-        ))}
-      </div>
+        </>
+      )}
+
+      {libre && (
+        <>
+          {/*
+            La remise libre n'a PAS de motif : elle n'en invente pas un. Le
+            rapport la range sous « Sans motif », ce qui est la vérité — et ce
+            qui rend visible le jour où elle devient l'habitude.
+          */}
+          <div className="options grand">
+            {[0, 5, 10, 15, 20, 25, 50].map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() =>
+                  void onValider({ type: 'pourcentage', valeurBp: pointsDeBase(p * 100) })
+                }
+              >
+                {p} %
+              </button>
+            ))}
+          </div>
+          {reductions.length > 0 && (
+            <button type="button" className="secondaire" onClick={() => setLibre(false)}>
+              ‹ Revenir aux réductions de la maison
+            </button>
+          )}
+        </>
+      )}
     </Modale>
   )
 }

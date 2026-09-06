@@ -68,8 +68,9 @@ export async function projeterCommande(
          tax_breakdown, exceptions,
          opened_at, sent_at, closed_at, cancelled_at,
          last_event_seq, event_count, updated_at,
-         shift_id, closed_by, cancel_reason, customer_name
-       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         shift_id, closed_by, cancel_reason, customer_name,
+         discount_id, discount_label
+       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT (id) DO UPDATE SET
          table_id = excluded.table_id,
          status = excluded.status,
@@ -84,6 +85,8 @@ export async function projeterCommande(
          paid_millimes = excluded.paid_millimes,
          tax_breakdown = excluded.tax_breakdown,
          exceptions = excluded.exceptions,
+         discount_id = excluded.discount_id,
+         discount_label = excluded.discount_label,
          sent_at = excluded.sent_at,
          closed_at = excluded.closed_at,
          cancelled_at = excluded.cancelled_at,
@@ -127,6 +130,16 @@ export async function projeterCommande(
         etat.closePar,
         etat.annuleeMotif,
         etat.clientNom,
+        /*
+         * D'où vient la réduction, et sous quel nom.
+         *
+         * Le libellé est RECOPIÉ, pas joint : renommer « Happy hour » l'an
+         * prochain ne doit pas réécrire ce qui a été accordé cette année. Un
+         * rapport qui change quand on renomme un réglage n'est plus un
+         * historique. L'identifiant, lui, permet de regrouper.
+         */
+        etat.remiseGlobale?.reductionId ?? null,
+        etat.remiseGlobale?.motif ?? null,
       ],
     )
 
@@ -143,8 +156,9 @@ export async function projeterCommande(
            unit_price_millimes, modifiers_millimes, line_gross_millimes,
            line_discount_millimes, global_discount_share_millimes,
            line_total_millimes, line_tax_millimes,
-           modifiers, note, position, voided_at
-         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+           modifiers, note, position, voided_at,
+           discount_id, discount_label
+         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           ligne.id,
           etat.id,
@@ -167,6 +181,11 @@ export async function projeterCommande(
           ligne.note,
           position,
           ligne.annulee ? ligne.ajouteeA : null,
+          // La réduction de LIGNE, distincte de la réduction globale portée
+          // par la commande : « −2 dinars sur le dessert » n'est pas la même
+          // décision que « −10 % sur la table ».
+          ligne.remise?.reductionId ?? null,
+          ligne.remise?.motif ?? null,
         ],
       )
       position += 1

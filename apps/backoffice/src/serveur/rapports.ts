@@ -52,6 +52,9 @@ export interface LigneVendue {
   readonly coutUnitaire: number | null
   readonly categorieId: string | null
   readonly categorieNom: string | null
+  /** La réduction de LIGNE, et son nom figé au moment de la vente (0030). */
+  readonly reductionId: string | null
+  readonly reductionNom: string | null
 }
 
 export interface CommandeVendue {
@@ -59,6 +62,9 @@ export interface CommandeVendue {
   readonly totalMillimes: number
   readonly vendeurId: string | null
   readonly closeA: string | null
+  /** La réduction GLOBALE de la commande, et son nom figé (0030). */
+  readonly reductionId?: string | null
+  readonly reductionNom?: string | null
 }
 
 export interface PaiementEncaisse {
@@ -214,6 +220,91 @@ export function ventilerParEmploye(
     const vendeur = vendeurParCommande.get(l.orderId) ?? null
     return { cle: vendeur ?? 'inconnu', libelle: nomDe(vendeur) }
   })
+}
+
+/** Ce qu'une réduction a coûté sur la période. */
+export interface VentilationReduction {
+  readonly cle: string
+  readonly libelle: string
+  readonly montantMillimes: Millimes
+  /** Nombre de VENTES concernées, pas de lignes. */
+  readonly ventes: number
+}
+
+/**
+ * Ce que chaque réduction a coûté, par MOTIF.
+ *
+ * ── Pourquoi une fonction à part, et pas `ventiler()` ─────────────────────
+ *
+ * Les autres ventilations partagent un chiffre d'affaires : chaque ligne
+ * appartient à un article, à une catégorie, à un employé. Une réduction, non
+ * — une vente peut n'en porter aucune, et deux réductions peuvent coexister
+ * sur la même vente (une de ligne, une globale). On additionne donc des
+ * MONTANTS REMISÉS, jamais un CA, et la somme des parts ne fait pas 100 %.
+ *
+ * ── « Sans motif » est une ligne, pas un trou ─────────────────────────────
+ *
+ * Une remise saisie à la main n'invente pas de nom. La ranger sous « Sans
+ * motif » dit la vérité — et rend visible le jour où elle devient
+ * l'habitude, ce qu'un total muet cacherait.
+ */
+export function ventilerParReduction(
+  lignes: readonly LigneVendue[],
+  commandes: readonly CommandeVendue[],
+): VentilationReduction[] {
+  const groupes = new Map<string, { libelle: string; montants: number[]; ventes: Set<string> }>()
+
+  const ajouter = (
+    cle: string | null | undefined,
+    libelle: string | null | undefined,
+    montant: number,
+    orderId: string,
+  ) => {
+    if (montant <= 0) return
+    // La clé est l'identifiant du référentiel s'il existe, sinon le libellé
+    // figé, sinon « sans motif ». Une réduction supprimée du référentiel ne
+    // doit pas faire disparaître ce qu'elle a coûté.
+    const identifiant = cle ?? (libelle ? `libelle:${libelle}` : 'sans-motif')
+    const groupe = groupes.get(identifiant) ?? {
+      libelle: libelle ?? 'Sans motif',
+      montants: [],
+      ventes: new Set<string>(),
+    }
+    groupe.montants.push(montant)
+    groupe.ventes.add(orderId)
+    groupes.set(identifiant, groupe)
+  }
+
+  for (const ligne of lignes) {
+    ajouter(ligne.reductionId, ligne.reductionNom, ligne.remiseLigneMillimes, ligne.orderId)
+  }
+
+  // La remise GLOBALE est portée par la commande : ses quotes-parts sont
+  // réparties sur les lignes, mais le motif, lui, est unique.
+  const globaleParCommande = new Map<string, number>()
+  for (const ligne of lignes) {
+    globaleParCommande.set(
+      ligne.orderId,
+      (globaleParCommande.get(ligne.orderId) ?? 0) + ligne.remiseGlobaleMillimes,
+    )
+  }
+  for (const commande of commandes) {
+    ajouter(
+      commande.reductionId,
+      commande.reductionNom,
+      globaleParCommande.get(commande.id) ?? 0,
+      commande.id,
+    )
+  }
+
+  return [...groupes.entries()]
+    .map(([cle, g]) => ({
+      cle,
+      libelle: g.libelle,
+      montantMillimes: sommeMillimes(g.montants),
+      ventes: g.ventes.size,
+    }))
+    .sort((a, b) => b.montantMillimes - a.montantMillimes)
 }
 
 export interface VentilationPaiement {

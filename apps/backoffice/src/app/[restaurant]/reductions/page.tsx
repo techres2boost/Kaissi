@@ -16,22 +16,36 @@
  * les jours, chez la même personne, c'est autre chose. L'écran classe donc
  * par employé et laisse voir chaque ticket concerné.
  *
- * ── Ce qui n'est pas encore là ────────────────────────────────────────────
+ * ── Le motif ──────────────────────────────────────────────────────────────
  *
- * Le MOTIF. La caisse enregistre un montant ou un pourcentage, pas une
- * raison. Une réduction nommée (« Happy hour », « Personnel ») demande un
- * référentiel de réductions et son écran sur la tablette — c'est le chantier
- * suivant, et il n'a pas de sens tant que la caisse ne sait pas la choisir.
+ * Depuis le référentiel (migration 0030), la caisse ne remonte plus seulement
+ * un montant : elle remonte le NOM de la réduction choisie. « Happy hour »
+ * chaque soir n'appelle pas la même question que « Geste commercial » trois
+ * fois par jour, et sans ce nom les deux se ressemblaient exactement.
+ *
+ * Le libellé affiché est celui qui a été RECOPIÉ dans la vente, pas celui du
+ * référentiel aujourd'hui : renommer un réglage ne doit pas réécrire les
+ * rapports de l'an dernier. Le regroupement, lui, suit l'identifiant — un
+ * « Happy hour » renommé reste une seule et même ligne.
+ *
+ * Une remise tapée à la main, sans motif, reste possible et se regroupe sous
+ * « Sans motif ». La faire disparaître donnerait un total juste et une
+ * répartition fausse.
  */
 
 import { formaterPourcentage } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { libelleJournee } from '../../../serveur/journee.js'
 import { chargerRapport } from '../../../serveur/rapport.js'
-import { calculerIndicateurs, ventilerParJournee } from '../../../serveur/rapports.js'
+import {
+  calculerIndicateurs,
+  ventilerParJournee,
+  ventilerParReduction,
+} from '../../../serveur/rapports.js'
 import { BandeauIndicateurs } from '../../../composants/BandeauIndicateurs.js'
 import { FiltresRapport } from '../../../composants/FiltresRapport.js'
 import { GraphiqueSerie } from '../../../composants/GraphiqueSerie.js'
+import Link from 'next/link'
 import { TableauRapport } from '../../../composants/TableauRapport.js'
 import { celluleMontant } from '../../../composants/RapportVentilation.js'
 
@@ -89,6 +103,15 @@ export default async function PageReductions({
       brutMillimes: brutParCommande.get(t.id) ?? 0,
     }))
     .filter((t) => t.remiseMillimes > 0)
+
+  /*
+   * Par MOTIF : la première question qu'on se pose devant un total de remises.
+   *
+   * Le calcul vit dans `rapports.ts` parce qu'il n'est pas trivial — la remise
+   * de ligne porte son propre motif, la remise globale celui de la commande,
+   * et les deux se comptent ensemble.
+   */
+  const parMotif = ventilerParReduction(ventes.lignes, ventes.commandes)
 
   /** Par employé : c'est la répartition qui parle, pas le total. */
   const parEmploye = new Map<string, { nom: string; remise: number; tickets: number }>()
@@ -188,6 +211,41 @@ export default async function PageReductions({
           personne, est autre chose.
         </p>
       </section>
+
+      <TableauRapport
+        titre="Par motif"
+        lignes={parMotif.map((l) => ({
+          cle: l.cle,
+          cellules: {
+            libelle: { texte: l.libelle },
+            ventes: { texte: String(l.ventes), valeur: l.ventes },
+            montant: celluleMontant(l.montantMillimes),
+            part: {
+              texte:
+                i.remisesMillimes === 0
+                  ? '—'
+                  : `${formaterPourcentage(
+                      Math.round((l.montantMillimes / i.remisesMillimes) * 10_000),
+                    )} %`,
+              valeur: i.remisesMillimes === 0 ? 0 : l.montantMillimes / i.remisesMillimes,
+            },
+          },
+        }))}
+        vide="Aucune réduction accordée sur cette période."
+        colonnes={[
+          { cle: 'libelle', titre: 'Réduction' },
+          { cle: 'ventes', titre: 'Ventes concernées', nombre: true },
+          { cle: 'montant', titre: 'Montant', nombre: true },
+          { cle: 'part', titre: 'Part des réductions', nombre: true, secondaire: true },
+        ]}
+      />
+      <p className="indication">
+        Les motifs proposés par la caisse se règlent dans{' '}
+        <Link href={{ pathname: `/${restaurant}/reductions/gestion` }}>
+          Articles → Réductions
+        </Link>
+        . Une remise tapée à la main apparaît sous « Sans motif ».
+      </p>
 
       <TableauRapport
         titre="Par employé"

@@ -104,6 +104,8 @@ interface LigneBrute {
   global_discount_share_millimes: number
   line_total_millimes: number
   line_tax_millimes: number
+  discount_id: string | null
+  discount_label: string | null
   voided_at: string | null
 }
 
@@ -185,7 +187,7 @@ export async function chargerVentes(
       supabase
         .from('orders')
         .select(
-          'id, status, ticket_number, total_millimes, closed_at, covers, opened_by, closed_by',
+          'id, status, ticket_number, total_millimes, closed_at, covers, opened_by, closed_by, discount_id, discount_label',
         )
         .eq('restaurant_id', restaurantId)
         .eq('status', 'close')
@@ -235,7 +237,7 @@ export async function chargerVentes(
       // type du résultat en LISANT cette chaîne. Un `'a' + 'b'` se résout en
       // `string`, et toute la requête retombe sur `GenericStringError`.
       .select(
-        'id, order_id, product_id, designation, qty, line_gross_millimes, line_discount_millimes, global_discount_share_millimes, line_total_millimes, line_tax_millimes, voided_at',
+        'id, order_id, product_id, designation, qty, line_gross_millimes, line_discount_millimes, global_discount_share_millimes, line_total_millimes, line_tax_millimes, discount_id, discount_label, voided_at',
       )
       .in('order_id', idsCommandes.slice(i, i + TRANCHE))
       .is('voided_at', null)
@@ -279,6 +281,8 @@ export async function chargerVentes(
       totalMillimes: commande.total_millimes,
       vendeurId,
       closeA: commande.closed_at,
+      reductionId: commande.discount_id,
+      reductionNom: commande.discount_label,
     })
 
     // Les lignes annulées sont déjà écartées par la requête : le client ne
@@ -297,6 +301,8 @@ export async function chargerVentes(
         remiseGlobaleMillimes: l.global_discount_share_millimes,
         netMillimes: l.line_total_millimes,
         taxeMillimes: l.line_tax_millimes,
+        reductionId: l.discount_id,
+        reductionNom: l.discount_label,
         // `undefined` deviendrait « pas de coût » comme `null` ; on normalise
         // pour que `lignesSansCout` compte juste.
         coutUnitaire: produit?.cout ?? null,

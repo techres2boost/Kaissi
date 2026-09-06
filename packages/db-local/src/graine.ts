@@ -255,6 +255,24 @@ export async function installerGraine(db: AdaptateurSqlite): Promise<boolean> {
       )
     }
 
+    // ── Réductions de démonstration ───────────────────────────────────────
+    // Trois cas qui couvrent les deux formes : un pourcentage courant, un
+    // pourcentage réservé au personnel, et un montant fixe. En production
+    // elles descendent par le catalogue ; ici elles permettent d'essayer
+    // l'écran sans serveur.
+    for (const [suffixe, nom, kind, bp, montant, pos] of [
+      ['960', 'Happy hour', 'pourcentage', 1000, null, 1],
+      ['961', 'Personnel', 'pourcentage', 2000, null, 2],
+      ['962', 'Geste commercial', 'montant', null, 2000, 3],
+    ] as const) {
+      await db.executer(
+        `INSERT INTO discounts
+           (id, organization_id, restaurant_id, name, kind, value_bp, amount_millimes, position)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id(suffixe), DEMO_ORG, DEMO_RESTO, nom, kind, bp, montant, pos],
+      )
+    }
+
     // ── Employés de démonstration ─────────────────────────────────────────
     // Les hachages sont PRÉCALCULÉS et embarqués : hacher trois PIN avec
     // Argon2id coûterait une bonne seconde au premier lancement sur une

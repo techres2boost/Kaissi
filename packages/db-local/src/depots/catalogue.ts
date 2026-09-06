@@ -73,6 +73,23 @@ export interface TableLocale {
   zoneNom: string | null
 }
 
+/**
+ * Une réduction du référentiel, telle que la caisse la propose.
+ *
+ * Elle est LUE sur la tablette, jamais écrite : le gérant la déclare au
+ * back-office, elle descend par le catalogue. Une réduction créée depuis la
+ * caisse serait une décision de gestion prise devant un client qui attend.
+ */
+export interface ReductionLocale {
+  id: string
+  nom: string
+  type: 'pourcentage' | 'montant'
+  /** Points de base ENTIERS : 10 % = 1000. Nul pour un montant fixe. */
+  valeurBp: number | null
+  /** Millimes entiers. Nul pour un pourcentage. */
+  montantMillimes: number | null
+}
+
 export interface MethodePaiementLocale {
   id: string
   nom: string
@@ -250,6 +267,26 @@ export function depotCatalogue(db: AdaptateurSqlite) {
         label: l.label,
         places: l.seats,
         zoneNom: l.zone_nom,
+      }))
+    },
+
+    async reductions(): Promise<ReductionLocale[]> {
+      const lignes = await db.lire<{
+        id: string
+        name: string
+        kind: string
+        value_bp: number | null
+        amount_millimes: number | null
+      }>(
+        `SELECT id, name, kind, value_bp, amount_millimes FROM discounts
+         WHERE archived_at IS NULL ORDER BY position, name`,
+      )
+      return lignes.map((l) => ({
+        id: l.id,
+        nom: l.name,
+        type: l.kind === 'montant' ? 'montant' : 'pourcentage',
+        valeurBp: l.value_bp,
+        montantMillimes: l.amount_millimes,
       }))
     },
 

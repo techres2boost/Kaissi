@@ -227,6 +227,19 @@ const TABLES_MIROIR: Record<
                'pin_hash', 'permissions', 'is_active', 'archived_at'],
   },
   /*
+   * Les réductions habituelles de l'établissement (Postgres 0030).
+   *
+   * Elles descendent par le catalogue pour une raison de fond : la caisse
+   * doit pouvoir proposer « Happy hour » à 19 h un soir de coupure réseau.
+   * Une liste chargée au moment du clic ne tomberait qu'en service, au pire
+   * moment.
+   */
+  discounts: {
+    nom: 'discounts',
+    colonnes: ['id', 'organization_id', 'restaurant_id', 'name', 'kind',
+               'value_bp', 'amount_millimes', 'position', 'archived_at'],
+  },
+  /*
    * « Commande prête », posé par la cuisine (Postgres 0029).
    *
    * Ce n'est pas du référentiel — c'est le seul marqueur transactionnel qui

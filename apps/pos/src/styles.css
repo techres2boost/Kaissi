@@ -783,3 +783,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
   color: var(--texte-2); font-weight: 600;
 }
 .details-techniques[open] > summary { margin-bottom: 1rem; }
+
+/* ── Réductions de la maison, dans la modale de remise ───────────────────── */
+/* Deux lignes par bouton : le NOM d'abord — c'est ce qu'on cherche — et la
+   valeur en dessous, pour vérifier avant d'accorder. */
+.options.grand .nom-reduction { display: block; font-weight: 650; }
+.options.grand .valeur-reduction {
+  display: block; margin-top: 0.15rem;
+  font-size: 0.8rem; color: var(--texte-2); font-variant-numeric: tabular-nums;
+}

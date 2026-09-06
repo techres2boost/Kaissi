@@ -8,6 +8,7 @@ import {
   ventilerParEmploye,
   ventilerParJournee,
   ventilerParPaiement,
+  ventilerParReduction,
   ventilerParProduit,
   type CommandeVendue,
   type LigneVendue,
@@ -28,6 +29,8 @@ function ligne(p: Partial<LigneVendue> = {}): LigneVendue {
     coutUnitaire: 10000,
     categorieId: 'cat1',
     categorieNom: 'Plats',
+    reductionId: null,
+    reductionNom: null,
     ...p,
   }
 }
@@ -322,5 +325,72 @@ describe('agréger une série en semaines et en mois', () => {
       'mois',
     )
     expect(points[0]!.caMillimes).toBe(999)
+  })
+})
+
+describe('ventiler les réductions par motif', () => {
+  const commande = (p: Partial<CommandeVendue> = {}): CommandeVendue => ({
+    id: 'c1',
+    totalMillimes: millimes(10_000),
+    vendeurId: 'e1',
+    closeA: '2026-09-06T12:00:00Z',
+    reductionId: null,
+    reductionNom: null,
+    ...p,
+  })
+
+  it('regroupe par identifiant de réduction', () => {
+    const v = ventilerParReduction(
+      [
+        ligne({ remiseLigneMillimes: 1_000, reductionId: 'r1', reductionNom: 'Happy hour' }),
+        ligne({ orderId: 'c2', remiseLigneMillimes: 500, reductionId: 'r1', reductionNom: 'Happy hour' }),
+      ],
+      [],
+    )
+    expect(v).toHaveLength(1)
+    expect(v[0]).toMatchObject({ libelle: 'Happy hour', montantMillimes: 1_500, ventes: 2 })
+  })
+
+  it('range une remise SANS motif sous « Sans motif »', () => {
+    // Une remise saisie à la main n'invente pas de nom. Le dire rend visible
+    // le jour où elle devient l'habitude.
+    const v = ventilerParReduction([ligne({ remiseLigneMillimes: 800 })], [])
+    expect(v[0]!.libelle).toBe('Sans motif')
+  })
+
+  it('additionne la remise GLOBALE sous le motif de la COMMANDE', () => {
+    // Les quotes-parts sont réparties sur les lignes, mais le motif est
+    // unique : le compter par ligne le dupliquerait.
+    const v = ventilerParReduction(
+      [
+        ligne({ remiseGlobaleMillimes: 600 }),
+        ligne({ remiseGlobaleMillimes: 400 }),
+      ],
+      [commande({ reductionId: 'r2', reductionNom: 'Personnel' })],
+    )
+    expect(v).toHaveLength(1)
+    expect(v[0]).toMatchObject({ libelle: 'Personnel', montantMillimes: 1_000, ventes: 1 })
+  })
+
+  it('sépare la remise de LIGNE de la remise GLOBALE, même sur une seule vente', () => {
+    const v = ventilerParReduction(
+      [ligne({ remiseLigneMillimes: 500, reductionId: 'r1', reductionNom: 'Happy hour', remiseGlobaleMillimes: 300 })],
+      [commande({ reductionId: 'r2', reductionNom: 'Personnel' })],
+    )
+    expect(v.map((x) => x.libelle).sort()).toEqual(['Happy hour', 'Personnel'])
+  })
+
+  it('ignore les remises nulles plutôt que d’inventer une ligne à zéro', () => {
+    expect(ventilerParReduction([ligne({ remiseLigneMillimes: 0 })], [commande()])).toEqual([])
+  })
+
+  it('garde le montant d’une réduction retirée du référentiel', () => {
+    // Le libellé est figé dans la vente : supprimer la réduction ne doit pas
+    // faire disparaître ce qu'elle a coûté.
+    const v = ventilerParReduction(
+      [ligne({ remiseLigneMillimes: 700, reductionId: null, reductionNom: 'Ancienne promo' })],
+      [],
+    )
+    expect(v[0]).toMatchObject({ libelle: 'Ancienne promo', montantMillimes: 700 })
   })
 })

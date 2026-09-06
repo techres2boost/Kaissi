@@ -115,16 +115,30 @@ await etape('envoi en cuisine — le bon s’affiche au lieu de s’imprimer', a
   await page.click('.modale .fermer')
 })
 
-await etape('remise de 10 % (sous le plafond du caissier)', async () => {
+await etape('remise « Happy hour » choisie dans le référentiel', async () => {
   await page.click('.actions-commande button:has-text("Remise")')
-  await page.click('.options.grand button:text-is("10 %")')
+  // Les réductions de la maison s'affichent EN PREMIER : c'est le geste
+  // normal. Elles nomment la décision, ce qu'un pourcentage anonyme ne fait
+  // pas — et c'est ce nom que le rapport regroupe.
+  await page.waitForSelector('.options.grand .nom-reduction', { timeout: 10000 })
+  const proposees = await page.$$eval('.options.grand .nom-reduction', (n) =>
+    n.map((e) => e.textContent.trim()),
+  )
+  console.log(`    réductions proposées : ${proposees.join(', ')}`)
+  if (!proposees.includes('Happy hour')) {
+    throw new Error('Le référentiel de réductions n’est pas descendu jusqu’à la caisse.')
+  }
+  await page.click('.options.grand button:has-text("Happy hour")')
   await page.waitForFunction(() => document.querySelector('.remise-appliquee') !== null, { timeout: 10000 })
   const remise = await page.textContent('.remise-appliquee span:last-child')
   console.log(`    remise : ${remise}`)
 })
 
-await etape('remise de 50 % → escalade vers un manager', async () => {
+await etape('remise LIBRE de 50 % → escalade vers un manager', async () => {
   await page.click('.actions-commande button:has-text("Remise")')
+  // La saisie libre reste accessible : le geste commercial n'entre dans
+  // aucune case, et il se décide devant un client qui attend.
+  await page.click('.modale button:has-text("Autre remise")')
   await page.click('.options.grand button:text-is("50 %")')
   await page.waitForSelector('text=Autorisation requise', { timeout: 10000 })
   const motif = await page.textContent('.modale .sous-titre')

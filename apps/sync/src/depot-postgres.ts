@@ -744,9 +744,10 @@ export class DepotPostgres implements DepotSync {
                subtotal_millimes, discount_millimes, tax_millimes, service_millimes,
                stamp_duty_millimes, total_millimes, paid_millimes,
                tax_breakdown, exceptions, opened_at, sent_at, closed_at,
-               cancelled_at, cancel_reason, last_event_seq, event_count
+               cancelled_at, cancel_reason, last_event_seq, event_count,
+               discount_id, discount_label
              ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
-                       $19,$20,$21,$22,$23,$24,$25,$26,$27)
+                       $19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
              on conflict (id) do update set
                table_id = excluded.table_id,
                status = excluded.status,
@@ -768,6 +769,8 @@ export class DepotPostgres implements DepotSync {
                cancel_reason = excluded.cancel_reason,
                last_event_seq = excluded.last_event_seq,
                event_count = excluded.event_count,
+               discount_id = excluded.discount_id,
+               discount_label = excluded.discount_label,
                updated_at = now()`,
             [
               etat.id, etat.organizationId, etat.restaurantId, etat.tableId,
@@ -780,6 +783,17 @@ export class DepotPostgres implements DepotSync {
               etat.ouverteA ?? new Date().toISOString(), etat.envoyeeA, etat.closeA,
               etat.annuleeA, etat.annuleeMotif, etat.derniereSeqServeur ?? 0,
               etat.nombreEvenements,
+              /*
+               * D'où vient la réduction, et sous quel nom (migration 0030).
+               *
+               * Le libellé est RECOPIÉ depuis l'événement, jamais joint au
+               * référentiel : renommer « Happy hour » l'an prochain ne doit
+               * pas réécrire ce qui a été accordé cette année. L'identifiant,
+               * lui, permet de regrouper — et il vient de l'événement aussi,
+               * donc d'une caisse qui pouvait être hors ligne.
+               */
+              etat.remiseGlobale?.reductionId ?? null,
+              etat.remiseGlobale?.motif ?? null,
             ],
           )
 
@@ -793,8 +807,8 @@ export class DepotPostgres implements DepotSync {
                  station_id, tax_rate_id, designation, qty, unit_price_millimes,
                  modifiers_millimes, line_gross_millimes, line_discount_millimes,
                  global_discount_share_millimes, line_total_millimes, line_tax_millimes,
-                 modifiers, note, position, voided_at
-               ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
+                 modifiers, note, position, voided_at, discount_id, discount_label
+               ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
               [
                 ligne.id, etat.organizationId, etat.restaurantId, orderId,
                 ligne.produitId, ligne.variantId, ligne.stationId, ligne.tauxTaxeId,
@@ -805,6 +819,7 @@ export class DepotPostgres implements DepotSync {
                 calc?.baseApresRemisesMillimes ?? 0, calc?.taxeMillimes ?? 0,
                 JSON.stringify(ligne.modificateurs), ligne.note, position,
                 ligne.annulee ? ligne.ajouteeA : null,
+                ligne.remise?.reductionId ?? null, ligne.remise?.motif ?? null,
               ],
             )
             position += 1

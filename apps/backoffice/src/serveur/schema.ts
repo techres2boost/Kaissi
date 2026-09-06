@@ -126,6 +126,28 @@ export type Station = {
   archived_at: Horodatage | null
 }
 
+/**
+ * Une réduction du référentiel (migration 0030).
+ *
+ * `value_bp` OU `amount_millimes`, jamais les deux : la contrainte de base
+ * l'impose, parce qu'une ligne qui porterait les deux laisserait la caisse
+ * choisir — et deux caisses choisiraient différemment.
+ */
+export type Reduction = {
+  id: Uuid
+  organization_id: Uuid
+  restaurant_id: Uuid
+  name: string
+  /** `'pourcentage'` ou `'montant'`. */
+  kind: string
+  /** Points de base ENTIERS : 10 % = 1000. Nul pour un montant fixe. */
+  value_bp: number | null
+  amount_millimes: Millimes | null
+  position: number
+  updated_at: Horodatage
+  archived_at: Horodatage | null
+}
+
 export type TauxTaxe = {
   id: Uuid
   organization_id: Uuid
@@ -210,6 +232,13 @@ export type Commande = {
   total_millimes: Millimes
   tax_breakdown: LigneVentilation[]
   covers: number | null
+  /**
+   * La réduction appliquée à la commande, et son nom AU MOMENT de la vente
+   * (0030). Le libellé est recopié, jamais joint : renommer une réduction ne
+   * doit pas réécrire ce qui a été accordé l'an dernier.
+   */
+  discount_id: Uuid | null
+  discount_label: string | null
   opened_at: Horodatage
   /** Horodatage du premier envoi en cuisine. Alimente l'écran de cuisine. */
   sent_at: Horodatage | null
@@ -242,6 +271,9 @@ export type LigneCommande = {
    */
   line_total_millimes: Millimes
   line_tax_millimes: Millimes
+  /** La réduction appliquée à CETTE ligne, et son nom figé (0030). */
+  discount_id: Uuid | null
+  discount_label: string | null
   modifiers: { nom?: string; prixDeltaMillimes?: number }[]
   note: string | null
   position: number
@@ -452,6 +484,7 @@ export type Database = {
       categories: Table<Categorie>
       stations: Table<Station>
       tax_rates: Table<TauxTaxe>
+      discounts: Table<Reduction>
       products: Table<Produit>
       orders: Table<Commande>
       order_items: Table<LigneCommande>

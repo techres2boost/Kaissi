@@ -21,10 +21,35 @@ export interface TauxTaxe {
   readonly incluse: boolean
 }
 
-/** Une remise, exprimée soit en montant fixe, soit en pourcentage (bp). */
+/**
+ * Une remise, exprimée soit en montant fixe, soit en pourcentage (bp).
+ *
+ * ── `reductionId` et `motif` : l'identifiant ET le libellé ────────────────
+ *
+ * Les deux, et pas l'un ou l'autre. L'identifiant renvoie au référentiel
+ * (migration 0030) et permet de REGROUPER : « combien ont coûté les happy
+ * hours ce mois-ci ». Le libellé, lui, est FIGÉ au moment de la vente :
+ * renommer « Happy hour » l'an prochain ne doit pas réécrire ce qu'on a
+ * accordé cette année.
+ *
+ * Les deux restent facultatifs : une remise saisie à la main — le geste
+ * commercial qui n'entre dans aucune case — reste possible, et c'est
+ * volontaire. La borner au référentiel obligerait à créer une réduction
+ * devant un client qui attend.
+ */
 export type Remise =
-  | { readonly type: 'montant'; readonly valeurMillimes: Millimes; readonly motif?: string }
-  | { readonly type: 'pourcentage'; readonly valeurBp: PointsDeBase; readonly motif?: string }
+  | {
+      readonly type: 'montant'
+      readonly valeurMillimes: Millimes
+      readonly motif?: string
+      readonly reductionId?: Uuid
+    }
+  | {
+      readonly type: 'pourcentage'
+      readonly valeurBp: PointsDeBase
+      readonly motif?: string
+      readonly reductionId?: Uuid
+    }
 
 /** Une ligne de commande, telle qu'elle entre dans le calcul des totaux. */
 export interface LigneCalculable {

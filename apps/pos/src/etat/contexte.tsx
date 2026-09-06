@@ -16,7 +16,12 @@ import {
   type ReactNode,
 } from 'react'
 import type { ConfigCalcul, Employe, EnteteEtablissement } from '@kaissi/domain'
-import type { EmployeLocal, MethodePaiementLocale, TableLocale } from '@kaissi/db-local'
+import type {
+  EmployeLocal,
+  MethodePaiementLocale,
+  ReductionLocale,
+  TableLocale,
+} from '@kaissi/db-local'
 import type { ContexteApplication } from '../donnees/demarrage.js'
 import { MoteurSync, transportHttp, type ResumeSync } from '@kaissi/sync-client'
 import { uuidV7 } from '@kaissi/domain'
@@ -42,6 +47,8 @@ export interface ValeurContexte {
   readonly stations: ReadonlyMap<string, StationImprimante>
   readonly tables: readonly TableLocale[]
   readonly methodesPaiement: readonly MethodePaiementLocale[]
+  /** Les réductions habituelles, descendues par le catalogue (0030). */
+  readonly reductions: readonly ReductionLocale[]
   readonly employes: readonly EmployeLocal[]
   /** Employé en poste. `null` = terminal verrouillé. */
   readonly employe: Employe | null
@@ -75,6 +82,7 @@ interface DonneesChargees {
   stations: Map<string, StationImprimante>
   tables: TableLocale[]
   methodesPaiement: MethodePaiementLocale[]
+  reductions: ReductionLocale[]
   employes: EmployeLocal[]
 }
 
@@ -182,10 +190,12 @@ export function FournisseurApp({ app, children }: Props) {
   useEffect(() => {
     let vivant = true
     void (async () => {
-      const [taxes, tables, methodes, employes, org, resto, device] = await Promise.all([
+      const [taxes, tables, methodes, reductions, employes, org, resto, device] =
+        await Promise.all([
         app.catalogue.tauxTaxes(),
         app.catalogue.tables(),
         app.catalogue.methodesPaiement(),
+        app.catalogue.reductions(),
         app.employes.actifs(),
         app.etat.lire('organization_id'),
         app.etat.lire('restaurant_id'),
@@ -225,6 +235,7 @@ export function FournisseurApp({ app, children }: Props) {
         ),
         tables,
         methodesPaiement: methodes,
+        reductions,
         employes,
       })
     })()
@@ -372,6 +383,7 @@ export function FournisseurApp({ app, children }: Props) {
             stations: donnees.stations,
             tables: donnees.tables,
             methodesPaiement: donnees.methodesPaiement,
+            reductions: donnees.reductions,
             employes: donnees.employes,
             employe,
             definirEmploye,

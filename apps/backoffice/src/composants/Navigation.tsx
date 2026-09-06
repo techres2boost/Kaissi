@@ -86,6 +86,15 @@ const GROUPES = [
       { chemin: 'catalogue', libelle: 'Liste d’articles', icone: '📖', gestionnaire: true },
       { chemin: 'categories', libelle: 'Catégories', icone: '🗃️', gestionnaire: true },
       { chemin: 'stock', libelle: 'Stock', icone: '📦', gestionnaire: true },
+      /*
+       * Le RÉFÉRENTIEL des réductions, pas leur rapport.
+       *
+       * Les deux portent le même mot et vivent volontairement à deux endroits
+       * différents : ici on règle ce que la caisse propose, dans « Rapports »
+       * on lit ce que cela a coûté. Un seul écran mélangerait un réglage et
+       * une mesure — et on ne consulte pas les deux au même moment.
+       */
+      { chemin: 'reductions/gestion', libelle: 'Réductions', icone: '🏷️', gestionnaire: true },
     ],
   },
   {

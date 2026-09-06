@@ -108,6 +108,10 @@ Tu peux donc ouvrir **Stock** dès maintenant et voir les pastilles.
 Le tableau porte aussi une colonne **En vente**, à ne pas confondre avec
 l'état de stock — §5.3 explique pourquoi ce sont deux choses différentes.
 
+Trois **réductions** sont également déclarées — *Happy hour* (10 %),
+*Personnel* (20 %), *Geste commercial* (−2,000 TND). La caisse les propose au
+moment de la remise, et le rapport les regroupe par motif (§5 bis K).
+
 ---
 
 ## 3. Le scénario — un service de 5 tickets
@@ -133,10 +137,16 @@ coût :  2 × 1,400  +  1 × 1,300          =   4,100 TND
 
 ### Ticket 2 — la remise *(sert les rapports Remises)*
 
-Table 5 → **Couscous poulet** ×1 → bouton **Remise** → **10 %** → Encaisser.
+Table 5 → **Couscous poulet** ×1 → bouton **Remise** → **Happy hour (10 %)**
+→ Encaisser.
 
 > Observe : le coût ne bouge pas, la marge baisse. C'est exactement ce qu'un
 > gérant doit voir avant d'accorder des remises à la chaîne.
+
+> La remise porte un **motif** parce qu'on l'a choisie dans la liste de la
+> maison. « Autre remise… » ouvre la grille libre — et le rapport range alors
+> la ligne sous « Sans motif ». Les deux sont légitimes ; §5 bis K explique
+> lequel sert à quoi.
 
 ### Ticket 3 — l'envoi en cuisine *(sert l'écran Cuisine)*
 
@@ -1211,7 +1221,7 @@ le marché connaît : un restaurateur qui vient de Loyverse cherche
 | Groupe | Écrans |
 |---|---|
 | **Rapports** | Récapitulatif des ventes · Ventes par article · par catégorie · par employé · par mode de paiement · Reçus · Réductions · Périodes de travail |
-| **Articles** | Liste d'articles · Catégories · Stock |
+| **Articles** | Liste d'articles · Catégories · Stock · Réductions |
 | **Configuration** | Employés |
 
 > **« Tickets » s'appelle « Reçus ».** L'ancienne adresse `/‹resto›/tickets`
@@ -1311,11 +1321,86 @@ liste des reçus remisés, cliquables.
 > suspecte. Le seul autre moment où on la remarque, c'est quand la marge du
 > mois est inexplicablement basse.
 >
-> Ce qui manque encore : le **motif**. La caisse enregistre un montant, pas
-> une raison. Une réduction nommée (« Happy hour », « Personnel ») demande un
-> référentiel de réductions **et** son écran sur la tablette — c'est le
-> chantier suivant, et il n'a pas de sens tant que la caisse ne sait pas la
-> choisir.
+> Le **motif**, lui, est arrivé : voir **§5 bis K** juste dessous. Le premier
+> tableau de l'écran s'appelle désormais **« Par motif »**.
+
+---
+
+### K. Les réductions ont un NOM — de la caisse jusqu'au rapport
+
+Jusqu'ici la caisse enregistrait « −10 % », jamais « pourquoi ». Le rapport
+additionnait donc des décisions qui n'ont rien à voir entre elles : un happy
+hour de tous les soirs et un geste commercial répété chez la même personne
+s'affichaient dans le même total.
+
+**LE RÉFÉRENTIEL — CE QUE LA MAISON PROPOSE**
+
+1. **Articles → Réductions** (le groupe *Articles*, pas *Rapports* — les deux
+   écrans portent le même mot, et c'est voulu : ici on **règle**, là-bas on
+   **mesure**).
+2. Trois réductions sont déjà là : **Happy hour** (10 %), **Personnel**
+   (20 %), **Geste commercial** (−2,000 TND).
+3. Crée-en une : nom, **Pourcentage** ou **Montant fixe**, la valeur.
+
+**Attendu** : un seul champ de valeur est demandé, celui qui correspond au
+type choisi. Une réduction ne peut pas porter les deux — la base le refuse, et
+afficher les deux champs laisserait croire le contraire.
+
+4. Renomme « Happy hour » en « Apéro du soir ».
+
+**Attendu** : le message le dit — **les ventes déjà encaissées gardent
+l'ancien nom**. Le libellé est **recopié** dans la vente au moment de
+l'encaissement, jamais joint. Un rapport qui change quand on renomme un
+réglage n'est plus un historique. L'identifiant, lui, reste : les deux noms se
+regroupent sur une seule ligne.
+
+5. Archive-en une.
+
+**Attendu** : elle disparaît des propositions de la caisse et passe dans
+« Archivées », avec un bouton **Remettre**. Elle n'est pas supprimée : les
+ventes passées la mentionnent toujours, et le rapport continue de les
+regrouper.
+
+**SUR LA CAISSE**
+
+6. Sur la tablette (ou `pnpm pos:dev`), ouvre une table, ajoute un article,
+   puis **Remise**.
+
+**Attendu** : les réductions de la maison **en premier**, avec leur valeur —
+un geste, pas une saisie. En dessous, **« Autre remise… »** ouvre la grille
+libre 0 / 5 / 10 / 15 / 20 / 25 / 50 %.
+
+> **Pourquoi la saisie libre reste là.** Un geste commercial n'entre dans
+> aucune case, et il se décide devant un client qui attend. Obliger à créer
+> une réduction au back-office avant de pouvoir l'accorder, c'est refuser de
+> vendre pour une question de rangement.
+
+7. Choisis « Happy hour », puis encaisse.
+8. Synchronise (**Synchroniser maintenant** dans Diagnostic).
+
+**Attendu** : le référentiel descend par le **catalogue** — le canal qui porte
+déjà les prix, avec son curseur `seq` bigserial. Aucune nouvelle route de
+synchronisation : une réduction créée au back-office arrive sur la caisse
+exactement comme un changement de prix.
+
+**DANS LE RAPPORT**
+
+9. **Rapports → Réductions**.
+
+**Attendu** : un premier tableau **« Par motif »** — la réduction, le nombre
+de ventes concernées, le montant, la part des réductions. Le classement **par
+employé** et la liste des reçus remisés sont toujours dessous : le motif dit
+*quoi*, l'employé dit *qui*, et c'est le croisement des deux qui parle.
+
+10. Fais une remise **sans** la choisir dans la liste (« Autre remise… »).
+
+**Attendu** : elle apparaît sous **« Sans motif »**. La faire disparaître
+donnerait un total juste et une répartition fausse.
+
+> **Ce que ces réductions ne changent PAS : les droits.** Le plafond de remise
+> reste celui du **rôle**. Une réduction déclarée à 50 % demandera toujours
+> l'autorisation d'un responsable — elle nomme la décision, elle ne
+> l'autorise pas.
 
 ---
 
