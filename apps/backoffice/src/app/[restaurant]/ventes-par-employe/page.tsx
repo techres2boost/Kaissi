@@ -30,9 +30,11 @@ import { BandeauIndicateurs } from '../../../composants/BandeauIndicateurs.js'
 import { FiltresRapport } from '../../../composants/FiltresRapport.js'
 import { GraphiqueSerie } from '../../../composants/GraphiqueSerie.js'
 import {
-  TableauVentilationRapport,
+  colonnesVentilation,
+  lignesVentilation,
   TopCinq,
 } from '../../../composants/RapportVentilation.js'
+import { TableauRapport } from '../../../composants/TableauRapport.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -141,18 +143,16 @@ export default async function PageVentesParEmploye({
         />
       </section>
 
-      <TableauVentilationRapport
-        lignes={parEmploye}
-        entete="Employé"
-        colonnesEnTete={[
-          {
-            cle: 'tickets',
-            titre: 'Tickets',
-            nombre: true,
-            rendu: (l) => ticketsPar.get(l.cle) ?? 0,
-            valeur: (l) => ticketsPar.get(l.cle) ?? 0,
+      <TableauRapport
+        lignes={lignesVentilation(parEmploye, (l) => ({
+          tickets: {
+            texte: String(ticketsPar.get(l.cle) ?? 0),
+            valeur: ticketsPar.get(l.cle) ?? 0,
           },
-        ]}
+        }))}
+        colonnes={colonnesVentilation('Employé', [
+          { cle: 'tickets', titre: 'Tickets', nombre: true },
+        ])}
         actions={
           <BoutonsExport
             restaurantId={restaurant}

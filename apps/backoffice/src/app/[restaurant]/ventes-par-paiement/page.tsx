@@ -12,7 +12,7 @@
  * Le total ici doit, lui, coller à l'écran Journée : c'est le même argent.
  */
 
-import { formaterPourcentage, formaterTND, millimes } from '@kaissi/domain'
+import { formaterPourcentage } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { chargerRapport } from '../../../serveur/rapport.js'
 import {
@@ -26,6 +26,7 @@ import { BandeauIndicateurs } from '../../../composants/BandeauIndicateurs.js'
 import { FiltresRapport } from '../../../composants/FiltresRapport.js'
 import { GraphiqueSerie } from '../../../composants/GraphiqueSerie.js'
 import { TableauRapport } from '../../../composants/TableauRapport.js'
+import { celluleMontant } from '../../../composants/RapportVentilation.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -127,8 +128,26 @@ export default async function PageVentesParPaiement({
       </section>
 
       <TableauRapport
-        lignes={paiements}
-        cleDe={(p) => p.type}
+        lignes={paiements.map((p) => ({
+          cle: p.type,
+          cellules: {
+            moyen: { texte: p.libelle },
+            nombre: { texte: String(p.nombre), valeur: p.nombre },
+            montant: celluleMontant(p.montantMillimes),
+            part: {
+              texte:
+                total === 0
+                  ? '—'
+                  : `${formaterPourcentage(
+                      Math.round((p.montantMillimes / total) * 10_000),
+                    )} %`,
+              valeur: p.montantMillimes,
+            },
+            moyenne: celluleMontant(
+              p.nombre === 0 ? 0 : Math.round(p.montantMillimes / p.nombre),
+            ),
+          },
+        }))}
         actions={
           <BoutonsExport
             restaurantId={restaurant}
@@ -138,42 +157,11 @@ export default async function PageVentesParPaiement({
           />
         }
         colonnes={[
-          { cle: 'moyen', titre: 'Mode de paiement', rendu: (p) => p.libelle, valeur: (p) => p.libelle },
-          {
-            cle: 'nombre',
-            titre: 'Transactions',
-            nombre: true,
-            rendu: (p) => p.nombre,
-            valeur: (p) => p.nombre,
-          },
-          {
-            cle: 'montant',
-            titre: 'Montant encaissé',
-            nombre: true,
-            rendu: (p) => formaterTND(p.montantMillimes),
-            valeur: (p) => p.montantMillimes,
-          },
-          {
-            cle: 'part',
-            titre: 'Part',
-            nombre: true,
-            rendu: (p) =>
-              total === 0
-                ? '—'
-                : `${formaterPourcentage(Math.round((p.montantMillimes / total) * 10_000))} %`,
-            valeur: (p) => p.montantMillimes,
-          },
-          {
-            cle: 'moyenne',
-            titre: 'Ticket moyen',
-            nombre: true,
-            secondaire: true,
-            rendu: (p) =>
-              p.nombre === 0
-                ? '—'
-                : formaterTND(millimes(Math.round(p.montantMillimes / p.nombre))),
-            valeur: (p) => (p.nombre === 0 ? 0 : p.montantMillimes / p.nombre),
-          },
+          { cle: 'moyen', titre: 'Mode de paiement' },
+          { cle: 'nombre', titre: 'Transactions', nombre: true },
+          { cle: 'montant', titre: 'Montant encaissé', nombre: true },
+          { cle: 'part', titre: 'Part', nombre: true },
+          { cle: 'moyenne', titre: 'Ticket moyen', nombre: true, secondaire: true },
         ]}
       />
     </>

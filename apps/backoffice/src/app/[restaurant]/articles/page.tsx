@@ -30,9 +30,11 @@ import { BandeauIndicateurs } from '../../../composants/BandeauIndicateurs.js'
 import { FiltresRapport } from '../../../composants/FiltresRapport.js'
 import { GraphiqueSerie } from '../../../composants/GraphiqueSerie.js'
 import {
-  TableauVentilationRapport,
+  colonnesVentilation,
+  lignesVentilation,
   TopCinq,
 } from '../../../composants/RapportVentilation.js'
+import { TableauRapport } from '../../../composants/TableauRapport.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -146,21 +148,20 @@ export default async function PageArticles({
         </p>
       )}
 
-      <TableauVentilationRapport
-        lignes={articles}
-        entete="Article"
-        colonnesEnTete={[
-          {
-            cle: 'categorie',
-            titre: 'Catégorie',
-            secondaire: true,
+      <TableauRapport
+        lignes={lignesVentilation(articles, (l) => ({
+          categorie: {
             // La catégorie du PREMIER passage suffit : un article n'en a
             // qu'une, et la ventilation regroupe déjà par article.
-            rendu: (l) =>
-              ventes.lignes.find((x) => (x.produitId ?? `designation:${x.designation}`) === l.cle)
-                ?.categorieNom ?? '—',
+            texte:
+              ventes.lignes.find(
+                (x) => (x.produitId ?? `designation:${x.designation}`) === l.cle,
+              )?.categorieNom ?? '—',
           },
-        ]}
+        }))}
+        colonnes={colonnesVentilation('Article', [
+          { cle: 'categorie', titre: 'Catégorie', secondaire: true },
+        ])}
         actions={
           <BoutonsExport
             restaurantId={restaurant}

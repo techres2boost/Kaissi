@@ -24,9 +24,11 @@ import { BandeauIndicateurs } from '../../../composants/BandeauIndicateurs.js'
 import { FiltresRapport } from '../../../composants/FiltresRapport.js'
 import { GraphiqueSerie } from '../../../composants/GraphiqueSerie.js'
 import {
-  TableauVentilationRapport,
+  colonnesVentilation,
+  lignesVentilation,
   TopCinq,
 } from '../../../composants/RapportVentilation.js'
+import { TableauRapport } from '../../../composants/TableauRapport.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -124,9 +126,9 @@ export default async function PageVentesParCategorie({
         />
       </section>
 
-      <TableauVentilationRapport
-        lignes={categories}
-        entete="Catégorie"
+      <TableauRapport
+        lignes={lignesVentilation(categories)}
+        colonnes={colonnesVentilation('Catégorie')}
         actions={
           <BoutonsExport
             restaurantId={restaurant}

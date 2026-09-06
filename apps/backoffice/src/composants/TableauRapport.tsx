@@ -1,7 +1,23 @@
 'use client'
 
 /**
- * Le tableau d'un rapport : colonnes au choix, pagination, export.
+ * Le tableau d'un rapport : colonnes au choix, tri, pagination, export.
+ *
+ * ── Pourquoi les cellules arrivent DÉJÀ formatées ─────────────────────────
+ *
+ * Première version : chaque colonne portait une fonction `rendu(ligne)`. Le
+ * code se lisait bien, et il a fait tomber SIX écrans en production —
+ * « Application error: a server-side exception has occurred ».
+ *
+ * La cause n'a rien à voir avec les données : une fonction ne traverse pas la
+ * frontière entre un composant serveur et un composant client. React doit
+ * sérialiser les propriétés pour les envoyer au navigateur, et une clôture
+ * ne se sérialise pas. Le compilateur ne le voit pas, `next build` non plus :
+ * l'erreur n'apparaît qu'au rendu, une fois déployé.
+ *
+ * Les cellules sont donc du TEXTE, calculé côté serveur, accompagné d'une
+ * valeur de tri facultative. Ce qui traverse la frontière est de la donnée,
+ * et rien d'autre — ce qui est aussi la règle générale de ce dépôt.
  *
  * ── Pourquoi la pagination est côté NAVIGATEUR ────────────────────────────
  *
@@ -9,48 +25,59 @@
  * ont besoin, et une somme partielle serait fausse. Repaginer côté serveur
  * ajouterait un aller-retour par clic pour redécouper des lignes déjà là.
  *
- * ── Pourquoi un choix de colonnes ─────────────────────────────────────────
- *
- * Douze colonnes ne tiennent pas sur un écran de gérant, et les masquer
- * d'autorité, c'est décider à sa place ce qu'il regarde. Le choix est
- * mémorisé pendant la visite, pas au-delà : une préférence stockée qu'on a
- * oublié d'avoir posée fait croire à des colonnes disparues.
- *
  * ── L'export ne suit PAS la pagination ────────────────────────────────────
  *
  * Il porte la période entière. Exporter « la page 2 » serait le genre de
  * piège qu'on ne découvre qu'en rapprochant deux totaux qui ne collent pas.
  */
 
+import Link from 'next/link'
 import { useState } from 'react'
+import { destinationSure } from '../serveur/redirection.js'
 
-export interface ColonneRapport<L> {
+/** Une cellule : du texte, et de quoi la trier ou la nuancer. */
+export interface Cellule {
+  readonly texte: string
+  /** Clé de tri. À défaut, on trie sur le texte — donc alphabétiquement. */
+  readonly valeur?: number | string
+  /** Classe supplémentaire : « detail » pour un tiret gris, « negatif »… */
+  readonly classe?: string
+  /** Infobulle — « Coût d'achat non saisi » sur un tiret, par exemple. */
+  readonly aide?: string
+  /** Chemin interne : la cellule devient un lien. */
+  readonly lien?: string
+}
+
+export interface ColonneRapport {
   readonly cle: string
   readonly titre: string
   /** Aligné à droite : tout ce qui se compare verticalement. */
   readonly nombre?: boolean
   /** Colonne masquée au premier affichage — l'essentiel reste visible. */
   readonly secondaire?: boolean
-  readonly rendu: (ligne: L) => React.ReactNode
-  /** Clé de tri ; à défaut, la colonne n'est pas triable. */
-  readonly valeur?: (ligne: L) => number | string
+  /** Colonne non triable (un lien, une action). */
+  readonly sansTri?: boolean
+}
+
+export interface LigneRapport {
+  readonly cle: string
+  readonly cellules: Readonly<Record<string, Cellule>>
 }
 
 const TAILLES = [10, 25, 50, 100] as const
 
-export function TableauRapport<L>({
+export function TableauRapport({
   lignes,
   colonnes,
-  cleDe,
   titre,
   actions,
   vide = 'Aucune ligne sur cette période.',
 }: {
-  lignes: readonly L[]
-  colonnes: readonly ColonneRapport<L>[]
-  cleDe: (ligne: L) => string
+  lignes: readonly LigneRapport[]
+  colonnes: readonly ColonneRapport[]
   titre?: string
-  /** Boutons d'export, rendus à droite du titre. */
+  /** Boutons d'export, rendus à droite du titre. Un ÉLÉMENT traverse la
+   *  frontière sans problème — c'est une fonction qui ne le peut pas. */
   actions?: React.ReactNode
   vide?: string
 }) {
@@ -64,25 +91,26 @@ export function TableauRapport<L>({
 
   const visibles = colonnes.filter((c) => !masquees.has(c.cle))
 
-  const colonneTri = tri ? colonnes.find((c) => c.cle === tri.cle) : null
-  const triees =
-    colonneTri?.valeur === undefined
-      ? lignes
-      : [...lignes].sort((a, b) => {
-          const va = colonneTri.valeur!(a)
-          const vb = colonneTri.valeur!(b)
-          const ordre =
-            typeof va === 'number' && typeof vb === 'number'
-              ? va - vb
-              : String(va).localeCompare(String(vb), 'fr')
-          return tri!.descendant ? -ordre : ordre
-        })
+  const cle = (ligne: LigneRapport, colonne: string) =>
+    ligne.cellules[colonne]?.valeur ?? ligne.cellules[colonne]?.texte ?? ''
+
+  const triees = tri
+    ? [...lignes].sort((a, b) => {
+        const va = cle(a, tri.cle)
+        const vb = cle(b, tri.cle)
+        const ordre =
+          typeof va === 'number' && typeof vb === 'number'
+            ? va - vb
+            : String(va).localeCompare(String(vb), 'fr')
+        return tri.descendant ? -ordre : ordre
+      })
+    : lignes
 
   const pages = Math.max(1, Math.ceil(triees.length / taille))
   // La page courante est bornée à chaque rendu : après un filtre qui réduit
   // la liste, rester sur la page 7 afficherait un tableau vide sans rien dire.
   const pageSure = Math.min(page, pages)
-  const visiblesLignes = triees.slice((pageSure - 1) * taille, pageSure * taille)
+  const affichees = triees.slice((pageSure - 1) * taille, pageSure * taille)
 
   return (
     <section className="bloc">
@@ -132,7 +160,9 @@ export function TableauRapport<L>({
                 <tr>
                   {visibles.map((c) => (
                     <th key={c.cle} className={c.nombre ? 'nombre' : undefined}>
-                      {c.valeur ? (
+                      {c.sansTri ? (
+                        c.titre
+                      ) : (
                         <button
                           type="button"
                           className="tri"
@@ -147,21 +177,29 @@ export function TableauRapport<L>({
                           {c.titre}
                           {tri?.cle === c.cle ? (tri.descendant ? ' ↓' : ' ↑') : ''}
                         </button>
-                      ) : (
-                        c.titre
                       )}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {visiblesLignes.map((ligne) => (
-                  <tr key={cleDe(ligne)}>
-                    {visibles.map((c) => (
-                      <td key={c.cle} className={c.nombre ? 'nombre' : undefined}>
-                        {c.rendu(ligne)}
-                      </td>
-                    ))}
+                {affichees.map((ligne) => (
+                  <tr key={ligne.cle}>
+                    {visibles.map((c) => {
+                      const cellule = ligne.cellules[c.cle]
+                      const classes = [c.nombre ? 'nombre' : '', cellule?.classe ?? '']
+                        .filter(Boolean)
+                        .join(' ')
+                      return (
+                        <td key={c.cle} className={classes || undefined} title={cellule?.aide}>
+                          {cellule?.lien ? (
+                            <Link href={destinationSure(cellule.lien)}>{cellule.texte}</Link>
+                          ) : (
+                            (cellule?.texte ?? '—')
+                          )}
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))}
               </tbody>

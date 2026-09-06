@@ -24,8 +24,7 @@
  * suivant, et il n'a pas de sens tant que la caisse ne sait pas la choisir.
  */
 
-import Link from 'next/link'
-import { formaterPourcentage, formaterTND, millimes } from '@kaissi/domain'
+import { formaterPourcentage } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { libelleJournee } from '../../../serveur/journee.js'
 import { chargerRapport } from '../../../serveur/rapport.js'
@@ -34,6 +33,7 @@ import { BandeauIndicateurs } from '../../../composants/BandeauIndicateurs.js'
 import { FiltresRapport } from '../../../composants/FiltresRapport.js'
 import { GraphiqueSerie } from '../../../composants/GraphiqueSerie.js'
 import { TableauRapport } from '../../../composants/TableauRapport.js'
+import { celluleMontant } from '../../../composants/RapportVentilation.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -191,84 +191,59 @@ export default async function PageReductions({
 
       <TableauRapport
         titre="Par employé"
-        lignes={classementEmployes}
-        cleDe={(l) => l.cle}
+        lignes={classementEmployes.map((l) => ({
+          cle: l.cle,
+          cellules: {
+            nom: { texte: l.nom },
+            tickets: { texte: String(l.tickets), valeur: l.tickets },
+            remise: celluleMontant(l.remise),
+            moyenne: celluleMontant(Math.round(l.remise / l.tickets)),
+          },
+        }))}
         vide="Aucune réduction accordée sur cette période."
         colonnes={[
-          { cle: 'nom', titre: 'Employé', rendu: (l) => l.nom, valeur: (l) => l.nom },
-          {
-            cle: 'tickets',
-            titre: 'Tickets remisés',
-            nombre: true,
-            rendu: (l) => l.tickets,
-            valeur: (l) => l.tickets,
-          },
-          {
-            cle: 'remise',
-            titre: 'Réductions',
-            nombre: true,
-            rendu: (l) => formaterTND(millimes(l.remise)),
-            valeur: (l) => l.remise,
-          },
-          {
-            cle: 'moyenne',
-            titre: 'Moyenne par ticket',
-            nombre: true,
-            rendu: (l) => formaterTND(millimes(Math.round(l.remise / l.tickets))),
-            valeur: (l) => l.remise / l.tickets,
-          },
+          { cle: 'nom', titre: 'Employé' },
+          { cle: 'tickets', titre: 'Tickets remisés', nombre: true },
+          { cle: 'remise', titre: 'Réductions', nombre: true },
+          { cle: 'moyenne', titre: 'Moyenne par ticket', nombre: true },
         ]}
       />
 
       <TableauRapport
         titre="Les tickets concernés"
-        lignes={ticketsRemises}
-        cleDe={(t) => t.id}
+        lignes={ticketsRemises.map((t) => ({
+          cle: t.id,
+          cellules: {
+            numero: {
+              texte: t.numero ?? '—',
+              valeur: t.numero ?? '',
+              // Le reçu s'ouvre d'un clic : devant une remise qui interroge,
+              // la question suivante est toujours « sur quoi ? ».
+              lien: `/${restaurant}/recus?ticket=${t.id}`,
+            },
+            vendeur: { texte: t.vendeur },
+            brut: celluleMontant(t.brutMillimes),
+            remise: celluleMontant(t.remiseMillimes),
+            taux: {
+              texte:
+                t.brutMillimes === 0
+                  ? '—'
+                  : `${formaterPourcentage(
+                      Math.round((t.remiseMillimes / t.brutMillimes) * 10_000),
+                    )} %`,
+              valeur: t.brutMillimes === 0 ? 0 : t.remiseMillimes / t.brutMillimes,
+            },
+            paye: celluleMontant(t.totalMillimes),
+          },
+        }))}
         vide="Aucune réduction accordée sur cette période."
         colonnes={[
-          {
-            cle: 'numero',
-            titre: 'Reçu',
-            rendu: (t) => (
-              <Link href={{ pathname: `/${restaurant}/recus`, query: { ticket: t.id } }}>
-                {t.numero ?? '—'}
-              </Link>
-            ),
-            valeur: (t) => t.numero ?? '',
-          },
-          { cle: 'vendeur', titre: 'Employé', rendu: (t) => t.vendeur, valeur: (t) => t.vendeur },
-          {
-            cle: 'brut',
-            titre: 'Avant réduction',
-            nombre: true,
-            rendu: (t) => formaterTND(millimes(t.brutMillimes)),
-            valeur: (t) => t.brutMillimes,
-          },
-          {
-            cle: 'remise',
-            titre: 'Réduction',
-            nombre: true,
-            rendu: (t) => formaterTND(millimes(t.remiseMillimes)),
-            valeur: (t) => t.remiseMillimes,
-          },
-          {
-            cle: 'taux',
-            titre: 'Taux',
-            nombre: true,
-            rendu: (t) =>
-              t.brutMillimes === 0
-                ? '—'
-                : `${formaterPourcentage(Math.round((t.remiseMillimes / t.brutMillimes) * 10_000))} %`,
-            valeur: (t) => (t.brutMillimes === 0 ? 0 : t.remiseMillimes / t.brutMillimes),
-          },
-          {
-            cle: 'paye',
-            titre: 'Payé',
-            nombre: true,
-            secondaire: true,
-            rendu: (t) => formaterTND(millimes(t.totalMillimes)),
-            valeur: (t) => t.totalMillimes,
-          },
+          { cle: 'numero', titre: 'Reçu', sansTri: true },
+          { cle: 'vendeur', titre: 'Employé' },
+          { cle: 'brut', titre: 'Avant réduction', nombre: true },
+          { cle: 'remise', titre: 'Réduction', nombre: true },
+          { cle: 'taux', titre: 'Taux', nombre: true },
+          { cle: 'paye', titre: 'Payé', nombre: true, secondaire: true },
         ]}
       />
     </>

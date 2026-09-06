@@ -13,7 +13,7 @@
  * contredire, et personne ne saurait lequel a tort.
  */
 
-import { formaterPourcentage, formaterTND, millimes } from '@kaissi/domain'
+import { formaterPourcentage } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { journeeCourante, libelleJournee } from '../../../serveur/journee.js'
 import { chargerRapport } from '../../../serveur/rapport.js'
@@ -27,6 +27,7 @@ import { BandeauIndicateurs } from '../../../composants/BandeauIndicateurs.js'
 import { FiltresRapport } from '../../../composants/FiltresRapport.js'
 import { GraphiqueSerie } from '../../../composants/GraphiqueSerie.js'
 import { TableauRapport } from '../../../composants/TableauRapport.js'
+import { celluleMontant, cellulePourcent } from '../../../composants/RapportVentilation.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -177,8 +178,21 @@ export default async function PageVentes({
 
       <TableauRapport
         titre="Détail par journée"
-        lignes={lignesTableau}
-        cleDe={(l) => l.cle}
+        lignes={lignesTableau.map((l) => ({
+          cle: l.cle,
+          // Les cellules sont formatées ICI, côté serveur : seule de la
+          // donnée traverse la frontière vers le tableau, qui est un
+          // composant client.
+          cellules: {
+            jour: { texte: l.libelle, valeur: l.cle },
+            tickets: { texte: String(l.tickets), valeur: l.tickets },
+            nettes: celluleMontant(l.nettes),
+            cout: celluleMontant(l.cout),
+            marge: celluleMontant(l.margeMillimes),
+            margeBp: cellulePourcent(l.margeBp),
+            taxes: celluleMontant(l.taxes),
+          },
+        }))}
         actions={
           <BoutonsExport
             restaurantId={restaurant}
@@ -188,57 +202,13 @@ export default async function PageVentes({
           />
         }
         colonnes={[
-          { cle: 'jour', titre: 'Période', rendu: (l) => l.libelle, valeur: (l) => l.cle },
-          {
-            cle: 'tickets',
-            titre: 'Tickets',
-            nombre: true,
-            rendu: (l) => l.tickets,
-            valeur: (l) => l.tickets,
-          },
-          {
-            cle: 'nettes',
-            titre: 'Ventes nettes',
-            nombre: true,
-            rendu: (l) => formaterTND(millimes(l.nettes)),
-            valeur: (l) => l.nettes,
-          },
-          {
-            cle: 'cout',
-            titre: 'Coût des marchandises',
-            nombre: true,
-            rendu: (l) => formaterTND(millimes(l.cout)),
-            valeur: (l) => l.cout,
-          },
-          {
-            cle: 'marge',
-            titre: 'Marge brute',
-            nombre: true,
-            rendu: (l) => formaterTND(millimes(l.margeMillimes)),
-            valeur: (l) => l.margeMillimes,
-          },
-          {
-            cle: 'margeBp',
-            titre: 'Marge',
-            nombre: true,
-            rendu: (l) =>
-              l.margeBp === null ? (
-                <span className="detail" title="Coût d’achat non saisi">
-                  —
-                </span>
-              ) : (
-                `${formaterPourcentage(l.margeBp)} %`
-              ),
-            valeur: (l) => l.margeBp ?? -1,
-          },
-          {
-            cle: 'taxes',
-            titre: 'Taxes',
-            nombre: true,
-            secondaire: true,
-            rendu: (l) => formaterTND(millimes(l.taxes)),
-            valeur: (l) => l.taxes,
-          },
+          { cle: 'jour', titre: 'Période' },
+          { cle: 'tickets', titre: 'Tickets', nombre: true },
+          { cle: 'nettes', titre: 'Ventes nettes', nombre: true },
+          { cle: 'cout', titre: 'Coût des marchandises', nombre: true },
+          { cle: 'marge', titre: 'Marge brute', nombre: true },
+          { cle: 'margeBp', titre: 'Marge', nombre: true },
+          { cle: 'taxes', titre: 'Taxes', nombre: true, secondaire: true },
         ]}
       />
     </>
