@@ -18,6 +18,7 @@ import {
   type Resultat,
 } from '../app/[restaurant]/catalogue/actions.js'
 import { pourChampMontant } from '../serveur/formulaire.js'
+import { grouperParCategorie } from './grouper.js'
 import { formaterPourcentage, formaterTND, margeProduit, millimes } from '@kaissi/domain'
 
 /**
@@ -525,7 +526,6 @@ export function EditeurCatalogue({
             <thead>
               <tr>
                 <th>Produit</th>
-                <th>Catégorie</th>
                 <th className="nombre">Prix</th>
                 <th className="nombre">Coût</th>
                 <th className="nombre">Marge</th>
@@ -533,8 +533,21 @@ export function EditeurCatalogue({
                 {modifiable && <th />}
               </tr>
             </thead>
-            <tbody>
-              {produits.map((produit) => (
+            {/*
+              Un `tbody` PAR catégorie, et le nom de la catégorie en titre.
+              La colonne « Catégorie » disparaît du même coup : elle répétait
+              la même valeur sur toutes les lignes d'un groupe, ce qui coûte
+              une colonne de largeur sans rien apprendre.
+            */}
+            {grouperParCategorie(produits, (p) => p.categorieId || null, categories).map(
+              (groupe) => (
+              <tbody key={groupe.cle}>
+                <tr className="ligne-groupe">
+                  <td colSpan={modifiable ? 6 : 5}>
+                    {groupe.titre} <span className="compte">· {groupe.lignes.length}</span>
+                  </td>
+                </tr>
+              {groupe.lignes.map((produit) => (
                 <tr key={produit.id}>
                   <td>
                     {produit.nom}
@@ -542,7 +555,6 @@ export function EditeurCatalogue({
                       <div className="indication">{produit.description}</div>
                     )}
                   </td>
-                  <td>{categories.find((c) => c.id === produit.categorieId)?.nom ?? '—'}</td>
                   <td className="nombre">{produit.prixAffiche}</td>
                   <td className="nombre">
                     {produit.coutUnitaire === null ? (
@@ -628,7 +640,9 @@ export function EditeurCatalogue({
                   )}
                 </tr>
               ))}
-            </tbody>
+              </tbody>
+              ),
+            )}
           </table>
         )}
       </section>

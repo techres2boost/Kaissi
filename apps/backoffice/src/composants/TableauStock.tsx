@@ -18,6 +18,7 @@ import {
   enregistrerMouvement,
 } from '../app/[restaurant]/stock/actions.js'
 import type { ProduitStock } from '../app/[restaurant]/stock/page.js'
+import { grouperParCategorie } from './grouper.js'
 
 const LIBELLE_ETAT: Record<string, string> = {
   rupture: 'Rupture',
@@ -29,9 +30,12 @@ const LIBELLE_ETAT: Record<string, string> = {
 export function TableauStock({
   restaurantId,
   produits,
+  categories,
 }: {
   restaurantId: string
   produits: ProduitStock[]
+  /** Les catégories DANS L'ORDRE du Menu — c'est l'ordre des groupes. */
+  categories: readonly { id: string; nom: string }[]
 }) {
   const router = useRouter()
   const [ouvert, setOuvert] = useState<string | null>(null)
@@ -65,23 +69,37 @@ export function TableauStock({
         <thead>
           <tr>
             <th>Produit</th>
-            <th>Catégorie</th>
             <th className="nombre">Prix</th>
             <th className="nombre">Coût</th>
             <th className="nombre">Marge</th>
-            <th className="nombre">Stock</th>
+            {/* Deux colonnes s'appelaient « Stock » : la quantité et l'état
+                de la carte. On nomme donc la première par ce qu'elle est —
+                une quantité — et la seconde garde « Stock », qui est la
+                question posée à la caisse : en reste-t-il ? */}
+            <th className="nombre">Quantité</th>
             <th className="nombre">Seuil</th>
             <th>État</th>
             <th>Stock</th>
             <th />
           </tr>
         </thead>
-        <tbody>
-          {produits.map((p) => (
+        {/*
+          Un `tbody` par catégorie. Quarante références à la file se lisent
+          ligne à ligne ; rangées sous « Boissons », « Pizzas », « Plats »,
+          elles se parcourent d'un coup d'œil — et une catégorie qu'on a
+          oublié de compter saute aux yeux.
+        */}
+        {grouperParCategorie(produits, (p) => p.categorieId, categories).map((groupe) => (
+        <tbody key={groupe.cle}>
+          <tr className="ligne-groupe">
+            <td colSpan={9}>
+              {groupe.titre} <span className="compte">· {groupe.lignes.length}</span>
+            </td>
+          </tr>
+          {groupe.lignes.map((p) => (
             <>
               <tr key={p.id}>
                 <td>{p.nom}</td>
-                <td className="detail">{p.categorie ?? '—'}</td>
                 <td className="nombre">{formaterTND(millimes(p.prixMillimes))}</td>
                 <td className="nombre">
                   {p.coutUnitaire === null ? (
@@ -122,23 +140,33 @@ export function TableauStock({
                     }
                   >
                     {p.enVente
-                      ? 'En vente'
+                      ? 'En stock'
                       : p.motifRetrait === 'stock'
                         ? 'Rupture (auto)'
                         : 'Rupture (manuel)'}
                   </button>
-                  {p.suivi && (
-                    <label className="bascule-auto" title="Retirer de la carte dès que le stock atteint zéro">
-                      <input
-                        type="checkbox"
-                        checked={p.ruptureAuto}
-                        disabled={enCours}
-                        onChange={(e) =>
-                          agir(() => basculerRuptureAuto(restaurantId, p.id, e.target.checked))
-                        }
-                      />
-                      auto
-                    </label>
+                  {/*
+                    La case « auto » a QUITTÉ cette cellule.
+                    
+                    Deux caractères sans phrase, sous un bouton qui dit déjà
+                    autre chose : personne ne pouvait deviner qu'elle coupait
+                    la sortie automatique de la carte. On la décochait sans
+                    le savoir, et le produit restait vendable à zéro — ce qui
+                    ressemblait alors à une panne. Elle vit maintenant dans le
+                    tiroir « Ajuster », avec sa phrase entière.
+
+                    Ce qui RESTE ici, c'est la conséquence : quand
+                    l'automatisme est coupé ET que le stock est à zéro, la
+                    ligne le dit. Sans cela, « Rupture » et « En stock » se
+                    contredisent sous les yeux du gérant.
+                  */}
+                  {p.suivi && !p.ruptureAuto && (p.quantite ?? 0) <= 0 && (
+                    <div
+                      className="indication"
+                      title="Le retrait automatique est coupé pour ce produit (tiroir « Ajuster »)."
+                    >
+                      automatisme coupé
+                    </div>
                   )}
                 </td>
                 <td>
@@ -154,7 +182,7 @@ export function TableauStock({
 
               {ouvert === p.id && (
                 <tr key={`${p.id}-edition`} className="ligne-edition">
-                  <td colSpan={10}>
+                  <td colSpan={9}>
                     <div className="grille deux">
                       <form
                         action={(donnees) =>
@@ -196,6 +224,36 @@ export function TableauStock({
                         <button type="submit" className="principal" disabled={enCours}>
                           {p.suivi ? 'Enregistrer le comptage' : 'Enregistrer le stock'}
                         </button>
+
+                        {p.suivi && (
+                          <label
+                            className="champ"
+                            style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={p.ruptureAuto}
+                              disabled={enCours}
+                              onChange={(e) =>
+                                agir(() =>
+                                  basculerRuptureAuto(restaurantId, p.id, e.target.checked),
+                                )
+                              }
+                              style={{ width: 'auto', marginTop: '0.2rem' }}
+                            />
+                            <span>
+                              Retirer ce produit de la carte <strong>dès qu’il atteint
+                              zéro</strong>, et l’y remettre à la première réception.
+                              <span className="indication">
+                                À décocher pour un produit dont le comptage n’est
+                                qu’indicatif — un plat dont on ne compte pas les
+                                ingrédients ne doit pas disparaître de la carte pour une
+                                erreur d’inventaire. Décoché, il reste vendable même à
+                                zéro.
+                              </span>
+                            </span>
+                          </label>
+                        )}
                       </form>
 
                       {p.suivi && (
@@ -267,6 +325,7 @@ export function TableauStock({
             </>
           ))}
         </tbody>
+        ))}
       </table>
     </section>
   )

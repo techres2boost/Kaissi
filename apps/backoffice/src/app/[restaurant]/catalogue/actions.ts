@@ -448,9 +448,27 @@ export async function basculerDisponibilite(
   disponible: boolean,
 ): Promise<Resultat> {
   return agir(restaurantId, async ({ supabase }) => {
+    /*
+     * `unavailable_reason` part AVEC la disponibilité.
+     *
+     * Ce bouton ne l'écrivait pas, et laissait donc des produits « en
+     * vente » portant encore le motif « manuel » d'un retrait précédent.
+     * L'état est incohérent, et il a une conséquence : la rupture
+     * automatique ne remet en carte QUE ce qu'elle a elle-même retiré
+     * (motif « stock »). Un produit remis en vente ici, retiré ensuite à
+     * zéro, ne serait jamais revenu tout seul à la réception — et personne
+     * n'aurait pu deviner pourquoi.
+     *
+     * L'écran Stock l'écrivait déjà correctement : les deux boutons font
+     * désormais la même chose.
+     */
     const { error } = await supabase
       .from('products')
-      .update({ is_available: disponible, updated_at: new Date().toISOString() })
+      .update({
+        is_available: disponible,
+        unavailable_reason: disponible ? null : 'manuel',
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', produitId)
       .eq('restaurant_id', restaurantId)
     if (error) throw new Error(messageBase(error.message, error.code))

@@ -29,6 +29,8 @@ export interface ProduitStock {
   id: string
   nom: string
   categorie: string | null
+  /** Pour ranger la ligne sous sa catégorie. */
+  categorieId: string | null
   prixMillimes: number
   coutUnitaire: number | null
   margeMillimes: number
@@ -66,7 +68,14 @@ export default async function PageStock({
       .eq('restaurant_id', restaurant)
       .is('archived_at', null)
       .order('position', { ascending: true }),
-    supabase.from('categories').select('id, name').eq('restaurant_id', restaurant),
+    // AVEC leur position : c'est l'ordre des groupes de l'écran, le même
+    // que celui du Menu. Trier par nom ignorerait les flèches du gérant.
+    supabase
+      .from('categories')
+      .select('id, name, position')
+      .eq('restaurant_id', restaurant)
+      .is('archived_at', null)
+      .order('position'),
     supabase
       .from('stock_actuel')
       .select('product_id, qty_on_hand, min_qty, qty_vendue, counted_at')
@@ -111,6 +120,7 @@ export default async function PageStock({
       id: p.id,
       nom: p.name,
       categorie: p.category_id ? (categories.get(p.category_id) ?? null) : null,
+      categorieId: p.category_id ?? null,
       prixMillimes: p.base_price_millimes,
       coutUnitaire: p.cost_per_unit,
       margeMillimes: marge.margeMillimes,
@@ -240,7 +250,14 @@ export default async function PageStock({
         ]}
       />
 
-      <TableauStock restaurantId={restaurant} produits={produits} />
+      <TableauStock
+        restaurantId={restaurant}
+        produits={produits}
+        categories={(categoriesRes.data ?? []).map((c) => ({
+          id: c.id as string,
+          nom: c.name as string,
+        }))}
+      />
 
       <HistoriqueStock mouvements={mouvements} />
 

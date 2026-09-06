@@ -1143,6 +1143,64 @@ qui change.
 
 ---
 
+### I. Le stock : la case mystérieuse, et les groupes
+
+**LA CASE « auto » A CHANGÉ DE PLACE (et enfin de libellé)**
+
+1. **Stock** → une ligne de produit. Sous le bouton d'état, la petite case
+   `auto` **n'y est plus**.
+2. Clique **Ajuster** : elle est dans le tiroir, avec sa phrase entière —
+   *« Retirer ce produit de la carte dès qu'il atteint zéro, et l'y remettre à
+   la première réception. »*
+
+> **Pourquoi elle était incompréhensible.** Deux caractères sans phrase, sous
+> un bouton qui dit déjà autre chose. On la décochait sans le savoir — et le
+> produit restait vendable à zéro, ce qui ressemblait alors à une panne.
+> C'est exactement ce qui était arrivé à *Ojja merguez* sur ta base : stock
+> **−2**, automatisme **coupé**, donc toujours en vente. Je l'ai laissé tel
+> quel : c'est maintenant visible, et c'est ton réglage.
+
+3. Sur une ligne à zéro dont l'automatisme est coupé, la cellule affiche
+   **« automatisme coupé »**.
+
+**Attendu** : plus de contradiction à l'écran. « Rupture » et « En stock »
+côte à côte sans explication laissaient croire à un bug.
+
+**« EN VENTE » DEVIENT « EN STOCK », ET LES DEUX COLONNES « STOCK » AUSSI**
+
+4. Les en-têtes : la quantité s'appelle **Quantité**, l'état de la carte
+   s'appelle **Stock**. Deux colonnes portaient le même nom.
+
+**LE PRODUIT À ZÉRO EST GRISÉ SUR LA CAISSE**
+
+5. Mets un produit à `0` (**Ajuster**, automatisme **coché**), synchronise la
+   caisse.
+
+**Attendu** : sur la caisse, la tuile est **grisée, en pointillés, avec
+« RUPTURE » en rouge**. Elle reste **cliquable** — et le clic dit *pourquoi* :
+« en rupture de stock » ou « retiré de la carte par le gérant ». Un bouton
+désactivé ne dit rien, et on tape trois fois dessus.
+
+> **Ce qui retire un produit de la carte, c'est le SERVEUR**, jamais la
+> tablette : lui travaille sur le stock calculé à l'instant, une tablette
+> hors ligne sur un souvenir vieux de trois heures. La caisse ne fait
+> qu'appliquer, comme pour un changement de prix.
+
+**LES PRODUITS SONT RANGÉS PAR GROUPES**
+
+6. **Menu**, puis **Stock** : les produits sont désormais **sous le nom de
+   leur catégorie** — Boissons ensemble, Pizzas ensemble, Plats ensemble.
+
+**Attendu** : l'ordre des groupes suit celui des catégories au Menu (les
+flèches ↑↓), pas l'ordre alphabétique. La colonne « Catégorie » a disparu :
+elle répétait la même valeur sur toutes les lignes d'un groupe.
+
+> Un produit dont la catégorie a été archivée n'est pas perdu : il apparaît
+> sous **« Catégorie archivée »**, à la fin. Le faire disparaître de l'écran
+> où l'on va justement pour le reclasser serait le pire choix.
+
+---
+
 ## 6. Gérer le menu et le stock
 
 ### Changer un prix ou un coût
