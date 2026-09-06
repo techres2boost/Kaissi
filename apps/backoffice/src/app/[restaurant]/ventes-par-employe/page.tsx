@@ -1,19 +1,19 @@
 /**
- * « Ventes par article » — ce qui se vend, et ce qui rapporte.
+ * « Ventes par employé » — qui encaisse quoi.
  *
- * ── Pourquoi un écran à part du récapitulatif ─────────────────────────────
+ * ── La vente est attribuée à qui l'a ENCAISSÉE ────────────────────────────
  *
- * Le récapitulatif répond à « combien ai-je fait ». Celui-ci répond à « avec
- * quoi » — la question qu'un restaurateur se pose pour décider quoi garder à
- * la carte, quoi mettre en avant, et quoi arrêter.
+ * `closed_by` d'abord, `opened_by` en repli. Un serveur ouvre la table, le
+ * caissier conclut : attribuer la vente à l'ouverture ferait porter le
+ * chiffre à quelqu'un qui n'a jamais touché l'argent. C'est la même règle que
+ * partout ailleurs dans les rapports — et elle est écrite une seule fois,
+ * dans le chargement des ventes.
  *
- * ── Ce qui a disparu, et pourquoi ─────────────────────────────────────────
+ * ── Ce que cet écran n'est PAS ────────────────────────────────────────────
  *
- * La barre de longueur dans le tableau. Elle répétait le classement que le
- * rang disait déjà : « Ojja merguez est premier » écrit deux fois, dont une
- * en couleur, dans une colonne qui prenait un tiers de la largeur. Le top 5
- * en tête donne le classement d'un coup d'œil ; le tableau donne les
- * chiffres, et rien qu'eux.
+ * Un classement de performance. Un caissier posté à midi encaisse plus qu'un
+ * serveur de soirée sans mieux travailler. Le filtre horaire, en tête, est là
+ * pour comparer ce qui est comparable.
  */
 
 import { formaterPourcentage } from '@kaissi/domain'
@@ -21,8 +21,8 @@ import { ecranReserve, etablissementObligatoire } from '../../../serveur/session
 import { chargerRapport } from '../../../serveur/rapport.js'
 import {
   calculerIndicateurs,
+  ventilerParEmploye,
   ventilerParJournee,
-  ventilerParProduit,
 } from '../../../serveur/rapports.js'
 import { libelleJournee } from '../../../serveur/journee.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
@@ -36,7 +36,7 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-export default async function PageArticles({
+export default async function PageVentesParEmploye({
   params,
   searchParams,
 }: {
@@ -54,20 +54,27 @@ export default async function PageArticles({
   if (ventes.erreur) {
     return (
       <section className="bloc">
-        <h1>Ventes par article</h1>
+        <h1>Ventes par employé</h1>
         <p className="message erreur">Lecture impossible : {ventes.erreur}</p>
       </section>
     )
   }
 
-  const articles = ventilerParProduit(ventes.lignes)
+  const parEmploye = ventilerParEmploye(ventes.lignes, ventes.commandes, ventes.nomEmploye)
   const i = calculerIndicateurs(ventes.lignes, ventes.commandes, ventes.remboursements)
   const p = calculerIndicateurs(precedent.lignes, precedent.commandes, precedent.remboursements)
+
+  /** Tickets encaissés par employé — la vente entière, pas la ligne. */
+  const ticketsPar = new Map<string, number>()
+  for (const commande of ventes.commandes) {
+    const cle = commande.vendeurId ?? 'inconnu'
+    ticketsPar.set(cle, (ticketsPar.get(cle) ?? 0) + 1)
+  }
 
   return (
     <>
       <header className="entete-rapport">
-        <h1>Ventes par article</h1>
+        <h1>Ventes par employé</h1>
         <p className="sous-titre">
           {periode.du === periode.au
             ? libelleJournee(periode.du)
@@ -88,28 +95,23 @@ export default async function PageArticles({
       <BandeauIndicateurs
         indicateurs={[
           {
-            libelle: 'Articles vendus',
-            valeurMillimes: i.articlesVendus * 1000,
-            precedentMillimes: p.articlesVendus * 1000,
-            detail: `${articles.length} référence(s)`,
-            aide: 'Nombre d’articles vendus, toutes références confondues.',
+            libelle: 'Tickets',
+            valeurMillimes: i.nombreTickets * 1000,
+            precedentMillimes: p.nombreTickets * 1000,
+            detail:
+              i.panierMoyenMillimes === null
+                ? 'aucune vente'
+                : `panier moyen ${(i.panierMoyenMillimes / 1000).toFixed(3)} TND`,
           },
-          {
-            libelle: 'Ventes brutes',
-            valeurMillimes: i.caBrutMillimes,
-            precedentMillimes: p.caBrutMillimes,
-          },
+          { libelle: 'Ventes brutes', valeurMillimes: i.caBrutMillimes, precedentMillimes: p.caBrutMillimes },
           {
             libelle: 'Réductions',
             valeurMillimes: i.remisesMillimes,
             precedentMillimes: p.remisesMillimes,
             hausseDefavorable: true,
+            aide: 'À rapprocher du plafond de remise du rôle : une remise systématique se voit ici.',
           },
-          {
-            libelle: 'Ventes nettes',
-            valeurMillimes: i.caNetMillimes,
-            precedentMillimes: p.caNetMillimes,
-          },
+          { libelle: 'Ventes nettes', valeurMillimes: i.caNetMillimes, precedentMillimes: p.caNetMillimes },
           {
             libelle: 'Marge brute',
             valeurMillimes: i.marge.margeMillimes,
@@ -122,49 +124,39 @@ export default async function PageArticles({
         ]}
       />
 
-      <TopCinq lignes={articles} entete="Articles" />
+      <TopCinq lignes={parEmploye} entete="Employés" />
 
       <section className="bloc">
         <GraphiqueSerie
-          titre="Tableau des ventes par article"
+          titre="Ventes par employé"
           journees={ventilerParJournee(ventes.commandes, fiche.timezone, fiche.bascule, {
             du: periode.du,
             au: periode.au,
           })}
-          parts={articles.map((a) => ({
-            cle: a.cle,
-            libelle: a.libelle,
-            valeurMillimes: a.marge.caMillimes,
+          parts={parEmploye.map((e) => ({
+            cle: e.cle,
+            libelle: e.libelle,
+            valeurMillimes: e.marge.caMillimes,
           }))}
         />
       </section>
 
-      {i.lignesSansCout > 0 && (
-        <p className="message avertissement">
-          ⚠ {i.lignesSansCout} ligne(s) sans coût d’achat saisi : leur marge
-          apparaît « — » plutôt qu’à 100 %, qui aurait l’air juste.
-        </p>
-      )}
-
       <TableauVentilationRapport
-        lignes={articles}
-        entete="Article"
+        lignes={parEmploye}
+        entete="Employé"
         colonnesEnTete={[
           {
-            cle: 'categorie',
-            titre: 'Catégorie',
-            secondaire: true,
-            // La catégorie du PREMIER passage suffit : un article n'en a
-            // qu'une, et la ventilation regroupe déjà par article.
-            rendu: (l) =>
-              ventes.lignes.find((x) => (x.produitId ?? `designation:${x.designation}`) === l.cle)
-                ?.categorieNom ?? '—',
+            cle: 'tickets',
+            titre: 'Tickets',
+            nombre: true,
+            rendu: (l) => ticketsPar.get(l.cle) ?? 0,
+            valeur: (l) => ticketsPar.get(l.cle) ?? 0,
           },
         ]}
         actions={
           <BoutonsExport
             restaurantId={restaurant}
-            exports={[{ quoi: 'articles', libelle: 'Exporter' }]}
+            exports={[{ quoi: 'employes', libelle: 'Exporter' }]}
             du={periode.du}
             au={periode.au}
           />

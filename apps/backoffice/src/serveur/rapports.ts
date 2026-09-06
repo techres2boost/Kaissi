@@ -46,6 +46,8 @@ export interface LigneVendue {
   readonly remiseLigneMillimes: number
   readonly remiseGlobaleMillimes: number
   readonly netMillimes: number
+  /** TVA de la ligne, telle que la projection l'a calculée. */
+  readonly taxeMillimes: number
   /** Coût unitaire du produit au catalogue, fractionnaire, ou `null`. */
   readonly coutUnitaire: number | null
   readonly categorieId: string | null
@@ -128,6 +130,15 @@ export interface Ventilation {
   readonly quantite: number
   readonly marge: Marge
   readonly part: number
+  /*
+   * Le détail que réclame un export comptable, et que l'écran masque par
+   * défaut : ventes BRUTES, réductions, taxes. Sans elles, on ne peut pas
+   * refaire à la main le chemin du brut au net — et un rapport qu'on ne peut
+   * pas vérifier n'est pas un rapport, c'est une affirmation.
+   */
+  readonly brutMillimes: Millimes
+  readonly remisesMillimes: Millimes
+  readonly taxesMillimes: Millimes
 }
 
 /**
@@ -162,6 +173,11 @@ function ventiler(
         quantite: groupe.lignes.reduce((t, l) => t + l.quantite, 0),
         marge: calculerMarge(net, cout),
         part: total === 0 ? 0 : Math.round((net / total) * 10000),
+        brutMillimes: sommeMillimes(groupe.lignes.map((l) => l.brutMillimes)),
+        remisesMillimes: sommeMillimes(
+          groupe.lignes.map((l) => l.remiseLigneMillimes + l.remiseGlobaleMillimes),
+        ),
+        taxesMillimes: sommeMillimes(groupe.lignes.map((l) => l.taxeMillimes)),
       }
     })
     .sort((a, b) => b.marge.caMillimes - a.marge.caMillimes)
@@ -287,6 +303,89 @@ export function ventilerParJournee(
     jour = journeeDecalee(jour, 1)
   }
   return jours
+}
+
+/** Le pas de temps d'un graphique de rapport. */
+export type Granularite = 'jours' | 'semaines' | 'mois'
+
+export interface PointSerie {
+  /** Clé stable du seau — sert de `key` React et d'ordre de tri. */
+  readonly cle: string
+  /** Ce qui s'affiche sous la colonne : « lun. 1 », « 31 août – 6 sept. ». */
+  readonly libelle: string
+  readonly caMillimes: Millimes
+  readonly tickets: number
+}
+
+/** Lundi de la semaine d'une journée « AAAA-MM-JJ ». */
+function lundiDe(journee: string): string {
+  const [a, m, j] = journee.split('-').map(Number)
+  const date = new Date(Date.UTC(a!, m! - 1, j!))
+  // `getUTCDay()` rend 0 pour dimanche : on le ramène à 7 pour que la semaine
+  // commence le lundi, comme partout en Tunisie et dans Loyverse.
+  const jourSemaine = date.getUTCDay() === 0 ? 7 : date.getUTCDay()
+  date.setUTCDate(date.getUTCDate() - (jourSemaine - 1))
+  return date.toISOString().slice(0, 10)
+}
+
+function libelleCourt(journee: string): string {
+  const [a, m, j] = journee.split('-').map(Number)
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(a!, m! - 1, j!)))
+}
+
+/**
+ * Agrège des journées en SEMAINES ou en MOIS.
+ *
+ * ── Pourquoi partir des journées déjà ventilées ───────────────────────────
+ *
+ * `ventilerParJournee` porte déjà la seule règle difficile : une vente
+ * encaissée à 1 h du matin appartient à la soirée de la veille. Regrouper
+ * ensuite des journées, c'est de l'arithmétique. Repartir des commandes
+ * réécrirait cette règle une deuxième fois — et deux écritures d'une même
+ * règle finissent toujours par diverger.
+ *
+ * Les seaux VIDES sont conservés : une semaine de fermeture doit se voir en
+ * creux, pas disparaître en resserrant le graphique.
+ */
+export function agregerSerie(
+  journees: readonly JourneeCA[],
+  granularite: Granularite,
+): PointSerie[] {
+  if (granularite === 'jours') {
+    return journees.map((j) => ({
+      cle: j.journee,
+      libelle: libelleCourt(j.journee),
+      caMillimes: j.caMillimes,
+      tickets: j.tickets,
+    }))
+  }
+
+  const cumul = new Map<string, { total: number[]; tickets: number; premiere: string; derniere: string }>()
+  for (const j of journees) {
+    const cle = granularite === 'semaines' ? lundiDe(j.journee) : j.journee.slice(0, 7)
+    const seau = cumul.get(cle) ?? { total: [], tickets: 0, premiere: j.journee, derniere: j.journee }
+    seau.total.push(j.caMillimes)
+    seau.tickets += j.tickets
+    seau.derniere = j.journee
+    cumul.set(cle, seau)
+  }
+
+  return [...cumul.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([cle, seau]) => ({
+      cle,
+      libelle:
+        granularite === 'semaines'
+          ? `${libelleCourt(seau.premiere)} – ${libelleCourt(seau.derniere)}`
+          : new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+              .format(new Date(`${cle}-01T00:00:00Z`)),
+      caMillimes: sommeMillimes(seau.total),
+      tickets: seau.tickets,
+    }))
 }
 
 /** L'état d'un produit au regard de son seuil — ce que la pastille affiche. */

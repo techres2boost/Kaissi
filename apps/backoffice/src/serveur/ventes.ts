@@ -17,9 +17,11 @@
 
 import {
   bornesJourneeCommerciale,
+  heureLocale,
   journeeCourante,
   type BornesJournee,
 } from './journee.js'
+import { FILTRES_PAR_DEFAUT, type FiltresRapport } from './filtres.js'
 import { supabaseServeur } from './supabase.js'
 import type {
   CommandeVendue,
@@ -101,6 +103,7 @@ interface LigneBrute {
   line_discount_millimes: number
   global_discount_share_millimes: number
   line_total_millimes: number
+  line_tax_millimes: number
   voided_at: string | null
 }
 
@@ -146,11 +149,34 @@ export async function chargerFiche(restaurantId: string): Promise<FicheRestauran
   }
 }
 
+/**
+ * Charge les ventes d'une période, éventuellement filtrées.
+ *
+ * ── Pourquoi le filtre horaire et l'employé sont appliqués EN MÉMOIRE ─────
+ *
+ * L'heure d'un encaissement se lit dans le fuseau de l'établissement, et
+ * l'employé retenu est celui qui a CONCLU la vente (`closed_by`, à défaut
+ * `opened_by`) — une règle déjà écrite ici. Les redire en SQL, ce serait les
+ * écrire deux fois, avec la certitude qu'un jour les deux divergent.
+ *
+ * La période est bornée à 92 jours : filtrer après coup coûte quelques
+ * milliers de lignes traversées, pas davantage.
+ */
 export async function chargerVentes(
   restaurantId: string,
   periode: Periode,
+  /** Fuseau et bascule — nécessaires pour lire une heure LOCALE. */
+  fiche?: FicheRestaurant,
+  filtres: FiltresRapport = FILTRES_PAR_DEFAUT,
 ): Promise<VentesChargees> {
   const supabase = await supabaseServeur()
+  const fuseau = fiche?.timezone ?? 'Africa/Tunis'
+  const dansLaTranche = (instant: string | null | undefined): boolean => {
+    if (filtres.heureDebut === 0 && filtres.heureFin === 23) return true
+    if (!instant) return false
+    const heure = heureLocale(new Date(instant), fuseau)
+    return heure >= filtres.heureDebut && heure <= filtres.heureFin
+  }
   const debut = periode.bornes.debut.toISOString()
   const fin = periode.bornes.fin.toISOString()
 
@@ -174,7 +200,7 @@ export async function chargerVentes(
       supabase.from('users').select('id, full_name'),
       supabase
         .from('payments')
-        .select('type, amount_millimes, voided_at, created_at')
+        .select('type, amount_millimes, voided_at, created_at, order_id')
         .eq('restaurant_id', restaurantId)
         .is('voided_at', null)
         .gte('created_at', debut)
@@ -209,7 +235,7 @@ export async function chargerVentes(
       // type du résultat en LISANT cette chaîne. Un `'a' + 'b'` se résout en
       // `string`, et toute la requête retombe sur `GenericStringError`.
       .select(
-        'id, order_id, product_id, designation, qty, line_gross_millimes, line_discount_millimes, global_discount_share_millimes, line_total_millimes, voided_at',
+        'id, order_id, product_id, designation, qty, line_gross_millimes, line_discount_millimes, global_discount_share_millimes, line_total_millimes, line_tax_millimes, voided_at',
       )
       .in('order_id', idsCommandes.slice(i, i + TRANCHE))
       .is('voided_at', null)
@@ -237,10 +263,17 @@ export async function chargerVentes(
   const commandes: CommandeVendue[] = []
   const tickets: TicketResume[] = []
 
+  /** Commandes retenues par les filtres — sert aussi à trier les paiements. */
+  const retenues = new Set<string>()
+
   for (const commande of commandesRes.data ?? []) {
     // `closed_by` d'abord : la vente s'attribue à qui l'a ENCAISSÉE. Un
     // serveur ouvre la table, c'est le caissier qui conclut la vente.
     const vendeurId = commande.closed_by ?? commande.opened_by ?? null
+
+    if (filtres.employeId && vendeurId !== filtres.employeId) continue
+    if (!dansLaTranche(commande.closed_at)) continue
+    retenues.add(commande.id)
     commandes.push({
       id: commande.id,
       totalMillimes: commande.total_millimes,
@@ -263,6 +296,7 @@ export async function chargerVentes(
         remiseLigneMillimes: l.line_discount_millimes,
         remiseGlobaleMillimes: l.global_discount_share_millimes,
         netMillimes: l.line_total_millimes,
+        taxeMillimes: l.line_tax_millimes,
         // `undefined` deviendrait « pas de coût » comme `null` ; on normalise
         // pour que `lignesSansCout` compte juste.
         coutUnitaire: produit?.cout ?? null,
@@ -286,13 +320,15 @@ export async function chargerVentes(
     lignes,
     commandes,
     tickets,
-    paiements: (paiementsRes.data ?? []).map((p) => ({
-      type: p.type,
-      montantMillimes: p.amount_millimes,
-    })),
-    remboursements: (remboursementsRes.data ?? []).map((r) => ({
-      montantMillimes: r.amount_millimes,
-    })),
+    // Les paiements suivent LEUR commande : filtrés par leur propre heure,
+    // ils se détacheraient des ventes qu'ils règlent — un encaissement se
+    // fait parfois quelques minutes après la clôture.
+    paiements: (paiementsRes.data ?? [])
+      .filter((p) => retenues.has(p.order_id))
+      .map((p) => ({ type: p.type, montantMillimes: p.amount_millimes })),
+    remboursements: (remboursementsRes.data ?? [])
+      .filter((r) => dansLaTranche(r.created_at))
+      .map((r) => ({ montantMillimes: r.amount_millimes })),
     nomEmploye,
     erreur: null,
   }

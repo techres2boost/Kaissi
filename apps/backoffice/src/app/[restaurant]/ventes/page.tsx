@@ -1,28 +1,32 @@
 /**
- * Récapitulatif des ventes, et ses quatre ventilations.
+ * Récapitulatif des ventes.
  *
- * Par produit, par catégorie, par employé, par moyen de paiement — les
- * quatre questions qu'un gérant se pose devant son chiffre. Toutes calculées
- * à partir des MÊMES lignes que le tableau de bord (`chargerVentes`), donc
- * sans risque que les deux écrans se contredisent.
+ * ── Ce que cet écran répond, dans cet ordre ───────────────────────────────
+ *
+ * Combien ? (le bandeau) — comment cela évolue ? (le graphique) — et de quoi
+ * c'est fait, période par période (le tableau). Les quatre ventilations qui
+ * encombraient cette page ont chacune leur écran, comme dans Loyverse : on
+ * vient ici pour le chiffre d'ensemble, pas pour comparer douze articles.
+ *
+ * Tout part des MÊMES lignes (`chargerRapport`), filtres compris. Deux
+ * écrans qui rechargeraient les ventes chacun de leur côté finiraient par se
+ * contredire, et personne ne saurait lequel a tort.
  */
 
-import { formaterPourcentage, formaterTND } from '@kaissi/domain'
+import { formaterPourcentage, formaterTND, millimes } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { journeeCourante, libelleJournee } from '../../../serveur/journee.js'
-import { chargerFiche, chargerVentes, resoudrePeriode } from '../../../serveur/ventes.js'
+import { chargerRapport } from '../../../serveur/rapport.js'
 import {
+  agregerSerie,
   calculerIndicateurs,
-  ventilerParCategorie,
-  ventilerParEmploye,
   ventilerParJournee,
-  ventilerParPaiement,
-  ventilerParProduit,
 } from '../../../serveur/rapports.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
-import { CourbeJournaliere } from '../../../composants/CourbeJournaliere.js'
-import { SelecteurPeriode } from '../../../composants/SelecteurPeriode.js'
-import { TableauVentilation } from '../tableau-bord/page.js'
+import { BandeauIndicateurs } from '../../../composants/BandeauIndicateurs.js'
+import { FiltresRapport } from '../../../composants/FiltresRapport.js'
+import { GraphiqueSerie } from '../../../composants/GraphiqueSerie.js'
+import { TableauRapport } from '../../../composants/TableauRapport.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,35 +35,76 @@ export default async function PageVentes({
   searchParams,
 }: {
   params: Promise<{ restaurant: string }>
-  searchParams: Promise<{ du?: string; au?: string }>
+  searchParams: Promise<Record<string, string | undefined>>
 }) {
   const { restaurant } = await params
-  const { du, au } = await searchParams
+  const recherche = await searchParams
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
 
-  const fiche = await chargerFiche(restaurant)
-  const periode = resoudrePeriode(fiche, du, au)
-  const ventes = await chargerVentes(restaurant, periode)
-  const aujourdhui = journeeCourante(fiche.timezone, fiche.bascule)
+  const socle = await chargerRapport(restaurant, recherche)
+  const { periode, filtres, ventes, precedent, fiche, aujourdhui, employes } = socle
 
   if (ventes.erreur) {
     return (
       <section className="bloc">
-        <h1>Ventes</h1>
+        <h1>Récapitulatif des ventes</h1>
         <p className="message erreur">Lecture impossible : {ventes.erreur}</p>
       </section>
     )
   }
 
   const i = calculerIndicateurs(ventes.lignes, ventes.commandes, ventes.remboursements)
-  const paiements = ventilerParPaiement(ventes.paiements)
-  const totalEncaisse = paiements.reduce((t, p) => t + p.montantMillimes, 0)
+  const p = calculerIndicateurs(precedent.lignes, precedent.commandes, precedent.remboursements)
+
+  const journees = ventilerParJournee(ventes.commandes, fiche.timezone, fiche.bascule, {
+    du: periode.du,
+    au: periode.au,
+  })
+
+  /*
+   * Le tableau reprend le MÊME découpage que le graphique.
+   *
+   * Deux découpages différents sur un même écran, c'est la garantie qu'on
+   * additionnera les colonnes de l'un en lisant les barres de l'autre.
+   *
+   * ⚑ La journée d'une commande vient de `journeeCourante`, JAMAIS des dix
+   * premiers caractères de `closed_at`. Ce raccourci-là découperait sur le
+   * jour calendaire UTC : une vente encaissée à 1 h du matin basculerait au
+   * lendemain — et le samedi soir paraîtrait moitié moins bon qu'il ne l'a
+   * été. C'est la même bascule que l'écran Journée, partout.
+   */
+  const journeeDe = new Map(
+    ventes.commandes.map((c) => [
+      c.id,
+      c.closeA ? journeeCourante(fiche.timezone, fiche.bascule, new Date(c.closeA)) : '',
+    ]),
+  )
+  const lignesParJournee = new Map<string, typeof ventes.lignes>()
+  for (const ligne of ventes.lignes) {
+    const journee = journeeDe.get(ligne.orderId) ?? ''
+    lignesParJournee.set(journee, [...(lignesParJournee.get(journee) ?? []), ligne])
+  }
+
+  const lignesTableau = agregerSerie(journees, 'jours').map((point) => {
+    const lignes = lignesParJournee.get(point.cle) ?? []
+    const indicateurs = calculerIndicateurs(lignes, [], [])
+    return {
+      cle: point.cle,
+      libelle: point.libelle,
+      nettes: indicateurs.caNetMillimes,
+      cout: indicateurs.coutMillimes,
+      margeMillimes: indicateurs.marge.margeMillimes,
+      margeBp: indicateurs.marge.margeBp,
+      taxes: lignes.reduce((t, l) => t + l.taxeMillimes, 0),
+      tickets: point.tickets,
+    }
+  })
 
   return (
     <>
       <header className="entete-rapport">
-        <h1>Ventes</h1>
+        <h1>Récapitulatif des ventes</h1>
         <p className="sous-titre">
           {periode.du === periode.au
             ? libelleJournee(periode.du)
@@ -67,132 +112,135 @@ export default async function PageVentes({
         </p>
       </header>
 
-      <SelecteurPeriode du={periode.du} au={periode.au} aujourdhui={aujourdhui} />
-
-      {/* Les bornes affichées sont recopiées dans le lien : sans elles, on
-          regarde septembre et on télécharge la semaine en cours. */}
-      <BoutonsExport
-        restaurantId={restaurant}
-        exports={[{ quoi: 'ventes', libelle: 'Résumé' }, { quoi: 'articles', libelle: 'Par article' }, { quoi: 'categories', libelle: 'Par catégorie' }, { quoi: 'employes', libelle: 'Par employé' }, { quoi: 'paiements', libelle: 'Paiements' }]}
+      <FiltresRapport
         du={periode.du}
         au={periode.au}
+        aujourdhui={aujourdhui}
+        heureDebut={filtres.heureDebut}
+        heureFin={filtres.heureFin}
+        employeId={filtres.employeId}
+        employes={employes}
+      />
+
+      <BandeauIndicateurs
+        indicateurs={[
+          {
+            libelle: 'Ventes brutes',
+            valeurMillimes: i.caBrutMillimes,
+            precedentMillimes: p.caBrutMillimes,
+            aide: 'Le prix des articles vendus, avant réductions et hors remboursements.',
+          },
+          {
+            libelle: 'Remboursements',
+            valeurMillimes: i.remboursementsMillimes,
+            precedentMillimes: p.remboursementsMillimes,
+            hausseDefavorable: true,
+            aide: 'Ce qui a été rendu au client après encaissement.',
+          },
+          {
+            libelle: 'Réductions',
+            valeurMillimes: i.remisesMillimes,
+            precedentMillimes: p.remisesMillimes,
+            hausseDefavorable: true,
+            aide: 'Remises de ligne et remises globales, réparties au prorata.',
+          },
+          {
+            libelle: 'Ventes nettes',
+            valeurMillimes: i.caNetMillimes,
+            precedentMillimes: p.caNetMillimes,
+            detail: `${i.nombreTickets} ticket(s)`,
+            aide: 'Ventes brutes moins les réductions. Hors taxe : c’est la seule grandeur comparable à un coût d’achat.',
+          },
+          {
+            libelle: 'Marge brute',
+            valeurMillimes: i.marge.margeMillimes,
+            precedentMillimes: p.marge.margeMillimes,
+            detail:
+              i.marge.margeBp === null
+                ? 'coût non saisi'
+                : `${formaterPourcentage(i.marge.margeBp)} % du CA net`,
+            aide: 'Ventes nettes moins le coût d’achat des articles vendus.',
+          },
+        ]}
       />
 
       <section className="bloc">
-        <h2>Évolution jour par jour</h2>
-        <CourbeJournaliere
-          jours={ventilerParJournee(ventes.commandes, fiche.timezone, fiche.bascule, {
-            du: periode.du,
-            au: periode.au,
-          })}
-        />
+        <GraphiqueSerie journees={journees} titre="Ventes brutes" />
       </section>
 
-      <section className="bloc">
-        <h2>Récapitulatif</h2>
-        <dl className="lignes-chiffres">
-          <dt>Chiffre d’affaires brut</dt>
-          <dd>{formaterTND(i.caBrutMillimes)}</dd>
-          <dt>Remises accordées</dt>
-          <dd className={i.remisesMillimes > 0 ? 'attention' : ''}>
-            − {formaterTND(i.remisesMillimes)}
-          </dd>
-          <dt className="fort">Chiffre d’affaires net</dt>
-          <dd className="fort">{formaterTND(i.caNetMillimes)}</dd>
-          <dt>Coût d’achat des articles vendus</dt>
-          <dd>− {formaterTND(i.coutMillimes)}</dd>
-          <dt className="fort">Marge brute</dt>
-          <dd className={`fort ${i.marge.margeMillimes < 0 ? 'ecart negatif' : ''}`}>
-            {formaterTND(i.marge.margeMillimes)}
-            {i.marge.margeBp !== null && `  (${formaterPourcentage(i.marge.margeBp)} %)`}
-          </dd>
-          <dt>Remboursements</dt>
-          <dd className={i.remboursementsMillimes > 0 ? 'attention' : ''}>
-            {formaterTND(i.remboursementsMillimes)}
-          </dd>
-          <dt>Tickets · panier moyen</dt>
-          <dd>
-            {i.nombreTickets} ·{' '}
-            {i.panierMoyenMillimes === null ? '—' : formaterTND(i.panierMoyenMillimes)}
-          </dd>
-        </dl>
-        {i.lignesSansCout > 0 && (
-          <p className="indication">
-            ⚠ {i.lignesSansCout} ligne(s) sans coût d’achat saisi : la marge
-            ci-dessus est surestimée d’autant.
-          </p>
-        )}
-      </section>
-
-      <section className="bloc">
-        <h2>Par produit</h2>
-        {ventes.lignes.length === 0 ? (
-          <p className="vide">Aucune vente sur cette période.</p>
-        ) : (
-          <TableauVentilation lignes={ventilerParProduit(ventes.lignes)} entete="Produit" />
-        )}
-      </section>
-
-      <section className="bloc">
-        <h2>Par catégorie</h2>
-        {ventes.lignes.length === 0 ? (
-          <p className="vide">Aucune vente sur cette période.</p>
-        ) : (
-          <TableauVentilation lignes={ventilerParCategorie(ventes.lignes)} entete="Catégorie" />
-        )}
-      </section>
-
-      <section className="bloc">
-        <h2>Par employé</h2>
-        <p className="indication">
-          La vente est attribuée à qui l’a <strong>encaissée</strong> : un serveur
-          ouvre la table, c’est le caissier qui conclut.
+      {i.lignesSansCout > 0 && (
+        <p className="message avertissement">
+          ⚠ {i.lignesSansCout} ligne(s) vendue(s) sans coût d’achat saisi : la marge
+          est surestimée d’autant. Renseignez le coût au Menu pour la rendre juste.
         </p>
-        {ventes.lignes.length === 0 ? (
-          <p className="vide">Aucune vente sur cette période.</p>
-        ) : (
-          <TableauVentilation
-            lignes={ventilerParEmploye(ventes.lignes, ventes.commandes, ventes.nomEmploye)}
-            entete="Employé"
+      )}
+
+      <TableauRapport
+        titre="Détail par journée"
+        lignes={lignesTableau}
+        cleDe={(l) => l.cle}
+        actions={
+          <BoutonsExport
+            restaurantId={restaurant}
+            exports={[{ quoi: 'ventes', libelle: 'Exporter' }]}
+            du={periode.du}
+            au={periode.au}
           />
-        )}
-      </section>
-
-      <section className="bloc">
-        <h2>Par moyen de paiement</h2>
-        <p className="indication">
-          Montants <strong>encaissés</strong>, donc TTC — ils ne s’additionnent pas
-          au chiffre d’affaires net ci-dessus, qui est hors taxe.
-        </p>
-        {paiements.length === 0 ? (
-          <p className="vide">Aucun encaissement sur cette période.</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th>Moyen</th>
-                <th className="nombre">Transactions</th>
-                <th className="nombre">Montant</th>
-                <th className="nombre">Part</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paiements.map((p) => (
-                <tr key={p.type}>
-                  <td>{p.libelle}</td>
-                  <td className="nombre">{p.nombre}</td>
-                  <td className="nombre">{formaterTND(p.montantMillimes)}</td>
-                  <td className="nombre">
-                    {totalEncaisse === 0
-                      ? '—'
-                      : `${formaterPourcentage(Math.round((p.montantMillimes / totalEncaisse) * 10000))} %`}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
+        }
+        colonnes={[
+          { cle: 'jour', titre: 'Période', rendu: (l) => l.libelle, valeur: (l) => l.cle },
+          {
+            cle: 'tickets',
+            titre: 'Tickets',
+            nombre: true,
+            rendu: (l) => l.tickets,
+            valeur: (l) => l.tickets,
+          },
+          {
+            cle: 'nettes',
+            titre: 'Ventes nettes',
+            nombre: true,
+            rendu: (l) => formaterTND(millimes(l.nettes)),
+            valeur: (l) => l.nettes,
+          },
+          {
+            cle: 'cout',
+            titre: 'Coût des marchandises',
+            nombre: true,
+            rendu: (l) => formaterTND(millimes(l.cout)),
+            valeur: (l) => l.cout,
+          },
+          {
+            cle: 'marge',
+            titre: 'Marge brute',
+            nombre: true,
+            rendu: (l) => formaterTND(millimes(l.margeMillimes)),
+            valeur: (l) => l.margeMillimes,
+          },
+          {
+            cle: 'margeBp',
+            titre: 'Marge',
+            nombre: true,
+            rendu: (l) =>
+              l.margeBp === null ? (
+                <span className="detail" title="Coût d’achat non saisi">
+                  —
+                </span>
+              ) : (
+                `${formaterPourcentage(l.margeBp)} %`
+              ),
+            valeur: (l) => l.margeBp ?? -1,
+          },
+          {
+            cle: 'taxes',
+            titre: 'Taxes',
+            nombre: true,
+            secondaire: true,
+            rendu: (l) => formaterTND(millimes(l.taxes)),
+            valeur: (l) => l.taxes,
+          },
+        ]}
+      />
     </>
   )
 }

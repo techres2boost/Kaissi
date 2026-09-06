@@ -140,13 +140,20 @@ h1 { font-family: var(--titre); font-weight: 700; font-size: 1.5rem;
 h2 { font-family: var(--titre); font-weight: 600; font-size: 1.05rem; margin: 0 0 0.75rem; }
 .sous-titre { color: var(--attenue); margin: 0 0 1.5rem; font-size: 0.92rem; }
 
-.carte {
+.carte, .bloc {
   background: var(--panneau);
   border: 1px solid var(--bordure);
   border-radius: var(--rayon);
   padding: 1.15rem;
   margin-bottom: 1.25rem;
 }
+/*
+ * `.bloc` n'avait AUCUN style : les sections des rapports flottaient sur le
+ * fond, sans limite visible. On lisait alors un mur continu où le tableau du
+ * bas semblait appartenir au graphique du haut. Le panneau dit où commence
+ * et où finit chaque réponse — c'est ce que fait Loyverse, et c'est ce qui
+ * manquait le plus à ces écrans.
+ */
 
 .grille { display: grid; gap: 1.25rem; }
 @media (min-width: 60rem) { .grille.deux { grid-template-columns: 1fr 1fr; } }
@@ -239,10 +246,6 @@ button.danger { color: var(--danger); }
 }
 
 /* La case « rupture auto », sous le bouton d'état de carte. */
-.bascule-auto {
-  display: flex; align-items: center; gap: 0.3rem; margin-top: 0.3rem;
-  font-size: 0.78rem; color: var(--texte-2); cursor: pointer;
-}
 
 /* Postes de préparation : la même séparation que les bons émis par la caisse. */
 .onglets-postes {
@@ -312,7 +315,13 @@ button.danger { color: var(--danger); }
 .periode-raccourcis button.actif {
   background: var(--accent); color: var(--fond); border-color: var(--accent); font-weight: 650;
 }
-.periode-bornes { display: flex; gap: 0.75rem; align-items: center; margin-left: auto; }
+.periode-bornes {
+  display: flex; gap: 0.75rem; align-items: center; margin-left: auto;
+  /* Trois filtres de plus (heures, employé) : sur un écran étroit ils
+     passent à la ligne au lieu de pousser les raccourcis hors de vue. */
+  flex-wrap: wrap;
+}
+.periode-bornes select { width: auto; min-width: 5rem; }
 .periode-bornes label {
   display: flex; align-items: center; gap: 0.4rem; margin: 0;
   color: var(--attenue); font-size: 0.85rem;
@@ -413,30 +422,12 @@ button.danger { color: var(--danger); }
    9,2 même en vision normale, sous le plancher de 15). Deux articles voisins
    seraient indiscernables pour une partie des lecteurs. */
 
-.classement td, .classement th { vertical-align: middle; }
-.classement .rang { width: 2.5rem; color: var(--attenue); font-variant-numeric: tabular-nums; }
 /* 32 % et non 40 : à 40, les colonnes chiffrées se serraient au point que
    « 83,500 TND » passait à la ligne, et « 37,4 % » se coupait entre le
    nombre et le signe. Un chiffre sur deux lignes ne se compare plus. */
-.classement .colonne-barre { width: 32%; min-width: 10rem; }
 /* Les colonnes de chiffres ne s'enroulent JAMAIS : on les lit en colonne,
    et une valeur qui se casse en deux rompt l'alignement de toute la pile. */
-.classement td.nombre, .classement th.nombre { white-space: nowrap; }
 
-.barre-piste {
-  position: relative;
-  display: flex; align-items: center;
-  height: 1.5rem;
-  background: var(--panneau-clair);
-  border-radius: 4px;          /* extrémité arrondie, ancrée à la ligne de base */
-  overflow: hidden;
-}
-.barre-valeur {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 4px;
-  min-width: 2px;              /* une valeur minuscule reste visible */
-}
 /* PAS d'étiquette dans la barre.
    Première version : le montant était posé à droite de la piste. Sur écran
    étroit, une barre longue passait dessous et le texte ivoire se retrouvait
@@ -448,7 +439,6 @@ button.danger { color: var(--danger); }
 
 /* Le nom garde de la place : sans minimum, « Pizza Quatre Fromages » se
    hachait sur cinq lignes dans le tableau défilant. */
-.classement td:nth-child(2) { min-width: 9rem; }
 
 .graphique-jours { display: flex; flex-direction: column; gap: 0.5rem; }
 /* `stretch` et non `flex-end` : chaque colonne doit occuper toute la
@@ -479,14 +469,6 @@ button.danger { color: var(--danger); }
 
 .entete-bloc { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 
-.bascule { display: flex; gap: 0.25rem; }
-.bascule a {
-  padding: 0.25rem 0.7rem; border-radius: 999px;
-  font-size: 0.82rem; text-decoration: none; color: var(--attenue);
-  border: 1px solid var(--bordure);
-}
-.bascule a:hover { color: var(--texte); }
-.bascule a.actif { background: var(--accent); color: var(--fond); border-color: var(--accent); font-weight: 650; }
 
 /* ── Ticket tel qu'il s'imprime ────────────────────────────────────────────
    Police à chasse fixe, obligatoire : le rendu ESC/POS aligne ses colonnes
@@ -507,3 +489,127 @@ button.danger { color: var(--danger); }
 }
 .ticket-papier > summary { cursor: pointer; color: var(--attenue); font-size: 0.9rem; }
 .ticket-papier > summary:hover { color: var(--texte); }
+
+/* ── Graphique de série : colonnes, aires, ligne ─────────────────────────── */
+.graphique-serie { display: flex; flex-direction: column; gap: 0.75rem; }
+.options-graphique { display: flex; gap: 0.5rem; }
+.options-graphique select { width: auto; min-width: 8rem; }
+
+/* Le tracé occupe la même hauteur que les colonnes : basculer d'une forme à
+   l'autre ne doit pas faire sauter la page sous le curseur. */
+.trace { width: 100%; height: 9rem; overflow: visible; }
+.grille { stroke: var(--bordure); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.ligne {
+  fill: none; stroke: var(--accent); stroke-width: 2;
+  /* Sans cela, l'étirement du viewBox épaissirait le trait à l'horizontale
+     et l'amincirait à la verticale : une même ligne, deux épaisseurs. */
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round; stroke-linecap: round;
+}
+.aire { fill: var(--accent); opacity: 0.16; }
+.point { fill: var(--accent); stroke: var(--panneau); stroke-width: 2; vector-effect: non-scaling-stroke; }
+
+.axe-x { display: flex; gap: 2px; }
+.axe-x span {
+  flex: 1 1 0; min-width: 0; text-align: center;
+  font-size: 0.72rem; color: var(--attenue);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Masqué à l'œil, conservé pour les lecteurs d'écran : la liste des périodes
+   reste complète pour qui ne voit pas le graphique. */
+.axe-x .efface { visibility: hidden; }
+
+.visuellement-cache {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+
+/* ── Bandeau d'indicateurs ───────────────────────────────────────────────── */
+/* Défilable à l'horizontale : sur un téléphone, cinq tuiles ne tiennent pas,
+   et les empiler ferait descendre le graphique sous la ligne de flottaison. */
+.bandeau-indicateurs {
+  display: flex; gap: 0.75rem; overflow-x: auto;
+  padding-bottom: 0.25rem; scroll-snap-type: x proximity;
+}
+.indicateur {
+  flex: 1 0 11rem; scroll-snap-align: start;
+  display: flex; flex-direction: column; gap: 0.15rem;
+  background: var(--panneau); border: 1px solid var(--bordure);
+  border-radius: var(--rayon); padding: 0.9rem 1rem;
+}
+.indicateur-libelle {
+  font-size: 0.78rem; color: var(--attenue);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  display: flex; align-items: center; gap: 0.35rem;
+}
+.indicateur-libelle abbr { cursor: help; text-decoration: none; opacity: 0.7; }
+.indicateur-valeur {
+  font-family: var(--titre); font-size: 1.5rem; font-weight: 700;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.indicateur-ecart { font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+/* Le SENS d'une hausse dépend de la mesure : plus de remboursements est une
+   mauvaise nouvelle. La couleur suit donc « favorable », jamais le signe. */
+.indicateur-ecart.hausse { color: var(--succes); }
+.indicateur-ecart.baisse { color: var(--danger); }
+.indicateur-ecart.neutre { color: var(--attenue); }
+.indicateur-detail { font-size: 0.75rem; color: var(--attenue); }
+
+/* ── Tableau de rapport : colonnes, tri, pagination ──────────────────────── */
+.actions-tableau { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.choix-colonnes {
+  border: 1px solid var(--bordure); border-radius: var(--rayon);
+  padding: 0.75rem 1rem; margin: 0.75rem 0;
+  display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem;
+}
+.choix-colonnes legend { color: var(--attenue); font-size: 0.8rem; padding: 0 0.4rem; }
+.choix-colonnes label {
+  display: flex; align-items: center; gap: 0.4rem;
+  margin: 0; color: var(--texte); font-size: 0.85rem;
+}
+.choix-colonnes input { width: auto; }
+
+th .tri {
+  background: none; border: none; padding: 0; color: inherit;
+  font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer;
+}
+th .tri:hover { color: var(--texte); }
+
+.pagination {
+  display: flex; align-items: center; gap: 0.75rem;
+  margin-top: 0.75rem; flex-wrap: wrap;
+}
+.pagination select { width: auto; min-width: 4.5rem; }
+.pagination label { display: flex; align-items: center; gap: 0.4rem; margin: 0; }
+
+/* ── Camembert des parts ─────────────────────────────────────────────────── */
+.camembert { display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; }
+.camembert svg { width: 12rem; height: 12rem; flex: none; }
+/* L'écart de surface entre deux parts : sans lui, deux teintes voisines se
+   touchent et la frontière disparaît pour qui les distingue mal. */
+.camembert .part { stroke: var(--panneau); stroke-width: 2; }
+.camembert .part:hover { opacity: 0.85; }
+.camembert .legende { list-style: none; margin: 0; padding: 0; flex: 1 1 14rem; }
+.camembert .legende li {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.3rem 0; border-bottom: 1px solid var(--bordure);
+}
+.camembert .legende li:last-child { border-bottom: none; }
+.camembert .legende-nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.camembert .legende-valeur { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ── Top 5 ───────────────────────────────────────────────────────────────── */
+.top-cinq { list-style: none; margin: 0; padding: 0; }
+.top-cinq li {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.5rem 0; border-bottom: 1px solid var(--bordure);
+}
+.top-cinq li:last-child { border-bottom: none; }
+.top-cinq .rang {
+  flex: none; width: 1.6rem; height: 1.6rem; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--panneau-clair); color: var(--attenue);
+  font-size: 0.8rem; font-weight: 700;
+}
+.top-cinq .nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.top-cinq .valeur { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 650; }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { formaterPourcentage } from '@kaissi/domain'
+import { formaterPourcentage, millimes } from '@kaissi/domain'
 import {
+  agregerSerie,
   calculerIndicateurs,
   etatStock,
   ventilerParCategorie,
@@ -23,6 +24,7 @@ function ligne(p: Partial<LigneVendue> = {}): LigneVendue {
     remiseLigneMillimes: 0,
     remiseGlobaleMillimes: 0,
     netMillimes: 15000,
+    taxeMillimes: 0,
     coutUnitaire: 10000,
     categorieId: 'cat1',
     categorieNom: 'Plats',
@@ -264,5 +266,61 @@ describe('ventilerParJournee', () => {
       { du: '2026-09-03', au: '2026-09-03' },
     )
     expect(jours[0]?.caMillimes).toBe(0)
+  })
+})
+
+describe('agréger une série en semaines et en mois', () => {
+  const jour = (journee: string, ca: number, tickets = 1) => ({
+    journee,
+    caMillimes: millimes(ca),
+    tickets,
+  })
+
+  it('rend les journées telles quelles au pas « jours »', () => {
+    const points = agregerSerie([jour('2026-09-01', 10_000)], 'jours')
+    expect(points).toHaveLength(1)
+    expect(points[0]!.caMillimes).toBe(10_000)
+  })
+
+  it('regroupe par semaine, du LUNDI au dimanche', () => {
+    // 31 août 2026 est un lundi ; le 6 septembre, le dimanche qui suit.
+    const points = agregerSerie(
+      [
+        jour('2026-08-30', 5_000), // dimanche → semaine précédente
+        jour('2026-08-31', 10_000),
+        jour('2026-09-06', 20_000),
+      ],
+      'semaines',
+    )
+    expect(points).toHaveLength(2)
+    expect(points[0]!.caMillimes).toBe(5_000)
+    expect(points[1]!.caMillimes).toBe(30_000)
+  })
+
+  it('regroupe par mois', () => {
+    const points = agregerSerie(
+      [jour('2026-08-30', 5_000), jour('2026-09-01', 10_000), jour('2026-09-30', 1_000)],
+      'mois',
+    )
+    expect(points.map((p) => p.caMillimes)).toEqual([5_000, 11_000])
+    expect(points[1]!.libelle).toContain('septembre')
+  })
+
+  it('conserve les seaux VIDES — une semaine de fermeture se voit en creux', () => {
+    const points = agregerSerie(
+      [jour('2026-08-31', 10_000, 1), jour('2026-09-01', 0, 0)],
+      'semaines',
+    )
+    expect(points).toHaveLength(1)
+    expect(points[0]!.tickets).toBe(1)
+  })
+
+  it('additionne des millimes ENTIERS, sans repasser par un flottant', () => {
+    // 3 × 333 millimes = 999, pas 998,9999999.
+    const points = agregerSerie(
+      [jour('2026-09-01', 333), jour('2026-09-02', 333), jour('2026-09-03', 333)],
+      'mois',
+    )
+    expect(points[0]!.caMillimes).toBe(999)
   })
 })

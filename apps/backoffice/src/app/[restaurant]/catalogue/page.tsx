@@ -77,7 +77,7 @@ export default async function PageCatalogue({
 
   return (
     <>
-      <h1>Menu</h1>
+      <h1>Liste d’articles</h1>
       <p className="sous-titre">
         {etablissement.gestionnaire
           ? 'Une modification part vers les tablettes à leur prochaine synchronisation — pas instantanément.'
@@ -131,12 +131,6 @@ export default async function PageCatalogue({
           coutUnitaire: p.cost_per_unit === null ? null : Number(p.cost_per_unit),
           position: (p.position as number) ?? 0,
           disponible: Boolean(p.is_available),
-        }))}
-        archivees={(categoriesArchivees ?? []).map((c) => ({
-          id: c.id as string,
-          nom: c.name as string,
-          position: (c.position as number) ?? 0,
-          stationId: (c.station_id as string | null) ?? null,
         }))}
         produitsArchives={(produitsArchives ?? []).map((p) => ({
           id: p.id as string,

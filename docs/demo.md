@@ -1201,6 +1201,124 @@ elle répétait la même valeur sur toutes les lignes d'un groupe.
 
 ---
 
+### J. Les rapports, aux noms et à la forme de Loyverse
+
+La colonne de gauche a changé. Elle porte désormais **exactement** les
+intitulés de Loyverse — ce n'est pas de l'imitation, c'est le vocabulaire que
+le marché connaît : un restaurateur qui vient de Loyverse cherche
+« Récapitulatif des ventes », pas « Ventes ».
+
+| Groupe | Écrans |
+|---|---|
+| **Rapports** | Récapitulatif des ventes · Ventes par article · par catégorie · par employé · par mode de paiement · Reçus · Réductions · Périodes de travail |
+| **Articles** | Liste d'articles · Catégories · Stock |
+| **Configuration** | Employés |
+
+> **« Tickets » s'appelle « Reçus ».** L'ancienne adresse `/‹resto›/tickets`
+> redirige : un favori ou un lien envoyé par message continue de marcher.
+
+**LES TROIS FILTRES, EN TÊTE DE CHAQUE RAPPORT**
+
+1. Ouvre **Rapports → Récapitulatif des ventes**.
+2. En haut : les raccourcis, **deux vrais calendriers** (du / au), une
+   **tranche horaire**, et un **filtre par employé**.
+3. Choisis `12 h → 15 h`.
+
+**Attendu** : tous les chiffres de l'écran ne portent plus que sur le service
+du midi. Les heures sont celles de **ton** établissement — pas UTC, ce qui
+ferait basculer un service de midi dans la tranche du matin.
+
+4. Change de rapport : les filtres **suivent**, ils sont dans l'adresse. Copie
+   l'URL, envoie-la : elle rouvre exactement le même rapport.
+
+**LE BANDEAU DE TÊTE**
+
+5. Cinq nombres : **Ventes brutes → Remboursements → Réductions → Ventes
+   nettes → Marge brute**.
+
+**Attendu** : ce n'est pas une liste, c'est une **soustraction**. Lue de
+gauche à droite, elle répond à « pourquoi le net n'est pas le brut », qui est
+la première question devant un rapport.
+
+6. Sous chaque nombre, l'**écart** avec la période précédente **de même
+   longueur** : sept jours se comparent aux sept jours d'avant.
+
+**Attendu** : le vert veut dire *favorable*, pas *en hausse*. Plus de
+remboursements ou plus de réductions s'affichent en **rouge** même si le
+nombre monte. Et quand la période précédente est vide, il n'y a **rien** —
+pas « +100 % », qui serait une division par zéro déguisée.
+
+**LE GRAPHIQUE**
+
+7. Deux menus déroulants : **Colonnes / Aires / Ligne**, et **Jours /
+   Semaines / Mois**.
+8. Prends « 30 derniers jours », puis « Jours », puis « Semaines ».
+
+**Attendu** : trente colonnes deviennent cinq barres lisibles. Le pas par
+défaut suit la longueur de la période — au-delà de deux mois, il se met de
+lui-même sur « Mois ».
+
+> **Les trois formes ne disent pas la même chose.** Les colonnes sont
+> l'honnêteté par défaut : il n'y a rien entre mardi et mercredi, et une
+> colonne l'assume. La ligne relie les points, ce qui affirme une continuité
+> qui n'existe pas — mais sur trois mois, la tendance devient la vraie
+> question.
+
+**LE TABLEAU**
+
+9. En bas : **Colonnes** (choix des champs), tri par en-tête, pagination
+   **10 / 25 / 50 / 100**, et **Exporter**.
+10. Passe à 25 lignes, trie par « Marge », puis exporte.
+
+**Attendu** : l'export porte sur **toute la période**, jamais sur la page
+affichée. Exporter « la page 2 » est le genre de piège qu'on ne découvre
+qu'en rapprochant deux totaux qui ne collent pas.
+
+**VENTES PAR ARTICLE (§13.2)**
+
+11. **Rapports → Ventes par article**.
+
+**Attendu** : le **Top 5** en tête, puis le graphique — avec une option de
+plus, **Circulaire** — puis le tableau complet.
+
+12. Choisis **Circulaire**.
+
+**Attendu** : cinq parts au maximum, la sixième s'appelle **« Autres (n) »**,
+et chaque part porte son **nom** et son **pourcentage** à côté.
+
+> **Pourquoi ces couleurs-là, qui ne sont pas la menthe de la marque.** Ici
+> les articles SONT le sujet : c'est de l'identité, pas de la grandeur. Une
+> seule teinte déclinée en six valeurs se lit très mal en camembert. La
+> palette a été **vérifiée par un validateur** contre ce fond sombre :
+> écart perceptuel suffisant en daltonisme, contraste suffisant. Et la
+> couleur n'est jamais seule — le nom et le pourcentage sont écrits.
+
+> **La barre dans le tableau a disparu.** Elle répétait le classement que le
+> rang disait déjà : « Ojja merguez est premier », écrit deux fois, dont une
+> en couleur, dans une colonne qui prenait un tiers de la largeur. C'était
+> ton reproche, et il était juste.
+
+**RÉDUCTIONS (§13 et §14.3)**
+
+13. **Rapports → Réductions**.
+
+**Attendu** : combien a été accordé, **quelle part des ventes brutes**,
+combien de tickets sont concernés — puis le classement **par employé**, et la
+liste des reçus remisés, cliquables.
+
+> **Pourquoi cet écran compte.** Une remise est de l'argent qui sort sans
+> qu'aucun billet ne bouge : elle ne laisse ni écart de caisse, ni ligne
+> suspecte. Le seul autre moment où on la remarque, c'est quand la marge du
+> mois est inexplicablement basse.
+>
+> Ce qui manque encore : le **motif**. La caisse enregistre un montant, pas
+> une raison. Une réduction nommée (« Happy hour », « Personnel ») demande un
+> référentiel de réductions **et** son écran sur la tablette — c'est le
+> chantier suivant, et il n'a pas de sens tant que la caisse ne sait pas la
+> choisir.
+
+---
+
 ## 6. Gérer le menu et le stock
 
 ### Changer un prix ou un coût

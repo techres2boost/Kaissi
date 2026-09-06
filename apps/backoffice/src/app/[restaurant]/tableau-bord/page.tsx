@@ -202,7 +202,16 @@ function Kpi({
   )
 }
 
-export function TableauVentilation({
+/*
+ * Local, et non plus exporté.
+ *
+ * Une page Next.js n'a le droit d'exporter que ses champs connus
+ * (`default`, `dynamic`, `metadata`…) : tout le reste fait échouer le build
+ * avec « n'est pas un champ d'export de Page valide ». Ce tableau était
+ * importé par l'écran Ventes, qui a désormais le sien — il redevient donc ce
+ * qu'il aurait toujours dû être : un détail de cette page.
+ */
+function TableauVentilation({
   lignes,
   entete,
 }: {

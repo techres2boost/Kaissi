@@ -57,21 +57,40 @@ const GROUPES = [
     ],
   },
   {
+    /*
+     * Les rapports portent EXACTEMENT les noms de Loyverse.
+     *
+     * Ce n'est pas de l'imitation : c'est le vocabulaire que le marché
+     * connaît déjà. Un restaurateur qui vient de Loyverse cherche
+     * « Récapitulatif des ventes » ; l'appeler « Ventes » l'oblige à
+     * apprendre notre mot pour sa propre question.
+     */
     titre: 'Rapports',
     onglets: [
-      { chemin: 'ventes', libelle: 'Ventes', icone: '🧾', gestionnaire: true },
-      { chemin: 'articles', libelle: 'Par article', icone: '🍽️', gestionnaire: true },
-      { chemin: 'tickets', libelle: 'Tickets', icone: '🎫', gestionnaire: true },
+      { chemin: 'ventes', libelle: 'Récapitulatif des ventes', icone: '🧾', gestionnaire: true },
+      { chemin: 'articles', libelle: 'Ventes par article', icone: '🍽️', gestionnaire: true },
+      { chemin: 'ventes-par-categorie', libelle: 'Ventes par catégorie', icone: '🗂️', gestionnaire: true },
+      { chemin: 'ventes-par-employe', libelle: 'Ventes par employé', icone: '👤', gestionnaire: true },
+      { chemin: 'ventes-par-paiement', libelle: 'Ventes par mode de paiement', icone: '💳', gestionnaire: true },
+      { chemin: 'recus', libelle: 'Reçus', icone: '🎫', gestionnaire: true },
+      { chemin: 'reductions', libelle: 'Réductions', icone: '🏷️', gestionnaire: true },
       { chemin: 'periodes', libelle: 'Périodes de travail', icone: '🕐', gestionnaire: true },
     ],
   },
   {
-    titre: 'Configuration',
+    // « Articles » et non « Menu » : c'est là qu'on gère la carte, ses
+    // catégories et ses réductions. Le mot « Menu » désignait à la fois la
+    // carte et la barre de navigation — deux choses dans un même mot.
+    titre: 'Articles',
     onglets: [
-      { chemin: 'catalogue', libelle: 'Menu', icone: '📖', gestionnaire: true },
+      { chemin: 'catalogue', libelle: 'Liste d’articles', icone: '📖', gestionnaire: true },
+      { chemin: 'categories', libelle: 'Catégories', icone: '🗃️', gestionnaire: true },
       { chemin: 'stock', libelle: 'Stock', icone: '📦', gestionnaire: true },
-      { chemin: 'employes', libelle: 'Employés', icone: '👥', gestionnaire: true },
     ],
+  },
+  {
+    titre: 'Configuration',
+    onglets: [{ chemin: 'employes', libelle: 'Employés', icone: '👥', gestionnaire: true }],
   },
 ] as const
 

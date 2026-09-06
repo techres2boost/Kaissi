@@ -1,19 +1,13 @@
 /**
- * « Ventes par article » — ce qui se vend, et ce qui rapporte.
+ * « Ventes par catégorie » — la carte vue de haut.
  *
- * ── Pourquoi un écran à part du récapitulatif ─────────────────────────────
+ * L'article dit quoi garder ; la catégorie dit où va le service. « Les
+ * boissons font 40 % du chiffre » est une phrase qu'aucun classement
+ * d'articles ne donne, parce qu'elle demande d'additionner trente lignes.
  *
- * Le récapitulatif répond à « combien ai-je fait ». Celui-ci répond à « avec
- * quoi » — la question qu'un restaurateur se pose pour décider quoi garder à
- * la carte, quoi mettre en avant, et quoi arrêter.
- *
- * ── Ce qui a disparu, et pourquoi ─────────────────────────────────────────
- *
- * La barre de longueur dans le tableau. Elle répétait le classement que le
- * rang disait déjà : « Ojja merguez est premier » écrit deux fois, dont une
- * en couleur, dans une colonne qui prenait un tiers de la largeur. Le top 5
- * en tête donne le classement d'un coup d'œil ; le tableau donne les
- * chiffres, et rien qu'eux.
+ * La catégorie vient du produit AU MOMENT de la lecture, pas de la vente :
+ * reclasser un article change donc les rapports passés. C'est le comportement
+ * voulu — « combien font mes boissons » se pose sur la carte d'aujourd'hui.
  */
 
 import { formaterPourcentage } from '@kaissi/domain'
@@ -21,8 +15,8 @@ import { ecranReserve, etablissementObligatoire } from '../../../serveur/session
 import { chargerRapport } from '../../../serveur/rapport.js'
 import {
   calculerIndicateurs,
+  ventilerParCategorie,
   ventilerParJournee,
-  ventilerParProduit,
 } from '../../../serveur/rapports.js'
 import { libelleJournee } from '../../../serveur/journee.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
@@ -36,7 +30,7 @@ import {
 
 export const dynamic = 'force-dynamic'
 
-export default async function PageArticles({
+export default async function PageVentesParCategorie({
   params,
   searchParams,
 }: {
@@ -54,20 +48,20 @@ export default async function PageArticles({
   if (ventes.erreur) {
     return (
       <section className="bloc">
-        <h1>Ventes par article</h1>
+        <h1>Ventes par catégorie</h1>
         <p className="message erreur">Lecture impossible : {ventes.erreur}</p>
       </section>
     )
   }
 
-  const articles = ventilerParProduit(ventes.lignes)
+  const categories = ventilerParCategorie(ventes.lignes)
   const i = calculerIndicateurs(ventes.lignes, ventes.commandes, ventes.remboursements)
   const p = calculerIndicateurs(precedent.lignes, precedent.commandes, precedent.remboursements)
 
   return (
     <>
       <header className="entete-rapport">
-        <h1>Ventes par article</h1>
+        <h1>Ventes par catégorie</h1>
         <p className="sous-titre">
           {periode.du === periode.au
             ? libelleJournee(periode.du)
@@ -88,28 +82,19 @@ export default async function PageArticles({
       <BandeauIndicateurs
         indicateurs={[
           {
-            libelle: 'Articles vendus',
-            valeurMillimes: i.articlesVendus * 1000,
-            precedentMillimes: p.articlesVendus * 1000,
-            detail: `${articles.length} référence(s)`,
-            aide: 'Nombre d’articles vendus, toutes références confondues.',
+            libelle: 'Catégories vendues',
+            valeurMillimes: categories.length * 1000,
+            precedentMillimes: null,
+            detail: `${i.articlesVendus} article(s)`,
           },
-          {
-            libelle: 'Ventes brutes',
-            valeurMillimes: i.caBrutMillimes,
-            precedentMillimes: p.caBrutMillimes,
-          },
+          { libelle: 'Ventes brutes', valeurMillimes: i.caBrutMillimes, precedentMillimes: p.caBrutMillimes },
           {
             libelle: 'Réductions',
             valeurMillimes: i.remisesMillimes,
             precedentMillimes: p.remisesMillimes,
             hausseDefavorable: true,
           },
-          {
-            libelle: 'Ventes nettes',
-            valeurMillimes: i.caNetMillimes,
-            precedentMillimes: p.caNetMillimes,
-          },
+          { libelle: 'Ventes nettes', valeurMillimes: i.caNetMillimes, precedentMillimes: p.caNetMillimes },
           {
             libelle: 'Marge brute',
             valeurMillimes: i.marge.margeMillimes,
@@ -122,49 +107,30 @@ export default async function PageArticles({
         ]}
       />
 
-      <TopCinq lignes={articles} entete="Articles" />
+      <TopCinq lignes={categories} entete="Catégories" />
 
       <section className="bloc">
         <GraphiqueSerie
-          titre="Tableau des ventes par article"
+          titre="Ventes par catégorie"
           journees={ventilerParJournee(ventes.commandes, fiche.timezone, fiche.bascule, {
             du: periode.du,
             au: periode.au,
           })}
-          parts={articles.map((a) => ({
-            cle: a.cle,
-            libelle: a.libelle,
-            valeurMillimes: a.marge.caMillimes,
+          parts={categories.map((c) => ({
+            cle: c.cle,
+            libelle: c.libelle,
+            valeurMillimes: c.marge.caMillimes,
           }))}
         />
       </section>
 
-      {i.lignesSansCout > 0 && (
-        <p className="message avertissement">
-          ⚠ {i.lignesSansCout} ligne(s) sans coût d’achat saisi : leur marge
-          apparaît « — » plutôt qu’à 100 %, qui aurait l’air juste.
-        </p>
-      )}
-
       <TableauVentilationRapport
-        lignes={articles}
-        entete="Article"
-        colonnesEnTete={[
-          {
-            cle: 'categorie',
-            titre: 'Catégorie',
-            secondaire: true,
-            // La catégorie du PREMIER passage suffit : un article n'en a
-            // qu'une, et la ventilation regroupe déjà par article.
-            rendu: (l) =>
-              ventes.lignes.find((x) => (x.produitId ?? `designation:${x.designation}`) === l.cle)
-                ?.categorieNom ?? '—',
-          },
-        ]}
+        lignes={categories}
+        entete="Catégorie"
         actions={
           <BoutonsExport
             restaurantId={restaurant}
-            exports={[{ quoi: 'articles', libelle: 'Exporter' }]}
+            exports={[{ quoi: 'categories', libelle: 'Exporter' }]}
             du={periode.du}
             au={periode.au}
           />

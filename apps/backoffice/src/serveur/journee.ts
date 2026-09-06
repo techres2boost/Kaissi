@@ -53,6 +53,25 @@ function instantDepuisLocal(annee: number, mois: number, jour: number, minutes: 
   return new Date(naif - decalageMinutes(premier, fuseau) * 60_000)
 }
 
+/**
+ * L'HEURE LOCALE d'un instant, dans le fuseau de l'établissement.
+ *
+ * Sert au filtre horaire des rapports : « ce qui a été encaissé entre 12 h et
+ * 15 h » se lit dans l'heure du restaurant, pas en UTC. À Tunis l'écart est
+ * d'une ou deux heures selon la saison — assez pour faire basculer un service
+ * de midi dans la tranche du matin.
+ */
+export function heureLocale(instant: Date, fuseau: string): number {
+  const heure = new Intl.DateTimeFormat('en-US', {
+    timeZone: fuseau,
+    hour12: false,
+    hour: '2-digit',
+  }).format(instant)
+  const valeur = Number(heure)
+  // `24` apparaît sur certains environnements pour minuit : c'est zéro.
+  return valeur === 24 ? 0 : valeur
+}
+
 export class ErreurJournee extends Error {}
 
 /** « 04:00 » ou « 04:00:00 » → minutes depuis minuit. */
