@@ -13,7 +13,11 @@ import { creerServeur } from './serveur.js'
 import { formaterErreurBase } from './diagnostic-base.js'
 import { configurationPg, hoteDe } from './connexion.js'
 import { planifierReparation, INTERVALLE_DEFAUT_MINUTES } from './reparation.js'
-import { planifierAlertesStock, INTERVALLE_ALERTES_MINUTES } from './alertes.js'
+import {
+  planifierAlertesStock,
+  INTERVALLE_ALERTES_MINUTES,
+  type AlertesPlanifiees,
+} from './alertes.js'
 
 export * from './protocole.js'
 export * from './depot.js'
@@ -146,7 +150,21 @@ export async function demarrer(): Promise<void> {
     process.exit(1)
   }
   const hoteBase = hoteDe(configuration)
-  const depot = new DepotPostgres(configuration)
+  /*
+   * Le balayage d'alertes n'existe pas encore quand le dépôt est construit,
+   * et le dépôt doit pourtant pouvoir le réveiller.
+   *
+   * D'où cette variable plutôt qu'une dépendance directe : le dépôt ne
+   * connaît qu'une fonction, appelée quand une reprojection vient de changer
+   * la carte. Tant que le balayage n'est pas planifié — ou s'il est coupé par
+   * `SYNC_ALERTES=0` — l'appel ne fait rien, et c'est le bon comportement.
+   */
+  let alertes: AlertesPlanifiees | null = null
+
+  const depot = new DepotPostgres({
+    ...configuration,
+    surCarteModifiee: () => alertes?.declencher(),
+  })
 
   // On JOINT la base avant d'annoncer quoi que ce soit. Annoncer « en
   // écoute » sans l'avoir fait donnerait un serveur qui paraît sain et qui
@@ -222,7 +240,7 @@ export async function demarrer(): Promise<void> {
       process.env['SYNC_ALERTES_MINUTES'] || String(INTERVALLE_ALERTES_MINUTES),
       10,
     )
-    planifierAlertesStock(depot, {
+    alertes = planifierAlertesStock(depot, {
       ...(Number.isFinite(minutesAlertes) ? { intervalleMinutes: minutesAlertes } : {}),
     })
   }

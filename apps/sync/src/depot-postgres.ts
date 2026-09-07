@@ -64,12 +64,29 @@ export interface OptionsDepot {
    * Sinon, le réglage rendu par `sslDepuisEnvironnement()`.
    */
   readonly ssl?: boolean | ReglageSsl
+  /**
+   * Appelé quand une reprojection vient de CHANGER la carte — un produit
+   * sorti à zéro, ou remis à la réception.
+   *
+   * C'est le seul instant où l'on SAIT qu'il y a peut-être une alerte à
+   * envoyer. Sans ce signal, la rupture attend le balayage périodique : le
+   * produit disparaît de la caisse tout de suite, et le gérant l'apprend
+   * jusqu'à quinze minutes plus tard — sur le même écran qui lui dit déjà
+   * que c'est fait.
+   *
+   * Il ne doit RIEN attendre et ne jamais lever : il est appelé après une
+   * vente encaissée, et perdre une vente pour une notification serait
+   * absurde.
+   */
+  readonly surCarteModifiee?: (restaurantId: string) => void
 }
 
 export class DepotPostgres implements DepotSync {
   private readonly pool: Pool
+  private readonly surCarteModifiee: ((restaurantId: string) => void) | null
 
   constructor(options: OptionsDepot) {
+    this.surCarteModifiee = options.surCarteModifiee ?? null
     // `connectionString` n'est passée QUE si elle existe : `pg` la
     // ré-analyse et écraserait les champs séparés, mot de passe compris.
     this.pool = new Pool({
@@ -881,10 +898,25 @@ export class DepotPostgres implements DepotSync {
        */
       if (produitsTouches.size > 0) {
         try {
-          await client.query('select kaissi.appliquer_rupture_auto($1, $2::uuid[])', [
-            restaurantId,
-            [...produitsTouches],
-          ])
+          const { rows } = await client.query<{ appliquer_rupture_auto: number }>(
+            'select kaissi.appliquer_rupture_auto($1, $2::uuid[])',
+            [restaurantId, [...produitsTouches]],
+          )
+          /*
+           * La fonction rend le nombre de lignes qu'elle a bougées. Zéro est
+           * le cas courant — on vend des produits qui restent en stock — et
+           * il ne doit réveiller personne.
+           *
+           * Appel SYNCHRONE et sans `await` : ce qui suit ne doit ni
+           * ralentir la réponse à la caisse, ni pouvoir la faire échouer.
+           */
+          if ((rows[0]?.appliquer_rupture_auto ?? 0) > 0) {
+            try {
+              this.surCarteModifiee?.(restaurantId)
+            } catch (erreur) {
+              console.warn('[sync] signal de carte modifiée non délivré', erreur)
+            }
+          }
         } catch (erreur) {
           console.warn('[sync] rupture automatique non appliquée', erreur)
         }
@@ -912,6 +944,175 @@ export class DepotPostgres implements DepotSync {
       [authUserId, restaurantId],
     )
     return rows[0]?.role ?? null
+  }
+
+  async etablissementsAdministres(
+    authUserId: string,
+  ): Promise<{ restaurantId: string; organizationId: string; nom: string }[]> {
+    const { rows } = await this.pool.query<{
+      restaurant_id: string
+      organization_id: string
+      name: string
+    }>(
+      `select m.restaurant_id, m.organization_id, r.name
+         from kaissi.memberships m
+         join kaissi.users u on u.id = m.user_id
+         join kaissi.restaurants r on r.id = m.restaurant_id
+        where u.auth_user_id = $1
+          and m.role = 'admin'
+          and m.revoked_at is null
+          and u.status = 'actif'
+        order by r.name`,
+      [authUserId],
+    )
+    return rows.map((r) => ({
+      restaurantId: r.restaurant_id,
+      organizationId: r.organization_id,
+      nom: r.name,
+    }))
+  }
+
+  async creerEtablissement(demande: {
+    organizationId: string
+    nom: string
+    timezone: string
+    bascule: string
+    modeleRestaurantId: string | null
+    authUserId: string
+  }): Promise<{ restaurantId: string; reglagesCopies: number }> {
+    const client = await this.pool.connect()
+    try {
+      await client.query('begin')
+
+      // RÈGLE 2 : l'identifiant vient du code, jamais d'un « serial ».
+      const restaurantId = uuidV7()
+
+      /*
+       * Le `slug` est unique PAR ORGANISATION, et il n'est pas saisi.
+       *
+       * Le demander ajouterait un champ que personne ne sait remplir, pour
+       * une valeur qui n'apparaît nulle part dans l'interface. On le dérive
+       * du nom, et on le désambiguïse au besoin — comme un numéro de ticket
+       * en collision : mieux vaut « snack-lac-1-2 » qu'un refus.
+       */
+      const base =
+        demande.nom
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 50) || 'etablissement'
+      let slug = base
+      for (let n = 2; n < 100; n += 1) {
+        const { rows } = await client.query(
+          'select 1 from kaissi.restaurants where organization_id = $1 and slug = $2',
+          [demande.organizationId, slug],
+        )
+        if (rows.length === 0) break
+        slug = `${base}-${n}`
+      }
+
+      await client.query(
+        `insert into kaissi.restaurants
+           (id, organization_id, name, slug, timezone, business_day_start)
+         values ($1, $2, $3, $4, $5, $6)`,
+        [
+          restaurantId,
+          demande.organizationId,
+          demande.nom,
+          slug,
+          demande.timezone,
+          demande.bascule,
+        ],
+      )
+
+      /*
+       * Le référentiel de DÉPART, recopié d'un établissement existant.
+       *
+       * Trois tables et pas une de plus : sans taux de taxe ni mode de
+       * paiement, une caisse ne peut RIEN encaisser — elle refuserait la
+       * première vente sans expliquer pourquoi. Les postes suivent parce
+       * qu'un produit sans poste n'apparaît sur aucun écran de préparation,
+       * et que cela ne se voit qu'en plein service.
+       *
+       * La CARTE, elle, n'est pas copiée : c'est le travail du gérant, et un
+       * nouveau restaurant qui ouvrirait avec les plats d'un autre serait
+       * plus long à corriger qu'à saisir. On ne devine pas un menu.
+       *
+       * ⚠ Les taux recopiés sont ceux que l'établissement modèle utilise
+       *   DÉJÀ : c'est volontaire. Écrire ici des taux « standard » serait
+       *   affirmer une règle fiscale depuis du code, ce que ce dépôt
+       *   s'interdit.
+       */
+      let reglagesCopies = 0
+      if (demande.modeleRestaurantId) {
+        /*
+         * `kaissi.uuid_v7()` explicitement : ces tables n'ont PAS de valeur
+         * par défaut sur `id` (RÈGLE 2 — l'identifiant vient de celui qui
+         * crée l'entité, jamais d'un « serial »). Ici, c'est le serveur qui
+         * crée, et il le fait avec la même fonction que les tablettes.
+         */
+        for (const copie of [
+          `insert into kaissi.tax_rates
+             (id, organization_id, restaurant_id, name, rate_bp, is_included, is_default)
+           select kaissi.uuid_v7(), organization_id, $1, name, rate_bp, is_included, is_default
+             from kaissi.tax_rates
+            where restaurant_id = $2 and archived_at is null`,
+          `insert into kaissi.payment_methods
+             (id, organization_id, restaurant_id, name, type, opens_drawer, position, is_active)
+           select kaissi.uuid_v7(), organization_id, $1, name, type, opens_drawer, position, is_active
+             from kaissi.payment_methods
+            where restaurant_id = $2 and archived_at is null`,
+          `insert into kaissi.stations
+             (id, organization_id, restaurant_id, name, position)
+           select kaissi.uuid_v7(), organization_id, $1, name, position
+             from kaissi.stations
+            where restaurant_id = $2 and archived_at is null`,
+        ]) {
+          const { rowCount } = await client.query(copie, [
+            restaurantId,
+            demande.modeleRestaurantId,
+          ])
+          reglagesCopies += rowCount ?? 0
+        }
+      }
+
+      /*
+       * L'appartenance du créateur — sans quoi il ne verrait pas ce qu'il
+       * vient de créer.
+       *
+       * RLS ne rend que ce à quoi on appartient : un établissement sans
+       * appartenance est invisible de tout le monde, y compris de son
+       * auteur, et devient irrattrapable depuis l'interface. C'est la raison
+       * pour laquelle cette route existe côté service plutôt qu'en base :
+       * la toute PREMIÈRE appartenance ne peut pas être créée sous RLS, il
+       * faudrait déjà appartenir.
+       */
+      const { rows: moi } = await client.query<{ id: string }>(
+        `select id from kaissi.users
+          where auth_user_id = $1 and organization_id = $2 limit 1`,
+        [demande.authUserId, demande.organizationId],
+      )
+      const employeId = moi[0]?.id
+      if (!employeId) throw new Error("Votre compte n'appartient pas à cette organisation.")
+
+      await client.query(
+        `insert into kaissi.memberships (organization_id, user_id, restaurant_id, role)
+         values ($1, $2, $3, 'admin')
+         on conflict (user_id, restaurant_id) do update
+            set role = 'admin', revoked_at = null, updated_at = now()`,
+        [demande.organizationId, employeId, restaurantId],
+      )
+
+      await client.query('commit')
+      return { restaurantId, reglagesCopies }
+    } catch (erreur) {
+      await client.query('rollback').catch(() => undefined)
+      throw erreur
+    } finally {
+      client.release()
+    }
   }
 
   async compteParEmail(email: string): Promise<{ id: string; email: string } | null> {

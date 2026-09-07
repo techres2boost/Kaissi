@@ -9,6 +9,10 @@ import {
   type Etablissement,
 } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
+// Le pont vers le service de synchronisation vit à part : la création d'un
+// établissement s'en sert aussi, et le dupliquer serait dupliquer la garde
+// qui va avec.
+import { appelerService } from '../../../serveur/service-sync.js'
 import { uuidV7 } from '@kaissi/domain'
 import {
   choix,
@@ -352,58 +356,6 @@ export async function embaucher(
 // service relit les droits EN BASE : il ne croit pas le back-office sur
 // parole, et un défaut ici ne peut donc pas ouvrir un accès chez un autre
 // client.
-
-/** Le jeton de la session en cours, pour parler au service en son nom. */
-async function jetonDeSession(): Promise<string> {
-  const supabase = await supabaseServeur()
-  const { data } = await supabase.auth.getSession()
-  const jeton = data.session?.access_token
-  if (!jeton) throw new ErreurSaisie('session', 'Session expirée — reconnectez-vous.')
-  return jeton
-}
-
-async function appelerService(
-  chemin: string,
-  charge: Record<string, unknown>,
-): Promise<{ message?: string }> {
-  const base = (process.env['URL_SYNC'] ?? '').replace(/\/+$/, '')
-  if (!base) {
-    throw new ErreurSaisie(
-      'service',
-      "L'adresse du service de synchronisation n'est pas configurée " +
-        '(apps/pos/deploiement.json, ou la variable URL_SYNC).',
-    )
-  }
-  let reponse: Response
-  try {
-    reponse = await fetch(`${base}${chemin}`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${await jetonDeSession()}`,
-      },
-      body: JSON.stringify(charge),
-      // Un service qui ne répond pas ne doit pas laisser l'écran en attente
-      // indéfinie : le gérant doit savoir qu'il peut réessayer.
-      signal: AbortSignal.timeout(15_000),
-    })
-  } catch (erreur) {
-    throw new ErreurSaisie(
-      'service',
-      'Le service de synchronisation est injoignable. ' +
-        (erreur instanceof Error ? erreur.message : String(erreur)),
-    )
-  }
-
-  const corps = (await reponse.json().catch(() => null)) as {
-    message?: string
-    erreur?: string
-  } | null
-  if (!reponse.ok) {
-    throw new ErreurSaisie('service', corps?.message ?? `Le service a répondu ${reponse.status}.`)
-  }
-  return corps ?? {}
-}
 
 /**
  * Ouvre à un employé l'accès au back-office.

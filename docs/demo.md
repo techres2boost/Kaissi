@@ -1573,6 +1573,101 @@ pire que pas de bouton. Rattacher un client existant, en revanche, marche
 
 ---
 
+### N. Ouvrir un DEUXIÈME établissement
+
+Jusqu'ici, un seul restaurant. Le schéma est multi-établissements depuis le
+premier jour — `organization_id` **et** `restaurant_id` sur presque chaque
+table — mais rien ne permettait d'en créer un second depuis l'interface.
+
+1. Connecte-toi avec un compte **administrateur**.
+2. Colonne de gauche, tout en bas : **Administration → Établissements**.
+
+**Attendu** : un gérant ne voit pas cette entrée — et s'il tape l'adresse à la
+main, la page répond **« introuvable »**, pas « accès refusé ». Il n'a pas à
+apprendre que l'écran existe.
+
+3. **Ouvrir un établissement** : un nom, l'établissement dont on reprend les
+   réglages, le fuseau, l'heure de bascule.
+
+**Attendu** : l'établissement apparaît immédiatement dans « Vos
+établissements », et le message dit combien de réglages ont été repris.
+
+**CE QUI EST COPIÉ, ET CE QUI NE L'EST PAS**
+
+| | Copié ? | Pourquoi |
+|---|---|---|
+| Taux de taxe | **oui** | sans eux, la caisse ne peut RIEN encaisser |
+| Modes de paiement | **oui** | idem — pas même une vente en espèces |
+| Postes de préparation | **oui** | un produit sans poste n'apparaît sur aucun écran de cuisine, et cela ne se voit qu'en plein service |
+| **La carte** | **non** | on ne devine pas un menu. Ouvrir avec les plats d'un autre restaurant serait plus long à corriger qu'à saisir |
+| Les employés | **non** | chacun est rattaché à SON établissement (§9) |
+| Le stock, les clients, les ventes | **non** | ce sont des données d'exploitation |
+
+> **Les taux recopiés sont ceux que le modèle utilise déjà**, et c'est
+> délibéré : écrire des taux « standard » dans le code reviendrait à affirmer
+> une règle fiscale depuis un logiciel. Ce dépôt s'y refuse — c'est un des
+> points marqués ⚠ à valider avec un expert-comptable.
+
+4. Va dans **Articles → Liste d'articles** du nouvel établissement, et crée un
+   produit. Puis **Configuration → Employés**, et embauche quelqu'un.
+
+**Attendu** : tout fonctionne comme sur le premier. Les deux établissements
+sont étanches — RLS ne rend à chacun que ses propres lignes, et c'est vrai
+même pour toi qui les administres tous les deux : change d'établissement dans
+l'en-tête, les chiffres changent complètement.
+
+> **Pourquoi cet écran passe par le service de synchronisation.** La toute
+> PREMIÈRE appartenance à un établissement ne peut pas être créée sous RLS :
+> il faudrait déjà y appartenir pour s'y rattacher. Un restaurant créé sans
+> appartenance serait invisible de tout le monde — y compris de son auteur —
+> et irrattrapable depuis l'interface. Le service, lui, parle à Postgres avec
+> un rôle privilégié et pose les deux d'un coup, dans une transaction. Il ne
+> croit pas le back-office sur parole pour autant : il relit en base que
+> l'appelant est bien administrateur, et **dérive l'organisation de là**,
+> jamais du corps de la requête.
+
+**APPAIRER LA CAISSE DU NOUVEAU RESTAURANT**
+
+5. Sur une seconde tablette (ou `pnpm pos:dev` dans une autre fenêtre
+   privée) : **Diagnostic → Appairer**, avec l'e-mail et le mot de passe du
+   gérant, puis choisis le nouvel établissement.
+
+**Attendu** : elle reçoit son propre préfixe de tickets. Deux terminaux de
+deux restaurants différents ne peuvent pas produire le même numéro.
+
+---
+
+### O. La rupture prévient TOUT DE SUITE
+
+6. Mets un produit suivi à **1** (Articles → Stock → Ajuster).
+7. Vends-le sur la caisse, et synchronise.
+
+**Attendu** : la notification arrive dans les **secondes** qui suivent — pas
+au prochain quart d'heure.
+
+> **Ce qui a changé, et pourquoi ça se voyait.** Le produit sortait de la
+> carte tout de suite ; la notification, elle, attendait le balayage
+> périodique. Le gérant regardait donc un écran qui lui annonçait la rupture
+> et un téléphone qui ne sonnait pas — et en concluait, à raison, que les
+> notifications ne marchaient pas.
+>
+> La reprojection SAIT qu'elle vient de changer la carte : c'est le seul
+> instant où l'on sait qu'il y a peut-être quelque chose à annoncer. Elle
+> réveille donc le balayage, au lieu de le laisser dormir.
+
+8. Vends coup sur coup trois produits différents qui tombent à zéro.
+
+**Attendu** : **une seule** notification, « 3 ruptures de stock ». Les
+déclenchements sont groupés sur quelques secondes — cinq notifications à la
+suite se coupent, et on coupe alors aussi les vraies.
+
+> **Le balayage périodique n'a pas disparu**, et il ne doit pas : il rattrape
+> ce qu'un service redémarré au mauvais moment aurait manqué, et les seuils
+> franchis par un mouvement de stock saisi au back-office. C'est le filet,
+> pas le mécanisme principal.
+
+---
+
 ## 6. Gérer le menu et le stock
 
 ### Changer un prix ou un coût

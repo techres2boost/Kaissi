@@ -357,6 +357,96 @@ export function creerServeur({
     })
   })
 
+  // ── GET /admin/etablissements ────────────────────────────────────────
+  //
+  // « Où suis-je administrateur ? » — la question que le back-office pose
+  // avant de proposer d'ouvrir un établissement. La réponse est relue EN
+  // BASE, jamais déduite de ce que le client affirme.
+  app.post('/admin/etablissements', async (c) => {
+    return adminSupabase(c, async ({ appelant }) => {
+      const administres = await depot.etablissementsAdministres(appelant.userId)
+      return {
+        // Une seule organisation en pratique ; la liste reste ouverte parce
+        // que le schéma, lui, l'est depuis le premier jour.
+        organisations: [...new Set(administres.map((e) => e.organizationId))],
+        etablissements: administres,
+      }
+    })
+  })
+
+  // ── POST /admin/restaurants ──────────────────────────────────────────
+  //
+  // Ouvrir un NOUVEL établissement. Réservé à un administrateur : un gérant
+  // exploite le sien, il n'en ouvre pas un second (migration 0024).
+  //
+  // Pourquoi ici et pas en base, sous RLS : la toute PREMIÈRE appartenance
+  // ne peut pas être créée sous RLS — il faudrait déjà appartenir à
+  // l'établissement pour s'y rattacher. Un restaurant créé sans appartenance
+  // serait invisible de tout le monde, y compris de son auteur.
+  app.post('/admin/restaurants', async (c) => {
+    return adminSupabase(c, async ({ appelant, corps }) => {
+      const administres = await depot.etablissementsAdministres(appelant.userId)
+      if (administres.length === 0) {
+        throw new ErreurAuth(
+          "Seul un administrateur peut ouvrir un établissement. Votre compte n'administre aucun établissement existant.",
+          401,
+        )
+      }
+
+      const nom = String(corps['nom'] ?? '').trim()
+      if (nom.length < 2 || nom.length > 200) {
+        throw new ErreurAuth("Le nom de l'établissement doit faire entre 2 et 200 caractères.", 401)
+      }
+
+      /*
+       * L'organisation vient du MODÈLE, pas du client.
+       *
+       * Laisser passer un `organizationId` dans le corps de la requête
+       * permettrait à un administrateur d'ouvrir un établissement chez un
+       * autre client — le service parle à Postgres avec un rôle privilégié,
+       * RLS ne l'arrêterait pas. Elle est donc dérivée d'un établissement
+       * qu'il administre DÉJÀ.
+       */
+      const modeleDemande = String(corps['modeleRestaurantId'] ?? '')
+      const modele = modeleDemande
+        ? administres.find((e) => e.restaurantId === modeleDemande)
+        : administres[0]
+      if (!modele) {
+        throw new ErreurAuth(
+          "L'établissement modèle doit être un établissement que vous administrez.",
+          401,
+        )
+      }
+
+      // Le fuseau par défaut est celui du produit, pas celui du serveur :
+      // un conteneur en Europe ne doit pas décider de la journée
+      // commerciale d'un restaurant tunisien.
+      const timezone = String(corps['timezone'] ?? '').trim() || 'Africa/Tunis'
+      const bascule = String(corps['bascule'] ?? '').trim() || '04:00'
+      if (!/^\d{2}:\d{2}(:\d{2})?$/.test(bascule)) {
+        throw new ErreurAuth('L\u2019heure de bascule doit s\u2019écrire « 04:00 ».', 401)
+      }
+
+      const { restaurantId, reglagesCopies } = await depot.creerEtablissement({
+        organizationId: modele.organizationId,
+        nom,
+        timezone,
+        bascule,
+        modeleRestaurantId: modele.restaurantId,
+        authUserId: appelant.userId,
+      })
+
+      return {
+        restaurantId,
+        reglagesCopies,
+        message:
+          `Établissement « ${nom} » ouvert, avec ${reglagesCopies} réglage(s) repris de ` +
+          `« ${modele.nom} » — taux de taxe, modes de paiement et postes. La carte, elle, ` +
+          'reste à saisir : on ne devine pas un menu.',
+      }
+    })
+  })
+
   // ── POST /admin/mot-de-passe ─────────────────────────────────────────
   //
   // « J'ai perdu le mot de passe du cuisinier. » Le PIN se réinitialise au

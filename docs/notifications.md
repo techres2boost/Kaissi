@@ -24,9 +24,20 @@ Trois pièces, et une seule d'entre elles envoie quoi que ce soit :
 > descend pas vers le client. Le back-office n'envoie aucune notification —
 > il enregistre seulement à qui en envoyer.
 
-Le balayage tourne **toutes les 15 minutes** dans le service de sync. Il ne
-réveille personne deux fois pour la même rupture : `stock_alerts` retient ce
-qui est déjà parti, et ne rouvre une alerte qu'après un retour en stock.
+**L'alerte part dans les secondes qui suivent la vente.** Quand une
+reprojection retire un produit de la carte, elle réveille le balayage : c'est
+le seul instant où l'on sait qu'il y a peut-être quelque chose à annoncer. Les
+déclenchements sont groupés sur quelques secondes — cinq produits vidés en une
+minute font UNE notification, pas cinq.
+
+Un balayage **périodique** tourne par-dessus, toutes les 15 minutes. Ce n'est
+pas le mécanisme principal, c'est le filet : il rattrape ce qu'un service
+redémarré au mauvais moment aurait manqué, et les seuils franchis par un
+mouvement de stock saisi au back-office.
+
+Dans les deux cas, personne n'est réveillé deux fois pour la même rupture :
+`stock_alerts` retient ce qui est déjà parti, et ne rouvre une alerte qu'après
+un retour en stock.
 
 ---
 
@@ -154,9 +165,13 @@ Trois conditions, et elles ne sont pas négociables :
 
 ### Le chemin court
 
-Mets un produit suivi à zéro : **Stock → Ajuster → Quantité 0 → Enregistrer**.
-Attends le prochain balayage (≤ 15 min). La notification arrive, et l'article
-est sorti de la carte.
+Vends le dernier exemplaire d'un produit suivi depuis la caisse, et
+synchronise. La notification arrive dans les **secondes** qui suivent, et
+l'article est sorti de la carte.
+
+Le même essai depuis le back-office — **Stock → Ajuster → Quantité 0** —
+n'est pas immédiat : rien n'a été reprojeté, donc rien n'a réveillé le
+balayage. Compter jusqu'à 15 minutes.
 
 ### Le chemin qui dit POURQUOI, quand ça ne marche pas
 

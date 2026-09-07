@@ -219,6 +219,40 @@ export interface DepotSync {
    */
   roleDansEtablissement(authUserId: string, restaurantId: string): Promise<string | null>
 
+  /**
+   * Les établissements où cet utilisateur est ADMINISTRATEUR, avec leur
+   * organisation.
+   *
+   * Sert à répondre à « puis-je créer un restaurant, et dans quelle
+   * organisation ». Un administrateur distribue les pouvoirs ; ouvrir un
+   * établissement en fait partie. Un gérant EXPLOITE le sien, il n'en ouvre
+   * pas un second.
+   */
+  etablissementsAdministres(
+    authUserId: string,
+  ): Promise<{ restaurantId: string; organizationId: string; nom: string }[]>
+
+  /**
+   * Crée un établissement, son référentiel de départ, et l'appartenance de
+   * son créateur — le tout dans UNE transaction.
+   *
+   * Les trois ensemble, et pas l'un après l'autre : un restaurant sans taux
+   * de TVA ni mode de paiement ne peut RIEN encaisser, et un restaurant sans
+   * appartenance n'est visible de personne — pas même de celui qui vient de
+   * le créer, puisque RLS ne rend que ce à quoi on appartient. Une création à
+   * moitié faite serait donc irrattrapable depuis l'interface.
+   */
+  creerEtablissement(demande: {
+    organizationId: string
+    nom: string
+    timezone: string
+    bascule: string
+    /** L'établissement dont on recopie taux de taxe, paiements et postes. */
+    modeleRestaurantId: string | null
+    /** Le créateur, qui en devient administrateur. */
+    authUserId: string
+  }): Promise<{ restaurantId: string; reglagesCopies: number }>
+
   /** Compte d'authentification portant cette adresse, s'il existe. */
   compteParEmail(email: string): Promise<{ id: string; email: string } | null>
 

@@ -325,9 +325,20 @@ export async function balayerAlertesStock(
 /** Intervalle par défaut entre deux balayages d'alertes, en minutes. */
 export const INTERVALLE_ALERTES_MINUTES = 15
 
+/**
+ * Le délai de groupement d'un balayage DEMANDÉ, en millisecondes.
+ *
+ * Assez court pour que le gérant reçoive l'alerte pendant qu'il a encore la
+ * caisse sous les yeux ; assez long pour qu'une rafale d'encaissements — cinq
+ * produits vidés en une minute — fasse UNE notification et non cinq.
+ */
+export const GROUPEMENT_IMMEDIAT_MS = 4_000
+
 export interface OptionsPlanificationAlertes extends OptionsAlertes {
   /** 0 ou négatif : aucun balayage périodique, seulement celui du démarrage. */
   readonly intervalleMinutes?: number
+  /** Délai de groupement d'un balayage demandé. Les tests le raccourcissent. */
+  readonly groupementMs?: number
 }
 
 /**
@@ -343,31 +354,83 @@ export interface OptionsPlanificationAlertes extends OptionsAlertes {
  * sinon un SIGTERM d'hébergeur attendrait le prochain tour et le
  * redéploiement paraîtrait bloqué.
  */
+export interface AlertesPlanifiees {
+  /** Arrête le balayage périodique. */
+  readonly arreter: () => void
+  /**
+   * Demande un balayage MAINTENANT — sans attendre le prochain tour.
+   *
+   * Appelée quand la carte vient de changer : c'est le seul moment où l'on
+   * sait qu'il y a peut-être quelque chose à annoncer. Elle ne rend rien et
+   * ne lève jamais : l'appelant est sur le chemin d'un encaissement.
+   */
+  readonly declencher: () => void
+}
+
 export function planifierAlertesStock(
   depot: DepotSync,
   options: OptionsPlanificationAlertes = {},
-): () => void {
+): AlertesPlanifiees {
   const minutes = options.intervalleMinutes ?? INTERVALLE_ALERTES_MINUTES
+  const groupementMs = options.groupementMs ?? GROUPEMENT_IMMEDIAT_MS
 
   // Un seul balayage à la fois : deux tours qui se chevauchent enverraient
   // la même alerte deux fois — l'un lisant avant que l'autre n'ait
   // journalisé.
   let enCours = false
+  // Un tour a été demandé PENDANT qu'un autre tournait : on le refera juste
+  // après. Sans cela, la vente qui a déclenché la demande attendrait le
+  // prochain quart d'heure — exactement ce que « déclencher » sert à éviter.
+  let redemande = false
   const tour = async () => {
-    if (enCours) return
+    if (enCours) {
+      redemande = true
+      return
+    }
     enCours = true
     try {
       await balayerAlertesStock(depot, options)
     } finally {
       enCours = false
     }
+    if (redemande) {
+      redemande = false
+      await tour()
+    }
+  }
+
+  /*
+   * Le déclenchement immédiat est GROUPÉ sur quelques secondes.
+   *
+   * En plein service, cinq encaissements en une minute peuvent vider cinq
+   * produits. Balayer cinq fois enverrait cinq notifications, que le gérant
+   * couperait — donc aussi les vraies. Attendre quelques secondes les réunit
+   * en une seule, celle qui dit « 5 ruptures de stock » et les nomme.
+   *
+   * `unref()` pour la même raison que le minuteur périodique : un SIGTERM
+   * d'hébergeur ne doit pas attendre ce délai.
+   */
+  let attente: ReturnType<typeof setTimeout> | null = null
+  const declencher = () => {
+    if (attente) return
+    attente = setTimeout(() => {
+      attente = null
+      void tour()
+    }, groupementMs)
+    attente.unref?.()
   }
 
   void tour()
 
-  if (minutes <= 0) return () => {}
+  if (minutes <= 0) return { arreter: () => {}, declencher }
 
   const minuteur = setInterval(() => void tour(), minutes * 60_000)
   minuteur.unref()
-  return () => clearInterval(minuteur)
+  return {
+    arreter: () => {
+      clearInterval(minuteur)
+      if (attente) clearTimeout(attente)
+    },
+    declencher,
+  }
 }

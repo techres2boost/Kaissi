@@ -26,6 +26,19 @@ export default async function Accueil() {
         <h1>Vos établissements</h1>
         <p className="sous-titre">Choisissez celui que vous voulez administrer.</p>
 
+        {/*
+          Le raccourci d'administration, pour qui en a le rôle. Il est ici
+          parce que c'est l'écran où l'on arrive quand on gère plusieurs
+          établissements — donc l'endroit où l'on pense à en ouvrir un.
+        */}
+        {session.etablissements.some((e) => e.administrateur) && (
+          <p>
+            <Link className="bouton discret" href="/administration">
+              🏢 Administration — ouvrir un établissement
+            </Link>
+          </p>
+        )}
+
         {session.etablissements.length === 0 ? (
           <div className="carte">
             <p className="message avertissement">

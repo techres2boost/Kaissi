@@ -198,6 +198,32 @@ export function Navigation({
           })}
         </nav>
 
+        {/*
+          « Administration » n'est PAS dans les groupes ci-dessus, et ce n'est
+          pas un oubli : son adresse ne commence pas par l'établissement. Elle
+          ne parle d'aucun établissement en particulier — c'est là qu'on en
+          ouvre un autre.
+
+          Elle n'apparaît qu'au rôle `administrateur`. Le gérant, lui, ne doit
+          même pas apprendre que l'écran existe : la page répond « introuvable »
+          pour lui, pas « accès refusé ».
+        */}
+        {etablissement.administrateur && !etablissement.preparation && (
+          <nav className="laterale-groupe">
+            <span className="laterale-titre">Administration</span>
+            <Link
+              href="/administration"
+              aria-current={cheminActuel === '/administration' ? 'page' : undefined}
+              onClick={() => setOuvert(false)}
+            >
+              <span className="laterale-icone" aria-hidden="true">
+                🏢
+              </span>
+              Établissements
+            </Link>
+          </nav>
+        )}
+
         <div className="laterale-pied">
           <span className="laterale-qui">{session.nom}</span>
           <span className="etiquette">{etablissement.role}</span>

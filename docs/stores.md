@@ -150,24 +150,100 @@ targetSdk 35, signature de production câblée.
 
 ### 3.1 Le keystore, une seule fois dans la vie du produit
 
+> **Deux malentendus à lever avant de taper quoi que ce soit.**
+>
+> **1. Le mot de passe, tu le CHOISIS.** `keytool` ne te demande pas un mot de
+> passe existant : il crée un fichier neuf, et te demande d'inventer le mot de
+> passe qui le protégera. Six caractères au minimum. Rien ne s'affiche pendant
+> que tu tapes — pas même des étoiles. C'est normal.
+>
+> **2. `keystore.properties` n'existe pas encore, et c'est voulu.** Tu ne le
+> trouveras nulle part dans le dépôt : il contient des mots de passe, il est
+> dans `.gitignore`, et c'est **à toi de le créer**. Sans lui, seul le build
+> de *debug* fonctionne — exactement ce qu'on veut : une CI ne doit pas
+> pouvoir signer une version de production.
+
+**Sur Windows**, `~` n'existe pas : ni `cmd.exe` ni PowerShell ne le
+remplacent par ton dossier personnel, et `keytool` cherche alors un dossier
+littéralement nommé `~`. Donne un chemin complet.
+
+```powershell
+# PowerShell, depuis n'importe où
+keytool -genkey -v -keystore C:\Users\salem\kaissi-release.keystore `
+  -alias kaissi -keyalg RSA -keysize 2048 -validity 10000
+```
+
 ```bash
+# macOS / Linux
 keytool -genkey -v -keystore ~/kaissi-release.keystore \
   -alias kaissi -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-`apps/pos/android/keystore.properties` (déjà dans `.gitignore`) :
+Les questions arrivent dans cet ordre :
 
-```properties
-storeFile=/chemin/absolu/vers/kaissi-release.keystore
-storePassword=…
-keyAlias=kaissi
-keyPassword=…
+| La question | Ce qu'il faut répondre |
+|---|---|
+| `Enter keystore password` | **Invente-le.** 6 caractères minimum. Note-le tout de suite. |
+| `Re-enter new password` | le même |
+| `What is your first and last name?` | `Res2Boost` — c'est le *CN* du certificat, pas ton nom |
+| `organizational unit` / `organization` | `Kaissi` / `Res2Boost` |
+| `City`, `State`, `country code` | `Tunis`, `Tunis`, **`TN`** (deux lettres) |
+| `Is CN=…, correct?` | `oui` — ou `yes` selon la langue de ton Java |
+| `Enter key password for <kaissi>` | **Appuie sur Entrée** pour reprendre le même |
+
+> Rien de tout cela n'est vérifié par qui que ce soit, et rien n'est visible
+> par tes clients. Ce qui compte, c'est le fichier produit et son mot de passe.
+
+**Vérifie qu'il est bien là** — cette commande le lit et affiche son contenu :
+
+```powershell
+keytool -list -v -keystore C:\Users\salem\kaissi-release.keystore
 ```
 
-> ⚠ **Sauvegarde ce fichier ailleurs, aujourd'hui.** Le perdre, c'est ne plus
-> jamais pouvoir mettre à jour l'application installée sur les tablettes de
-> tes clients. Google Play Signing en garde une copie côté Google, à condition
-> de l'activer au premier envoi — fais-le.
+Tu dois y voir `Alias name: kaissi` et une validité de ~27 ans (10 000 jours).
+
+**Ensuite, crée le fichier de configuration.** Il va dans
+`apps/pos/android/keystore.properties` — à côté de `build.gradle`, pas à la
+racine du dépôt :
+
+```properties
+storeFile=C:/Users/salem/kaissi-release.keystore
+storePassword=celui-que-tu-viens-de-choisir
+keyAlias=kaissi
+keyPassword=le-meme-si-tu-as-fait-Entree
+```
+
+> ⚠ **Des barres obliques normales, même sur Windows.** Un fichier
+> `.properties` est lu par Java, où `\` ouvre une séquence d'échappement :
+> `C:\Users` devient `C:Users` et Gradle t'annoncera un keystore introuvable
+> sans dire pourquoi. Écris `C:/Users/…`, ou double les barres :
+> `C:\\Users\\…`.
+
+Sous PowerShell, pour le créer sans éditeur :
+
+```powershell
+cd C:\Users\salem\PycharmProjects\Kaissi\apps\pos\android
+@"
+storeFile=C:/Users/salem/kaissi-release.keystore
+storePassword=TON_MOT_DE_PASSE
+keyAlias=kaissi
+keyPassword=TON_MOT_DE_PASSE
+"@ | Set-Content -Encoding ASCII keystore.properties
+```
+
+> ⚠ **Sauvegarde le fichier `.keystore` ailleurs, aujourd'hui.** Le perdre,
+> c'est ne plus jamais pouvoir mettre à jour l'application installée sur les
+> tablettes de tes clients — Google refuse une mise à jour signée par une
+> autre clé, et il n'y a aucun recours. Google Play Signing en garde une copie
+> côté Google, à condition de l'activer au premier envoi : **fais-le.**
+>
+> Et le mot de passe avec, ailleurs que dans ta tête. Un keystore dont on a
+> perdu le mot de passe est exactement aussi inutile qu'un keystore perdu.
+
+**Si tu construis par Codemagic, ce fichier ne te sert pas.** Codemagic
+reçoit le keystore et ses mots de passe dans *Teams → Code signing identities*
+(§2 bis, étape 2) et fabrique lui-même l'équivalent. `keystore.properties` ne
+sert qu'à signer **depuis ton PC**.
 
 ### 3.2 Le numéro de version se pose à UN seul endroit
 
