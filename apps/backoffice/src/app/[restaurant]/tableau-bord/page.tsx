@@ -18,6 +18,7 @@ import {
 } from '../../../serveur/rapports.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
 import { SelecteurPeriode } from '../../../composants/SelecteurPeriode.js'
+import { AvertissementTronque } from '../../../composants/AvertissementTronque.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,6 +62,8 @@ export default async function PageTableauBord({
             : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
         </p>
       </header>
+
+      <AvertissementTronque tronque={ventes.tronque} />
 
       <SelecteurPeriode du={periode.du} au={periode.au} aujourdhui={aujourdhui} />
 

@@ -20,6 +20,7 @@ import { reconstruireTicket } from '../../../serveur/ticket.js'
 import { chargerRapport } from '../../../serveur/rapport.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
 import { FiltresRapport } from '../../../composants/FiltresRapport.js'
+import { AvertissementTronque } from '../../../composants/AvertissementTronque.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,6 +80,8 @@ export default async function PageRecus({
             : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
         </p>
       </header>
+
+      <AvertissementTronque tronque={ventes.tronque} />
 
       <FiltresRapport
         du={periode.du}

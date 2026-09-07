@@ -119,6 +119,44 @@ export interface TicketResume {
   readonly nombreArticles: number
 }
 
+/**
+ * Le nombre maximum de commandes qu'un rapport charge en mémoire.
+ *
+ * ── Pourquoi une limite, et pourquoi celle-ci ─────────────────────────────
+ *
+ * MESURÉ, sur un jeu réaliste de 200 commandes par jour : un rapport annuel
+ * rend **73 000 commandes**, que PostgreSQL trie sur DISQUE (`external
+ * merge`), puis ~220 000 lignes tirées en 365 requêtes. Le tout est parsé en
+ * objets JavaScript dans une fonction serverless — plusieurs centaines de
+ * mégaoctets, et un temps qui dépasse le délai d'exécution.
+ *
+ * Sans limite, la page ne rend pas une réponse lente : elle rend une **erreur
+ * 500 sans explication**, sur l'écran des chiffres d'affaires. C'est
+ * exactement ce qu'un calendrier qui permet de choisir un an d'un clic rend
+ * facile à déclencher.
+ *
+ * Le chiffre vient d'un calcul, pas d'une intuition. Un établissement
+ * ordinaire fait 40 à 60 ventes par jour, soit ~20 000 par an : le premier
+ * plafond essayé, 20 000, se déclenchait donc sur le bilan annuel d'un
+ * restaurant NORMAL — une limite qui gêne tout le monde n'est pas un
+ * garde-fou, c'est une panne. C'est le test qui l'a dit.
+ *
+ * 50 000 laisse passer deux ans et demi d'un établissement ordinaire, et une
+ * bonne moitié d'année d'un très gros ; il reste largement sous les 73 000
+ * mesurés au point de rupture. Au-delà, on ne tronque pas en silence : on le
+ * DIT (`tronque`), et l'écran affiche un avertissement. Un total faux qui a
+ * l'air juste est le pire résultat possible sur un rapport financier — pire
+ * qu'une erreur, qui au moins se voit.
+ *
+ * ⚠ Ce plafond est un garde-fou, pas une architecture. La vraie réponse pour
+ *   les longues périodes est d'agréger EN SQL et de ne jamais faire remonter
+ *   la ligne à ligne — voir `docs/audit-production.md`.
+ */
+export const PLAFOND_COMMANDES = 50_000
+
+/** Combien de tranches de lignes on tire EN PARALLÈLE. */
+const PARALLELISME = 6
+
 export interface VentesChargees {
   readonly lignes: LigneVendue[]
   readonly commandes: CommandeVendue[]
@@ -127,12 +165,21 @@ export interface VentesChargees {
   readonly tickets: TicketResume[]
   readonly nomEmploye: (id: string | null) => string
   readonly erreur: string | null
+  /**
+   * `true` si la période dépasse ce qu'un rapport peut charger.
+   *
+   * Les totaux affichés ne portent alors QUE sur les commandes les plus
+   * récentes. L'écran doit le dire — sans quoi on lirait un chiffre
+   * d'affaires amputé en le croyant complet.
+   */
+  readonly tronque: boolean
 }
 
 const VIDE = (erreur: string | null): VentesChargees => ({
   lignes: [], commandes: [], paiements: [], remboursements: [], tickets: [],
   nomEmploye: () => 'Inconnu',
   erreur,
+  tronque: false,
 })
 
 /** Charge la fiche de l'établissement — fuseau et heure de bascule. */
@@ -193,7 +240,11 @@ export async function chargerVentes(
         .eq('status', 'close')
         .gte('closed_at', debut)
         .lt('closed_at', fin)
-        .order('closed_at', { ascending: false }),
+        // Les plus RÉCENTES d'abord : si la période dépasse le plafond, ce
+        // qu'on garde est la fin de la période, pas un début arbitraire.
+        .order('closed_at', { ascending: false })
+        // +1 pour SAVOIR qu'on a dépassé, sans avoir à compter séparément.
+        .limit(PLAFOND_COMMANDES + 1),
       supabase
         .from('products')
         .select('id, name, cost_per_unit, category_id')
@@ -228,22 +279,46 @@ export async function chargerVentes(
    * finirait par être rejeté par le serveur.
    */
   const TRANCHE = 200
-  const idsCommandes = (commandesRes.data ?? []).map((c) => c.id)
+  const toutes = commandesRes.data ?? []
+  const tronque = toutes.length > PLAFOND_COMMANDES
+  const idsCommandes = toutes.slice(0, PLAFOND_COMMANDES).map((c) => c.id)
+
+  /*
+   * Les tranches EN PARALLÈLE, par paquets bornés.
+   *
+   * Elles étaient tirées l'une après l'autre : sur un mois chargé, cent
+   * allers-retours en file indienne, chacun payant sa latence réseau. Six de
+   * front divisent le temps d'attente par six sans inonder PostgREST — et
+   * c'est la borne qui compte : `Promise.all` sur trois cents requêtes
+   * épuiserait le pool de connexions du projet Supabase, ce qui ferait
+   * échouer les autres écrans en même temps.
+   */
   const lignesBrutes: LigneBrute[] = []
+  const tranches: string[][] = []
   for (let i = 0; i < idsCommandes.length; i += TRANCHE) {
-    const { data, error } = await supabase
-      .from('order_items')
-      // Un SEUL littéral, jamais une concaténation : supabase-js infère le
-      // type du résultat en LISANT cette chaîne. Un `'a' + 'b'` se résout en
-      // `string`, et toute la requête retombe sur `GenericStringError`.
-      .select(
-        'id, order_id, product_id, designation, qty, line_gross_millimes, line_discount_millimes, global_discount_share_millimes, line_total_millimes, line_tax_millimes, discount_id, discount_label, voided_at',
-      )
-      .in('order_id', idsCommandes.slice(i, i + TRANCHE))
-      .is('voided_at', null)
-      .order('position', { ascending: true })
-    if (error) return VIDE(error.message)
-    lignesBrutes.push(...(data ?? []))
+    tranches.push(idsCommandes.slice(i, i + TRANCHE))
+  }
+  for (let i = 0; i < tranches.length; i += PARALLELISME) {
+    const paquet = await Promise.all(
+      tranches.slice(i, i + PARALLELISME).map((ids) =>
+        supabase
+          .from('order_items')
+          // Un SEUL littéral, jamais une concaténation : supabase-js infère
+          // le type du résultat en LISANT cette chaîne. Un `'a' + 'b'` se
+          // résout en `string`, et toute la requête retombe sur
+          // `GenericStringError`.
+          .select(
+            'id, order_id, product_id, designation, qty, line_gross_millimes, line_discount_millimes, global_discount_share_millimes, line_total_millimes, line_tax_millimes, discount_id, discount_label, voided_at',
+          )
+          .in('order_id', ids)
+          .is('voided_at', null)
+          .order('position', { ascending: true }),
+      ),
+    )
+    for (const { data, error } of paquet) {
+      if (error) return VIDE(error.message)
+      lignesBrutes.push(...(data ?? []))
+    }
   }
 
   const lignesParCommande = new Map<string, LigneBrute[]>()
@@ -268,7 +343,10 @@ export async function chargerVentes(
   /** Commandes retenues par les filtres — sert aussi à trier les paiements. */
   const retenues = new Set<string>()
 
-  for (const commande of commandesRes.data ?? []) {
+  // `toutes.slice(0, PLAFOND)` et non `commandesRes.data` : sans cela, on
+  // parcourrait la commande excédentaire — celle du « +1 » qui sert à
+  // détecter le dépassement — dont les lignes n'ont jamais été chargées.
+  for (const commande of toutes.slice(0, PLAFOND_COMMANDES)) {
     // `closed_by` d'abord : la vente s'attribue à qui l'a ENCAISSÉE. Un
     // serveur ouvre la table, c'est le caissier qui conclut la vente.
     const vendeurId = commande.closed_by ?? commande.opened_by ?? null
@@ -326,6 +404,7 @@ export async function chargerVentes(
     lignes,
     commandes,
     tickets,
+    tronque,
     // Les paiements suivent LEUR commande : filtrés par leur propre heure,
     // ils se détacheraient des ventes qu'ils règlent — un encaissement se
     // fait parfois quelques minutes après la clôture.

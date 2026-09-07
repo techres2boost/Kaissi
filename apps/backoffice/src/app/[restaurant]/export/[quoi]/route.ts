@@ -20,7 +20,12 @@ import { notFound } from 'next/navigation'
 import { formaterPourcentage, formaterTND, millimes } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../../serveur/session.js'
 import { supabaseServeur } from '../../../../serveur/supabase.js'
-import { chargerFiche, chargerVentes, resoudrePeriode } from '../../../../serveur/ventes.js'
+import {
+  chargerFiche,
+  chargerVentes,
+  resoudrePeriode,
+  PLAFOND_COMMANDES,
+} from '../../../../serveur/ventes.js'
 import {
   calculerIndicateurs,
   ventilerParCategorie,
@@ -127,6 +132,27 @@ export async function GET(
   const ventes = await chargerVentes(restaurant, periode)
   if (ventes.erreur) {
     return new Response(`Lecture impossible : ${ventes.erreur}`, { status: 502 })
+  }
+
+  /*
+   * Un export TRONQUÉ est refusé, pas livré amputé.
+   *
+   * À l'écran, une bannière suffit : on voit qu'il manque quelque chose. Un
+   * fichier, lui, quitte l'application — on l'ouvre dans un tableur, on
+   * l'envoie au comptable, et rien dedans ne dit qu'il est incomplet. Le
+   * total y aura l'air juste indéfiniment.
+   *
+   * 413 « Payload Too Large » plutôt qu'une erreur générique : c'est
+   * exactement ce dont il s'agit, et le message dit quoi faire.
+   */
+  if (ventes.tronque) {
+    return new Response(
+      "Période trop large pour un export complet.\n\n" +
+        `Elle dépasse ${PLAFOND_COMMANDES.toLocaleString('fr-FR')} ventes, et un ` +
+        "fichier tronqué ne dirait pas qu'il l'est — le total aurait l'air juste.\n" +
+        'Exportez par mois ou par trimestre, puis assemblez.',
+      { status: 413, headers: { 'content-type': 'text/plain; charset=utf-8' } },
+    )
   }
 
   const suffixe = `${periode.du}_${periode.au}`
