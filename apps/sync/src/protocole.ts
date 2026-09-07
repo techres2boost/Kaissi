@@ -177,6 +177,14 @@ export type CodeErreur =
   | 'protocole_non_supporte'
   | 'requete_invalide'
   | 'erreur_serveur'
+  /**
+   * Trop de tentatives — sur les IDENTIFIANTS seulement.
+   *
+   * Jamais rendu par `/sync/*` : une caisse qui rattrape trois semaines hors
+   * ligne envoie des dizaines de lots à la suite, et la freiner retarderait
+   * des encaissements déjà faits.
+   */
+  | 'trop_de_tentatives'
   // ── Appairage par identifiants ──────────────────────────────────────────
   /** Le serveur n'a pas SUPABASE_URL / SUPABASE_ANON_KEY. */
   | 'appairage_indisponible'

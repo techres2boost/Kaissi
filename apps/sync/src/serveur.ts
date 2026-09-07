@@ -13,6 +13,13 @@ import { Hono, type Context } from 'hono'
 import { cors } from 'hono/cors'
 import type { AppareilAuthentifie, DepotSync } from './depot.js'
 import { jetonDepuisEntete, empreinteDe } from './jeton.js'
+import {
+  adresseClient,
+  Limiteur,
+  QUOTA_ADMIN_PAR_COMPTE,
+  QUOTA_APPAIRAGE_PAR_COMPTE,
+  QUOTA_APPAIRAGE_PAR_IP,
+} from './limiteur.js'
 import { ErreurSync, VERSION_PROTOCOLE, type ReponseErreur } from './protocole.js'
 import { ServiceSync } from './service.js'
 import {
@@ -95,6 +102,32 @@ export function creerServeur({
   app.use('/appairage', corsKaissi)
   app.use('/admin/*', corsKaissi)
 
+  /*
+   * Limitation de débit — sur les identifiants SEULEMENT.
+   *
+   * Deux limiteurs, deux dimensions, parce qu'ils arrêtent deux attaques
+   * différentes : par ADRESSE IP contre le balayage depuis une machine, par
+   * ADRESSE E-MAIL contre le bourrage d'identifiants, où l'attaquant change
+   * d'IP mais garde sa cible. L'un sans l'autre laisse passer la moitié.
+   *
+   * `/sync/*` n'en a AUCUN, et ce n'est pas un oubli : voir `limiteur.ts`.
+   */
+  const parIp = new Limiteur(QUOTA_APPAIRAGE_PAR_IP)
+  const parCompte = new Limiteur(QUOTA_APPAIRAGE_PAR_COMPTE)
+  const parAdmin = new Limiteur(QUOTA_ADMIN_PAR_COMPTE)
+
+  /** Réponse 429 normalisée — avec `Retry-After`, que les clients lisent. */
+  const tropDeTentatives = (c: ContexteKaissi, secondes: number, quoi: string) => {
+    const corps: ReponseErreur = {
+      erreur: 'trop_de_tentatives',
+      message:
+        `Trop de tentatives ${quoi}. Réessayez dans ${secondes} seconde(s). ` +
+        'Cette limite protège les comptes de votre établissement.',
+    }
+    c.header('Retry-After', String(secondes))
+    return c.json(corps, 429)
+  }
+
   // ── Santé ────────────────────────────────────────────────────────────
   // Sans authentification : c'est ce que sonde l'hébergeur.
   // `/sante` joint la BASE, pas seulement le processus. Un contrôle de santé
@@ -133,6 +166,13 @@ export function creerServeur({
   // authentifie la caisse, révocable, distinct du compte et du PIN employé.
   // Seule sa REMISE est automatisée.
   app.post('/appairage', async (c) => {
+    // AVANT toute lecture du corps : refuser tôt coûte moins cher que
+    // d'analyser du JSON pour un appelant qu'on va de toute façon éconduire.
+    const verdictIp = parIp.verifier(adresseClient(c.req.raw.headers))
+    if (!verdictIp.autorise) {
+      return tropDeTentatives(c, verdictIp.attendreSecondes, "d'appairage depuis cette connexion")
+    }
+
     if (!auth) {
       // On NOMME ce qui manque, une variable à la fois.
       //
@@ -183,8 +223,24 @@ export function creerServeur({
       return c.json(corps, 400)
     }
 
+    /*
+     * La limite par COMPTE, juste avant d'appeler GoTrue.
+     *
+     * Ici et pas plus haut : on a besoin de l'adresse, et il fallait
+     * d'abord vérifier que la requête est bien formée — sinon un corps
+     * invalide consommerait le quota d'un compte qu'il ne vise même pas.
+     */
+    const cleCompte = `appairage:${email.trim().toLowerCase()}`
+    const verdictCompte = parCompte.verifier(cleCompte)
+    if (!verdictCompte.autorise) {
+      return tropDeTentatives(c, verdictCompte.attendreSecondes, 'pour ce compte')
+    }
+
     try {
       const identite = await identifierParMotDePasse(auth, email, motDePasse, fetchAuth)
+      // Mot de passe juste : on rend ses essais au distrait. Sans cela, la
+      // limite punirait surtout ceux qui se sont trompés puis souvenus.
+      parCompte.reussite(cleCompte)
       const etablissements = await depot.etablissementsEnrolables(identite.userId)
 
       if (etablissements.length === 0) {
@@ -543,6 +599,18 @@ export function creerServeur({
 
     try {
       const appelant = await identifierParJeton(auth, jeton, fetchAuth)
+      /*
+       * Bornée par APPELANT, une fois qu'on sait qui il est.
+       *
+       * Ces routes sont déjà derrière un jeton de session valide : la limite
+       * n'empêche pas une intrusion, elle borne les dégâts d'un jeton volé —
+       * et elle évite qu'une boucle d'interface n'inonde GoTrue de créations
+       * de comptes.
+       */
+      const verdict = parAdmin.verifier(`admin:${appelant.userId}`)
+      if (!verdict.autorise) {
+        return tropDeTentatives(c, verdict.attendreSecondes, "d'administration")
+      }
       const resultat = await travail({
         config: auth,
         cle: cleService,
