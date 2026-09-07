@@ -8,6 +8,7 @@ import {
   embaucher,
   ouvrirAcces,
   reinitialiserPin,
+  retirerDeLEtablissement,
   type Resultat,
 } from '../app/[restaurant]/employes/actions.js'
 
@@ -92,6 +93,29 @@ export function ListeEmployes({
     })
   }
 
+  const retirer = (employe: Employe) => {
+    setMessage(null)
+    demarrer(async () => {
+      setMessage(await retirerDeLEtablissement(restaurantId, employe.id))
+    })
+  }
+
+  /*
+   * Deux tables, pas une colonne « État » à relire ligne par ligne.
+   *
+   * Un employé suspendu au milieu des autres se lit comme un employé : on
+   * regarde le nom et le rôle, pas l'étiquette au bout de la ligne. Or la
+   * question qu'on pose à cet écran est « qui travaille ici », et la réponse
+   * doit tenir dans la première table — sans quoi on finit par compter les
+   * étiquettes.
+   *
+   * Les suspendus ne DISPARAISSENT pas pour autant : on doit pouvoir
+   * réactiver quelqu'un revenu de congé, et surtout voir qu'il existe. Ils
+   * descendent simplement dans leur propre section.
+   */
+  const enPoste = employes.filter((e) => e.statut === 'actif')
+  const suspendus = employes.filter((e) => e.statut !== 'actif')
+
   return (
     <>
       {modifiable && (
@@ -110,7 +134,89 @@ export function ListeEmployes({
         {employes.length === 0 ? (
           <p className="vide">Aucun employé rattaché à cet établissement.</p>
         ) : (
-          <table>
+          <TableEmployes
+            titre="En poste"
+            employes={enPoste}
+            vide="Personne en poste : tout le monde est suspendu."
+            modifiable={modifiable}
+            enCours={enCours}
+            gerer={setCible}
+            basculerStatut={basculerStatut}
+            retirer={retirer}
+          />
+        )}
+      </section>
+
+      {/*
+        Les suspendus, à part et repliés. Ils restent à un clic — quelqu'un
+        revient de congé, on le réactive — mais ils ne se lisent plus au
+        milieu de l'équipe du jour.
+      */}
+      {suspendus.length > 0 && (
+        <section className="carte">
+          <details>
+            <summary>
+              Ne prennent plus de poste <span className="etiquette">{suspendus.length}</span>
+            </summary>
+            <p className="indication">
+              Un employé suspendu ne peut plus ouvrir de commande ; ses ventes
+              passées gardent son nom. <strong>Retirer</strong> le sort
+              définitivement de cet établissement — sans rien effacer de ce
+              qu’il a fait.
+            </p>
+            <TableEmployes
+              titre={null}
+              employes={suspendus}
+              vide=""
+              modifiable={modifiable}
+              enCours={enCours}
+              gerer={setCible}
+              basculerStatut={basculerStatut}
+              retirer={retirer}
+            />
+          </details>
+        </section>
+      )}
+
+      {cible && (
+        <PanneauEmploye
+          key={cible.id}
+          restaurantId={restaurantId}
+          administrateur={administrateur}
+          employe={cible}
+          postes={postes}
+          fermer={() => setCible(null)}
+        />
+      )}
+    </>
+  )
+}
+
+/** La table elle-même — la même pour l'équipe en poste et pour les suspendus. */
+function TableEmployes({
+  titre,
+  employes,
+  vide,
+  modifiable,
+  enCours,
+  gerer,
+  basculerStatut,
+  retirer,
+}: {
+  titre: string | null
+  employes: Employe[]
+  vide: string
+  modifiable: boolean
+  enCours: boolean
+  gerer: (e: Employe) => void
+  basculerStatut: (e: Employe) => void
+  retirer: (e: Employe) => void
+}) {
+  if (employes.length === 0) return vide ? <p className="vide">{vide}</p> : null
+  return (
+    <>
+      {titre && <h2>{titre}</h2>}
+      <table>
             <thead>
               <tr>
                 <th>Employé</th>
@@ -151,7 +257,7 @@ export function ListeEmployes({
                           <button
                             type="button"
                             className="discret"
-                            onClick={() => setCible(employe)}
+                            onClick={() => gerer(employe)}
                           >
                             Gérer
                           </button>
@@ -163,6 +269,36 @@ export function ListeEmployes({
                           >
                             {employe.statut === 'actif' ? 'Suspendre' : 'Réactiver'}
                           </button>
+                          {/*
+                            « Retirer » n'apparaît QUE pour un employé déjà
+                            suspendu. Un départ se décide en deux temps —
+                            suspendre, puis retirer — et ce n'est pas une
+                            précaution de façade : sur la même ligne que
+                            « Gérer », le bouton qui sort quelqu'un de
+                            l'établissement se cliquerait par erreur, un jour
+                            de service.
+                          */}
+                          {employe.statut !== 'actif' && (
+                            <button
+                              type="button"
+                              className="discret danger"
+                              disabled={enCours}
+                              onClick={() => {
+                                if (
+                                  confirm(
+                                    `Retirer ${employe.nom} de cet établissement ?\n\n` +
+                                      'Il disparaîtra de la liste et ne pourra plus prendre de ' +
+                                      'poste. Ses ventes passées gardent son nom — rien n’est ' +
+                                      'effacé. Le réembaucher plus tard reste possible.',
+                                  )
+                                ) {
+                                  retirer(employe)
+                                }
+                              }}
+                            >
+                              Retirer
+                            </button>
+                          )}
                         </>
                       ) : (
                         <span className="indication">non administrable ici</span>
@@ -173,19 +309,6 @@ export function ListeEmployes({
               ))}
             </tbody>
           </table>
-        )}
-      </section>
-
-      {cible && (
-        <PanneauEmploye
-          key={cible.id}
-          restaurantId={restaurantId}
-          administrateur={administrateur}
-          employe={cible}
-          postes={postes}
-          fermer={() => setCible(null)}
-        />
-      )}
     </>
   )
 }

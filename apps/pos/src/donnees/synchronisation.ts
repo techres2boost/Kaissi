@@ -10,7 +10,7 @@
  */
 
 import type { ConfigCalcul, EvenementCommande } from '@kaissi/domain'
-import { projeterCommande } from '@kaissi/db-local'
+import { appliquerMiroir, projeterCommande } from '@kaissi/db-local'
 import type { DepotLocalSync } from '@kaissi/sync-client'
 import type { ContexteApplication } from './demarrage.js'
 
@@ -89,34 +89,24 @@ export function depotLocalSync(
      */
     async integrerCatalogue(changements) {
       if (changements.length === 0) return
-      await db.transaction(async () => {
-        for (const c of changements) {
-          const table = TABLES_MIROIR[c.entite]
-          if (!table) continue // entité que cette version ne connaît pas encore
-
-          // La clé n'est pas toujours `id` : `kitchen_ready` est identifiée
-          // par la COMMANDE qui est prête. Le serveur journalise cet
-          // identifiant-là dans `entity_id`, et c'est celui-ci qui sert de
-          // clé de conflit — sans quoi chaque « prêt » créerait une ligne.
-          const cle = table.cle ?? 'id'
-
-          if (c.operation === 'delete') {
-            await db.executer(`DELETE FROM ${table.nom} WHERE ${cle} = ?`, [c.entiteId])
-            continue
-          }
-          if (!c.donnees) continue
-
-          const colonnes = table.colonnes.filter((col) => col in c.donnees!)
-          const valeurs = colonnes.map((col) => normaliser(c.donnees![col]))
-          const marques = colonnes.map(() => '?').join(', ')
-          const majSet = colonnes.map((col) => `${col} = excluded.${col}`).join(', ')
-          await db.executer(
-            `INSERT INTO ${table.nom} (${colonnes.join(', ')}) VALUES (${marques})
-             ON CONFLICT (${cle}) DO UPDATE SET ${majSet}`,
-            valeurs,
-          )
-        }
-      })
+      // Le miroir lui-même vit dans `@kaissi/db-local` : il parle du schéma
+      // local, pas du réseau, et c'est là qu'il est testable contre une vraie
+      // base — y compris pour ce qui compte le plus, un PIN réinitialisé qui
+      // doit prendre effet sur la tablette.
+      const touchees = await db.transaction(() => appliquerMiroir(db, changements))
+      /*
+       * On note QUAND le catalogue a réellement changé.
+       *
+       * « Dernière synchronisation » répond déjà à « ai-je du réseau ». Elle
+       * ne répond pas à la question qu'on se pose vraiment devant une caisse
+       * qui refuse un code PIN tout juste réinitialisé : est-ce que CE
+       * changement-là est arrivé jusqu'ici ? Un contact réseau permanent et
+       * un catalogue vieux de trois jours se ressemblent exactement, sans
+       * cette ligne.
+       */
+      if (touchees > 0) {
+        await contexte.etat.ecrire('catalogue_applique_a', new Date().toISOString())
+      }
     },
 
     /**
@@ -152,118 +142,4 @@ export function depotLocalSync(
       return contexte.journal.enAttente()
     },
   }
-}
-
-/**
- * Tables du référentiel répliquées localement, avec leurs colonnes.
- *
- * Liste EXPLICITE et non « toutes les colonnes reçues » : le serveur peut
- * être plus récent que l'application et envoyer des colonnes que ce schéma
- * local ne connaît pas encore. Les ignorer est exactement ce que demande le
- * support N−2 du protocole.
- */
-const TABLES_MIROIR: Record<
-  string,
-  { nom: string; colonnes: string[]; /** Clé primaire, `id` par défaut. */ cle?: string }
-> = {
-  tax_rates: {
-    nom: 'tax_rates',
-    colonnes: ['id', 'organization_id', 'restaurant_id', 'name', 'rate_bp',
-               'is_included', 'is_default', 'archived_at'],
-  },
-  categories: {
-    nom: 'categories',
-    colonnes: ['id', 'organization_id', 'restaurant_id', 'name', 'position',
-               'color', 'station_id', 'archived_at'],
-  },
-  stations: {
-    nom: 'stations',
-    colonnes: ['id', 'organization_id', 'restaurant_id', 'name', 'printer_host',
-               'printer_port', 'position', 'archived_at'],
-  },
-  products: {
-    nom: 'products',
-    colonnes: ['id', 'organization_id', 'restaurant_id', 'category_id', 'station_id',
-               'tax_rate_id', 'name', 'description', 'base_price_millimes', 'color',
-               'position', 'is_available', 'unavailable_reason', 'track_stock',
-               'archived_at'],
-  },
-  product_variants: {
-    nom: 'product_variants',
-    colonnes: ['id', 'organization_id', 'restaurant_id', 'product_id', 'name',
-               'price_delta_millimes', 'position', 'is_available', 'archived_at'],
-  },
-  modifier_groups: {
-    nom: 'modifier_groups',
-    colonnes: ['id', 'organization_id', 'restaurant_id', 'name', 'min_select',
-               'max_select', 'is_required', 'position', 'archived_at'],
-  },
-  modifiers: {
-    nom: 'modifiers',
-    colonnes: ['id', 'organization_id', 'restaurant_id', 'modifier_group_id', 'name',
-               'price_delta_millimes', 'position', 'is_available', 'archived_at'],
-  },
-  areas: {
-    nom: 'areas',
-    colonnes: ['id', 'organization_id', 'restaurant_id', 'name', 'position', 'archived_at'],
-  },
-  tables: {
-    nom: 'tables',
-    colonnes: ['id', 'organization_id', 'restaurant_id', 'area_id', 'label',
-               'seats', 'archived_at'],
-  },
-  payment_methods: {
-    nom: 'payment_methods',
-    colonnes: ['id', 'organization_id', 'restaurant_id', 'name', 'type',
-               'opens_drawer', 'position', 'is_active', 'archived_at'],
-  },
-  // Côté serveur, un employé est la jointure de users et memberships ; le
-  // journal de changements l'envoie déjà aplati à cette forme-là. L'appareil
-  // reçoit le HACHAGE Argon2id du PIN, jamais le PIN : c'est ce qui lui
-  // permet de valider une prise de poste sans réseau.
-  employees: {
-    nom: 'employees',
-    colonnes: ['id', 'organization_id', 'restaurant_id', 'full_name', 'role',
-               'pin_hash', 'permissions', 'is_active', 'archived_at'],
-  },
-  /*
-   * Les réductions habituelles de l'établissement (Postgres 0030).
-   *
-   * Elles descendent par le catalogue pour une raison de fond : la caisse
-   * doit pouvoir proposer « Happy hour » à 19 h un soir de coupure réseau.
-   * Une liste chargée au moment du clic ne tomberait qu'en service, au pire
-   * moment.
-   */
-  discounts: {
-    nom: 'discounts',
-    colonnes: ['id', 'organization_id', 'restaurant_id', 'name', 'kind',
-               'value_bp', 'amount_millimes', 'position', 'archived_at'],
-  },
-  /*
-   * « Commande prête », posé par la cuisine (Postgres 0029).
-   *
-   * Ce n'est pas du référentiel — c'est le seul marqueur transactionnel qui
-   * descende par ce canal. Il y passe justement parce que le canal existe :
-   * un troisième flux aurait voulu son curseur, sa route et sa dégradation
-   * silencieuse, pour un booléen. Ici, la caisse ne fait qu'appliquer, comme
-   * pour un changement de prix.
-   *
-   * `cleared_at` est ce qui distingue « plus prêt » de « jamais reçu » : le
-   * serveur MET À JOUR la ligne au lieu de la supprimer, sinon le retrait ne
-   * descendrait pas et le badge resterait allumé.
-   */
-  kitchen_ready: {
-    nom: 'kitchen_ready',
-    cle: 'order_id',
-    colonnes: ['order_id', 'organization_id', 'restaurant_id', 'ready_at', 'cleared_at'],
-  },
-}
-
-/** SQLite ne connaît ni booléen ni objet : on convertit à la frontière. */
-function normaliser(valeur: unknown): string | number | null {
-  if (valeur === null || valeur === undefined) return null
-  if (typeof valeur === 'boolean') return valeur ? 1 : 0
-  if (typeof valeur === 'number') return valeur
-  if (typeof valeur === 'string') return valeur
-  return JSON.stringify(valeur)
 }

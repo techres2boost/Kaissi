@@ -163,4 +163,52 @@ describe('un gérant administre son équipe', () => {
       ]),
     ).toBe('filtre')
   })
+
+  /*
+   * Le RETRAIT de l'établissement — le départ, par opposition à la
+   * suspension.
+   *
+   * Il passe par `memberships.revoked_at`, jamais par une suppression de
+   * l'utilisateur : ses ventes portent son identifiant, et l'effacer rendrait
+   * anonymes des encaissements déjà faits.
+   */
+  it('retire un employé d’exploitation de l’établissement', async () => {
+    expect(
+      await dansLaPeauDe(
+        gerant,
+        `update kaissi.memberships set revoked_at = now()
+         where user_id = $1 and restaurant_id = $2 and revoked_at is null`,
+        [cuisinier, DEMO_RESTO],
+      ),
+    ).toBe('applique')
+  })
+
+  it('ne retire PAS un autre gérant — ça, c’est l’affaire d’un administrateur', async () => {
+    const collegue = await creer('gerant')
+    // RÈGLE (0024) : un gérant exploite, un administrateur distribue les
+    // pouvoirs. Retirer un gérant, c'est retirer les clés — donc réservé.
+    expect(
+      await dansLaPeauDe(
+        gerant,
+        `update kaissi.memberships set revoked_at = now()
+         where user_id = $1 and restaurant_id = $2 and revoked_at is null`,
+        [collegue, DEMO_RESTO],
+      ),
+    ).not.toBe('applique')
+  })
+
+  it('le retrait n’efface NI l’utilisateur NI son nom', async () => {
+    await client.query(
+      `update kaissi.memberships set revoked_at = now()
+       where user_id = $1 and restaurant_id = $2`,
+      [cuisinier, DEMO_RESTO],
+    )
+    const { rows } = await client.query<{ full_name: string }>(
+      'select full_name from kaissi.users where id = $1',
+      [cuisinier],
+    )
+    // Sans cette ligne, un rapport de la semaine dernière afficherait « — »
+    // là où il y avait un nom.
+    expect(rows[0]?.full_name).toBe('Test cuisine')
+  })
 })

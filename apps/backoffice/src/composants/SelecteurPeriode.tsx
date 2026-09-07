@@ -12,6 +12,7 @@
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useTransition } from 'react'
 import { destinationSure } from '../serveur/redirection.js'
+import { Calendrier } from './Calendrier.js'
 
 /** Décale une journée « AAAA-MM-JJ » de n jours, en UTC pour rester stable. */
 function decaler(journee: string, jours: number): string {
@@ -69,14 +70,10 @@ export function SelecteurPeriode({
         ))}
       </div>
       <div className="periode-bornes">
-        <label>
-          Du
-          <input type="date" value={du} max={au} onChange={(e) => aller(e.target.value, au)} />
-        </label>
-        <label>
-          au
-          <input type="date" value={au} min={du} onChange={(e) => aller(du, e.target.value)} />
-        </label>
+        {/* Le MÊME calendrier que les rapports : deux gestes différents pour
+            choisir une période, sur deux écrans voisins, s'apprennent deux
+            fois. */}
+        <Calendrier du={du} au={au} aujourdhui={aujourdhui} onChoisir={aller} />
       </div>
     </div>
   )

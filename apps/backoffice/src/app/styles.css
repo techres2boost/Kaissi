@@ -328,6 +328,52 @@ button.danger { color: var(--danger); }
 }
 .periode-bornes input { width: auto; }
 
+/* ── Le calendrier de période ────────────────────────────────────────────
+   Un déclencheur qui montre la période, un panneau qui montre le mois.
+   Le panneau est en `absolute` : poussé dans le flux, il ferait sauter tout
+   le rapport de 20 rem à chaque ouverture. */
+.calendrier { position: relative; }
+.calendrier-declencheur {
+  display: flex; align-items: center; gap: 0.45rem;
+  padding: 0.4rem 0.75rem; font-size: 0.9rem; font-variant-numeric: tabular-nums;
+}
+.calendrier-panneau {
+  position: absolute; z-index: 30; top: calc(100% + 0.4rem); right: 0;
+  width: 19rem; padding: 0.75rem;
+  background: var(--panneau); border: 1px solid var(--bordure);
+  border-radius: var(--rayon); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+.calendrier-entete {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.5rem; margin-bottom: 0.35rem;
+}
+.calendrier-entete strong { font-size: 0.95rem; }
+.calendrier-entete button { padding: 0.2rem 0.6rem; line-height: 1; }
+.calendrier-consigne {
+  margin: 0 0 0.5rem; font-size: 0.78rem; color: var(--attenue); min-height: 1.1rem;
+}
+.calendrier-grille { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.calendrier-jour-entete {
+  text-align: center; font-size: 0.7rem; color: var(--attenue);
+  padding-bottom: 0.25rem; letter-spacing: 0.04em;
+}
+.calendrier-case {
+  padding: 0.35rem 0; font-size: 0.82rem; font-variant-numeric: tabular-nums;
+  background: transparent; border: 1px solid transparent; border-radius: 4px;
+}
+.calendrier-case:hover:not(:disabled) { background: var(--panneau-clair); }
+/* Les jours du mois voisin restent lisibles mais s'effacent : les masquer
+   couperait les semaines en deux, et on perdrait le repère des lundis. */
+.calendrier-case.hors-mois { color: var(--attenue); opacity: 0.45; }
+.calendrier-case:disabled { opacity: 0.2; cursor: default; }
+.calendrier-case.dans-periode { background: #123526; color: var(--texte); opacity: 1; }
+.calendrier-case.borne {
+  background: var(--accent); color: var(--fond); font-weight: 650; opacity: 1;
+}
+/* Aujourd'hui reste repérable même hors période : c'est le point d'ancrage
+   de toute lecture d'un rapport. */
+.calendrier-case.aujourdhui { border-color: var(--accent); }
+
 .cartes-kpi {
   display: grid; gap: 0.9rem; margin-bottom: 1.25rem;
   grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
@@ -370,6 +416,19 @@ button.danger { color: var(--danger); }
 .etiquette.etat-faible { background: #2A2416; color: var(--or); }
 .etiquette.etat-ok { background: #123526; color: var(--succes); }
 .etiquette.etat-non_suivi { background: var(--panneau-clair); color: var(--attenue); }
+
+/*
+  « Épuisé, toujours en vente » — la contradiction, sous le bouton qui dit
+  « En stock ». Elle passe à la ligne au lieu de s'aligner : posée à côté,
+  elle se lisait comme une précision du bouton, alors qu'elle le contredit.
+*/
+.rappel-rupture {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
 
 .liste-alertes { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
 .liste-alertes li { display: flex; align-items: center; gap: 0.6rem; }

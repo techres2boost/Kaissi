@@ -206,6 +206,46 @@ export async function changerStatut(
   })
 }
 
+/**
+ * Retire un employé de CET établissement.
+ *
+ * ── Pourquoi « retirer » et non « supprimer » ─────────────────────────────
+ *
+ * Parce que ses ventes portent son identifiant. `orders.opened_by`,
+ * `shifts.closed_by`, le journal d'audit : supprimer la personne rendrait
+ * anonymes des encaissements déjà faits, et un rapport de la semaine
+ * dernière afficherait « — » là où il y avait un nom. Une suspension
+ * n'efface jamais rien ; un départ non plus.
+ *
+ * Ce qui part, c'est l'APPARTENANCE : la personne ne travaille plus ici. Elle
+ * disparaît donc de la liste, ne prend plus de poste, et son PIN n'ouvre plus
+ * rien — mais tout ce qu'elle a fait reste lisible. Si elle travaille dans un
+ * autre établissement du groupe, elle y reste, avec son rôle là-bas.
+ *
+ * Et c'est réversible : réembaucher recrée l'appartenance, sans rien perdre.
+ */
+export async function retirerDeLEtablissement(
+  restaurantId: string,
+  employeId: string,
+): Promise<Resultat> {
+  return agir(restaurantId, async (supabase) => {
+    const { count, error } = await supabase
+      .from('memberships')
+      .update({ revoked_at: new Date().toISOString() }, { count: 'exact' })
+      .eq('user_id', employeId)
+      .eq('restaurant_id', restaurantId)
+      .is('revoked_at', null)
+
+    if (error) throw new Error(error.message)
+    exigerUneLigne(count, 'Le retrait de l’établissement')
+
+    return (
+      'Employé retiré de l’établissement. Il n’apparaît plus dans la liste et ne ' +
+      'peut plus prendre de poste ; ses ventes passées gardent son nom.'
+    )
+  })
+}
+
 /** Valide un PIN et rend son hachage, ou lève un message affichable. */
 function hachageDuPin(donnees: FormData, champPin: string, champConfirmation: string): string {
   const pin = texteObligatoire(donnees, champPin, 'Le code PIN', 8)

@@ -146,26 +146,35 @@ export function TableauStock({
                         : 'Rupture (manuel)'}
                   </button>
                   {/*
-                    La case « auto » a QUITTÉ cette cellule.
-                    
-                    Deux caractères sans phrase, sous un bouton qui dit déjà
-                    autre chose : personne ne pouvait deviner qu'elle coupait
-                    la sortie automatique de la carte. On la décochait sans
-                    le savoir, et le produit restait vendable à zéro — ce qui
-                    ressemblait alors à une panne. Elle vit maintenant dans le
-                    tiroir « Ajuster », avec sa phrase entière.
+                    « Épuisé et toujours en vente » — la contradiction, DITE.
 
-                    Ce qui RESTE ici, c'est la conséquence : quand
-                    l'automatisme est coupé ET que le stock est à zéro, la
-                    ligne le dit. Sans cela, « Rupture » et « En stock » se
-                    contredisent sous les yeux du gérant.
+                    Cette ligne portait « automatisme coupé » en petit gris,
+                    sous un bouton qui affichait « En stock » alors que la
+                    quantité était à −3. Trois signaux qui se contredisent, et
+                    c'est le plus discret qui expliquait les deux autres : on
+                    lisait « En stock » et on concluait à une panne.
+
+                    Le mot qui compte n'est donc plus le réglage, c'est sa
+                    CONSÉQUENCE : le serveur va continuer d'en prendre. Et la
+                    correction se fait ici, où le problème se voit — pas trois
+                    clics plus loin dans un tiroir.
                   */}
-                  {p.suivi && !p.ruptureAuto && (p.quantite ?? 0) <= 0 && (
-                    <div
-                      className="indication"
-                      title="Le retrait automatique est coupé pour ce produit (tiroir « Ajuster »)."
-                    >
-                      automatisme coupé
+                  {p.suivi && p.enVente && (p.quantite ?? 0) <= 0 && (
+                    <div className="rappel-rupture">
+                      <span className="etiquette etat-rupture">Épuisé, toujours en vente</span>
+                      {!p.ruptureAuto && (
+                        <button
+                          type="button"
+                          className="discret"
+                          disabled={enCours}
+                          onClick={() =>
+                            agir(() => basculerRuptureAuto(restaurantId, p.id, true))
+                          }
+                          title="Le retrait automatique est coupé pour ce produit : le remettre le sortira de la carte tout de suite, et l’y remettra à la première réception."
+                        >
+                          Rétablir le retrait automatique
+                        </button>
+                      )}
                     </div>
                   )}
                 </td>

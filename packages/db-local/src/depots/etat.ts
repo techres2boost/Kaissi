@@ -28,6 +28,12 @@ export type CleEtat =
   // reconnaître ce terminal quand on le remet en service, au lieu de lui
   // créer un appareil de plus (migration Postgres 0021).
   | 'installation_id'
+  // Quand le catalogue a RÉELLEMENT changé pour la dernière fois — distinct
+  // de `last_sync_at`, qui ne dit que « j'ai eu du réseau ». Un contact
+  // permanent et un catalogue vieux de trois jours se ressemblent sans elle,
+  // et c'est exactement ce qu'on regarde quand un PIN réinitialisé est
+  // refusé par la caisse.
+  | 'catalogue_applique_a'
 
 export function depotEtat(db: AdaptateurSqlite) {
   return {

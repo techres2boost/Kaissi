@@ -19,6 +19,7 @@
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useTransition } from 'react'
 import { destinationSure } from '../serveur/redirection.js'
+import { Calendrier } from './Calendrier.js'
 
 /** Décale une journée « AAAA-MM-JJ » de n jours, en UTC pour rester stable. */
 function decaler(journee: string, jours: number): string {
@@ -95,24 +96,20 @@ export function FiltresRapport({
       </div>
 
       <div className="periode-bornes">
-        <label>
-          Du
-          <input
-            type="date"
-            value={du}
-            max={au}
-            onChange={(e) => aller({ du: e.target.value })}
-          />
-        </label>
-        <label>
-          au
-          <input
-            type="date"
-            value={au}
-            min={du}
-            onChange={(e) => aller({ au: e.target.value })}
-          />
-        </label>
+        {/*
+          Un seul contrôle pour les deux bornes.
+          
+          Deux champs « Du » et « au » posaient deux questions là où il n'y en
+          a qu'une : quelle période. On les remplissait dans le désordre, et
+          entre les deux saisies la page rechargeait un rapport sur une
+          période que personne n'avait demandée.
+        */}
+        <Calendrier
+          du={du}
+          au={au}
+          aujourdhui={aujourdhui}
+          onChoisir={(d, a) => aller({ du: d, au: a })}
+        />
 
         <label>
           🕐

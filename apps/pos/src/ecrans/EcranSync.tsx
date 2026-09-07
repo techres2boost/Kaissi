@@ -57,6 +57,18 @@ export function EcranSync() {
   const { app, sync, resumeSync, rafraichir, identite } = useApp()
   const [rejets, setRejets] = useState<EnregistrementOutbox[]>([])
   const [enAttente, setEnAttente] = useState<EnregistrementOutbox[]>([])
+  /*
+   * Ce que la tablette a REÇU, et quand.
+   *
+   * Devant un code PIN tout juste réinitialisé au back-office et refusé par
+   * la caisse, la seule question utile est « ce changement est-il arrivé
+   * ici ? ». « Dernière synchronisation » n'y répond pas : elle dit qu'il y
+   * a du réseau, pas que le catalogue a bougé.
+   */
+  const [catalogue, setCatalogue] = useState<{ recuA: string | null; employes: number }>({
+    recuA: null,
+    employes: 0,
+  })
 
   useEffect(() => {
     let vivant = true
@@ -71,7 +83,10 @@ export function EcranSync() {
         status: string
         created_at: string
       }>(`SELECT * FROM outbox WHERE status = 'rejete' ORDER BY created_at DESC LIMIT 50`)
+      const recuA = await app.etat.lire('catalogue_applique_a')
+      const employes = await app.employes.actifs()
       if (!vivant) return
+      setCatalogue({ recuA: recuA || null, employes: employes.length })
       setEnAttente(lot)
       setRejets(
         tous.map((l) => ({
@@ -146,6 +161,12 @@ export function EcranSync() {
             {resumeSync.derniereSyncA
               ? new Date(resumeSync.derniereSyncA).toLocaleString('fr-FR')
               : 'jamais'}
+          </dd>
+          <dt>Dernier changement reçu</dt>
+          <dd>
+            {catalogue.recuA
+              ? `${new Date(catalogue.recuA).toLocaleString('fr-FR')} · ${catalogue.employes} employé(s)`
+              : 'aucun — catalogue local d’origine'}
           </dd>
           {resumeSync.tentatives > 0 && (
             <>
