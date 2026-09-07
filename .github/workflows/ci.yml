@@ -249,30 +249,60 @@ jobs:
           fi
           echo "OK — l'idempotence est garantie."
 
-      - name: Aucune cle de service Supabase dans le depot
+      - name: La cle de service Supabase ne DESCEND pas vers le navigateur
         run: |
-          # La cle service_role CONTOURNE RLS : elle ne doit exister nulle part
-          # dans le code, et surtout pas dans le back-office qui tourne sur
-          # Vercel. Seule la cle publique y a sa place.
-          # Le seul fichier autorise a nommer ces cles est celui qui les REFUSE.
-          if grep -rnE 'sb_secret_|service_role_key|SUPABASE_SERVICE_ROLE' \
+          # La regle n'est pas « nulle part » : elle est directionnelle.
+          #
+          # `service_role` contourne RLS. Elle vit LEGITIMEMENT dans le service
+          # de synchronisation (apps/sync), qui porte deja la chaine PostgreSQL,
+          # ne s'execute dans aucun navigateur, et que personne ne telecharge :
+          # c'est lui qui cree les comptes Supabase. Elle ne doit JAMAIS entrer
+          # dans ce qui est livre a un navigateur — le POS et le back-office.
+          #
+          # Interdire le mot partout, comme cette garde le faisait, cassait la
+          # CI sur le code qui APPLIQUE la regle. Une garde qui echoue sur du
+          # code correct finit desactivee, et ce jour-la elle ne protege plus
+          # rien.
+          fautes=$(grep -rnE 'sb_secret_|service_role_key|SUPABASE_SERVICE_ROLE' \
                --include='*.ts' --include='*.tsx' --include='*.mjs' \
-               --include='*.json' apps packages 2>/dev/null \
-             | grep -v 'apps/backoffice/src/serveur/supabase.ts'; then
-            echo '::error::Une reference a la cle de service Supabase a ete introduite.'
+               --include='*.json' apps/pos apps/backoffice packages 2>/dev/null \
+             | grep -v 'apps/backoffice/src/serveur/supabase.ts' || true)
+          if [ -n "$fautes" ]; then
+            echo '::error::La cle de service Supabase a ete introduite dans du code livre a un navigateur :'
+            echo "$fautes"
+            echo 'Elle monte vers apps/sync, elle ne descend pas vers le client. Voir CLAUDE.md.'
             exit 1
           fi
-          echo "OK — aucune cle de service dans le code."
+          echo "OK — la cle de service reste dans le service."
+
+      - name: Le back-office REFUSE la cle de service au demarrage
+        run: |
+          # Le pendant positif de la garde precedente : l'absence d'une mention
+          # ne prouve rien si le controle qui la refuse a disparu.
+          if ! grep -q 'sb_secret_' apps/backoffice/src/serveur/supabase.ts; then
+            echo '::error::Le controle qui refuse la cle de service a disparu du back-office.'
+            exit 1
+          fi
+          echo "OK — le back-office refuse encore la cle de service."
 
       - name: Aucun PIN en clair dans le code ou la graine
         run: |
-          # Un hachage Argon2id est acceptable ; un PIN littéral affecté à
-          # `pin_hash` ne l'est jamais.
-          fautes=$(grep -rnE "pin_hash.*['\"][0-9]{4,8}['\"]" \
+          # Un PIN litteral AFFECTE a `pin_hash` ne l'est jamais ; un PIN passe
+          # a `hacherPin()` l'est toujours — c'est meme la seule facon d'ecrire
+          # un test lisible de la prise de poste.
+          #
+          # D'ou l'affectation DIRECTE dans le motif : `pin_hash: '2468'` est
+          # refuse, `pin_hash: hacherPin('2468')` passe. Le motif large
+          # d'avant refusait les deux, et le second est correct.
+          fautes=$(grep -rnE "pin_hash['\"]?\s*[:=,]\s*['\"][0-9]{4,8}['\"]" \
             packages/ apps/ --include='*.ts' --include='*.tsx' || true)
-          if [ -n "$fautes" ]; then
+          # Et en SQL : une graine qui poserait un PIN en clair dans la colonne.
+          fautes_sql=$(grep -rnE "pin_hash[^)]*values[^)]*'[0-9]{4,8}'" \
+            supabase/migrations/*.sql || true)
+          if [ -n "$fautes$fautes_sql" ]; then
             echo "::error::PIN en clair détecté :"
             echo "$fautes"
+            echo "$fautes_sql"
             exit 1
           fi
           echo "OK — aucun PIN en clair."
