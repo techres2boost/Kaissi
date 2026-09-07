@@ -112,6 +112,10 @@ Trois **réductions** sont également déclarées — *Happy hour* (10 %),
 *Personnel* (20 %), *Geste commercial* (−2,000 TND). La caisse les propose au
 moment de la remise, et le rapport les regroupe par motif (§5 bis K).
 
+Et trois **clients** : Salem Haddad, Amine Ben Youssef, et une « Dame de la
+4 » sans téléphone — de quoi voir tout de suite ce que le bouton **Client**
+de la caisse propose (§5 bis M).
+
 ---
 
 ## 3. Le scénario — un service de 5 tickets
@@ -1046,6 +1050,10 @@ caissier ne commande pas les réapprovisionnements.
 | Produit passé de **« faible » à zéro** | **oui** | Ce sont deux nouvelles différentes. |
 | **Aucune clé VAPID** configurée | pas d'envoi | L'écran Stock, lui, continue de tout montrer : rien ne dépend d'un fournisseur tiers. |
 
+> **Pour les allumer réellement** — générer les clés VAPID, les poser sur
+> Railway et sur Vercel, s'abonner depuis un téléphone, et vérifier :
+> [`notifications.md`](notifications.md), dix minutes une seule fois.
+
 ---
 
 ### F. Les exports
@@ -1222,7 +1230,7 @@ le marché connaît : un restaurateur qui vient de Loyverse cherche
 |---|---|
 | **Rapports** | Récapitulatif des ventes · Ventes par article · par catégorie · par employé · par mode de paiement · Reçus · Réductions · Périodes de travail |
 | **Articles** | Liste d'articles · Catégories · Stock · Réductions |
-| **Configuration** | Employés |
+| **Configuration** | Employés · Clients |
 
 > **« Tickets » s'appelle « Reçus ».** L'ancienne adresse `/‹resto›/tickets`
 > redirige : un favori ou un lien envoyé par message continue de marcher.
@@ -1230,27 +1238,37 @@ le marché connaît : un restaurateur qui vient de Loyverse cherche
 **LES TROIS FILTRES, EN TÊTE DE CHAQUE RAPPORT**
 
 1. Ouvre **Rapports → Récapitulatif des ventes**.
-2. En haut : les raccourcis, **deux vrais calendriers** (du / au), une
-   **tranche horaire**, et un **filtre par employé**.
-3. Choisis `12 h → 15 h`.
+2. En haut : les raccourcis, un **vrai calendrier**, une **tranche horaire**,
+   et un **filtre par employé**.
+3. Clique sur le bouton de dates : un **mois s'ouvre**. Premier clic, le jour
+   de début ; second clic, le jour de fin — la période s'applique et le
+   panneau se referme.
+
+**Attendu** : les jours à venir sont éteints (un rapport sur demain rendrait
+des totaux justes sur une durée fausse), aujourd'hui est cerclé, et la période
+en cours de choix se peint **pendant** qu'on survole. Un champ où l'on tape
+« 09/07/2026 » obligeait à traduire « la semaine dernière » en chiffres avant
+de pouvoir la demander.
+
+4. Choisis `12 h → 15 h`.
 
 **Attendu** : tous les chiffres de l'écran ne portent plus que sur le service
 du midi. Les heures sont celles de **ton** établissement — pas UTC, ce qui
 ferait basculer un service de midi dans la tranche du matin.
 
-4. Change de rapport : les filtres **suivent**, ils sont dans l'adresse. Copie
+5. Change de rapport : les filtres **suivent**, ils sont dans l'adresse. Copie
    l'URL, envoie-la : elle rouvre exactement le même rapport.
 
 **LE BANDEAU DE TÊTE**
 
-5. Cinq nombres : **Ventes brutes → Remboursements → Réductions → Ventes
+6. Cinq nombres : **Ventes brutes → Remboursements → Réductions → Ventes
    nettes → Marge brute**.
 
 **Attendu** : ce n'est pas une liste, c'est une **soustraction**. Lue de
 gauche à droite, elle répond à « pourquoi le net n'est pas le brut », qui est
 la première question devant un rapport.
 
-6. Sous chaque nombre, l'**écart** avec la période précédente **de même
+7. Sous chaque nombre, l'**écart** avec la période précédente **de même
    longueur** : sept jours se comparent aux sept jours d'avant.
 
 **Attendu** : le vert veut dire *favorable*, pas *en hausse*. Plus de
@@ -1260,9 +1278,9 @@ pas « +100 % », qui serait une division par zéro déguisée.
 
 **LE GRAPHIQUE**
 
-7. Deux menus déroulants : **Colonnes / Aires / Ligne**, et **Jours /
+8. Deux menus déroulants : **Colonnes / Aires / Ligne**, et **Jours /
    Semaines / Mois**.
-8. Prends « 30 derniers jours », puis « Jours », puis « Semaines ».
+9. Prends « 30 derniers jours », puis « Jours », puis « Semaines ».
 
 **Attendu** : trente colonnes deviennent cinq barres lisibles. Le pas par
 défaut suit la longueur de la période — au-delà de deux mois, il se met de
@@ -1276,9 +1294,9 @@ lui-même sur « Mois ».
 
 **LE TABLEAU**
 
-9. En bas : **Colonnes** (choix des champs), tri par en-tête, pagination
-   **10 / 25 / 50 / 100**, et **Exporter**.
-10. Passe à 25 lignes, trie par « Marge », puis exporte.
+10. En bas : **Colonnes** (choix des champs), tri par en-tête, pagination
+    **10 / 25 / 50 / 100**, et **Exporter**.
+11. Passe à 25 lignes, trie par « Marge », puis exporte.
 
 **Attendu** : l'export porte sur **toute la période**, jamais sur la page
 affichée. Exporter « la page 2 » est le genre de piège qu'on ne découvre
@@ -1286,12 +1304,12 @@ qu'en rapprochant deux totaux qui ne collent pas.
 
 **VENTES PAR ARTICLE (§13.2)**
 
-11. **Rapports → Ventes par article**.
+12. **Rapports → Ventes par article**.
 
 **Attendu** : le **Top 5** en tête, puis le graphique — avec une option de
 plus, **Circulaire** — puis le tableau complet.
 
-12. Choisis **Circulaire**.
+13. Choisis **Circulaire**.
 
 **Attendu** : cinq parts au maximum, la sixième s'appelle **« Autres (n) »**,
 et chaque part porte son **nom** et son **pourcentage** à côté.
@@ -1310,7 +1328,7 @@ et chaque part porte son **nom** et son **pourcentage** à côté.
 
 **RÉDUCTIONS (§13 et §14.3)**
 
-13. **Rapports → Réductions**.
+14. **Rapports → Réductions**.
 
 **Attendu** : combien a été accordé, **quelle part des ventes brutes**,
 combien de tickets sont concernés — puis le classement **par employé**, et la
@@ -1401,6 +1419,157 @@ donnerait un total juste et une répartition fausse.
 > reste celui du **rôle**. Une réduction déclarée à 50 % demandera toujours
 > l'autorisation d'un responsable — elle nomme la décision, elle ne
 > l'autorise pas.
+
+---
+
+### L. Le PIN, la rupture et les départs — trois corrections
+
+**UN CODE PIN CHANGÉ PREND EFFET SUR LA TABLETTE**
+
+1. **Configuration → Employés → Gérer** sur un caissier → **Réinitialiser le
+   PIN**.
+2. Sur la caisse : **Diagnostic → « Ne pas attendre — envoyer maintenant »**.
+3. Regarde la ligne **« Dernier changement reçu »** : elle porte l'heure qu'il
+   est, et le nombre d'employés connus.
+4. Verrouille, puis reprends le poste avec le **nouveau** code.
+
+**Attendu** : le nouveau code ouvre, **l'ancien est refusé**.
+
+> **Pourquoi cette ligne « Dernier changement reçu » existe.** « Dernière
+> synchronisation » dit qu'il y a du réseau — pas que le catalogue a bougé.
+> Les deux se ressemblent exactement, et c'est précisément ce qu'on regarde
+> quand un code tout juste changé est refusé : la question n'est pas « ai-je
+> Internet », c'est « **ce changement-là** est-il arrivé jusqu'ici ».
+>
+> Le chemin fait quatre sauts — le back-office écrit le hachage, un
+> déclencheur journalise une ligne par établissement, la tablette tire la
+> page, le miroir l'applique. Les quatre sont désormais couverts par des
+> tests, dont celui qui compte : **l'ancien code cesse de marcher**. Un
+> ancien code qui continue d'ouvrir la caisse, c'est un employé parti qui
+> entre encore.
+
+**UN PRODUIT ÉPUISÉ QUI RESTE EN VENTE LE DIT**
+
+5. **Articles → Stock**, mets un produit à **0**, puis rouvre « Ajuster » et
+   **décoche** « Retirer ce produit de la carte dès qu'il atteint zéro ».
+
+**Attendu** : la ligne affiche « En stock », et **juste en dessous**, une
+étiquette rouge : **« Épuisé, toujours en vente »**, avec un bouton
+**« Rétablir le retrait automatique »**.
+
+6. Clique ce bouton.
+
+**Attendu** : le produit sort de la carte immédiatement, et la caisse le
+grise à sa prochaine synchronisation.
+
+> **Ce que cette ligne remplace.** Elle disait « automatisme coupé » en petit
+> gris, sous un bouton affichant « En stock » alors que la quantité était à
+> −3. Trois signaux qui se contredisent, et c'est le plus discret qui
+> expliquait les deux autres — on lisait « En stock » et on concluait à une
+> panne. Le mot qui compte n'est pas le réglage, c'est sa **conséquence** : le
+> serveur va continuer d'en prendre.
+
+**UN EMPLOYÉ QUI S'EN VA**
+
+7. **Configuration → Employés → Suspendre** quelqu'un.
+
+**Attendu** : il **descend** dans une section repliée, « Ne prennent plus de
+poste ». Il ne se lit plus au milieu de l'équipe du jour, mais il reste à un
+clic — on réactive quelqu'un qui revient de congé.
+
+8. Déplie la section, et clique **Retirer**.
+
+**Attendu** : une confirmation, puis il disparaît de la liste.
+
+> **Ce n'est pas une suppression, et ça ne peut pas en être une.** Ses ventes
+> portent son identifiant : `orders.opened_by`, `shifts.closed_by`, le journal
+> d'audit. L'effacer rendrait anonymes des encaissements déjà faits, et un
+> rapport de la semaine dernière afficherait « — » là où il y avait un nom.
+> Ce qui part, c'est **l'appartenance** — et c'est réversible.
+>
+> Le bouton n'apparaît **que** pour un employé déjà suspendu : un départ se
+> décide en deux temps. Sur la même ligne que « Gérer », il se cliquerait par
+> erreur, un jour de service.
+
+---
+
+### M. Clients : qui vient au restaurant
+
+`orders.customer_id` existait depuis le premier schéma, sans table en face.
+Elle existe maintenant — et la caisse sait à qui elle vend.
+
+**LE CARNET**
+
+1. **Configuration → Clients** (juste sous « Employés », comme dans Loyverse).
+2. Trois fiches sont déjà là : Salem Haddad, Amine Ben Youssef, et une
+   « Dame de la 4 » **sans téléphone**.
+3. Cherche « 20 12 » dans le champ de recherche.
+
+**Attendu** : Salem sort. La recherche porte sur le **nom, le téléphone et
+l'e-mail à la fois** — au comptoir, on tape ce qu'on a sous la main, pas ce
+que le logiciel attend.
+
+4. Ajoute un client avec le numéro **20 123 456**, déjà pris.
+
+**Attendu** : un refus qui explique — *« Un client porte déjà ce numéro… ouvrez
+sa fiche plutôt que d'en créer une seconde »*. Deux fiches pour la même
+personne partagent ses visites en deux, et **aucun des deux totaux n'est
+vrai**.
+
+> **Une fiche sans téléphone reste légitime.** « Dame de la 4 » n'en a pas, et
+> une seconde fiche sans numéro ne sera pas refusée : l'unicité ne porte que
+> sur les numéros réellement saisis.
+
+**LES VISITES SE CALCULENT**
+
+5. Sur la caisse, ouvre une table, ajoute un article, puis **Client** →
+   **Salem Haddad**. Encaisse. Synchronise.
+6. Reviens sur **Clients**.
+
+**Attendu** : « Total des visites » passe à 1, « Total dépensé » au montant de
+la vente, et « Première visite » à aujourd'hui.
+
+> **Rien de tout cela n'est stocké.** C'est une vue sur les commandes closes
+> (migration 0031). Un compteur incrémenté par déclencheur devrait défaire
+> exactement ce qu'il a fait à chaque reprojection — y compris quand une
+> commande passe « annulée » — et dériverait en silence. C'est la même
+> décision que pour le stock, et pour la même raison.
+
+7. Renomme la fiche (« Salem Haddad Becha »), puis rouvre le **reçu** de la
+   vente.
+
+**Attendu** : le reçu porte toujours **l'ancien nom**. Il est recopié au
+moment de la vente, jamais joint — comme le libellé d'une réduction. Un reçu
+qui change après coup n'est plus un reçu.
+
+**IMPORTER, EXPORTER**
+
+8. **Exporter** : le CSV contient **tout le carnet**, pas la page affichée.
+9. Ouvre-le, ajoute deux lignes, réimporte-le par **Importer**.
+
+**Attendu** : *« 2 client(s) ajouté(s), 3 déjà connu(s) et laissé(s)
+intact(s) »*. L'import **n'écrase jamais** une fiche existante — sinon un
+fichier réimporté après quelques corrections effacerait en silence ce qu'on
+vient de saisir. Et les en-têtes de l'export sont ceux de l'import :
+l'aller-retour par un tableur marche tel quel.
+
+10. Importe volontairement une ligne sans nom.
+
+**Attendu** : elle est refusée **nommément** (« Ligne 4 : nom vide »), et les
+autres entrent. Un fichier de trois cents clients contient toujours une ligne
+bancale ; tout refuser pour elle obligerait à la chercher à l'œil dans un
+tableur.
+
+**CE QUE LA CAISSE NE FAIT PAS**
+
+11. Sur la caisse, ouvre **Client** : il n'y a pas de bouton « Nouveau ».
+
+**Attendu**, et volontaire : le protocole de synchronisation ne remonte que
+des **événements de commande**. Une fiche créée sur la tablette n'aurait aucun
+chemin pour monter, et resterait invisible au back-office et aux autres
+terminaux. Un bouton qui produit une fiche que personne d'autre ne verra est
+pire que pas de bouton. Rattacher un client existant, en revanche, marche
+**hors ligne** — c'est un événement de commande comme un autre.
 
 ---
 
@@ -1676,12 +1845,14 @@ questionnaire *Data safety*. Les deux constructions se lancent **à la main** �
 chaque build iOS brûle un numéro chez Apple, et chaque envoi Android un
 `versionCode` que Play ne rend jamais.
 
-Tout est détaillé dans [`stores.md`](stores.md), y compris pourquoi une TWA
-Bubblewrap et un `server.url` — le mécanisme de Digital Fidelity, qui
-convient très bien à Stampi — sont **disqualifiés** pour une caisse : le code
-de l'application viendrait du réseau, et sans connexion elle ne s'ouvrirait
-même pas. La garde du mode avion le vérifie à chaque construction, sur la
-configuration `.ts` **et** sur les configurations natives générées.
+Tout est détaillé dans [`stores.md`](stores.md) : le **parcours clic par
+clic** des deux magasins (§2 bis), ce qui se réutilise du compte Digital
+Fidelity et ce qui ne se réutilise pas (§0), et pourquoi une TWA Bubblewrap
+et un `server.url` — le mécanisme qui convient très bien à Stampi — sont
+**disqualifiés** pour une caisse : le code de l'application viendrait du
+réseau, et sans connexion elle ne s'ouvrirait même pas. La garde du mode
+avion le vérifie à chaque construction, sur la configuration `.ts` **et** sur
+les configurations natives générées.
 
 Et une question ouverte, volontairement laissée telle quelle :
 

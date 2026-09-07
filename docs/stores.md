@@ -4,6 +4,41 @@ Loyverse a une application native sur les deux stores, et un back-office web.
 C'est le bon modèle, et c'est celui que Kaissi vise. Ce document dit comment
 y aller, et **pourquoi le chemin n'est pas celui de Digital Fidelity**.
 
+> ### « Je génère le Bubblewrap ? »
+>
+> **Non.** Pour Kaissi, jamais — et ce n'est pas une préférence, c'est la
+> raison d'être du produit. Le §1 explique pourquoi en trois paragraphes.
+>
+> Ce qui remplace Bubblewrap est **déjà fait** : le projet Android
+> (`apps/pos/android/`) et le projet iOS (`apps/pos/ios/`) sont dans le
+> dépôt, et `codemagic.yaml` construit les deux paquets signés. Il ne reste
+> aucune étape de développement — voir le §2 bis pour le parcours, clic par
+> clic.
+
+---
+
+## 0. Ce qu'on réutilise de Digital Fidelity, et ce qu'on ne réutilise pas
+
+La question n'est pas « faire comme Stampi » ou « faire autrement » : c'est
+que **la moitié administrative est identique, et la moitié technique est
+l'inverse**.
+
+| | Digital Fidelity / Stampi | Kaissi | On réutilise ? |
+|---|---|---|---|
+| Compte Google Play (25 $) | ✔ | ✔ | **Oui** — le même compte développeur porte les deux applications |
+| Compte Apple Developer (99 $/an) | ✔ | ✔ | **Oui** — même équipe, mêmes certificats |
+| Compte Codemagic | ✔ | ✔ | **Oui** — et le groupe de variables `ios_signing` **tel quel** |
+| Fiche du store, captures, confidentialité | ✔ | ✔ | Le **processus**, pas le contenu : ce sont deux produits |
+| **Bubblewrap / TWA** | ✔ le bon choix là-bas | ✘ **disqualifiant** | **Non** — §1 |
+| **`server.url`** dans la config Capacitor | ✔ | ✘ **interdit**, vérifié par la CI | **Non** |
+| Le bundle applicatif | téléchargé au lancement | **empaqueté** dans l'APK | **Non** |
+| La base de données | le réseau | SQLite dans l'appareil | **Non** |
+
+Autrement dit : **tout ce qui coûte de l'argent et du temps administratif se
+réutilise ; rien de ce qui touche à la façon dont l'application charge son
+code ne se réutilise.** C'est exactement l'inverse de l'intuition, et c'est
+pour cela que ce document existe.
+
 ---
 
 ## 1. Pas de Bubblewrap ici — et ce n'est pas un détail
@@ -57,6 +92,54 @@ dépôt. Le travail restant pour le Play Store n'est pas du développement.
 Les trois restent. La version web n'est pas un brouillon de l'APK : c'est
 l'entrée la plus rapide, celle qu'on ouvre en trente secondes chez un
 prospect. C'est l'APK qu'on installe le jour où le restaurant ouvre.
+
+---
+
+## 2 bis. Le parcours complet, dans l'ordre des clics
+
+Deux listes. Chaque ligne renvoie au détail plus bas quand il y en a un.
+
+### Android — de zéro à « en ligne »
+
+| # | Où | Quoi | Une seule fois ? |
+|---|---|---|---|
+| 1 | ton PC | `keytool …` → le keystore, **et sa sauvegarde** (§3.1) | oui, **pour la vie du produit** |
+| 2 | Codemagic | *Teams → Code signing identities → Android keystores* → téléverser sous le nom **`kaissi_keystore`** | oui |
+| 3 | play.google.com/console | créer le compte développeur, **25 $** | oui |
+| 4 | Play Console | *Créer une application* → nom, langue par défaut **français**, gratuite | oui |
+| 5 | Play Console | *Configuration → Intégrité de l'application* → activer **Play App Signing** | oui |
+| 6 | Play Console | fiche : icône 512, bannière 1024×500, captures **téléphone ET tablette**, description (§3.4) | à chaque refonte |
+| 7 | Play Console | *Règles → Contenu de l'application* : confidentialité, **Data safety**, classement, public cible | oui, puis à chaque changement |
+| 8 | ton PC | incrémenter `"version"` dans `apps/pos/package.json` (§3.2) | **à chaque envoi** |
+| 9 | Codemagic | *Start new build* → workflow **`pos-android`** | à chaque envoi |
+| 10 | Play Console | *Test → Test interne* : le brouillon est là, ajouter les testeurs, **promouvoir** | à chaque envoi |
+| 11 | Play Console | *Production → Créer une release* → soumettre à la revue | quand tu es prêt |
+
+Compter **une à deux semaines** pour la première validation, quelques heures
+pour les suivantes.
+
+### iOS — de zéro à TestFlight
+
+| # | Où | Quoi | Une seule fois ? |
+|---|---|---|---|
+| 1 | developer.apple.com | compte Apple Developer, **99 $/an** | oui, **renouvelable** |
+| 2 | App Store Connect | *Utilisateurs et accès → Intégrations → Clés App Store Connect* : créer une clé **App Manager**, télécharger le `.p8` (**une seule fois**), noter *Issuer ID* et *Key ID* | oui |
+| 3 | Codemagic | groupe de variables **`ios_signing`** : `ASC_ISSUER_ID`, `ASC_KEY_ID`, `ASC_PRIVATE_KEY` (le contenu du `.p8`), `CERTIFICATE_PRIVATE_KEY` — **c'est le groupe de Stampi, rien à ressaisir** | oui |
+| 4 | App Store Connect | *Mes applications → +* → nouvelle application, *Bundle ID* **`tn.res2boost.kaissi`** (à enregistrer d'abord dans *Certificates, Identifiers & Profiles* s'il n'existe pas) | oui |
+| 5 | ton PC | reporter l'**Apple ID à dix chiffres** de la fiche dans `APP_STORE_APPLE_ID`, dans `codemagic.yaml` | oui |
+| 6 | ton PC | incrémenter `"version"` dans `apps/pos/package.json` | **à chaque envoi** |
+| 7 | Codemagic | *Start new build* → workflow **`pos-ios`** (machine `mac_mini_m2` : **aucun Mac à acheter**) | à chaque envoi |
+| 8 | App Store Connect | *TestFlight* : la build arrive, traitement 10–30 min, puis installable | à chaque envoi |
+| 9 | App Store Connect | fiche, captures **iPad obligatoires**, confidentialité | à chaque refonte |
+| 10 | App Store Connect | *Notes pour le relecteur* : **compte de démonstration** (e-mail + mot de passe), un PIN de caisse, et la phrase qui désamorce la 4.2 — voir §4 | à chaque envoi |
+| 11 | App Store Connect | *Soumettre pour révision* | quand tu es prêt |
+
+Compter **24 à 48 h** pour la revue Apple, une fois la fiche complète.
+
+> **Aucune de ces deux listes ne contient d'étape de code.** C'est le sens du
+> §1 : le travail technique est fait, et il l'a été dans le bon ordre — d'abord
+> l'empaquetage, ensuite les magasins. Dans l'autre sens, on aurait publié une
+> caisse qui ne s'ouvre pas sans réseau.
 
 ---
 
