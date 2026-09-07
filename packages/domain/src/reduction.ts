@@ -349,7 +349,11 @@ export function reduireEvenements(
 
       case 'customer.attached': {
         const p = e.payload as import('./evenements.js').ChargesUtiles['customer.attached']
-        etat = { ...etat, clientId: p.clientId, clientNom: p.nom ?? null }
+        // Un identifiant absent DÉTACHE : le nom part avec lui, sinon la
+        // commande garderait le nom d'un client qu'on vient d'en retirer.
+        etat = p.clientId
+          ? { ...etat, clientId: p.clientId, clientNom: p.nom ?? null }
+          : { ...etat, clientId: null, clientNom: null }
         break
       }
 

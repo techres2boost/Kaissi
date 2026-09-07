@@ -22,6 +22,7 @@ import {
 } from '@kaissi/domain'
 import type {
   CategorieLocale,
+  ClientLocal,
   ModificateurLocal,
   ProduitLocal,
   ReductionLocale,
@@ -63,6 +64,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
     action: (manager: Employe) => Promise<void>
   } | null>(null)
   const [remiseOuverte, setRemiseOuverte] = useState(false)
+  const [clientOuvert, setClientOuvert] = useState(false)
   /**
    * Bons de cuisine qui viennent de partir, affichés tant que l'impression
    * est éteinte. La cuisine les voit de son côté au back-office ; cet aperçu
@@ -377,6 +379,22 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
           >
             Remise
           </button>
+          {/*
+            « Client » à côté de « Remise », pas dans un menu.
+            
+            On note à qui l'on vend au moment où on prend la commande — un
+            numéro de téléphone pour un plat à emporter, un habitué qu'on
+            reconnaît. Trois clics plus loin, personne ne le fait, et la
+            fiche client reste vide pour toujours.
+          */}
+          <button
+            type="button"
+            className="secondaire"
+            disabled={!modifiable}
+            onClick={() => setClientOuvert(true)}
+          >
+            {etat?.clientNom ? `👤 ${etat.clientNom}` : 'Client'}
+          </button>
           <button
             type="button"
             className="secondaire"
@@ -453,6 +471,21 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                 : remise.type === 'pourcentage'
                   ? `Remise de ${formaterPourcentage(remise.valeurBp)} %`
                   : `Remise de ${formaterTND(remise.valeurMillimes)}`,
+            )
+          }}
+        />
+      )}
+
+      {clientOuvert && (
+        <ModaleClient
+          rechercher={(texte) => app.app.catalogue.clients(texte)}
+          actuel={etat?.clientId ? { id: etat.clientId, nom: etat.clientNom ?? '' } : null}
+          onAnnuler={() => setClientOuvert(false)}
+          onChoisir={async (client) => {
+            setClientOuvert(false)
+            await executer(
+              () => session.attacherClient(employe, orderId, client),
+              client ? `Client « ${client.nom} »` : 'Client retiré de la commande',
             )
           }}
         />
@@ -738,6 +771,92 @@ function ModaleRemise({
             </button>
           )}
         </>
+      )}
+    </Modale>
+  )
+}
+
+/**
+ * Choisir le client d'une commande.
+ *
+ * ── Une recherche, pas une liste ──────────────────────────────────────────
+ *
+ * Un carnet de restaurant fait deux mille fiches au bout d'un an. Les
+ * dérouler sur une tablette est plus long que de retaper le nom. On tape donc
+ * ce qu'on a sous la main — un prénom, quatre chiffres du numéro — et la
+ * recherche cherche dans les deux : au comptoir, on a le téléphone à
+ * l'oreille, pas le temps de choisir une colonne.
+ *
+ * ── Ce que cette modale ne fait PAS ───────────────────────────────────────
+ *
+ * Créer une fiche. Le protocole de synchronisation ne remonte que des
+ * ÉVÉNEMENTS DE COMMANDE ; une fiche créée ici n'aurait aucun chemin pour
+ * monter, et resterait sur cette tablette — invisible au back-office et aux
+ * autres terminaux. Un bouton « Nouveau client » qui produit une fiche que
+ * personne d'autre ne verra est pire que pas de bouton du tout.
+ */
+function ModaleClient({
+  rechercher,
+  actuel,
+  onAnnuler,
+  onChoisir,
+}: {
+  rechercher: (texte: string) => Promise<ClientLocal[]>
+  actuel: { id: string; nom: string } | null
+  onAnnuler: () => void
+  onChoisir: (client: ClientLocal | null) => Promise<void>
+}) {
+  const [texte, setTexte] = useState('')
+  const [resultats, setResultats] = useState<ClientLocal[]>([])
+
+  useEffect(() => {
+    let vivant = true
+    // 150 ms : assez pour ne pas interroger la base à chaque touche, assez peu
+    // pour que la liste suive la frappe.
+    const minuteur = setTimeout(() => {
+      void rechercher(texte).then((r) => {
+        if (vivant) setResultats(r)
+      })
+    }, 150)
+    return () => {
+      vivant = false
+      clearTimeout(minuteur)
+    }
+  }, [texte, rechercher])
+
+  return (
+    <Modale titre="Client de la commande" onFermer={onAnnuler}>
+      <input
+        className="recherche-client"
+        type="search"
+        value={texte}
+        autoFocus
+        placeholder="Nom ou téléphone…"
+        aria-label="Rechercher un client"
+        onChange={(e) => setTexte(e.target.value)}
+      />
+
+      {actuel && (
+        <button type="button" className="secondaire" onClick={() => void onChoisir(null)}>
+          Retirer « {actuel.nom} » de la commande
+        </button>
+      )}
+
+      {resultats.length === 0 ? (
+        <p className="aide">
+          {texte.trim() === ''
+            ? 'Aucun client enregistré. Les fiches se créent au back-office et redescendent à la prochaine synchronisation.'
+            : `Aucun client ne correspond à « ${texte} ».`}
+        </p>
+      ) : (
+        <div className="options grand">
+          {resultats.map((c) => (
+            <button key={c.id} type="button" onClick={() => void onChoisir(c)}>
+              <span className="nom-reduction">{c.nom}</span>
+              {c.telephone && <span className="detail">{c.telephone}</span>}
+            </button>
+          ))}
+        </div>
       )}
     </Modale>
   )

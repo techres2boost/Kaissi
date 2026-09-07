@@ -212,7 +212,13 @@ button, .bouton {
 button:hover { border-color: var(--accent); }
 button.principal { background: var(--accent); color: var(--fond); border-color: var(--accent);
                    font-weight: 650; }
-button.discret { background: transparent; font-size: 0.85rem; padding: 0.3rem 0.6rem; }
+/* `.bouton` aussi, et pas seulement `button` : l'export est un LIEN — il
+   télécharge un fichier, et un « enregistrer sous » doit marcher dessus. Sans
+   ce sélecteur, il gardait le fond plein et se lisait comme l'action
+   principale de l'écran, à côté de « Ajouter un client ». */
+button.discret, .bouton.discret {
+  background: transparent; font-size: 0.85rem; padding: 0.3rem 0.6rem;
+}
 button.danger { color: var(--danger); }
 
 /* ── Messages ──────────────────────────────────────────────────────────── */
@@ -640,6 +646,25 @@ th .tri:hover { color: var(--texte); }
 }
 .pagination select { width: auto; min-width: 4.5rem; }
 .pagination label { display: flex; align-items: center; gap: 0.4rem; margin: 0; }
+
+/* ── Le carnet de clients ────────────────────────────────────────────────── */
+.barre-clients {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+/* La recherche pousse tout ce qui suit à droite : les actions restent
+   groupées à gauche, où on les cherche. */
+.recherche-clients { display: flex; gap: 0.4rem; margin-left: auto; }
+.recherche-clients input { width: auto; min-width: 14rem; }
+.discret.actif {
+  background: var(--accent); color: var(--fond); border-color: var(--accent);
+}
+/* L'en-tête d'un panneau dépliant : le titre, et sa fermeture au bout. */
+.entete-panneau {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 1rem; margin-bottom: 0.5rem;
+}
+.entete-panneau h2 { margin: 0; }
 
 /* ── Camembert des parts ─────────────────────────────────────────────────── */
 .camembert { display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; }

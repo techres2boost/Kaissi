@@ -115,6 +115,19 @@ export const TABLES_MIROIR: Record<
                'value_bp', 'amount_millimes', 'position', 'archived_at'],
   },
   /*
+   * Le carnet de clients (Postgres 0031).
+   *
+   * En lecture seule sur la tablette : elle rattache un client existant à une
+   * commande — un événement de commande, qui passe par l'outbox — mais ne
+   * crée pas de fiche hors ligne. Cela demanderait une route de remontée pour
+   * du référentiel, que le protocole n'a pas.
+   */
+  customers: {
+    nom: 'customers',
+    colonnes: ['id', 'organization_id', 'restaurant_id', 'name', 'phone', 'email',
+               'note', 'archived_at'],
+  },
+  /*
    * « Commande prête », posé par la cuisine (Postgres 0029).
    *
    * Ce n'est pas du référentiel — c'est le seul marqueur transactionnel qui

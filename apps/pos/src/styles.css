@@ -792,3 +792,22 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: block; margin-top: 0.15rem;
   font-size: 0.8rem; color: var(--texte-2); font-variant-numeric: tabular-nums;
 }
+
+/* ── Recherche de client, dans la modale de commande ─────────────────────── */
+/* Pleine largeur et haute : on la vise au doigt, en tenant un téléphone de
+   l'autre main.
+   Les couleurs sont posées EXPLICITEMENT : un `input[type=search]` prend
+   sinon l'apparence du système — fond blanc sur une caisse en thème sombre,
+   ce qui éblouit en salle le soir. */
+.recherche-client {
+  width: 100%; min-height: 52px; margin-bottom: 0.75rem;
+  font-size: 1.05rem; font: inherit; padding: 0.7rem;
+  background: var(--surface-2); color: var(--texte);
+  border: 1px solid var(--bordure); border-radius: 6px;
+  appearance: none;
+}
+.recherche-client::placeholder { color: var(--texte-2); }
+.options.grand .detail {
+  display: block; margin-top: 0.15rem;
+  font-size: 0.8rem; color: var(--texte-2); font-variant-numeric: tabular-nums;
+}

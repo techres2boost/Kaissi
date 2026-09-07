@@ -90,6 +90,19 @@ export interface ReductionLocale {
   montantMillimes: number | null
 }
 
+/**
+ * Une fiche client, telle que le comptoir la retrouve.
+ *
+ * Lue sur la tablette, jamais écrite : le protocole ne remonte que des
+ * événements de COMMANDE. Rattacher un client existant marche donc hors
+ * ligne ; en créer un demande le back-office.
+ */
+export interface ClientLocal {
+  id: string
+  nom: string
+  telephone: string | null
+}
+
 export interface MethodePaiementLocale {
   id: string
   nom: string
@@ -288,6 +301,28 @@ export function depotCatalogue(db: AdaptateurSqlite) {
         valeurBp: l.value_bp,
         montantMillimes: l.amount_millimes,
       }))
+    },
+
+    /**
+     * Cherche un client par son nom OU par son numéro.
+     *
+     * Une seule recherche pour les deux : au comptoir, on a le téléphone à
+     * l'oreille, et on tape ce qu'on entend — un prénom, quatre chiffres.
+     * Demander DANS QUEL champ chercher, c'est demander de savoir comment on
+     * a rangé.
+     *
+     * La liste est bornée : un carnet de deux mille fiches déroulé sur une
+     * tablette est plus long à parcourir qu'à retaper.
+     */
+    async clients(recherche = '', limite = 30): Promise<ClientLocal[]> {
+      const motif = `%${recherche.trim().replace(/[%_]/g, '')}%`
+      const lignes = await db.lire<{ id: string; name: string; phone: string | null }>(
+        `SELECT id, name, phone FROM customers
+         WHERE archived_at IS NULL AND (? = '%%' OR name LIKE ? OR phone LIKE ?)
+         ORDER BY name LIMIT ?`,
+        [motif, motif, motif, limite],
+      )
+      return lignes.map((l) => ({ id: l.id, nom: l.name, telephone: l.phone }))
     },
 
     async methodesPaiement(): Promise<MethodePaiementLocale[]> {

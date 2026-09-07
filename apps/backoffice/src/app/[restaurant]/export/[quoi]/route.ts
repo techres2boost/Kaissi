@@ -46,6 +46,8 @@ const SUJETS = [
   /** UN ticket, tel qu'il s'imprime — pas un tableau. */
   'ticket',
   'periodes',
+  /** Le carnet de clients — sans période : un carnet n'a pas de bornes. */
+  'clients',
 ] as const
 type Sujet = (typeof SUJETS)[number]
 
@@ -244,6 +246,75 @@ export async function GET(
         ),
         nom('paiements'),
       )
+
+    case 'clients': {
+      /*
+       * Le carnet ENTIER, pas la page affichée.
+       *
+       * Exporter « ce qu'on voit » est le piège classique : on trie, on
+       * pagine, on exporte, et le fichier ne contient que dix lignes sur
+       * deux mille. Personne ne s'en aperçoit avant d'avoir tenté un
+       * publipostage.
+       *
+       * Les visites viennent de la vue (0031), calculées — jamais d'un
+       * compteur qui aurait dérivé.
+       */
+      const supabase = await supabaseServeur()
+      const [{ data: clients }, { data: visites }] = await Promise.all([
+        supabase
+          .from('customers')
+          .select('id, name, phone, email, note, archived_at')
+          .eq('restaurant_id', restaurant)
+          .order('name'),
+        supabase
+          .from('clients_visites')
+          .select('customer_id, premiere_visite, derniere_visite, visites, depense_millimes')
+          .eq('restaurant_id', restaurant),
+      ])
+
+      const parClient = new Map((visites ?? []).map((v) => [v.customer_id, v]))
+      const date = (valeur: string | null | undefined) =>
+        valeur ? new Date(valeur).toLocaleDateString('fr-FR', { timeZone: fiche.timezone }) : ''
+
+      return reponseCsv(
+        versCsv(
+          [
+            // Les en-têtes de l'IMPORT, aux mêmes noms : un fichier exporté
+            // ici doit pouvoir être corrigé dans un tableur et réimporté tel
+            // quel. Deux vocabulaires pour un aller-retour, et l'aller-retour
+            // ne marche plus.
+            'nom',
+            'telephone',
+            'email',
+            'note',
+            'Première visite',
+            'Dernière visite',
+            'Total des visites',
+            'Total dépensé',
+            'Total dépensé (TND)',
+            'Archivé',
+          ],
+          (clients ?? []).map((c) => {
+            const v = parClient.get(c.id)
+            return [
+              c.name,
+              c.phone ?? '',
+              c.email ?? '',
+              c.note ?? '',
+              date(v?.premiere_visite),
+              date(v?.derniere_visite),
+              Number(v?.visites ?? 0),
+              tnd(Number(v?.depense_millimes ?? 0)),
+              brut(Number(v?.depense_millimes ?? 0)),
+              c.archived_at ? 'oui' : '',
+            ]
+          }),
+        ),
+        // Sans suffixe de période : un carnet d'adresses n'a pas de bornes,
+        // et « clients_2026-09-01_2026-09-07 » laisserait croire le contraire.
+        nomFichier('clients', etablissement.nom),
+      )
+    }
 
     case 'periodes': {
       const supabase = await supabaseServeur()

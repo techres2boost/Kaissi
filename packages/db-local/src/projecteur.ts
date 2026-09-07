@@ -68,9 +68,9 @@ export async function projeterCommande(
          tax_breakdown, exceptions,
          opened_at, sent_at, closed_at, cancelled_at,
          last_event_seq, event_count, updated_at,
-         shift_id, closed_by, cancel_reason, customer_name,
+         shift_id, closed_by, cancel_reason, customer_name, customer_id,
          discount_id, discount_label
-       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT (id) DO UPDATE SET
          table_id = excluded.table_id,
          status = excluded.status,
@@ -96,6 +96,7 @@ export async function projeterCommande(
          closed_by = excluded.closed_by,
          cancel_reason = excluded.cancel_reason,
          customer_name = excluded.customer_name,
+         customer_id = excluded.customer_id,
          -- Le shift d'origine ne se réécrit pas : une commande ouverte sur le
          -- shift du matin reste imputée au matin, même encaissée à midi.
          shift_id = COALESCE(orders.shift_id, excluded.shift_id)`,
@@ -130,6 +131,10 @@ export async function projeterCommande(
         etat.closePar,
         etat.annuleeMotif,
         etat.clientNom,
+        // L'identifiant du client, en plus de son nom (migration locale 009).
+        // Le nom seul ne relie rien : deux « Salem » ne se distinguent pas, et
+        // « Total des visites » resterait à zéro.
+        etat.clientId,
         /*
          * D'où vient la réduction, et sous quel nom.
          *

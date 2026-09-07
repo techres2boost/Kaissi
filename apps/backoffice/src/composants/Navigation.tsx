@@ -99,7 +99,12 @@ const GROUPES = [
   },
   {
     titre: 'Configuration',
-    onglets: [{ chemin: 'employes', libelle: 'Employés', icone: '👥', gestionnaire: true }],
+    onglets: [
+      { chemin: 'employes', libelle: 'Employés', icone: '👥', gestionnaire: true },
+      // « Clients » juste sous « Employés », comme dans Loyverse : ce sont
+      // les deux carnets de personnes, et on les cherche au même endroit.
+      { chemin: 'clients', libelle: 'Clients', icone: '🧑‍🤝‍🧑', gestionnaire: true },
+    ],
   },
 ] as const
 

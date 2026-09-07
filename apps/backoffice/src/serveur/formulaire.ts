@@ -43,9 +43,22 @@ export function texteObligatoire(
   return valeur
 }
 
-export function texteFacultatif(donnees: FormData, champ: string): string | null {
+export function texteFacultatif(
+  donnees: FormData,
+  champ: string,
+  /**
+   * Longueur maximale. Sans borne, une note collée depuis un document
+   * traverserait la validation et se ferait refuser par la contrainte de
+   * base, avec un message que personne ne peut lire.
+   */
+  max?: number,
+): string | null {
   const valeur = brut(donnees, champ)
-  return valeur === '' ? null : valeur
+  if (valeur === '') return null
+  if (max !== undefined && valeur.length > max) {
+    throw new ErreurSaisie(champ, `Ce champ ne peut pas dépasser ${max} caractères.`)
+  }
+  return valeur
 }
 
 /**

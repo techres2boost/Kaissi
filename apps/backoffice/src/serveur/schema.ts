@@ -148,6 +148,44 @@ export type Reduction = {
   archived_at: Horodatage | null
 }
 
+/**
+ * Une fiche client (migration 0031).
+ *
+ * Un carnet d'adresses, pas un programme de fidélité : de quoi rappeler
+ * quelqu'un pour une commande à emporter, ou reconnaître un habitué. Ni les
+ * visites ni le total dépensé ne sont ici — ils se calculent, et vivent dans
+ * la vue `clients_visites`.
+ */
+export type Client = {
+  id: Uuid
+  organization_id: Uuid
+  restaurant_id: Uuid
+  name: string
+  phone: string | null
+  email: string | null
+  note: string | null
+  created_at: Horodatage
+  updated_at: Horodatage
+  archived_at: Horodatage | null
+}
+
+/**
+ * Ce que les commandes disent d'un client — CALCULÉ, jamais compté.
+ *
+ * Un compteur incrémenté par déclencheur devrait défaire exactement ce qu'il
+ * a fait à chaque reprojection, y compris quand une commande passe
+ * « annulée ». Il dériverait en silence, et personne ne saurait depuis quand.
+ */
+export type ClientVisites = {
+  customer_id: Uuid
+  organization_id: Uuid
+  restaurant_id: Uuid
+  premiere_visite: Horodatage | null
+  derniere_visite: Horodatage | null
+  visites: number
+  depense_millimes: Millimes
+}
+
 export type TauxTaxe = {
   id: Uuid
   organization_id: Uuid
@@ -239,6 +277,13 @@ export type Commande = {
    */
   discount_id: Uuid | null
   discount_label: string | null
+  /**
+   * Le client rattaché à la commande, et son nom AU MOMENT de la vente
+   * (0031). Même raison que pour la réduction : corriger une fiche l'an
+   * prochain ne doit pas réécrire un reçu déjà remis.
+   */
+  customer_id: Uuid | null
+  customer_name: string | null
   opened_at: Horodatage
   /** Horodatage du premier envoi en cuisine. Alimente l'écran de cuisine. */
   sent_at: Horodatage | null
@@ -485,6 +530,8 @@ export type Database = {
       stations: Table<Station>
       tax_rates: Table<TauxTaxe>
       discounts: Table<Reduction>
+      customers: Table<Client>
+      clients_visites: Table<ClientVisites>
       products: Table<Produit>
       orders: Table<Commande>
       order_items: Table<LigneCommande>

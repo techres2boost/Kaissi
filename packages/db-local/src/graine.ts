@@ -292,6 +292,23 @@ export async function installerGraine(db: AdaptateurSqlite): Promise<boolean> {
       )
     }
 
+    /*
+     * Quelques clients, pour que le bouton « Client » ait quelque chose à
+     * montrer. Ils redescendent normalement du back-office ; ceux-ci n'ont
+     * d'existence que sur une caisse jamais appairée.
+     */
+    for (const [suffixe, nom, telephone] of [
+      ['0801', 'Salem Haddad', '20123456'],
+      ['0802', 'Amine Ben Youssef', '55987654'],
+      ['0803', 'Dame de la 4', null],
+    ] as const) {
+      await db.executer(
+        `INSERT INTO customers (id, organization_id, restaurant_id, name, phone)
+         VALUES (?, ?, ?, ?, ?)`,
+        [id(suffixe), DEMO_ORG, DEMO_RESTO, nom, telephone],
+      )
+    }
+
     // Identité locale de l'appareil de démonstration.
     for (const [cle, valeur] of [
       ['device_id', DEMO_DEVICE],

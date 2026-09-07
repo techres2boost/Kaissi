@@ -69,7 +69,19 @@ export interface ChargesUtiles {
   }
   'discount.removed': { ligneId?: Uuid | null }
   'service.set': { tauxBp: number; taxable: boolean; tauxTaxeId?: Uuid | null }
-  'customer.attached': { clientId: Uuid; nom?: string; telephone?: string }
+  /**
+   * Rattache un client à la commande — ou l'en DÉTACHE, avec `clientId: null`.
+   *
+   * Pas d'événement « détaché » séparé : le contraire d'un rattachement est un
+   * rattachement à personne, et le journal garde la trace des deux décisions.
+   * Un type d'événement pour l'inverse d'un autre double partout le nombre de
+   * cas à traiter.
+   *
+   * Le NOM voyage avec l'identifiant parce que la projection le RECOPIE dans
+   * la vente : corriger une fiche l'an prochain ne doit pas réécrire un reçu
+   * déjà remis.
+   */
+  'customer.attached': { clientId: Uuid | null; nom?: string; telephone?: string }
   'table.moved': { tableId: Uuid | null; motif?: string }
   'order.sent': { stationIds?: Uuid[] }
   'payment.recorded': {

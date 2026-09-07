@@ -293,6 +293,45 @@ export class SessionCaisse {
     return this.appliquer(orderId, [e])
   }
 
+  // ── Client ────────────────────────────────────────────────────────────
+
+  /**
+   * Rattache un client à la commande.
+   *
+   * Le NOM voyage avec l'identifiant, et c'est délibéré : le serveur le
+   * recopie dans la vente (`orders.customer_name`, migration 0031). Corriger
+   * une fiche l'an prochain ne doit pas réécrire un reçu déjà remis — même
+   * règle que pour le libellé d'une réduction.
+   *
+   * Aucune permission particulière : noter à qui l'on vend fait partie de la
+   * prise de commande, pas de la gestion. Ce qui est réservé, c'est de créer
+   * ou modifier une FICHE, et cela se passe au back-office.
+   */
+  async attacherClient(
+    acteur: Employe | null,
+    orderId: string,
+    client: { id: string; nom: string; telephone?: string | null } | null,
+  ): Promise<EtatCommande> {
+    if (!acteur) throw new RefusOperation('Aucun employé identifié.', false)
+    const etat = await this.etatDe(orderId)
+    this.gardeTransition(etat, 'customer.attached')
+    // Détacher, c'est rattacher « personne » : `clientId: null`. Le domaine
+    // remet alors le nom à nul avec lui.
+    const e = await this.evenement(
+      orderId,
+      'customer.attached',
+      client === null
+        ? { clientId: null }
+        : {
+            clientId: client.id as never,
+            nom: client.nom,
+            telephone: client.telephone ?? undefined,
+          },
+      acteur,
+    )
+    return this.appliquer(orderId, [e])
+  }
+
   // ── Table ─────────────────────────────────────────────────────────────
 
   async transfererTable(
