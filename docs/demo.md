@@ -1668,6 +1668,67 @@ suite se coupent, et on coupe alors aussi les vraies.
 
 ---
 
+### P. L'audit de production — les trois choses qui se VOIENT
+
+L'audit complet est dans **[`docs/audit-production.md`](audit-production.md)** :
+ce qui a été corrigé, ce qui a été mesuré puis écarté, et ce qui reste. La
+plupart de ses corrections sont invisibles à l'usage — c'est le but. Trois
+d'entre elles se vérifient à l'écran, en cinq minutes.
+
+#### P.1 — Un rapport trop large le DIT, au lieu de mentir
+
+1. Ouvre n'importe quel rapport (Rapports → **Ventes par article**) sur une
+   période très large — « Cette année », ou une date de début en 2020.
+
+**Attendu** : les chiffres s'affichent normalement. Si la période dépassait
+**50 000 commandes**, un bandeau apparaît AU-DESSUS des totaux : la période
+contient plus de commandes que l'écran n'en charge, les totaux sont donc
+partiels, et il faut resserrer la période.
+
+> **Pourquoi ce bandeau existe.** Le chargement des rapports lisait
+> auparavant les commandes SANS limite. Sur un restaurant à sa deuxième
+> année, un rapport « toute la période » demandait des dizaines de milliers
+> de lignes d'un coup : la page mettait une minute, puis parfois échouait.
+> Une limite muette aurait été pire encore — elle aurait affiché un chiffre
+> d'affaires FAUX qui aurait eu l'air juste. Un total incomplet qui se
+> déclare reste utilisable ; un total incomplet silencieux ne l'est pas.
+>
+> 50 000 n'est pas un nombre choisi au hasard : un restaurant à 55 tickets
+> par jour en fait 20 075 par an. Le plafond laisse donc passer un rapport
+> annuel entier, et ne se déclenche que sur des périodes qui, de toute
+> façon, n'ont pas de sens à l'écran.
+
+#### P.2 — Une page qui casse affiche un écran, pas un mur blanc
+
+2. Va sur une adresse qui n'existe pas : `…/‹resto›/nimportequoi`.
+
+**Attendu** : une page « Page introuvable » en français, avec un lien de
+retour — et non l'écran par défaut de Next.js en anglais.
+
+> Il existe aussi un écran d'erreur (avec un bouton « Réessayer ») pour le
+> cas où une page échoue vraiment. Avant l'audit, une erreur rendait un
+> texte anglais et un « Digest: 857891440 » — exactement ce qui avait été
+> remonté en production sur six écrans de rapports. Le digest reste affiché,
+> en petit : c'est LUI qui permet de retrouver la trace côté serveur.
+
+#### P.3 — Les tentatives sur les identifiants sont limitées
+
+3. Sur la page de connexion du back-office, ou sur l'appairage d'une
+   tablette, tape volontairement un mauvais mot de passe une dizaine de fois
+   de suite.
+
+**Attendu** : au bout de quelques essais, la réponse devient « trop de
+tentatives », avec un délai avant de pouvoir réessayer.
+
+> **Et ce qui n'est SURTOUT pas limité : `/sync`.** Une tablette qui
+> remonte ses ventes après quatre heures hors ligne envoie légitimement des
+> centaines de requêtes en rafale. La limiter, c'est perdre des
+> encaissements pour se protéger de rien : ce chemin est déjà authentifié
+> par un jeton d'appareil révocable. Le limiteur ne couvre que les chemins
+> où l'on peut ESSAYER un secret — appairage, comptes, mots de passe.
+
+---
+
 ## 6. Gérer le menu et le stock
 
 ### Changer un prix ou un coût
