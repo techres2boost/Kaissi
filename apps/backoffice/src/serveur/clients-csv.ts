@@ -34,7 +34,10 @@ export function comparerTelephone(brut: string): string {
  * en points-virgules, et l'utilisateur ne sait pas lequel il a.
  */
 export function analyserCsv(texte: string): Record<string, string>[] {
-  const sansBom = texte.replace(/^﻿/, '')
+  // Le BOM en séquence d'échappement, et non en caractère invisible : un
+  // « \ufeff » collé dans le source ne se voit ni à la relecture ni dans un
+  // diff, et se perd au premier copier-coller.
+  const sansBom = texte.replace(/^\ufeff/, '')
   const premiereLigne = sansBom.split(/\r?\n/, 1)[0] ?? ''
   const separateur =
     (premiereLigne.match(/;/g)?.length ?? 0) > (premiereLigne.match(/,/g)?.length ?? 0) ? ';' : ','

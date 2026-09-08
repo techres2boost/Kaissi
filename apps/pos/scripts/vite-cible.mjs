@@ -15,7 +15,7 @@
  */
 
 import { spawn } from 'node:child_process'
-import { dirname, join } from 'node:path'
+import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const [cible, commande, ...reste] = process.argv.slice(2)

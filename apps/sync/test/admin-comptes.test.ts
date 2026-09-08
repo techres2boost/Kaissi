@@ -35,7 +35,7 @@ const jetons = new Map<string, string>()
 /** Adresses déjà prises côté Supabase — pour rejouer le cas « déjà inscrit ». */
 const dejaInscrites = new Map<string, string>()
 let motsDePasseChanges: { id: string; motDePasse: string }[] = []
-let comptesCrees: string[] = []
+const comptesCrees: string[] = []
 
 const fetchSimule: typeof fetch = async (entree, init) => {
   const url = String(entree)

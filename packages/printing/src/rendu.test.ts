@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   millimes,
-  pointsDeBase,
   resumerShift,
   type Millimes,
   type TicketClient,

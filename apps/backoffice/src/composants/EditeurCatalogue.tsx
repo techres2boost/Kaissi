@@ -2,14 +2,11 @@
 
 import { useActionState, useState } from 'react'
 import {
-  archiverPoste,
   archiverProduit,
   basculerDisponibilite,
   deplacerProduit,
-  creerPoste,
   desarchiverProduit,
   enregistrerProduit,
-  renommerPoste,
   type Resultat,
 } from '../app/[restaurant]/catalogue/actions.js'
 import { pourChampMontant } from '../serveur/formulaire.js'

@@ -15,8 +15,11 @@ function estBoucleLocale(hote: string): boolean {
 export function expliquerEchecReseau(erreur: unknown, url: string): string {
   const origine = erreur instanceof Error ? erreur.message : String(erreur)
 
-  let hote = ''
-  let protocole = ''
+  // Déclarés SANS valeur : le `catch` ci-dessous retourne, donc un
+  // initialiseur ne serait jamais lu — et laisserait croire à un repli qui
+  // n'existe pas.
+  let hote: string
+  let protocole: string
   try {
     const analysee = new URL(url)
     hote = analysee.hostname

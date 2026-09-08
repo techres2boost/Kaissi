@@ -28,7 +28,10 @@ export default async function PageCatalogue({
     { data: stations },
     { data: taux },
     { data: produits, error },
-    { data: categoriesArchivees },
+    // La position est conservée — c'est un tableau positionnel — mais la
+    // valeur n'est plus lue : le préfixe `_` le dit sans laisser un nom qui
+    // ferait croire qu'on s'en sert.
+    { data: _categoriesArchivees },
     { data: produitsArchives },
   ] = await Promise.all([
       supabase

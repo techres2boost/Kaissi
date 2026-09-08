@@ -63,7 +63,12 @@ export interface OptionsDepot {
    * `false` en test local : le Postgres de test n'a pas de TLS.
    * Sinon, le réglage rendu par `sslDepuisEnvironnement()`.
    */
-  readonly ssl?: boolean | ReglageSsl
+  /*
+   * `boolean` OU le réglage détaillé — jamais `ReglageSsl` tel quel : ce type
+   * inclut déjà `false`, que `boolean` recouvre, et l'union redondante fait
+   * croire à deux formes là où il n'y en a qu'une.
+   */
+  readonly ssl?: boolean | Exclude<ReglageSsl, false>
   /**
    * Appelé quand une reprojection vient de CHANGER la carte — un produit
    * sorti à zéro, ou remis à la réception.

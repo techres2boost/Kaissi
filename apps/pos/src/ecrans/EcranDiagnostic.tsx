@@ -234,7 +234,7 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
                       />
                     </td>
                     <td>
-                      <button type="button" onClick={() => testerStation(s)}>
+                      <button type="button" onClick={() => void testerStation(s)}>
                         Tester
                       </button>
                     </td>

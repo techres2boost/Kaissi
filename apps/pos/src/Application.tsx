@@ -162,14 +162,25 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
         {vue.nom === 'salle' && (
           <EcranSalle
             onOuvrirCommande={(orderId) => setVue({ nom: 'commande', orderId })}
-            onNouvelleCommande={async (tableId) => {
+            /*
+             * `void` sur une fonction asynchrone passée à un gestionnaire
+             * d'événement.
+             *
+             * Sans lui, la promesse n'est tenue par personne : une ouverture
+             * de commande qui échoue — permission refusée, base verrouillée —
+             * ne produit AUCUN effet à l'écran. C'est exactement le défaut
+             * qui a fait croire que « Suspendre » était cassé, côté
+             * back-office : un bouton qui ne dit ni oui ni non se presse
+             * trois fois, puis on conclut que le logiciel ne marche pas.
+             */
+            onNouvelleCommande={(tableId) => void (async () => {
               const orderId = await app.session.ouvrirCommande(employe, {
                 type: tableId ? 'dine_in' : 'takeaway',
                 tableId,
               })
               app.rafraichir()
               setVue({ nom: 'commande', orderId })
-            }}
+            })()}
           />
         )}
 

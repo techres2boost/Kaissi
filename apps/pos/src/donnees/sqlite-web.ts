@@ -75,7 +75,11 @@ function lireImage(idb: IDBDatabase): Promise<Uint8Array | null> {
       if (!valeur) return resoudre(null)
       resoudre(valeur instanceof Uint8Array ? valeur : new Uint8Array(valeur))
     }
-    requete.onerror = () => rejeter(requete.error)
+    // Un `IDBRequest.error` peut être `null` : rejeter avec `null` donne un
+    // `catch` qui reçoit `undefined`, sans message ni pile. On garantit donc
+    // une vraie `Error` — c'est elle qu'on lira dans un rapport de panne.
+    requete.onerror = () =>
+      rejeter(requete.error ?? new Error('Lecture IndexedDB refusée, sans motif.'))
   })
 }
 
@@ -87,8 +91,8 @@ function ecrireImage(idb: IDBDatabase, image: Uint8Array): Promise<void> {
     // durable. Confondre les deux, c'est croire une vente enregistrée alors
     // qu'elle est encore en vol.
     tx.oncomplete = () => resoudre()
-    tx.onerror = () => rejeter(tx.error)
-    tx.onabort = () => rejeter(tx.error)
+    tx.onerror = () => rejeter(tx.error ?? new Error('Écriture IndexedDB refusée.'))
+    tx.onabort = () => rejeter(tx.error ?? new Error('Écriture IndexedDB interrompue.'))
     // Une COPIE : sql.js rend une vue sur sa mémoire linéaire, que la
     // prochaine écriture peut réallouer sous les pieds d'IndexedDB.
     tx.objectStore(MAGASIN).put(new Uint8Array(image), CLE)
@@ -106,7 +110,7 @@ export async function adaptateurWeb(): Promise<BaseWeb> {
   // Demandé UNE fois : sans cela, le navigateur range l'origine parmi les
   // caches jetables. Certains navigateurs l'accordent sans rien demander,
   // d'autres exigent que le site soit installé — d'où le rapport honnête.
-  let protege = false
+  let protege: boolean
   try {
     protege = (await navigator.storage?.persisted?.()) === true
     if (!protege) protege = (await navigator.storage?.persist?.()) === true

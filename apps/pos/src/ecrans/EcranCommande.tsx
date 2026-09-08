@@ -13,7 +13,6 @@ import {
   formaterTND,
   millimes,
   pointsDeBase,
-  reduireEvenements,
   estModifiable,
   type EtatCommande,
   type Millimes,

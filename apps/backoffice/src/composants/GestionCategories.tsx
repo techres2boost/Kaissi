@@ -15,7 +15,7 @@
  * « Boissons » dans la foulée doit tenir en un écran.
  */
 
-import { useActionState, useState } from 'react'
+import { useActionState } from 'react'
 import {
   archiverCategorie,
   archiverPoste,

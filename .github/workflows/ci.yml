@@ -188,6 +188,71 @@ jobs:
       - name: Tests d'intégration + banc à trois appareils
         run: pnpm --filter @kaissi/sync test
 
+  # ── Linter ────────────────────────────────────────────────────────────────
+  #
+  # Les règles retenues correspondent chacune à une panne RÉELLE de ce dépôt :
+  # la promesse abandonnée qui a fait croire que « Suspendre » était cassé, et
+  # la propriété de paramètre que le « type stripping » de Node refuse — qui
+  # aurait empêché le service de démarrer.
+  #
+  # Volontairement court : un linter qui signale trois cents choses ne signale
+  # rien, on le désactive, et ce jour-là on perd aussi les règles utiles.
+  lint:
+    name: Linter — les règles qui ont déjà attrapé quelque chose
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  # ── Dépendances et secrets ────────────────────────────────────────────────
+  #
+  # Deux contrôles que rien ne faisait, et qui trouvent des choses qu'aucune
+  # relecture ne trouve.
+  securite:
+    name: Dépendances vulnérables et secrets échappés
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Historique COMPLET : un secret commité puis retiré reste dans les
+          # objets git, et c'est justement celui-là qu'on cherche. Un scan sur
+          # le seul dernier commit ne verrait rien.
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Dépendances vulnérables
+        run: |
+          # Bloquant, et c'est le but : un avis NON examiné casse la
+          # construction.
+          #
+          # Les avis déjà examinés vivent dans `pnpm.auditConfig.ignoreGhsas`
+          # (package.json), avec la RAISON de leur mise à l'écart et la date
+          # de revue. Ce n'est pas une liste d'exceptions, c'est la trace
+          # d'une décision — et tout ce qui n'y figure pas passe au rouge.
+          #
+          # `--prod` a été essayé d'abord : dans un monorepo pnpm il ne filtre
+          # PAS les dépendances de développement, et la CI aurait donc été
+          # rouge dès le premier jour sur quatre alertes `postcss` non
+          # exploitables. Une garde qui échoue sur du code correct finit
+          # désactivée.
+          pnpm audit --audit-level=high
+
+      - name: Aucun secret dans l'historique
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   regles-absolues:
     name: Règles absolues (argent, UUID, server.url)
     runs-on: ubuntu-latest

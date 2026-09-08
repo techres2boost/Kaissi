@@ -91,9 +91,15 @@ export async function demarrer(): Promise<void> {
   // une URL, « ? » démarre la requête et « @ » sépare le mot de passe de
   // l'adresse — l'URL devient invalide ou mal découpée, et la connexion
   // échoue plus tard avec une erreur d'authentification incompréhensible.
-  let hote: string
   try {
-    hote = new URL(url).hostname
+    /*
+     * On analyse SANS retenir : cet appel ne sert qu'à provoquer l'erreur.
+     *
+     * Une variable nommée `hote` laissait croire qu'on s'en servait plus
+     * bas — alors que le `catch` sort du processus. Un nom qui ment sur
+     * l'intention coûte plus cher qu'une ligne de plus.
+     */
+    new URL(url)
   } catch {
     console.error(
       [
