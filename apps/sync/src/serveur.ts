@@ -38,6 +38,7 @@ import {
   verifierEmail,
   verifierMotDePasse,
 } from './admin-comptes.js'
+import { journal } from './journal.js'
 
 /**
  * Variables portées par le contexte de requête.
@@ -721,7 +722,7 @@ function reponseErreur(c: ContexteKaissi, erreur: unknown) {
   }
   // Une erreur inattendue ne fuite JAMAIS sa trace vers l'appareil : elle
   // part dans les journaux du serveur, où le support saura la lire.
-  console.error('[sync] erreur inattendue', erreur)
+  journal.erreur('erreur inattendue', { erreur })
   const corps: ReponseErreur = {
     erreur: 'erreur_serveur',
     message: 'Erreur interne du serveur de synchronisation. Vos ventes locales sont intactes.',

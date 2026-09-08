@@ -33,6 +33,7 @@
 
 import webpush from 'web-push'
 import type { AbonnementPush, DepotSync, ProduitEnAlerte } from './depot.js'
+import { journal } from './journal.js'
 
 /**
  * Nombre d'alertes ouvertes en UN passage.
@@ -221,7 +222,9 @@ export async function balayerAlertesStock(
   const vapid = options.vapid ?? configVapidDepuisEnvironnement()
   const email = options.email ?? configEmailDepuisEnvironnement()
   const fetchImpl = options.fetchImpl ?? fetch
-  const dire = options.journaliser ?? ((m: string) => console.log(m))
+  // Par défaut, le journal structuré : une ligne libre sur le tableau de bord
+  // d'un hébergeur est indistinguable du reste, donc introuvable.
+  const dire = options.journaliser ?? ((m: string) => journal.info(m))
 
   if (vapid) {
     webpush.setVapidDetails(vapid.sujet, vapid.clePublique, vapid.clePrivee)

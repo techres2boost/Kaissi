@@ -37,6 +37,7 @@ import type {
 import type { ChangementCatalogue, ShiftSynchronise } from './protocole.js'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { ReglageSsl } from './ssl.js'
+import { journal } from './journal.js'
 
 /**
  * Ne garde que les identifiants réellement au format UUID.
@@ -919,11 +920,18 @@ export class DepotPostgres implements DepotSync {
             try {
               this.surCarteModifiee?.(restaurantId)
             } catch (erreur) {
-              console.warn('[sync] signal de carte modifiée non délivré', erreur)
+              journal.avertissement('signal de carte modifiée non délivré', {
+                restaurantId,
+                erreur,
+              })
             }
           }
         } catch (erreur) {
-          console.warn('[sync] rupture automatique non appliquée', erreur)
+          journal.avertissement('rupture automatique non appliquée', {
+            restaurantId,
+            produits: produitsTouches.size,
+            erreur,
+          })
         }
       }
     } finally {
@@ -1426,8 +1434,35 @@ async function chargerConfig(client: PoolClient, restaurantId: string): Promise<
   }
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-function versEvenement(r: any): EvenementCommande {
+/**
+ * La forme EXACTE d'une ligne de `kaissi.order_events`, telle que `pg` la
+ * rend.
+ *
+ * Elle remplace un `any` — le seul du code. Un `any` ici désactivait le
+ * compilateur précisément sur le chemin où une faute de frappe dans un nom
+ * de colonne ne se voit qu'en production : l'événement se construit avec un
+ * champ `undefined`, la projection l'écrit, et la vente est fausse sans que
+ * rien n'échoue.
+ *
+ * Les types sont ceux du PILOTE, pas ceux de PostgreSQL : `pg` rend les
+ * `bigint` en chaîne — d'où les `Number()` ci-dessous — et les `timestamptz`
+ * en `Date`.
+ */
+interface LigneEvenement {
+  event_id: string
+  order_id: string
+  organization_id: string
+  restaurant_id: string
+  device_id: string
+  seq_device: string | number
+  server_seq: string | number | null
+  type: string
+  payload: unknown
+  actor_user_id: string | null
+  client_ts: Date | string
+}
+
+function versEvenement(r: LigneEvenement): EvenementCommande {
   return {
     eventId: r.event_id,
     orderId: r.order_id,
@@ -1436,8 +1471,12 @@ function versEvenement(r: any): EvenementCommande {
     deviceId: r.device_id,
     seqDevice: Number(r.seq_device),
     serverSeq: r.server_seq === null ? null : Number(r.server_seq),
-    type: r.type,
-    payload: r.payload,
+    // `as never` : le type d'événement et sa charge utile sont validés à
+    // l'ENTRÉE (`service.ts`), jamais à la relecture — une ligne déjà écrite
+    // dans un journal en insertion seule ne peut plus être corrigée, et la
+    // refuser à la lecture rendrait la commande illisible pour toujours.
+    type: r.type as never,
+    payload: r.payload as never,
     acteurId: r.actor_user_id,
     clientTs:
       r.client_ts instanceof Date ? r.client_ts.toISOString() : String(r.client_ts),

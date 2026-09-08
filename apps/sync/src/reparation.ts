@@ -47,6 +47,7 @@
  */
 
 import type { DepotSync } from './depot.js'
+import { journal } from './journal.js'
 
 /** Nombre d'événements récents examinés. Environ deux semaines de service. */
 export const FENETRE_DEFAUT = 20_000
@@ -85,7 +86,9 @@ export async function reparerProjectionsOrphelines(
 ): Promise<ResultatReparation> {
   const fenetre = options.fenetre ?? FENETRE_DEFAUT
   const plafond = options.plafond ?? PLAFOND_DEFAUT
-  const dire = options.journaliser ?? ((m: string) => console.log(m))
+  // Par défaut, le journal structuré : une ligne libre sur le tableau de bord
+  // d'un hébergeur est indistinguable du reste, donc introuvable.
+  const dire = options.journaliser ?? ((m: string) => journal.info(m))
   const retentionPrets = options.retentionPretsJours ?? RETENTION_PRETS_JOURS
 
   try {
@@ -107,7 +110,7 @@ export async function reparerProjectionsOrphelines(
           dire(`  🧹 ${purges} marqueur(s) « prêt » retiré(s) du journal de catalogue.`)
         }
       } catch (erreur) {
-        console.warn('[sync] purge des marqueurs « prêt » impossible', erreur)
+        journal.avertissement('purge des marqueurs « prêt » impossible', { erreur })
       }
     }
 
