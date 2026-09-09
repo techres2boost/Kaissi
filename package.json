@@ -45,21 +45,24 @@
     "turbo": "^2.3.3",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.69.0",
-    "vitest": "^3.0.5"
+    "vitest": "^4.1.11"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
     ],
     "auditConfig": {
-      "_commentaire": "Avis EXAMINÉS et écartés, avec leur raison. Ce n'est pas une liste d'exceptions : c'est la trace d'une décision. Tout avis NON listé fait échouer la CI — c'est ce qui rend ce contrôle utile plutôt que décoratif. À revoir à chaque montée de version majeure.",
-      "_revu_le": "2026-09-07",
-      "_GHSA-6g55-p6wh-862q": "postcss — lecture de fichier .map via sourceMappingURL. Dépendance de DÉVELOPPEMENT uniquement (vite -> vitest), jamais livrée. L'exploitation demande de faire traiter à postcss du CSS fourni par un attaquant au moment du build : notre CSS est dans le dépôt. `pnpm audit --prod` ne filtre pas les devDependencies dans un monorepo pnpm, d'où cette entrée explicite plutôt qu'un drapeau qui ne marche pas.",
-      "_GHSA-r28c-9q8g-f849": "postcss — même famille, même dépendance de développement, même raison.",
-      "ignoreGhsas": [
-        "GHSA-6g55-p6wh-862q",
-        "GHSA-r28c-9q8g-f849"
-      ]
+      "_commentaire": "Avis EXAMINÉS et écartés, avec leur raison. Ce n'est pas une liste d'exceptions : c'est la trace d'une décision. Tout avis NON listé fait échouer la CI — c'est ce qui rend ce contrôle utile plutôt que décoratif. Elle est VIDE aujourd'hui, et c'est le bon état : les avis qui s'y trouvaient (postcss) ne sont plus ignorés, ils sont CORRIGÉS par `pnpm.overrides`. Corriger vaut toujours mieux qu'écarter — une dérogation est faite pour ce qu'on ne PEUT pas corriger, pas pour ce qu'on n'a pas voulu faire.",
+      "_revu_le": "2026-09-09",
+      "ignoreGhsas": []
+    },
+    "overrides": {
+      "sharp": ">=0.35.4",
+      "postcss": ">=8.5.23"
+    },
+    "_overrides_pourquoi": {
+      "sharp": "GHSA-rgj7-g3m4-5g8c (HAUTE) — vulnérabilités libheif, corrigées en 0.35.4. Dépendance transitive de Next.js pour l'optimisation d'images ; Next tarde à remonter sa borne, on la force. Une alerte HAUTE ne se documente pas, elle se corrige.",
+      "postcss": "GHSA-qx2v-qp2m-jg93 et GHSA-fxqj-rqcc-2cmp — corrigés en 8.5.23. Ils étaient auparavant écartés comme « dépendance de développement » ; c'était devenu FAUX : postcss arrive maintenant par `next`, donc par le chemin de build du back-office. Une justification cesse d'être vraie sans prévenir — c'est pourquoi on préfère corriger."
     }
   }
 }
