@@ -13,6 +13,74 @@ Chaque section suit donc le même plan : le problème réel, le patron appliqué
 > en version courte. Celui-ci explique le raisonnement derrière, et le
 > vocabulaire pour le réutiliser ailleurs.
 
+### Comment lire ce document
+
+Chaque patron porte, juste sous son titre, un **renvoi vers l'endroit du code
+où il vit** :
+
+> ⟶ `packages/domain/src/totaux.ts:80` — `calculerTotaux()`
+
+Le chemin et la ligne servent à ouvrir le fichier ; c'est le **nom du symbole**
+qui est l'ancre durable — une ligne bouge, un nom se retrouve au `grep`. Quand
+un patron vit à plusieurs endroits (c'est le cas des plus importants), le
+renvoi les donne tous : c'est précisément ce qui rend le patron visible.
+
+Un patron sans renvoi n'existe pas dans ce dépôt. S'il en manque un, c'est un
+défaut de ce document, pas une abstraction.
+
+### Les 32 patrons, en un coup d'œil
+
+- [0. La contrainte qui décide de tout](#0-la-contrainte-qui-décide-de-tout)
+
+**PARTIE I — L'applicatif**
+
+- [1. Event sourcing — la commande est un journal, pas une ligne](#1-event-sourcing--la-commande-est-un-journal-pas-une-ligne)
+- [2. CQRS — écrire dans le journal, lire dans une projection](#2-cqrs--écrire-dans-le-journal-lire-dans-une-projection)
+- [3. Shared kernel — un seul endroit calcule l'argent](#3-shared-kernel--un-seul-endroit-calcule-largent)
+- [4. Ports & adapters — la même base sur trois runtimes](#4-ports--adapters--la-même-base-sur-trois-runtimes)
+- [5. Transactional outbox — ne jamais perdre une vente](#5-transactional-outbox--ne-jamais-perdre-une-vente)
+- [6. Clé d'idempotence — la garantie « jamais de double encaissement »](#6-clé-didempotence--la-garantie--jamais-de-double-encaissement-)
+- [7. Machine à états — interdire au lieu de vérifier partout](#7-machine-à-états--interdire-au-lieu-de-vérifier-partout)
+- [8. Types marqués — rendre l'état illégal impossible à écrire](#8-types-marqués--rendre-létat-illégal-impossible-à-écrire)
+- [9. Anti-corruption layer — le schéma écrit à la main](#9-anti-corruption-layer--le-schéma-écrit-à-la-main)
+- [10. Feature flag — écrit, testé, éteint](#10-feature-flag--écrit-testé-éteint)
+
+**PARTIE II — La base de données**
+
+- [11. Multi-tenance — la colonne discriminante, partout](#11-multi-tenance--la-colonne-discriminante-partout)
+- [12. Horloge logique — un curseur, jamais un timestamp](#12-horloge-logique--un-curseur-jamais-un-timestamp)
+- [13. Journal append-only + chaînage par hash](#13-journal-append-only--chaînage-par-hash)
+- [14. UUIDv7 — l'identifiant vient de celui qui crée](#14-uuidv7--lidentifiant-vient-de-celui-qui-crée)
+- [15. Instantané ponctuel — copier plutôt que joindre](#15-instantané-ponctuel--copier-plutôt-que-joindre)
+- [16. Index unique partiel — la contrainte qui sait faire une exception](#16-index-unique-partiel--la-contrainte-qui-sait-faire-une-exception)
+- [17. Migrations — en avant seulement, et additives](#17-migrations--en-avant-seulement-et-additives)
+- [17 bis. Aggregation pushdown — additionner là où sont les lignes](#17-bis-aggregation-pushdown--additionner-là-où-sont-les-lignes)
+- [17 ter. Le piège du plan générique — quand PostgreSQL devine mal](#17-ter-le-piège-du-plan-générique--quand-postgresql-devine-mal)
+
+**PARTIE III — La sécurité**
+
+- [18. Trois identités distinctes, jamais confondues](#18-trois-identités-distinctes-jamais-confondues)
+- [19. RLS — l'autorisation au plus près de la donnée](#19-rls--lautorisation-au-plus-près-de-la-donnée)
+- [20. Moindre privilège — trois rôles, trois portées](#20-moindre-privilège--trois-rôles-trois-portées)
+- [21. Le député confus — pourquoi le service relit les droits](#21-le-député-confus--pourquoi-le-service-relit-les-droits)
+- [22. Le privilège de colonne, et l'incident qu'il a causé](#22-le-privilège-de-colonne-et-lincident-quil-a-causé)
+- [23. Le hachage des PIN — Argon2id, et pourquoi pas autre chose](#23-le-hachage-des-pin--argon2id-et-pourquoi-pas-autre-chose)
+- [23 bis. Limitation de débit — protéger l'entrée, jamais la caisse](#23-bis-limitation-de-débit--protéger-lentrée-jamais-la-caisse)
+- [23 ter. Défense en profondeur — la CSP ne remplace pas RLS, elle échoue ailleurs](#23-ter-défense-en-profondeur--la-csp-ne-remplace-pas-rls-elle-échoue-ailleurs)
+
+**PARTIE IV — Fiabilité et exploitation**
+
+- [24. Auto-réparation — le bug qui a justifié le patron](#24-auto-réparation--le-bug-qui-a-justifié-le-patron)
+- [25. Les gardes de CI — les règles qu'une relecture ne tient pas](#25-les-gardes-de-ci--les-règles-quune-relecture-ne-tient-pas)
+- [26. Observabilité — l'écran qui répond à la vraie question](#26-observabilité--lécran-qui-répond-à-la-vraie-question)
+- [26 bis. Journal structuré — pour qu'une panne se cherche, pas se devine](#26-bis-journal-structuré--pour-quune-panne-se-cherche-pas-se-devine)
+- [26 ter. Frontière d'erreur — ce que voit le client quand ça casse](#26-ter-frontière-derreur--ce-que-voit-le-client-quand-ça-casse)
+
+**PARTIE V — Ce qu'on n'a PAS fait**
+
+- [Et ce qu'on a MESURÉ puis écarté](#et-ce-quon-a-mesuré-puis-écarté)
+
+
 ---
 
 ## 0. La contrainte qui décide de tout
@@ -39,6 +107,9 @@ pas encore, et tu vas choisir au hasard.
 # PARTIE I — L'applicatif
 
 ## 1. Event sourcing — la commande est un journal, pas une ligne
+> ⟶ `packages/domain/src/evenements.ts:19` — `TypeEvenement`, le vocabulaire
+> ⟶ `packages/domain/src/reduction.ts:160` — `reduire()`, le repli du journal
+
 
 **Le problème.** Deux tablettes hors ligne ajoutent chacune un article à la
 table 12. À la reconnexion, laquelle a raison ?
@@ -86,6 +157,9 @@ PowerSync (qui les implémente) est resté la porte de sortie, jamais franchie
 ---
 
 ## 2. CQRS — écrire dans le journal, lire dans une projection
+> ⟶ `packages/db-local/src/projecteur.ts` — la projection sur la tablette
+> ⟶ `apps/sync/src/depot-postgres.ts:716` — `reprojeter()`, côté serveur
+
 
 **Le problème créé par la partie 1.** Rejouer trois mille événements pour
 afficher une liste de commandes rendrait la caisse lente en fin de service,
@@ -122,6 +196,9 @@ ici ; inacceptable si l'écran servait à décider d'un débit bancaire.
 ---
 
 ## 3. Shared kernel — un seul endroit calcule l'argent
+> ⟶ `packages/domain/src/totaux.ts:80` — `calculerTotaux()`, l'ordre figé
+> ⟶ `packages/domain/src/marge.ts:74` — `calculerMarge()`, la base du CA
+
 
 **Le problème.** La tablette calcule un total, le serveur le recalcule. S'ils
 divergent d'un millime, l'écart apparaît dans une caisse, un mois plus tard,
@@ -149,6 +226,9 @@ exhaustive, sans base ni serveur — 168 tests en 6 secondes.
 ---
 
 ## 4. Ports & adapters — la même base sur trois runtimes
+> ⟶ `packages/db-local/src/adaptateur.ts:15` — le port, six méthodes
+> ⟶ `packages/db-local/src/adaptateurs/` — Capacitor, Node, navigateur
+
 
 **Le problème.** SQLite s'appelle différemment sur Android (plugin Capacitor),
 dans un navigateur (wa-sqlite/OPFS) et sous Node (better-sqlite3). Écrire trois
@@ -172,6 +252,10 @@ vocabulaire du domaine, jamais celui d'une technologie. Le nôtre parle de
 ---
 
 ## 5. Transactional outbox — ne jamais perdre une vente
+> ⟶ `packages/db-local/src/depots/journal.ts:2` — l'écriture jumelée
+> ⟶ `packages/sync-client/src/index.ts:36` — `delaiRetentative()`, la gigue
+> ⟶ `packages/sync-client/src/index.ts:52` — `estReessayable()`, ce qui ne se réessaie JAMAIS
+
 
 **Le problème.** La tablette encaisse hors ligne. Comment garantir que la
 vente partira, un jour, exactement une fois ?
@@ -200,6 +284,9 @@ serveur reçoit cinquante lots simultanés — le *thundering herd*.
 ---
 
 ## 6. Clé d'idempotence — la garantie « jamais de double encaissement »
+> ⟶ `supabase/migrations/0005_sync.sql:8` — `sync_mutations.event_id`, clé primaire
+> ⟶ `apps/sync/src/service.ts:149` — `push()`, l'idempotence consultée AVANT le métier
+
 
 **Le problème.** Le réseau coupe pendant le `POST`. La vente est-elle
 enregistrée ? La tablette n'en sait rien, donc elle réessaie. Une distribution
@@ -226,6 +313,8 @@ si.
 ---
 
 ## 7. Machine à états — interdire au lieu de vérifier partout
+> ⟶ `packages/domain/src/machine-etat.ts:18` — `TRANSITIONS`
+
 
 **Le problème.** Peut-on ajouter une ligne à une commande déjà encaissée ? La
 question se repose à chaque écran, et une seule réponse oubliée crée un trou.
@@ -243,6 +332,8 @@ n'est donc pas un booléen, c'est un verdict avec un motif.
 ---
 
 ## 8. Types marqués — rendre l'état illégal impossible à écrire
+> ⟶ `packages/domain/src/monnaie.ts:40` — `millimes()`, le constructeur qui refuse
+
 
 **Le problème.** `montant: number` accepte `24.5`, `-3`, `NaN` et
 `0.1 + 0.2`. Un flottant pour de l'argent est une erreur qui n'apparaît
@@ -270,6 +361,8 @@ type manque.
 ---
 
 ## 9. Anti-corruption layer — le schéma écrit à la main
+> ⟶ `apps/backoffice/src/serveur/schema.ts:503` — `Database`, écrit à la main
+
 
 **Le problème.** Le back-office lit Postgres via PostgREST. Un générateur de
 types produirait un miroir automatique — et une colonne renommée casserait la
@@ -286,6 +379,8 @@ générateur, lui, aurait tout déclaré, y compris ce que personne ne lit.
 ---
 
 ## 10. Feature flag — écrit, testé, éteint
+> ⟶ `apps/pos/src/config.ts:13` — `IMPRESSION_ACTIVE`
+
 
 `apps/pos/src/config.ts` porte `IMPRESSION_ACTIVE`, faux par défaut. Le module
 d'impression reste **écrit, testé et importé** ; il ne tourne simplement pas.
@@ -302,6 +397,8 @@ morte. Un drapeau doit avoir une date ou une condition de sortie.
 # PARTIE II — La base de données
 
 ## 11. Multi-tenance — la colonne discriminante, partout
+> ⟶ `supabase/migrations/0002_tenance.sql:4` — la colonne, partout
+
 
 **Trois modèles existent :**
 
@@ -330,6 +427,8 @@ quand elles paraissent prématurées. Les décisions réversibles se repoussent.
 ---
 
 ## 12. Horloge logique — un curseur, jamais un timestamp
+> ⟶ `supabase/migrations/0005_sync.sql` — `change_log.seq`, un `bigserial`
+
 
 **Le problème.** Sur quoi une tablette dit-elle « donne-moi ce qui a changé
 depuis… » ?
@@ -353,6 +452,8 @@ algorithme (et non au confort d'affichage), c'est un bug qui attend.
 ---
 
 ## 13. Journal append-only + chaînage par hash
+> ⟶ `packages/domain/src/audit.ts:37` — le chaînage par hash
+
 
 **Le problème.** Un journal d'audit qu'on peut modifier ne prouve rien.
 
@@ -374,6 +475,8 @@ registre chaîné, sans rien emprunter aux chaînes de blocs.
 ---
 
 ## 14. UUIDv7 — l'identifiant vient de celui qui crée
+> ⟶ `packages/domain/src/uuid.ts:48` — `uuidV7()`
+
 
 **Le problème.** Une tablette doit pouvoir ouvrir une commande **sans
 réseau**. Un `serial` exige un aller-retour serveur : disqualifié.
@@ -392,6 +495,9 @@ décision de **localité d'écriture**.
 ---
 
 ## 15. Instantané ponctuel — copier plutôt que joindre
+> ⟶ `supabase/migrations/0030_referentiel_de_reductions.sql` — `discount_label` recopié
+> ⟶ `supabase/migrations/0031_base_clients.sql` — `customer_name` recopié
+
 
 **Le problème.** Un rapport affiche « Happy hour ». L'an prochain, le gérant
 renomme la réduction en « Heure creuse ». Que doit afficher le rapport de
@@ -414,6 +520,8 @@ joint. Une facture est un fait ; un solde est un état.
 ---
 
 ## 16. Index unique partiel — la contrainte qui sait faire une exception
+> ⟶ `supabase/migrations/0021_appairage_stable.sql:60` — `devices_installation_idx`, partiel sur `revoked_at is null`
+
 
 Trois exemples, trois raisons :
 
@@ -439,6 +547,9 @@ et presque jamais ce qu'on écrit du premier coup.
 ---
 
 ## 17. Migrations — en avant seulement, et additives
+> ⟶ `packages/db-local/src/migrations/index.ts:30` — le registre vérifié
+> ⟶ `packages/db-local/src/migrateur.ts` — une migration, une transaction
+
 
 | Règle | Pourquoi |
 |---|---|
@@ -453,9 +564,133 @@ remplace ; les données, elles, restent.
 
 ---
 
+## 17 bis. Aggregation pushdown — additionner là où sont les lignes
+> ⟶ `supabase/migrations/0033_rapports_agreges_en_sql.sql` — `kaissi.rapport_ventes()`
+> ⟶ `apps/backoffice/src/serveur/agregats.ts:266` — `chargerAgregats()`
+> ⟶ `apps/sync/test/rapports-agreges.test.ts` — les DEUX chemins, comparés au millime
+
+**Le problème.** Un écran de rapport affiche une trentaine de nombres. Pour
+les produire, le back-office lisait la **ligne à ligne** : sur un trimestre à
+200 ventes par jour, 18 400 commandes et 55 200 lignes traversaient le réseau,
+étaient désérialisées en objets JavaScript dans une fonction serverless, puis
+additionnées. Mesuré au point de rupture : 73 000 commandes, un tri **sur
+disque** dans PostgreSQL, et une erreur 500 sans explication — sur l'écran du
+chiffre d'affaires.
+
+**Le patron : *aggregation pushdown*.** On ne déplace pas les données vers le
+calcul ; on déplace le calcul vers les données. La base rend quelques
+kilo-octets de JSON au lieu de plusieurs dizaines de mégaoctets de lignes.
+
+**La question qui rend ce patron intéressant ici**, et qui vaut pour tout
+système où l'argent se calcule : *cela n'enfreint-il pas la RÈGLE 7 — « les
+totaux se calculent à un seul endroit » ?*
+
+Non, et la distinction est **tout le sujet** :
+
+| | Ce que c'est | Où ça vit |
+|---|---|---|
+| **Une règle** | une **décision** — arrondir la TVA par taux puis sommer et non l'inverse ; répartir la remise globale au prorata ; rapporter la marge au CA ; n'arrondir les coûts qu'une fois, au total | `packages/domain`, et nulle part ailleurs |
+| **Une somme** | `sum()` sur des entiers **déjà décidés** — associative, exacte, indifférente à l'ordre | là où sont les lignes |
+
+La fonction SQL ne fait **que** la seconde. Elle ne recalcule aucune TVA, ne
+répartit aucune remise, ne divise rien. Trois précautions rendent la frontière
+**vérifiable** plutôt que déclarative :
+
+1. **Les coûts sortent NON ARRONDIS**, en `numeric` exact. C'est
+   `totaliserCouts()` du domaine qui arrondit, une seule fois. Arrondir en SQL
+   aurait déplacé une décision — et le test le refuserait.
+   *Effet de bord agréable* : le SQL est **plus exact** que l'ancien chemin,
+   parce que `numeric` est de l'arithmétique décimale là où JavaScript
+   accumulait en flottant.
+2. **Aucun pourcentage** n'est calculé en SQL. La fonction rend un CA et un
+   coût ; `calculerMarge()` en fait une marge. Une division est un arrondi,
+   donc une décision.
+3. **Un test compare les deux chemins** sur le même jeu de ventes et exige
+   l'égalité au millime : deux taux de TVA, deux employés, une remise nommée,
+   une sans motif, une remise globale répartie au prorata, une ligne annulée,
+   un coût fractionnaire (1,234567 millime l'unité), et une vente encaissée à
+   1 h du matin.
+
+**Le test a été éprouvé en sabotant volontairement le SQL** : retirer le
+filtre des lignes annulées fait tomber 4 tests, supprimer la bascule de
+journée commerciale en fait tomber 2. Un test de non-régression qu'on n'a
+jamais vu échouer ne prouve rien.
+
+**Ce que ça coûte.** Une seconde implémentation à garder alignée. C'est réel,
+et c'est la raison du test de comparaison : il ne documente pas l'alignement,
+il le **vérifie**.
+
+**Le corollaire d'architecture.** Le plafond de 50 000 commandes posé pendant
+l'audit était un garde-fou, pas une architecture. Sept écrans sur neuf ne
+chargent désormais plus **aucune** ligne, et n'ont donc plus rien à tronquer.
+Il reste sur les deux qui affichent une **liste** de tickets — là, une ligne
+écrite est une ligne lue, et l'agréger n'aurait aucun sens.
+
+**La règle à retenir** : *avant de déplacer un calcul, sépare la décision de
+l'addition.* La décision ne se duplique jamais ; l'addition se déplace
+librement.
+
+---
+
+## 17 ter. Le piège du plan générique — quand PostgreSQL devine mal
+> ⟶ `supabase/migrations/0033_rapports_agreges_en_sql.sql` — `set plan_cache_mode = 'force_custom_plan'`
+> ⟶ `apps/sync/test/rapports-agreges.test.ts` — le test qui fige la déclaration
+
+Ce patron n'était pas prévu. Il vient d'un banc de mesure, et c'est
+exactement pour cela qu'il mérite une section.
+
+**Le symptôme.** La fonction d'agrégation, écrite en `language sql`, était
+juste — et mettait **27 300 ms** sur 92 jours de ventes. La *même requête*,
+écrite à la main avec des dates littérales, en mettait **175 ms**. Cent
+soixante fois.
+
+**La cause.** PostgreSQL ne connaît pas les valeurs de `p_debut` et `p_fin` au
+moment où il planifie le corps d'une fonction. Il applique une sélectivité par
+défaut et estime que la période contiendra **UNE** commande. Sur cette
+estimation, il choisit des boucles imbriquées — le bon plan pour une ligne — et
+rebalaye alors un CTE de 18 000 lignes une fois par commande. Trois cent
+trente millions de lignes visitées pour en agréger cinquante-cinq mille.
+
+```
+        estimation du planificateur :        1 commande
+        réalité :                       18 400 commandes
+        conséquence :          Nested Loop au lieu de Hash Join
+```
+
+**Le correctif, en une ligne** : `plan_cache_mode = 'force_custom_plan'`.
+PostgreSQL replanifie alors à chaque appel, avec les vraies bornes.
+Replanifier coûte une fraction de milliseconde ; se tromper de plan en coûte
+vingt-sept mille.
+
+**Et le détail qui a coûté le plus de temps à trouver** : ce réglage n'a
+**aucun effet** sur une fonction `language sql` — son corps ne passe pas par le
+cache de plans qui l'honore. D'où le `begin … return (…) ; end` en `plpgsql`
+qui enveloppe la requête. Il ne fait rien d'autre que la confier à un moteur
+qui écoute ce réglage. Mesuré ensuite : **380 ms**.
+
+**Pourquoi c'est un patron et pas une anecdote.** Le symptôme aurait été le
+pire qui soit en production : correct en démonstration, correct chez un client
+qui démarre, et **de plus en plus lent chez celui qui vend le plus** — sans
+qu'une ligne de code ait changé. Un redémarrage de serveur l'aurait même
+« réparé » quelques requêtes durant.
+
+Deux tests figent donc la **déclaration** de la fonction (`plpgsql` et
+`force_custom_plan`), et non sa durée : un test de durée serait instable en
+intégration continue, alors qu'un `begin … end` qui a l'air inutile finit
+toujours par être « nettoyé ».
+
+**La leçon générale, valable hors PostgreSQL :** *un plan de requête est une
+hypothèse sur les données.* Dès qu'un paramètre décide de la taille du
+résultat, il faut vérifier que le moteur peut le savoir — ou le lui imposer.
+
+---
+
 # PARTIE III — La sécurité
 
 ## 18. Trois identités distinctes, jamais confondues
+> ⟶ `packages/domain/src/pin.ts:92` — le PIN, qui TRACE
+> ⟶ `apps/sync/src/jeton.ts` — le jeton d'appareil, qui PROTÈGE
+
 
 C'est la décision de sécurité la plus structurante du produit, et elle tient à
 une observation de terrain : **un serveur en salle change cinq fois par
@@ -484,6 +719,9 @@ C'est un modèle de menace, en une phrase.
 ---
 
 ## 19. RLS — l'autorisation au plus près de la donnée
+> ⟶ `supabase/migrations/0002_tenance.sql` — `protege_transactionnel()`
+> ⟶ `apps/backoffice/src/serveur/supabase.ts` — la clé publique, et rien d'autre
+
 
 **Le problème.** Le cloisonnement entre clients repose-t-il sur la vigilance
 de chaque `where restaurant_id = …` écrit à la main ? Un seul oubli rend les
@@ -519,6 +757,8 @@ profondeur*, et ce n'est pas « en mettre deux » : c'est en mettre deux
 ---
 
 ## 20. Moindre privilège — trois rôles, trois portées
+> ⟶ `apps/sync/src/depot-postgres.ts:143` — `sousIdentite()`, l'emprunt de rôle
+
 
 | Qui | Rôle Postgres | Peut |
 |---|---|---|
@@ -546,6 +786,8 @@ c'est exactement ainsi qu'on fabrique une fuite entre clients.
 ---
 
 ## 21. Le député confus — pourquoi le service relit les droits
+> ⟶ `apps/sync/src/serveur.ts` — les routes `/admin`, qui relisent les droits en base
+
 
 **Le problème.** Le back-office appelle le service pour créer un compte, parce
 que cela exige `service_role`. Le service a plus de pouvoirs que son appelant.
@@ -571,6 +813,8 @@ l'identité de l'appelant.
 ---
 
 ## 22. Le privilège de colonne, et l'incident qu'il a causé
+> ⟶ `supabase/migrations/0024_admin_distribue_les_pouvoirs.sql` — le privilège de colonne
+
 
 La migration `0014` accorde à un gérant l'écriture sur `users`, **colonne par
 colonne** : `full_name`, `phone`, `pin_hash`, `status`, `archived_at`. Pas
@@ -600,6 +844,8 @@ raison de l'écrire. Cinq tests RLS l'ont figé
 ---
 
 ## 23. Le hachage des PIN — Argon2id, et pourquoi pas autre chose
+> ⟶ `packages/domain/src/pin.ts:92` — `hacherPin()`, Argon2id
+
 
 | Choix | Verdict |
 |---|---|
@@ -617,9 +863,99 @@ PIN.
 
 ---
 
+## 23 bis. Limitation de débit — protéger l'entrée, jamais la caisse
+> ⟶ `apps/sync/src/limiteur.ts:89` — `Limiteur`, fenêtre glissante en mémoire
+> ⟶ `apps/sync/src/serveur.ts:116` — les deux limiteurs, et le commentaire qui dit où ils NE s'appliquent pas
+
+**Le problème.** `POST /appairage` accepte un e-mail et un mot de passe **sans
+authentification préalable**. C'est le seul endroit du produit où l'on peut
+*essayer* un secret, et il n'avait aucune limite.
+
+**Ce qui rend ce défaut plus grave qu'il n'en a l'air.** Le bourrage
+d'identifiants est le risque évident ; le vrai est ailleurs. Chaque tentative
+appelle GoTrue, **dont le quota est par projet Supabase** — et c'est notre
+serveur qu'il voit, pas l'attaquant. Il n'était donc pas nécessaire de trouver
+un mot de passe : saturer suffisait pour que **les vrais gérants ne puissent
+plus appairer**. L'endpoint était un amplificateur de déni de service.
+
+**Le patron : compteur à fenêtre glissante, sur DEUX dimensions.**
+
+| Dimension | Arrête |
+|---|---|
+| par **IP** | le balayage depuis une machine |
+| par **adresse e-mail** | le bourrage où l'attaquant change d'IP mais garde sa cible |
+
+L'une sans l'autre en laisse passer la moitié. C'est le point général : *une
+limite se pose sur ce qui identifie l'attaque, et une attaque a souvent deux
+identités.*
+
+**Ce qui n'est délibérément PAS limité : `/sync/*`.** Une caisse qui rattrape
+trois semaines hors ligne envoie légitimement des dizaines de lots à la
+suite ; la freiner retarderait des encaissements **déjà faits**. Le jeton
+d'appareil fait 32 octets aléatoires — il n'y a rien à protéger contre la
+force brute. *L'encaissement ne doit jamais s'arrêter* vaut aussi contre nos
+propres garde-fous, et c'est le test le plus important du fichier.
+
+**Deux défauts trouvés dans le correctif lui-même**, avant qu'il ne parte —
+et ils disent quelque chose sur la manière de relire un garde-fou :
+
+- il devenait **O(n log n) par requête** une fois son plafond de clés atteint,
+  c'est-à-dire précisément sous l'attaque qu'il devait absorber (8 s pour
+  25 000 clés → 54 ms après correction, par éviction dans l'ordre d'insertion
+  plutôt que par tri) ;
+- il utilisait une **propriété de paramètre**, que le *type stripping* de Node
+  refuse : **le service n'aurait pas démarré**. Une règle ESLint le refuse
+  maintenant à la frappe (§25).
+
+**Limite connue et assumée** : le compteur est en mémoire, donc **par
+processus**. Avec plusieurs instances, un attaquant obtient N fois le quota.
+Le jour du passage à l'échelle horizontale, il doit descendre dans Postgres ou
+Redis. *Un limiteur qu'on croit distribué sans l'être est pire que pas de
+limiteur*, parce qu'on cesse de regarder.
+
+---
+
+## 23 ter. Défense en profondeur — la CSP ne remplace pas RLS, elle échoue ailleurs
+> ⟶ `apps/backoffice/src/middleware.ts:47` — `politiqueContenu()`, nonce par réponse
+> ⟶ `apps/backoffice/next.config.mjs:49` — HSTS, nosniff, COOP, X-Frame-Options
+
+**Le problème.** Le back-office n'envoyait **aucun** en-tête de sécurité. Il
+était encadrable dans une iframe — donc détournable au clic — et le navigateur
+n'avait aucune consigne sur ce qu'il avait le droit de charger.
+
+**Le patron : *defence in depth*.** Le point important n'est pas d'empiler des
+protections, c'est que **chacune échoue différemment** :
+
+| Mécanisme | Empêche | N'empêche PAS |
+|---|---|---|
+| **RLS** | qu'un client LISE les données d'un autre | qu'un script injecté agisse dans la session d'un gérant légitime |
+| **CSP** | qu'un script injecté s'exécute | qu'une requête légitime rende trop de lignes |
+| **`ecranReserve()`** | qu'un rôle de préparation ouvre l'écran des ventes | quoi que ce soit entre CLIENTS — c'est le travail de RLS |
+
+Un mécanisme dont on ne sait pas dire **ce qu'il ne protège pas** est un
+mécanisme dont on surestime la portée. La question 5 de la checklist finale
+existe pour cela.
+
+**Le détail qui fait la différence entre une CSP et un décor :** le nonce est
+**renouvelé à chaque réponse**. Une valeur écrite dans la configuration serait
+constante, donc devinable, donc exactement aussi utile que `'unsafe-inline'`.
+
+`'unsafe-inline'` reste d'ailleurs sur les **styles**, et jamais sur les
+scripts : React pose des styles en ligne, et un style injecté **défigure** une
+page là où un script la **détourne**. Le compromis est asymétrique, et il
+penche du bon côté.
+
+**Vérifié dans un vrai navigateur**, en mode développement *et* en mode
+production : zéro violation, hydratation vivante. *Une CSP qu'on n'a pas
+chargée dans un navigateur est une hypothèse, pas une protection.*
+
+---
+
 # PARTIE IV — Fiabilité et exploitation
 
 ## 24. Auto-réparation — le bug qui a justifié le patron
+> ⟶ `apps/sync/src/reparation.ts:53` — la boucle qui reprend ce qui a échoué
+
 
 **La panne, observée en production.** Deux ventes avaient *tous* leurs
 événements dans `order_events`, `order.closed` compris, et **aucune ligne**
@@ -657,6 +993,9 @@ rattrape.
 ---
 
 ## 25. Les gardes de CI — les règles qu'une relecture ne tient pas
+> ⟶ `.github/workflows/ci.yml:257` — « Règles absolues »
+> ⟶ `apps/pos/scripts/verifier-mode-avion.mjs:10` — la garde `server.url`
+
 
 `.github/workflows/ci.yml` porte un job « Règles absolues » qui refuse :
 un `server.url` dans la configuration Capacitor ; une colonne monétaire sans
@@ -681,6 +1020,8 @@ détail de confort. C'est ce qui décide s'il survivra.
 ---
 
 ## 26. Observabilité — l'écran qui répond à la vraie question
+> ⟶ `apps/pos/src/ecrans/EcranDiagnostic.tsx:34` — l'écran du gérant
+
 
 Pas de Prometheus, pas de Grafana : un **écran Diagnostic** sur la tablette,
 lisible par le gérant.
@@ -698,6 +1039,82 @@ jour », et elle l'était — pour tout sauf ça.
 **La leçon générale :** une métrique utile répond à une **question qu'on se
 pose vraiment**. « Le service est-il en vie » n'est presque jamais cette
 question.
+
+---
+
+## 26 bis. Journal structuré — pour qu'une panne se cherche, pas se devine
+> ⟶ `apps/sync/src/journal.ts:125` — `journal`, une ligne = un objet JSON
+
+**Le problème.** Le service journalisait en `console.log`, en texte libre. Sur
+le tableau de bord d'un hébergeur, ces lignes sont indistinguables du reste :
+impossible de filtrer « montre-moi les erreurs », impossible de suivre UNE
+requête à travers plusieurs lignes, impossible de compter. On lit donc tout, à
+l'œil, en remontant — c'est-à-dire qu'on ne lit pas.
+
+**Le patron : JSONL** — une ligne, un objet JSON. C'est ce que savent lire
+Railway, Vercel, Datadog, Loki et `jq`, sans aucune dépendance : quarante
+lignes remplacent un paquet de plus à suivre, à mettre à jour et à auditer.
+
+**Mais le format n'est pas ce qui compte le plus.** Ce qui compte est **ce qui
+ne doit pas y entrer**. Un journal finit chez un hébergeur, dans un
+agrégateur, parfois collé dans un ticket de support : un jeton d'appareil qui
+s'y glisse une seule fois est un jeton à révoquer, et personne ne saura lequel.
+
+Le masquage porte donc sur le **NOM du champ**, en profondeur — jamais sur la
+valeur. Une expression régulière sur la valeur laisserait toujours passer le
+format qu'on n'avait pas prévu ; une liste de noms est explicite, relisible, et
+son défaut est de masquer un champ anodin de trop.
+
+**Deux garde-fous qui n'ont l'air de rien**, et qui sont les vrais pièges de
+ce patron :
+
+- **la profondeur est bornée** — une erreur `pg` porte sa connexion, qui se
+  porte elle-même ; une trace qui tue le processus est pire que la panne
+  qu'elle décrit ;
+- **`Error` est traitée à part** — parce que `JSON.stringify(new Error('x'))`
+  rend `{}`. Le message et la pile disparaîtraient exactement au moment où on
+  en a besoin.
+
+**Tout sur `stdout`, y compris les erreurs**, et non `stderr` : les hébergeurs
+mélangent les deux flux dans un même journal, et les séparer fait perdre
+l'ORDRE relatif des lignes. Une erreur apparaîtrait alors avant la requête qui
+l'a causée.
+
+---
+
+## 26 ter. Frontière d'erreur — ce que voit le client quand ça casse
+> ⟶ `apps/backoffice/src/app/error.tsx:32` — l'écran d'erreur
+> ⟶ `apps/backoffice/src/app/global-error.tsx` — celui qui ne dépend d'aucun style
+
+**Le problème, tel qu'il s'est produit.** Six écrans de rapport sont tombés en
+production. Ce que le client a vu :
+
+```
+Application error: a server-side exception has occurred
+(see the server logs). Digest: 857891440
+```
+
+En anglais, sans issue, et « voir les journaux » s'adresse à quelqu'un qui
+n'est pas là.
+
+**Le patron : *error boundary*** — mais le patron n'est pas le sujet. Le sujet
+est **l'ordre dans lequel l'écran parle** :
+
+1. **« vos données ne sont pas perdues »** — c'est la première inquiétude
+   devant une caisse cassée, et personne ne lit la suite tant qu'elle n'est pas
+   levée ;
+2. **quoi faire maintenant** — un bouton « Réessayer », un lien de retour ;
+3. **le code à donner au support** — le `digest`, en petit. C'est **lui** qui
+   permet de retrouver la trace côté serveur, et c'est la seule raison de
+   l'afficher.
+
+**Le détail non évident :** `global-error.tsx` ne dépend d'**aucune** feuille
+de style — tout est en styles en ligne. C'est précisément le CSS qui peut
+manquer quand cet écran-là s'affiche.
+
+**La leçon générale :** un message d'erreur s'écrit pour **celui qui le lira**.
+« An unexpected error occurred » est écrit pour le développeur qui n'a pas
+voulu choisir.
 
 ---
 
@@ -722,6 +1139,51 @@ distingue « on verra » d'une décision.
 
 ---
 
+## Et ce qu'on a MESURÉ puis écarté
+
+La section précédente écarte des architectures. Celle-ci écarte des
+**optimisations**, et c'est un exercice différent : on n'écarte pas sur un
+raisonnement, on écarte sur un chiffre. Sans le chiffre écrit quelque part,
+la même idée revient tous les six mois et on la re-discute.
+
+| Piste | Mesure | Verdict |
+|---|---|---|
+| Index sur `orders(restaurant_id, closed_at)` | aucun gain : le chargement rendait déjà **toutes** les lignes de la période — l'index n'évitait rien | écarté… **puis créé** (§17 bis) |
+| Fusionner les politiques permissives multiples sur 18 tables *(recommandé par l'analyseur Supabase)* | 3,569 ms contre 3,552 ms sur 50 000 produits | **écarté** — réécrire dix-huit politiques de **sécurité** pour zéro gain mesurable est un mauvais échange |
+| `(select auth.uid())` au lieu de `auth.uid()` | 3,628 ms → 3,492 ms sur 40 000 lignes, soit 4 % — dans le bruit | **appliqué quand même**, mais pas pour la performance |
+| Indexer les 86 clés étrangères non indexées | aucune requête du produit ne les emprunte | écarté |
+| Les 4 alertes `postcss` | non exploitables — outil de build, jamais exécuté chez un client | écartées, **avec leur raison et leur date de revue** |
+
+**Trois choses valent d'être retenues de ce tableau, et aucune n'est un
+chiffre.**
+
+**1. Une mesure vaut pour une requête, pas pour une table.** L'index sur
+`(restaurant_id, closed_at)` a été écarté à juste titre : à l'époque, le
+chargement rendait toutes les lignes et un index n'évite rien quand il faut
+tout lire. Il a été créé six commits plus tard, sans que la table ait changé —
+parce que **la requête**, elle, avait changé : une agrégation peut s'arrêter à
+l'index. *Une décision de performance est datée par la requête qu'elle sert.*
+
+**2. Un outil qui suggère n'est pas un outil qui mesure.** L'analyseur de
+Supabase avait raison sur le diagnostic (`auth.uid()` apparaît par ligne dans
+le PLAN) et tort sur la conséquence : la fonction est déclarée `stable`, donc
+PostgreSQL met déjà son résultat en cache. Le gain réel est de 4 %.
+
+On l'a appliqué **quand même**, et pour une raison qui n'est pas la
+performance : *un avertissement permanent qu'on a décidé d'ignorer enterre
+celui qui, un jour, comptera vraiment.* Garder un tableau de bord d'analyse
+**lisible** est une raison suffisante — à condition de le dire, ce que fait la
+migration `0032` en tête de fichier.
+
+**3. Une exception documentée n'est pas une exception.** Les quatre alertes
+`postcss` sont listées dans `pnpm.auditConfig.ignoreGhsas`, chacune avec **sa
+raison** et **sa date de revue**. Ce n'est pas une liste de dérogations, c'est
+la trace d'une décision — et tout avis **non listé** fait échouer la
+construction. La différence entre les deux est exactement la différence entre
+un garde-fou et un décor.
+
+---
+
 # Comment décider, la prochaine fois
 
 Les six questions qui ont produit toutes les décisions ci-dessus :
@@ -740,6 +1202,17 @@ Les six questions qui ont produit toutes les décisions ci-dessus :
    moitié de la réponse dit où il faut un second mécanisme.
 6. **Comment le saurai-je quand ça cassera ?** Si la réponse est « le client
    appellera », l'observabilité manque.
+7. **Ce calcul est-il une DÉCISION ou une ADDITION ?** Une décision ne se
+   duplique jamais ; une addition se déplace librement, y compris dans la base
+   (§17 bis). Confondre les deux fait soit un noyau qu'on contourne, soit des
+   écarts de caisse.
+8. **Quelle hypothèse mon moteur fait-il sur mes données ?** Un plan de
+   requête, un cache, un dimensionnement de pool sont des paris sur des
+   volumes. Le jour où le pari est faux, rien ne casse — ça ralentit, chez le
+   client qui s'en sert le plus (§17 ter).
+9. **Ai-je mesuré, ou ai-je supposé ?** Et si j'ai mesuré : *où le chiffre
+   est-il écrit ?* Une optimisation écartée sans trace revient tous les six
+   mois.
 
 ---
 
@@ -760,6 +1233,15 @@ Par ordre d'utilité pour ce qui précède :
   distribuées. C'est le fondement des parties 5 et 6.
 - **Marc Brooker, *Timeouts, retries and backoff with jitter*** (blog AWS
   Builders' Library) — pourquoi la gigue n'est pas une coquetterie.
+
+Et dans ce dépôt :
+
+- **[`docs/audit-production.md`](audit-production.md)** — l'audit complet dont
+  sortent les sections 17 bis, 17 ter, 23 bis, 23 ter, 26 bis et 26 ter. Il
+  donne pour chaque défaut la mesure qui l'a révélé, ce qui vaut mieux qu'un
+  patron nommé.
+- **[`docs/architecture.md`](architecture.md)** — les mêmes décisions, en
+  version courte, sans le raisonnement.
 
 Et le plus utile de tous : **relis les migrations de ce dépôt dans l'ordre**,
 de `0001` à la dernière. Chacune porte en tête le problème qu'elle résout. On

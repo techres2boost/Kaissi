@@ -57,7 +57,7 @@ mode avion — le seul test qui compte vraiment.
 | [`docs/tester-sans-tablette.md`](docs/tester-sans-tablette.md) | **Tester Android et l'impression sans matériel** — émulateur + imprimante virtuelle |
 | [`docs/tester-mode-avion.md`](docs/tester-mode-avion.md) | Le critère de sortie : démarrer sans réseau |
 | [`docs/architecture.md`](docs/architecture.md) | Les décisions structurantes, en version courte |
-| [`docs/system-design.md`](docs/system-design.md) | **Monter en compétence** — les patrons appliqués, applicatif, base, sécurité, et ceux qu'on a écartés |
+| [`docs/system-design.md`](docs/system-design.md) | **Monter en compétence** — 32 patrons, chacun avec son renvoi vers le code, plus ceux qu'on a mesurés puis écartés |
 | [`docs/audit-production.md`](docs/audit-production.md) | **L'audit de production** — ce qui a été corrigé, ce qui a été mesuré puis écarté, ce qui reste |
 | [`CLAUDE.md`](CLAUDE.md) | Les huit règles absolues du dépôt |
 

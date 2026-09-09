@@ -93,6 +93,24 @@ Les étapes **4** et **6** sont les deux sources d'écart les plus fréquentes e
 production. Elles sont couvertes par des tests exhaustifs ; ne les modifie pas
 sans en ajouter.
 
+> **La seule nuance, et elle est capitale : une RÈGLE n'est pas une SOMME.**
+>
+> Une **règle** est une décision — arrondir la TVA par taux puis sommer et non
+> l'inverse, répartir la remise globale au prorata, rapporter la marge au CA,
+> n'arrondir les coûts qu'une fois au total. Elle vit dans `packages/domain`,
+> et **nulle part ailleurs**.
+>
+> Une **somme** d'entiers déjà décidés n'est pas une décision : `sum()` est
+> associative et exacte. C'est ce qui autorise `kaissi.rapport_ventes()`
+> (migration 0033) à additionner les rapports DANS PostgreSQL au lieu de faire
+> remonter cinquante mille lignes. Elle ne recalcule aucune TVA, ne répartit
+> aucune remise, et rend les coûts **non arrondis** — c'est `totaliserCouts()`
+> qui arrondit, une fois.
+>
+> La frontière n'est pas déclarative : `apps/sync/test/rapports-agreges.test.ts`
+> fait tourner les **deux chemins** sur le même jeu de ventes et exige
+> l'égalité au millime. Si tu déplaces un calcul, déplace-le sous ce test.
+
 ### 8. Français
 
 Commentaires de code, messages d'erreur, libellés d'interface, messages de

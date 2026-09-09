@@ -1675,32 +1675,41 @@ ce qui a été corrigé, ce qui a été mesuré puis écarté, et ce qui reste. 
 plupart de ses corrections sont invisibles à l'usage — c'est le but. Trois
 d'entre elles se vérifient à l'écran, en cinq minutes.
 
-#### P.1 — Un rapport trop large le DIT, au lieu de mentir
+#### P.1 — Un rapport de trois mois s'affiche sans rien charger
 
-1. Ouvre n'importe quel rapport (Rapports → **Ventes par article**) sur une
-   période très large — « Cette année », ou une date de début en 2020.
+1. Ouvre n'importe quel rapport (Rapports → **Ventes par article**) sur la
+   période la plus large que le calendrier accepte.
 
-**Attendu** : les chiffres s'affichent normalement. Si la période dépassait
-**50 000 commandes**, un bandeau apparaît AU-DESSUS des totaux : la période
-contient plus de commandes que l'écran n'en charge, les totaux sont donc
-partiels, et il faut resserrer la période.
+**Attendu** : les chiffres s'affichent, vite, et **sans aucun bandeau**.
 
-> **Pourquoi ce bandeau existe.** Le chargement des rapports lisait
-> auparavant les commandes SANS limite. Sur un restaurant à sa deuxième
-> année, un rapport « toute la période » demandait des dizaines de milliers
-> de lignes d'un coup : la page mettait une minute, puis parfois échouait.
-> Une limite muette aurait été pire encore — elle aurait affiché un chiffre
-> d'affaires FAUX qui aurait eu l'air juste. Un total incomplet qui se
-> déclare reste utilisable ; un total incomplet silencieux ne l'est pas.
+> **Ce qui a changé depuis l'audit.** Le chargement des rapports lisait les
+> commandes SANS limite : sur un restaurant à sa deuxième année, une période
+> longue demandait des dizaines de milliers de lignes d'un coup, et la page
+> échouait. Un plafond avait été posé, avec un bandeau qui disait « les
+> totaux sont partiels » — un total incomplet qui se déclare reste
+> utilisable, un total incomplet silencieux ne l'est pas.
+>
+> Le plafond n'a plus lieu d'être : **c'est PostgreSQL qui additionne
+> maintenant**, et il ne renvoie qu'une trentaine de nombres au lieu de
+> cinquante mille lignes. Sept écrans sur neuf ne chargent plus une seule
+> ligne de vente.
+
+2. Va sur **Reçus**, avec la même période.
+
+**Attendu** : si la période dépasse 50 000 tickets, le bandeau apparaît —
+**là**, et seulement là.
+
+> **Pourquoi le bandeau survit sur cet écran-là.** « Reçus » affiche une
+> LISTE de tickets, un par un : une ligne écrite y est une ligne lue, et
+> l'agréger n'aurait aucun sens. C'est le seul cas où le plafond protège
+> encore quelque chose.
 >
 > 50 000 n'est pas un nombre choisi au hasard : un restaurant à 55 tickets
-> par jour en fait 20 075 par an. Le plafond laisse donc passer un rapport
-> annuel entier, et ne se déclenche que sur des périodes qui, de toute
-> façon, n'ont pas de sens à l'écran.
+> par jour en fait 20 075 par an. Le plafond laisse donc passer un an entier.
 
 #### P.2 — Une page qui casse affiche un écran, pas un mur blanc
 
-2. Va sur une adresse qui n'existe pas : `…/‹resto›/nimportequoi`.
+3. Va sur une adresse qui n'existe pas : `…/‹resto›/nimportequoi`.
 
 **Attendu** : une page « Page introuvable » en français, avec un lien de
 retour — et non l'écran par défaut de Next.js en anglais.
@@ -1713,7 +1722,7 @@ retour — et non l'écran par défaut de Next.js en anglais.
 
 #### P.3 — Les tentatives sur les identifiants sont limitées
 
-3. Sur la page de connexion du back-office, ou sur l'appairage d'une
+4. Sur la page de connexion du back-office, ou sur l'appairage d'une
    tablette, tape volontairement un mauvais mot de passe une dizaine de fois
    de suite.
 

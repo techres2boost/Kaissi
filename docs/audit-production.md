@@ -18,6 +18,7 @@ essayé.
 | **Haute** | 4 — tous corrigés |
 | **Moyenne** | 6 — 3 corrigés, 3 documentés |
 | **Basse / écartée** | 5 — mesurées puis écartées, avec la raison |
+| **Reste à faire** | 5 — dont **R-1, le plus rentable, désormais FAIT** |
 
 **Ce qui était déjà solide, et mérite d'être dit.** Un audit qui ne signale
 que des défauts donne une image fausse et fait refaire ce qui marche.
@@ -110,7 +111,11 @@ fichier quitte l'application, il n'a plus de bannière pour se contredire.
 > serait heurté au plafond sur son bilan annuel. Une limite qui gêne tout le
 > monde n'est pas un garde-fou.
 
-**Ce plafond reste un garde-fou, pas une architecture.** Voir R-1.
+**Ce plafond était un garde-fou, pas une architecture — et R-1 l'a remplacé.**
+Depuis la migration `0033`, sept écrans sur neuf ne chargent plus aucune ligne
+et n'ont donc plus rien à tronquer. Le plafond et sa bannière ne subsistent
+que sur les deux écrans qui affichent une **liste** de tickets, où une ligne
+écrite est une ligne lue.
 
 ---
 
@@ -225,7 +230,12 @@ organisation à chaque rapport.
 
 **Non corrigé délibérément** : la correction demande de restreindre à
 `restaurant_id`, ce qui changerait le comportement de l'écran « Employés » qui
-dépend de la portée large. À traiter avec R-1.
+dépend de la portée large.
+
+**Fortement atténué par R-1.** Les rapports ne lisent plus `users` pour
+NOMMER chaque ligne — l'agrégat SQL ne rend qu'un identifiant d'employé, et un
+seul chargement de noms sert tout l'écran. La lecture non bornée subsiste, sa
+fréquence a chuté.
 
 ## M-4 · Protection « mot de passe compromis » désactivée ⚠ action requise
 
@@ -329,22 +339,50 @@ revue.
 
 # CE QUI RESTE — par ordre de valeur
 
-## R-1 · Agréger les rapports EN SQL 〈le plus rentable〉
+## R-1 · Agréger les rapports EN SQL ✅ FAIT
 
-Le plafond de 50 000 commandes est un garde-fou, pas une architecture. La
-vraie réponse est de ne **jamais** faire remonter la ligne à ligne :
+*Migration `0033`, commit du 9 septembre 2026 — appliquée en production.*
 
-- une vue ou une fonction `kaissi.ventes_agregees(restaurant, du, au)` qui
-  rend les indicateurs, les ventilations par produit / catégorie / employé /
-  paiement, et la série temporelle ;
-- le back-office ne charge alors que quelques centaines de lignes, quelle que
-  soit la période ;
-- `packages/domain` reste la référence : les tests comparent la sortie SQL à
-  celle du calcul TypeScript sur un jeu réel, ce qui interdit la divergence.
+Le plafond de 50 000 commandes était un garde-fou, pas une architecture.
+`kaissi.rapport_ventes()` fait désormais les sommes **là où sont les lignes**
+et rend quelques kilo-octets de JSON. Sept écrans sur neuf ne chargent plus
+aucune ligne ; le plafond et sa bannière ne concernent plus que les deux qui
+affichent une **liste** de tickets — où une ligne écrite est bien une ligne
+lue.
 
-**Impact** : supprime C-2, M-3 et le plafond d'un coup. **Effort** : élevé.
-**Risque** : moyen — c'est du calcul d'argent, donc à valider par
-comparaison, jamais par relecture.
+**La règle 7 tient**, parce que règle et somme ne sont pas la même chose. Une
+règle est une décision (arrondir la TVA par taux puis sommer, répartir la
+remise globale au prorata, rapporter la marge au CA, n'arrondir les coûts
+qu'une fois au total) : aucune n'est en SQL. Une somme d'entiers déjà décidés
+n'en est pas une. Trois précautions le rendent vérifiable : les coûts sortent
+**non arrondis** (`numeric` exact — plus précis que l'ancien flottant), aucun
+pourcentage n'est calculé en SQL, et un test compare les **deux chemins** au
+millime sur un jeu de ventes hostile. Sabotage vérifié : retirer le filtre des
+lignes annulées fait tomber 4 tests, supprimer la bascule de journée en fait
+tomber 2.
+
+**Ce que le banc a trouvé et que la relecture n'aurait jamais vu.** Écrite en
+`language sql`, la fonction mettait **27 300 ms** sur 92 jours — la même
+requête avec des dates littérales en mettait 175. PostgreSQL ne connaît pas
+les bornes quand il planifie un corps de fonction : il estime une commande,
+choisit des boucles imbriquées, et rebalaye un CTE de 18 000 lignes une fois
+par commande.
+
+`plan_cache_mode = 'force_custom_plan'` le corrige — mais ce réglage n'a
+**aucun effet** sur une fonction `language sql`, d'où le `plpgsql`. Mesuré
+après : **380 ms**, soit 70×. Le symptôme en production aurait été le pire qui
+soit : correct en démonstration, et de plus en plus lent chez le client qui
+vend le plus. Deux tests figent la déclaration.
+
+L'index `(restaurant_id, closed_at)` **écarté** par E-1 est créé ici : la
+mesure d'alors était juste, mais portait sur une requête qui rendait déjà
+toutes les lignes. *Une décision de performance est datée par la requête
+qu'elle sert.*
+
+**Supprime C-2 et le plafond ; M-3 devient sans objet** sur les écrans agrégés.
+
+Le raisonnement complet est dans
+[`docs/system-design.md`](system-design.md) §17 bis et §17 ter.
 
 ## R-2 · Limiteur de débit distribué
 
