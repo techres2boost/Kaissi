@@ -182,6 +182,36 @@ const VIDE = (erreur: string | null): VentesChargees => ({
   tronque: false,
 })
 
+/**
+ * Ce que rend `chargerRapport` quand un écran n'a PAS demandé la ligne à
+ * ligne — depuis la migration 0033, c'est le cas de la plupart.
+ *
+ * Une valeur vide plutôt qu'un `undefined` : un écran qui lirait
+ * `ventes.lignes` sans l'avoir demandée affiche alors zéro au lieu de
+ * planter. Un rapport à zéro se remarque et se corrige ; un
+ * « Cannot read properties of undefined » en production, non.
+ */
+export const VENTES_NON_CHARGEES: VentesChargees = VIDE(null)
+
+/**
+ * Résout un identifiant d'employé en nom affichable.
+ *
+ * Les employés VISIBLES par RLS, et non les seules appartenances actives :
+ * un serveur parti l'an dernier a toujours des ventes dans les rapports, et
+ * les afficher sous « Inconnu » rendrait le rapport inutilisable pour la
+ * période où il travaillait.
+ *
+ * Le chemin agrégé en a besoin parce que `kaissi.rapport_ventes` ne rend
+ * qu'un identifiant : résoudre le nom en SQL en ferait un second endroit où
+ * « Inconnu » se décide.
+ */
+export async function chargerNomsEmployes(): Promise<(id: string | null) => string> {
+  const supabase = await supabaseServeur()
+  const { data } = await supabase.from('users').select('id, full_name')
+  const noms = new Map((data ?? []).map((u) => [u.id, u.full_name]))
+  return (id: string | null) => (id && noms.get(id)) || 'Inconnu'
+}
+
 /** Charge la fiche de l'établissement — fuseau et heure de bascule. */
 export async function chargerFiche(restaurantId: string): Promise<FicheRestaurant> {
   const supabase = await supabaseServeur()

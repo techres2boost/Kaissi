@@ -16,9 +16,6 @@ import { formaterPourcentage } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { chargerRapport } from '../../../serveur/rapport.js'
 import {
-  calculerIndicateurs,
-  ventilerParJournee,
-  ventilerParPaiement,
 } from '../../../serveur/rapports.js'
 import { libelleJournee } from '../../../serveur/journee.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
@@ -27,7 +24,6 @@ import { FiltresRapport } from '../../../composants/FiltresRapport.js'
 import { GraphiqueSerie } from '../../../composants/GraphiqueSerie.js'
 import { TableauRapport } from '../../../composants/TableauRapport.js'
 import { celluleMontant } from '../../../composants/RapportVentilation.js'
-import { AvertissementTronque } from '../../../composants/AvertissementTronque.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,23 +39,24 @@ export default async function PageVentesParPaiement({
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
 
-  const { periode, filtres, ventes, precedent, fiche, aujourdhui, employes } =
+  const { periode, filtres, agregats, agregatsPrecedent, aujourdhui, employes } =
     await chargerRapport(restaurant, recherche)
 
-  if (ventes.erreur) {
+  if (agregats.erreur) {
     return (
       <section className="bloc">
         <h1>Ventes par mode de paiement</h1>
-        <p className="message erreur">Lecture impossible : {ventes.erreur}</p>
+        <p className="message erreur">Lecture impossible : {agregats.erreur}</p>
       </section>
     )
   }
 
-  const paiements = ventilerParPaiement(ventes.paiements)
-  const paiementsPrecedents = ventilerParPaiement(precedent.paiements)
+  const paiements = agregats.parPaiement
+  const paiementsPrecedents = agregatsPrecedent.parPaiement
   const total = paiements.reduce((t, p) => t + p.montantMillimes, 0)
   const totalPrecedent = paiementsPrecedents.reduce((t, p) => t + p.montantMillimes, 0)
-  const i = calculerIndicateurs(ventes.lignes, ventes.commandes, ventes.remboursements)
+  const transactions = paiements.reduce((t, p) => t + p.nombre, 0)
+  const i = agregats.indicateurs
 
   return (
     <>
@@ -71,8 +68,6 @@ export default async function PageVentesParPaiement({
             : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
         </p>
       </header>
-
-      <AvertissementTronque tronque={ventes.tronque} />
 
       <FiltresRapport
         du={periode.du}
@@ -90,7 +85,7 @@ export default async function PageVentesParPaiement({
             libelle: 'Encaissé (TTC)',
             valeurMillimes: total,
             precedentMillimes: totalPrecedent,
-            detail: `${ventes.paiements.length} transaction(s)`,
+            detail: `${transactions} transaction(s)`,
             aide: 'Argent réellement entré en caisse, taxes et service compris.',
           },
           ...paiements.slice(0, 3).map((p) => ({
@@ -118,10 +113,7 @@ export default async function PageVentesParPaiement({
       <section className="bloc">
         <GraphiqueSerie
           titre="Encaissements"
-          journees={ventilerParJournee(ventes.commandes, fiche.timezone, fiche.bascule, {
-            du: periode.du,
-            au: periode.au,
-          })}
+          journees={agregats.parJournee}
           parts={paiements.map((p) => ({
             cle: p.type,
             libelle: p.libelle,

@@ -576,6 +576,31 @@ export type Database = {
         Args: { p_restaurant: string; p_produits?: string[] | null }
         Returns: number
       }
+
+      /**
+       * Agrège les ventes d'une période SANS remonter la ligne à ligne
+       * (migration 0033). Ne fait que des sommes d'entiers déjà décidés par
+       * la projection : les coûts en sortent NON arrondis, et marges et
+       * pourcentages restent dans `packages/domain`.
+       *
+       * `Returns: Json` et non un type détaillé : la forme est décrite —
+       * et vérifiée — dans `agregats.ts`, qui est le seul appelant. La
+       * décrire ici aussi la ferait exister à deux endroits.
+       */
+      rapport_ventes: {
+        Args: {
+          p_restaurant: string
+          p_debut: string
+          p_fin: string
+          p_timezone?: string
+          /** Intervalle PostgreSQL, « 04:00:00 ». */
+          p_bascule?: string
+          p_employe?: string | null
+          p_heure_debut?: number
+          p_heure_fin?: number
+        }
+        Returns: unknown
+      }
     }
     Enums: Aucun
     CompositeTypes: Aucun

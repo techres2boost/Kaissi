@@ -14,9 +14,6 @@ import { formaterPourcentage } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { chargerRapport } from '../../../serveur/rapport.js'
 import {
-  calculerIndicateurs,
-  ventilerParCategorie,
-  ventilerParJournee,
 } from '../../../serveur/rapports.js'
 import { libelleJournee } from '../../../serveur/journee.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
@@ -29,7 +26,6 @@ import {
   TopCinq,
 } from '../../../composants/RapportVentilation.js'
 import { TableauRapport } from '../../../composants/TableauRapport.js'
-import { AvertissementTronque } from '../../../composants/AvertissementTronque.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,21 +41,21 @@ export default async function PageVentesParCategorie({
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
 
-  const { periode, filtres, ventes, precedent, fiche, aujourdhui, employes } =
+  const { periode, filtres, agregats, agregatsPrecedent, aujourdhui, employes } =
     await chargerRapport(restaurant, recherche)
 
-  if (ventes.erreur) {
+  if (agregats.erreur) {
     return (
       <section className="bloc">
         <h1>Ventes par catégorie</h1>
-        <p className="message erreur">Lecture impossible : {ventes.erreur}</p>
+        <p className="message erreur">Lecture impossible : {agregats.erreur}</p>
       </section>
     )
   }
 
-  const categories = ventilerParCategorie(ventes.lignes)
-  const i = calculerIndicateurs(ventes.lignes, ventes.commandes, ventes.remboursements)
-  const p = calculerIndicateurs(precedent.lignes, precedent.commandes, precedent.remboursements)
+  const categories = agregats.parCategorie
+  const i = agregats.indicateurs
+  const p = agregatsPrecedent.indicateurs
 
   return (
     <>
@@ -71,8 +67,6 @@ export default async function PageVentesParCategorie({
             : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
         </p>
       </header>
-
-      <AvertissementTronque tronque={ventes.tronque} />
 
       <FiltresRapport
         du={periode.du}
@@ -117,10 +111,7 @@ export default async function PageVentesParCategorie({
       <section className="bloc">
         <GraphiqueSerie
           titre="Ventes par catégorie"
-          journees={ventilerParJournee(ventes.commandes, fiche.timezone, fiche.bascule, {
-            du: periode.du,
-            au: periode.au,
-          })}
+          journees={agregats.parJournee}
           parts={categories.map((c) => ({
             cle: c.cle,
             libelle: c.libelle,

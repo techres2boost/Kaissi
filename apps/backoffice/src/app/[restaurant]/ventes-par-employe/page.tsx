@@ -20,9 +20,6 @@ import { formaterPourcentage } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { chargerRapport } from '../../../serveur/rapport.js'
 import {
-  calculerIndicateurs,
-  ventilerParEmploye,
-  ventilerParJournee,
 } from '../../../serveur/rapports.js'
 import { libelleJournee } from '../../../serveur/journee.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
@@ -35,7 +32,6 @@ import {
   TopCinq,
 } from '../../../composants/RapportVentilation.js'
 import { TableauRapport } from '../../../composants/TableauRapport.js'
-import { AvertissementTronque } from '../../../composants/AvertissementTronque.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,28 +47,30 @@ export default async function PageVentesParEmploye({
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
 
-  const { periode, filtres, ventes, precedent, fiche, aujourdhui, employes } =
+  const { periode, filtres, agregats, agregatsPrecedent, aujourdhui, employes } =
     await chargerRapport(restaurant, recherche)
 
-  if (ventes.erreur) {
+  if (agregats.erreur) {
     return (
       <section className="bloc">
         <h1>Ventes par employé</h1>
-        <p className="message erreur">Lecture impossible : {ventes.erreur}</p>
+        <p className="message erreur">Lecture impossible : {agregats.erreur}</p>
       </section>
     )
   }
 
-  const parEmploye = ventilerParEmploye(ventes.lignes, ventes.commandes, ventes.nomEmploye)
-  const i = calculerIndicateurs(ventes.lignes, ventes.commandes, ventes.remboursements)
-  const p = calculerIndicateurs(precedent.lignes, precedent.commandes, precedent.remboursements)
+  const parEmploye = agregats.parEmploye
+  const i = agregats.indicateurs
+  const p = agregatsPrecedent.indicateurs
 
-  /** Tickets encaissés par employé — la vente entière, pas la ligne. */
-  const ticketsPar = new Map<string, number>()
-  for (const commande of ventes.commandes) {
-    const cle = commande.vendeurId ?? 'inconnu'
-    ticketsPar.set(cle, (ticketsPar.get(cle) ?? 0) + 1)
-  }
+  /*
+   * Tickets encaissés par employé — la vente ENTIÈRE, pas la ligne. Le
+   * compte descend avec l'agrégat : `kaissi.rapport_ventes` groupe cette
+   * ventilation-là sur les commandes et non sur les lignes, précisément
+   * pour pouvoir les compter (et pour qu'une commande dont toutes les
+   * lignes ont été annulées reste un ticket de cet employé).
+   */
+  const ticketsPar = new Map(parEmploye.map((e) => [e.cle, e.tickets]))
 
   return (
     <>
@@ -84,8 +82,6 @@ export default async function PageVentesParEmploye({
             : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
         </p>
       </header>
-
-      <AvertissementTronque tronque={ventes.tronque} />
 
       <FiltresRapport
         du={periode.du}
@@ -134,10 +130,7 @@ export default async function PageVentesParEmploye({
       <section className="bloc">
         <GraphiqueSerie
           titre="Ventes par employé"
-          journees={ventilerParJournee(ventes.commandes, fiche.timezone, fiche.bascule, {
-            du: periode.du,
-            au: periode.au,
-          })}
+          journees={agregats.parJournee}
           parts={parEmploye.map((e) => ({
             cle: e.cle,
             libelle: e.libelle,

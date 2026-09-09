@@ -10,15 +10,10 @@ import Link from 'next/link'
 import { formaterPourcentage, formaterTND, millimes } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { journeeCourante, libelleJournee } from '../../../serveur/journee.js'
-import { chargerFiche, chargerVentes, resoudrePeriode } from '../../../serveur/ventes.js'
-import {
-  calculerIndicateurs,
-  ventilerParCategorie,
-  ventilerParProduit,
-} from '../../../serveur/rapports.js'
+import { chargerFiche, resoudrePeriode } from '../../../serveur/ventes.js'
+import { chargerAgregats } from '../../../serveur/agregats.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
 import { SelecteurPeriode } from '../../../composants/SelecteurPeriode.js'
-import { AvertissementTronque } from '../../../composants/AvertissementTronque.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,21 +31,28 @@ export default async function PageTableauBord({
 
   const fiche = await chargerFiche(restaurant)
   const periode = resoudrePeriode(fiche, du, au)
-  const ventes = await chargerVentes(restaurant, periode)
+  /*
+   * Les totaux sont additionnés PAR PostgreSQL (migration 0033). Cet écran
+   * n'affiche que six nombres et deux classements : faire voyager les
+   * dizaines de milliers de lignes qui les produisent était le défaut C-2
+   * de l'audit — et il ne se manifestait pas par une page lente, mais par
+   * une erreur 500 sur l'écran du chiffre d'affaires.
+   */
+  const agregats = await chargerAgregats(restaurant, periode, fiche)
   const aujourdhui = journeeCourante(fiche.timezone, fiche.bascule)
 
-  if (ventes.erreur) {
+  if (agregats.erreur) {
     return (
       <section className="bloc">
         <h1>Tableau de bord</h1>
-        <p className="message erreur">Lecture impossible : {ventes.erreur}</p>
+        <p className="message erreur">Lecture impossible : {agregats.erreur}</p>
       </section>
     )
   }
 
-  const i = calculerIndicateurs(ventes.lignes, ventes.commandes, ventes.remboursements)
-  const parProduit = ventilerParProduit(ventes.lignes)
-  const parCategorie = ventilerParCategorie(ventes.lignes)
+  const i = agregats.indicateurs
+  const parProduit = agregats.parProduit
+  const parCategorie = agregats.parCategorie
 
   return (
     <>
@@ -62,8 +64,6 @@ export default async function PageTableauBord({
             : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
         </p>
       </header>
-
-      <AvertissementTronque tronque={ventes.tronque} />
 
       <SelecteurPeriode du={periode.du} au={periode.au} aujourdhui={aujourdhui} />
 

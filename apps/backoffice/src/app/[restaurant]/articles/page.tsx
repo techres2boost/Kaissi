@@ -20,9 +20,6 @@ import { formaterPourcentage } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { chargerRapport } from '../../../serveur/rapport.js'
 import {
-  calculerIndicateurs,
-  ventilerParJournee,
-  ventilerParProduit,
 } from '../../../serveur/rapports.js'
 import { libelleJournee } from '../../../serveur/journee.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
@@ -35,7 +32,6 @@ import {
   TopCinq,
 } from '../../../composants/RapportVentilation.js'
 import { TableauRapport } from '../../../composants/TableauRapport.js'
-import { AvertissementTronque } from '../../../composants/AvertissementTronque.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,21 +47,21 @@ export default async function PageArticles({
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
 
-  const { periode, filtres, ventes, precedent, fiche, aujourdhui, employes } =
+  const { periode, filtres, agregats, agregatsPrecedent, aujourdhui, employes } =
     await chargerRapport(restaurant, recherche)
 
-  if (ventes.erreur) {
+  if (agregats.erreur) {
     return (
       <section className="bloc">
         <h1>Ventes par article</h1>
-        <p className="message erreur">Lecture impossible : {ventes.erreur}</p>
+        <p className="message erreur">Lecture impossible : {agregats.erreur}</p>
       </section>
     )
   }
 
-  const articles = ventilerParProduit(ventes.lignes)
-  const i = calculerIndicateurs(ventes.lignes, ventes.commandes, ventes.remboursements)
-  const p = calculerIndicateurs(precedent.lignes, precedent.commandes, precedent.remboursements)
+  const articles = agregats.parProduit
+  const i = agregats.indicateurs
+  const p = agregatsPrecedent.indicateurs
 
   return (
     <>
@@ -77,8 +73,6 @@ export default async function PageArticles({
             : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
         </p>
       </header>
-
-      <AvertissementTronque tronque={ventes.tronque} />
 
       <FiltresRapport
         du={periode.du}
@@ -132,10 +126,7 @@ export default async function PageArticles({
       <section className="bloc">
         <GraphiqueSerie
           titre="Tableau des ventes par article"
-          journees={ventilerParJournee(ventes.commandes, fiche.timezone, fiche.bascule, {
-            du: periode.du,
-            au: periode.au,
-          })}
+          journees={agregats.parJournee}
           parts={articles.map((a) => ({
             cle: a.cle,
             libelle: a.libelle,
@@ -156,10 +147,10 @@ export default async function PageArticles({
           categorie: {
             // La catégorie du PREMIER passage suffit : un article n'en a
             // qu'une, et la ventilation regroupe déjà par article.
-            texte:
-              ventes.lignes.find(
-                (x) => (x.produitId ?? `designation:${x.designation}`) === l.cle,
-              )?.categorieNom ?? '—',
+            // La catégorie descend avec l'agrégat, résolue par la même
+            // requête que le chiffre : la chercher ici dans une liste de
+            // lignes obligerait à charger ces lignes.
+            texte: articles.find((a) => a.cle === l.cle)?.categorieNom ?? '—',
           },
         }))}
         colonnes={colonnesVentilation('Article', [

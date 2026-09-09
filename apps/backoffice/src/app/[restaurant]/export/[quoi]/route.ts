@@ -22,17 +22,13 @@ import { ecranReserve, etablissementObligatoire } from '../../../../serveur/sess
 import { supabaseServeur } from '../../../../serveur/supabase.js'
 import {
   chargerFiche,
+  chargerNomsEmployes,
   chargerVentes,
   resoudrePeriode,
+  VENTES_NON_CHARGEES,
   PLAFOND_COMMANDES,
 } from '../../../../serveur/ventes.js'
-import {
-  calculerIndicateurs,
-  ventilerParCategorie,
-  ventilerParEmploye,
-  ventilerParPaiement,
-  ventilerParProduit,
-} from '../../../../serveur/rapports.js'
+import { chargerAgregats } from '../../../../serveur/agregats.js'
 import { nomFichier, reponseCsv, versCsv, type Cellule } from '../../../../serveur/export-csv.js'
 import { reconstruireTicket } from '../../../../serveur/ticket.js'
 
@@ -129,9 +125,23 @@ export async function GET(
       : exporterMouvements(restaurant, etablissement.nom, fiche.timezone)
   }
 
-  const ventes = await chargerVentes(restaurant, periode)
-  if (ventes.erreur) {
-    return new Response(`Lecture impossible : ${ventes.erreur}`, { status: 502 })
+  /*
+   * Un seul export a besoin de la ligne à ligne : celui des TICKETS, qui
+   * est une liste. Tous les autres sont des totaux, et depuis la migration
+   * 0033 c'est PostgreSQL qui les additionne — un export de trimestre ne
+   * fait donc plus voyager cinquante mille lignes pour en écrire vingt.
+   */
+  const nomEmploye = await chargerNomsEmployes()
+  const [agregats, ventes] = await Promise.all([
+    chargerAgregats(restaurant, periode, fiche, undefined, nomEmploye),
+    quoi === 'tickets'
+      ? chargerVentes(restaurant, periode)
+      : Promise.resolve(VENTES_NON_CHARGEES),
+  ])
+  if (agregats.erreur ?? ventes.erreur) {
+    return new Response(`Lecture impossible : ${agregats.erreur ?? ventes.erreur}`, {
+      status: 502,
+    })
   }
 
   /*
@@ -144,6 +154,9 @@ export async function GET(
    *
    * 413 « Payload Too Large » plutôt qu'une erreur générique : c'est
    * exactement ce dont il s'agit, et le message dit quoi faire.
+   *
+   * ⚑ Ne concerne plus que l'export des tickets : les autres n'ont plus de
+   *   plafond, puisqu'ils ne chargent plus de lignes.
    */
   if (ventes.tronque) {
     return new Response(
@@ -160,7 +173,7 @@ export async function GET(
 
   switch (quoi) {
     case 'ventes': {
-      const i = calculerIndicateurs(ventes.lignes, ventes.commandes, ventes.remboursements)
+      const i = agregats.indicateurs
       return reponseCsv(
         versCsv(
           ['Indicateur', 'Valeur', 'Valeur brute (TND)'],
@@ -203,7 +216,7 @@ export async function GET(
       // LE rapport que réclame un restaurateur : ce qui se vend, combien, et
       // ce que ça rapporte. Trié par chiffre d'affaires décroissant, parce
       // que c'est dans cet ordre qu'on le lit.
-      const lignes: Cellule[][] = ventilerParProduit(ventes.lignes).map((v) => [
+      const lignes: Cellule[][] = agregats.parProduit.map((v) => [
         v.libelle,
         v.quantite,
         tnd(v.marge.caMillimes),
@@ -233,7 +246,7 @@ export async function GET(
       return reponseCsv(
         versCsv(
           ['Catégorie', 'Quantité', 'CA après remises', 'CA (TND)', 'Part du CA'],
-          ventilerParCategorie(ventes.lignes).map((v) => [
+          agregats.parCategorie.map((v) => [
             v.libelle,
             v.quantite,
             tnd(v.marge.caMillimes),
@@ -248,7 +261,7 @@ export async function GET(
       return reponseCsv(
         versCsv(
           ['Employé', 'Articles', 'CA après remises', 'CA (TND)', 'Part du CA'],
-          ventilerParEmploye(ventes.lignes, ventes.commandes, ventes.nomEmploye).map((v) => [
+          agregats.parEmploye.map((v) => [
             v.libelle,
             v.quantite,
             tnd(v.marge.caMillimes),
@@ -263,7 +276,7 @@ export async function GET(
       return reponseCsv(
         versCsv(
           ['Moyen de paiement', 'Opérations', 'Encaissé', 'Encaissé (TND)'],
-          ventilerParPaiement(ventes.paiements).map((v) => [
+          agregats.parPaiement.map((v) => [
             v.libelle,
             v.nombre,
             tnd(v.montantMillimes),

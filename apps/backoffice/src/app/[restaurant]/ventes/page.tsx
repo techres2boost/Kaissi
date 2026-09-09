@@ -15,20 +15,15 @@
 
 import { formaterPourcentage } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
-import { journeeCourante, libelleJournee } from '../../../serveur/journee.js'
+import { libelleJournee } from '../../../serveur/journee.js'
 import { chargerRapport } from '../../../serveur/rapport.js'
-import {
-  agregerSerie,
-  calculerIndicateurs,
-  ventilerParJournee,
-} from '../../../serveur/rapports.js'
+import { agregerSerie } from '../../../serveur/rapports.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
 import { BandeauIndicateurs } from '../../../composants/BandeauIndicateurs.js'
 import { FiltresRapport } from '../../../composants/FiltresRapport.js'
 import { GraphiqueSerie } from '../../../composants/GraphiqueSerie.js'
 import { TableauRapport } from '../../../composants/TableauRapport.js'
 import { celluleMontant, cellulePourcent } from '../../../composants/RapportVentilation.js'
-import { AvertissementTronque } from '../../../composants/AvertissementTronque.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,61 +39,55 @@ export default async function PageVentes({
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
 
+  /*
+   * Aucune ligne n'est demandée : cet écran n'affiche que des totaux, et
+   * depuis la migration 0033 c'est PostgreSQL qui les additionne. Charger
+   * les ~55 000 lignes d'un trimestre pour en tirer trente nombres était
+   * exactement le défaut C-2 de l'audit.
+   */
   const socle = await chargerRapport(restaurant, recherche)
-  const { periode, filtres, ventes, precedent, fiche, aujourdhui, employes } = socle
+  const { periode, filtres, agregats, agregatsPrecedent, aujourdhui, employes } = socle
 
-  if (ventes.erreur) {
+  if (agregats.erreur) {
     return (
       <section className="bloc">
         <h1>Récapitulatif des ventes</h1>
-        <p className="message erreur">Lecture impossible : {ventes.erreur}</p>
+        <p className="message erreur">Lecture impossible : {agregats.erreur}</p>
       </section>
     )
   }
 
-  const i = calculerIndicateurs(ventes.lignes, ventes.commandes, ventes.remboursements)
-  const p = calculerIndicateurs(precedent.lignes, precedent.commandes, precedent.remboursements)
+  const i = agregats.indicateurs
+  const p = agregatsPrecedent.indicateurs
 
-  const journees = ventilerParJournee(ventes.commandes, fiche.timezone, fiche.bascule, {
-    du: periode.du,
-    au: periode.au,
-  })
+  const journees = agregats.parJournee
 
   /*
-   * Le tableau reprend le MÊME découpage que le graphique.
+   * Le tableau reprend le MÊME découpage que le graphique — et désormais
+   * la même requête. Les deux grandeurs sont calculées côte à côte dans
+   * `kaissi.rapport_ventes` : le total TTC pour les barres, le détail hors
+   * taxe pour les colonnes. Deux découpages du « jour » sur un même écran,
+   * c'est la garantie qu'on additionnera les colonnes de l'un en lisant les
+   * barres de l'autre.
    *
-   * Deux découpages différents sur un même écran, c'est la garantie qu'on
-   * additionnera les colonnes de l'un en lisant les barres de l'autre.
-   *
-   * ⚑ La journée d'une commande vient de `journeeCourante`, JAMAIS des dix
-   * premiers caractères de `closed_at`. Ce raccourci-là découperait sur le
-   * jour calendaire UTC : une vente encaissée à 1 h du matin basculerait au
-   * lendemain — et le samedi soir paraîtrait moitié moins bon qu'il ne l'a
-   * été. C'est la même bascule que l'écran Journée, partout.
+   * ⚑ La journée vient de la bascule commerciale, JAMAIS des dix premiers
+   * caractères de `closed_at`. Ce raccourci découperait sur le jour
+   * calendaire UTC : une vente encaissée à 1 h du matin basculerait au
+   * lendemain, et le samedi soir paraîtrait moitié moins bon qu'il ne l'a
+   * été.
    */
-  const journeeDe = new Map(
-    ventes.commandes.map((c) => [
-      c.id,
-      c.closeA ? journeeCourante(fiche.timezone, fiche.bascule, new Date(c.closeA)) : '',
-    ]),
-  )
-  const lignesParJournee = new Map<string, typeof ventes.lignes>()
-  for (const ligne of ventes.lignes) {
-    const journee = journeeDe.get(ligne.orderId) ?? ''
-    lignesParJournee.set(journee, [...(lignesParJournee.get(journee) ?? []), ligne])
-  }
+  const detailDe = new Map(agregats.detailParJournee.map((d) => [d.journee, d]))
 
   const lignesTableau = agregerSerie(journees, 'jours').map((point) => {
-    const lignes = lignesParJournee.get(point.cle) ?? []
-    const indicateurs = calculerIndicateurs(lignes, [], [])
+    const detail = detailDe.get(point.cle)
     return {
       cle: point.cle,
       libelle: point.libelle,
-      nettes: indicateurs.caNetMillimes,
-      cout: indicateurs.coutMillimes,
-      margeMillimes: indicateurs.marge.margeMillimes,
-      margeBp: indicateurs.marge.margeBp,
-      taxes: lignes.reduce((t, l) => t + l.taxeMillimes, 0),
+      nettes: detail?.netMillimes ?? 0,
+      cout: detail?.marge.coutMillimes ?? 0,
+      margeMillimes: detail?.marge.margeMillimes ?? 0,
+      margeBp: detail?.marge.margeBp ?? null,
+      taxes: detail?.taxesMillimes ?? 0,
       tickets: point.tickets,
     }
   })
@@ -113,8 +102,6 @@ export default async function PageVentes({
             : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
         </p>
       </header>
-
-      <AvertissementTronque tronque={ventes.tronque} />
 
       <FiltresRapport
         du={periode.du}

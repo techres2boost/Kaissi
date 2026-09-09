@@ -8,11 +8,22 @@
  * requêtes. Dans une fonction serverless, c'est une erreur 500 sans
  * explication — sur l'écran des chiffres d'affaires.
  *
- * Le plafond évite cela. Mais le vrai risque, une fois le plafond posé, est
- * ailleurs : **tronquer en silence**. Un chiffre d'affaires amputé ressemble
- * exactement à un chiffre d'affaires complet. On l'exporte, on le porte à son
- * comptable, et rien ne le contredit. Ces tests figent donc surtout le
- * SIGNAL, pas la limite.
+ * Le plafond évitait cela. La migration 0033 fait mieux : elle SUPPRIME le
+ * besoin, en additionnant dans PostgreSQL. Le plafond ne concerne donc plus
+ * que les deux écrans qui affichent une LISTE de tickets — là où une ligne
+ * écrite est bien une ligne lue, et où l'agrégation n'a aucun sens.
+ *
+ * Le vrai risque, partout où le plafond subsiste, reste le même : **tronquer
+ * en silence**. Un chiffre d'affaires amputé ressemble exactement à un
+ * chiffre d'affaires complet. On l'exporte, on le porte à son comptable, et
+ * rien ne le contredit.
+ *
+ * ⚑ L'invariant testé ci-dessous est donc devenu conditionnel, et c'est
+ *   volontaire : « un écran qui charge des LIGNES doit afficher la bannière ;
+ *   un écran qui n'en charge pas ne doit pas prétendre le faire ». Il reste
+ *   juste au fur et à mesure que des écrans basculent — un test qui
+ *   énumérerait la liste à la main serait à réécrire à chaque bascule, donc
+ *   réécrit sans y penser.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -56,21 +67,43 @@ describe('ce que le drapeau `tronque` oblige à faire', () => {
     // eslint-disable-next-line
     require('node:fs').readFileSync(new URL(chemin, import.meta.url), 'utf8') as string
 
-  it('chaque écran de rapport affiche l’avertissement', () => {
-    const ecrans = [
-      '../app/[restaurant]/ventes/page.tsx',
-      '../app/[restaurant]/articles/page.tsx',
-      '../app/[restaurant]/ventes-par-categorie/page.tsx',
-      '../app/[restaurant]/ventes-par-employe/page.tsx',
-      '../app/[restaurant]/ventes-par-paiement/page.tsx',
-      '../app/[restaurant]/reductions/page.tsx',
-      '../app/[restaurant]/recus/page.tsx',
-      '../app/[restaurant]/tableau-bord/page.tsx',
-    ]
-    for (const ecran of ecrans) {
-      expect(lire(ecran), `${ecran} n’affiche pas AvertissementTronque`).toContain(
+  const ECRANS = [
+    '../app/[restaurant]/ventes/page.tsx',
+    '../app/[restaurant]/articles/page.tsx',
+    '../app/[restaurant]/ventes-par-categorie/page.tsx',
+    '../app/[restaurant]/ventes-par-employe/page.tsx',
+    '../app/[restaurant]/ventes-par-paiement/page.tsx',
+    '../app/[restaurant]/reductions/page.tsx',
+    '../app/[restaurant]/recus/page.tsx',
+    '../app/[restaurant]/tableau-bord/page.tsx',
+  ]
+
+  /** Un écran charge la ligne à ligne s'il la demande explicitement. */
+  const chargeDesLignes = (source: string) =>
+    source.includes('{ lignes: true }') || source.includes('chargerVentes(')
+
+  it('un écran qui charge des LIGNES affiche l’avertissement', () => {
+    const concernes = ECRANS.filter((e) => chargeDesLignes(lire(e)))
+    // Le jour où il n'y en a plus aucun, ce test passerait à vide et ne
+    // protégerait plus rien sans le dire. On exige donc qu'il en reste au
+    // moins un — la liste des reçus, qui est une liste par nature.
+    expect(concernes.length).toBeGreaterThan(0)
+    for (const ecran of concernes) {
+      expect(lire(ecran), `${ecran} charge des lignes sans AvertissementTronque`).toContain(
         'AvertissementTronque',
       )
+    }
+  })
+
+  it('un écran AGRÉGÉ n’affiche plus de bannière — il n’a plus rien à tronquer', () => {
+    for (const ecran of ECRANS.filter((e) => !chargeDesLignes(lire(e)))) {
+      const source = lire(ecran)
+      expect(source, `${ecran} affiche une bannière sans charger de lignes`).not.toContain(
+        'AvertissementTronque',
+      )
+      // Et il lit bien les agrégats : sans cela, « pas de bannière » voudrait
+      // simplement dire « écran cassé qui affiche zéro ».
+      expect(source, `${ecran} n’utilise pas les agrégats`).toContain('agregats')
     }
   })
 

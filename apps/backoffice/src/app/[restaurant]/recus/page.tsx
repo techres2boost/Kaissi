@@ -54,9 +54,16 @@ export default async function PageRecus({
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
 
+  /*
+   * L'un des deux écrans qui demandent encore la ligne à ligne, et pour la
+   * bonne raison : celui-ci EST une liste de tickets. Une ligne écrite y
+   * est une ligne lue — l'agréger n'aurait aucun sens. Le plafond de
+   * `chargerVentes` reste donc en vigueur ici, avec son bandeau.
+   */
   const { periode, filtres, ventes, aujourdhui, employes } = await chargerRapport(
     restaurant,
     recherche,
+    { lignes: true },
   )
 
   if (ventes.erreur) {

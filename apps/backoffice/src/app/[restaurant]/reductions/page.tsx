@@ -37,11 +37,6 @@ import { formaterPourcentage } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { libelleJournee } from '../../../serveur/journee.js'
 import { chargerRapport } from '../../../serveur/rapport.js'
-import {
-  calculerIndicateurs,
-  ventilerParJournee,
-  ventilerParReduction,
-} from '../../../serveur/rapports.js'
 import { BandeauIndicateurs } from '../../../composants/BandeauIndicateurs.js'
 import { FiltresRapport } from '../../../composants/FiltresRapport.js'
 import { GraphiqueSerie } from '../../../composants/GraphiqueSerie.js'
@@ -64,20 +59,28 @@ export default async function PageReductions({
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
 
-  const { periode, filtres, ventes, precedent, fiche, aujourdhui, employes } =
-    await chargerRapport(restaurant, recherche)
+  /*
+   * Le seul écran de rapport qui demande encore la ligne à ligne — et il a
+   * une raison : il affiche la LISTE des tickets remisés, un par un. Une
+   * liste est le cas où une ligne écrite est une ligne lue ; l'agréger
+   * n'aurait aucun sens. Les totaux, eux, viennent quand même de SQL.
+   */
+  const { periode, filtres, agregats, agregatsPrecedent, ventes, aujourdhui, employes } =
+    await chargerRapport(restaurant, recherche, { lignes: true })
 
-  if (ventes.erreur) {
+  if (agregats.erreur ?? ventes.erreur) {
     return (
       <section className="bloc">
         <h1>Réductions</h1>
-        <p className="message erreur">Lecture impossible : {ventes.erreur}</p>
+        <p className="message erreur">
+          Lecture impossible : {agregats.erreur ?? ventes.erreur}
+        </p>
       </section>
     )
   }
 
-  const i = calculerIndicateurs(ventes.lignes, ventes.commandes, ventes.remboursements)
-  const p = calculerIndicateurs(precedent.lignes, precedent.commandes, precedent.remboursements)
+  const i = agregats.indicateurs
+  const p = agregatsPrecedent.indicateurs
 
   /*
    * Une remise par COMMANDE : c'est l'unité de décision.
@@ -112,7 +115,7 @@ export default async function PageReductions({
    * de ligne porte son propre motif, la remise globale celui de la commande,
    * et les deux se comptent ensemble.
    */
-  const parMotif = ventilerParReduction(ventes.lignes, ventes.commandes)
+  const parMotif = agregats.parReduction
 
   /** Par employé : c'est la répartition qui parle, pas le total. */
   const parEmploye = new Map<string, { nom: string; remise: number; tickets: number }>()
@@ -197,10 +200,7 @@ export default async function PageReductions({
       <section className="bloc">
         <GraphiqueSerie
           titre="Réductions dans le temps"
-          journees={ventilerParJournee(ventes.commandes, fiche.timezone, fiche.bascule, {
-            du: periode.du,
-            au: periode.au,
-          })}
+          journees={agregats.parJournee}
           parts={classementEmployes.map((e) => ({
             cle: e.cle,
             libelle: e.nom,
