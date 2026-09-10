@@ -130,13 +130,13 @@ pour les suivantes.
 | 1 | developer.apple.com | compte Apple Developer, **99 $/an** | oui, **renouvelable** |
 | 2 | App Store Connect | *Utilisateurs et accès → Intégrations → Clés App Store Connect* : créer une clé **App Manager**, télécharger le `.p8` (**une seule fois**), noter *Issuer ID* et *Key ID* | oui |
 | 3 | Codemagic | groupe de variables **`ios_signing`** : `ASC_ISSUER_ID`, `ASC_KEY_ID`, `ASC_PRIVATE_KEY` (le contenu du `.p8`), `CERTIFICATE_PRIVATE_KEY` — **c'est le groupe de Stampi, rien à ressaisir** | oui |
-| 4 | App Store Connect | *Mes applications → +* → nouvelle application, *Bundle ID* **`tn.res2boost.kaissi`** (à enregistrer d'abord dans *Certificates, Identifiers & Profiles* s'il n'existe pas) | oui |
+| 4 | App Store Connect | *Mes applications → +* → nouvelle application, *Bundle ID* **`tn.res2boost.kaissi`** (à enregistrer d'abord dans *Certificates, Identifiers & Profiles* s'il n'existe pas), puis accepter l'accord **« Apps gratuites »** (§4 ter, étape 4) | oui |
 | 5 | ton PC | reporter l'**Apple ID à dix chiffres** de la fiche dans `APP_STORE_APPLE_ID`, dans `codemagic.yaml` | oui |
 | 6 | ton PC | incrémenter `"version"` dans `apps/pos/package.json` | **à chaque envoi** |
 | 7 | Codemagic | *Start new build* → workflow **`pos-ios`** (machine `mac_mini_m2` : **aucun Mac à acheter**) | à chaque envoi |
 | 8 | App Store Connect | *TestFlight* : la build arrive, traitement 10–30 min, puis installable | à chaque envoi |
-| 9 | App Store Connect | fiche, captures **iPad obligatoires**, confidentialité | à chaque refonte |
-| 10 | App Store Connect | *Notes pour le relecteur* : **compte de démonstration** (e-mail + mot de passe), un PIN de caisse, et la phrase qui désamorce la 4.2 — voir §4 | à chaque envoi |
+| 9 | App Store Connect | fiche : icône 1024, captures **des deux familles d'appareils déclarées**, mots-clés, confidentialité (§4 ter et §4 quater) | à chaque refonte |
+| 10 | App Store Connect | *Notes pour le relecteur* : **compte de démonstration** (e-mail + mot de passe), le PIN de caisse, et le paragraphe qui désamorce la 4.2 — texte prêt à coller au **§4 ter, étape 9** | à chaque envoi |
 | 11 | App Store Connect | *Soumettre pour révision* | quand tu es prêt |
 
 Compter **24 à 48 h** pour la revue Apple, une fois la fiche complète.
@@ -800,6 +800,398 @@ un effet de bord d'un commit.
 
 ---
 
+## 4 ter. Publier : le parcours App Store Connect, clic par clic
+
+Le pendant du §3.5, pour Apple. Les différences avec Play ne sont pas
+cosmétiques, et trois d'entre elles changent le calendrier :
+
+| | Google Play | App Store |
+|---|---|---|
+| Compte | **25 $, une fois** | **99 $ par AN** — non renouvelé, l'application **disparaît** du magasin |
+| Machine | n'importe laquelle | un Mac. `codemagic.yaml` en loue une (§4 bis) — rien à acheter |
+| Installer hors magasin | l'APK, à la main (§3.4) | **impossible**. TestFlight est la seule voie, et une build y expire au bout de **90 jours** |
+| Revue | 1 à 2 semaines la première fois | **24 à 48 h**, mais plus stricte |
+
+> **Ce troisième point se planifie.** Sur Android, on livre un client
+> aujourd'hui avec un APK et on publie plus tard. Sur iOS, il n'y a pas de
+> « sources inconnues » : avant publication, tout passe par TestFlight, et un
+> testeur externe doit avoir été invité. Ne promettez pas une installation
+> iPad pour demain avant d'avoir le compte développeur.
+
+### Étape 1 — Le compte Apple Developer
+
+1. <https://developer.apple.com/programs/enroll/> ;
+2. l'identifiant Apple utilisé doit avoir la **double authentification**
+   activée — sans elle, l'inscription s'arrête là ;
+3. choisissez **Organisation** ou **Personne physique** (voir juste en
+   dessous) ;
+4. 99 $, puis **chaque année**. Programmez un rappel : un renouvellement
+   oublié retire l'application du magasin, et les clients qui changent d'iPad
+   ne peuvent plus la réinstaller.
+
+| | Organisation | Personne physique |
+|---|---|---|
+| Vendeur affiché sur la fiche | la société | **votre nom civil** |
+| Pièces demandées | numéro **D-U-N-S** (gratuit, **1 à 2 semaines**), preuve d'autorité légale | pièce d'identité |
+| Délai | 1 à 3 semaines | 24 à 48 h |
+
+> **Commencez par là, comme pour Play.** C'est la seule étape dont le délai
+> ne dépend pas de vous. Et si vous facturez au nom d'une société, le D-U-N-S
+> se demande le premier jour, pas le dernier.
+
+### Étape 2 — Enregistrer l'identifiant de l'application
+
+*Certificates, Identifiers & Profiles* → **Identifiers** → **+** → *App IDs*
+→ *App* :
+
+| Champ | Valeur |
+|---|---|
+| Description | `Kaissi POS` |
+| Bundle ID | **Explicit** → `tn.res2boost.kaissi` |
+| Capabilities | aucune |
+
+Aucune capacité à cocher : Kaissi n'utilise ni notifications push, ni Apple
+Pay, ni iCloud sur l'appareil. En cocher « au cas où » ajoute des droits que
+le relecteur demandera de justifier.
+
+> `app-store-connect fetch-signing-files … --create` (workflow `pos-ios`) sait
+> le créer tout seul. Le faire à la main une fois laisse une console lisible,
+> où l'on retrouve ce qu'on a déclaré.
+
+### Étape 3 — Créer la fiche
+
+App Store Connect → **Mes applications** → **+** → *Nouvelle app* :
+
+| Champ | Ce qu'on met | Pourquoi |
+|---|---|---|
+| Plateformes | iOS | |
+| Nom | `Kaissi — Caisse restaurant` | **30 caractères**, et **unique dans tout l'App Store** — s'il est pris, Apple refuse à la création |
+| Langue principale | Français | le marché est tunisien |
+| Bundle ID | `tn.res2boost.kaissi` | celui de l'étape 2 |
+| SKU | `kaissi-pos-ios` | identifiant interne, jamais affiché, **jamais modifiable** |
+| Accès utilisateur | Accès complet | |
+
+Puis, dans *Informations sur l'app*, relevez l'**Apple ID à dix chiffres** de
+la fiche et reportez-le dans `APP_STORE_APPLE_ID`, dans `codemagic.yaml`
+(§4 bis). Tant qu'il est vide, le numéro de build retombe sur le compteur de
+Codemagic.
+
+### Étape 4 — Tarif, disponibilité, et le contrat qui bloque tout
+
+1. *Tarifs et disponibilité* → **Gratuit**. Même raison que sur Play :
+   Kaissi se vend en abonnement, avec paramétrage sur place ; l'application
+   seule ne se vend pas.
+2. Disponibilité : la **Tunisie** au minimum. Rien n'interdit d'ouvrir plus
+   large, mais une fiche en français dans quarante pays ne sert personne.
+3. *Accords, taxes et banque* → l'accord **« Apps gratuites »** doit être
+   **accepté**.
+
+> ⚠ **Le point 3 est le piège le plus bête de tout ce parcours.** Tant que
+> l'accord n'est pas accepté, la fiche reste bloquée dans un état d'attente,
+> et rien dans l'écran de soumission ne dit que c'est la cause. On cherche du
+> côté de la build pendant une heure.
+
+### Étape 5 — Confidentialité (App Privacy)
+
+L'équivalent du *Data safety* de Play, avec le vocabulaire d'Apple. Ce que
+Kaissi collecte réellement — **la même vérité que sur Play, les mêmes
+réponses** :
+
+| Donnée | Collectée ? | Catégorie Apple | Liée à l'utilisateur ? | Utilisée pour le SUIVI ? |
+|---|---|---|---|---|
+| Adresse e-mail (compte du gérant) | oui | *Contact Info → Email Address* | oui | **non** |
+| Nom (l'employé) | oui | *Contact Info → Name* | oui | **non** |
+| `device_id` | oui | *Identifiers → Device ID* | oui | **non** |
+| Ventes, tickets | oui | *Financial Info → Other Financial Info* | oui | **non** |
+| Position | **non** | | | |
+| Contacts, photos, micro, carnet d'adresses | **non** | | | |
+| Données d'usage, diagnostics | **non** | | | |
+
+Usage déclaré pour chacune : **App Functionality** — et rien d'autre. Ni
+*Analytics*, ni *Product Personalization*, ni *Developer's Advertising*.
+
+**« Utilisée pour le suivi » : non, partout.** Ce mot a un sens précis chez
+Apple — croiser ces données avec celles d'autres sociétés à des fins
+publicitaires. Répondre « oui » par prudence déclencherait l'obligation
+d'afficher la demande **App Tracking Transparency** au premier lancement
+d'une caisse, ce qui serait à la fois faux et absurde.
+
+**URL de politique de confidentialité** : obligatoire, publique, et Apple la
+teste comme Google. La même que pour Play.
+
+### Étape 6 — Classement par âge
+
+Un questionnaire, dans *Informations sur l'app*. Kaissi : aucune violence,
+aucun contenu sexuel, aucun jeu d'argent, aucun contenu généré par les
+utilisateurs. Le classement obtenu est **le plus bas**.
+
+> ⚠ **Une seule question peut tout faire basculer : « accès web sans
+> restriction ».** Répondre oui fait passer le classement à la tranche
+> adulte, et une caisse classée « 18+ » a l'air de tout sauf d'un logiciel de
+> gestion. La réponse est **non** : Kaissi n'embarque aucun navigateur, et
+> son bundle est local — c'est exactement ce que garantit
+> `verifier-mode-avion.mjs` (§1).
+
+### Étape 7 — Envoyer une build
+
+Deux chemins, au choix :
+
+```bash
+# 1. Codemagic — aucun Mac nécessaire
+#    Start new build → workflow « pos-ios » (§4 bis)
+
+# 2. Sur un Mac, à la main
+pnpm install && pnpm pos:build
+pnpm --filter @kaissi/pos exec cap sync ios
+cd apps/pos/ios/App && pod install && open App.xcworkspace
+# Xcode → Product → Archive → Distribute App → App Store Connect → Upload
+```
+
+La build apparaît ensuite dans *TestFlight*, en **traitement** pendant 10 à
+30 minutes. Si Apple la refuse, un e-mail arrive avec un code `ITMS-…` — il
+nomme précisément ce qui manque.
+
+> **La conformité à l'export de cryptographie est déjà répondue.**
+> `ITSAppUsesNonExemptEncryption = false` est dans l'`Info.plist` (§4). Sans
+> cette clé, App Store Connect repose la question à **chaque** envoi et
+> bloque TestFlight tant que personne n'y répond à la main.
+
+### Étape 8 — TestFlight, et l'installation chez un client
+
+| | Testeurs internes | Testeurs externes |
+|---|---|---|
+| Combien | 100 | 10 000 |
+| Qui | les membres de votre équipe App Store Connect | n'importe qui, par e-mail ou **lien public** |
+| Revue | **aucune** | *Beta App Review* au premier build, souvent < 24 h |
+| Disponible | dès la fin du traitement | après cette revue |
+
+Le testeur installe l'application **TestFlight** depuis l'App Store, ouvre le
+lien, et Kaissi s'installe. **C'est aussi la seule façon de faire tourner
+Kaissi sur l'iPad d'un client avant publication** — il n'y a pas d'équivalent
+de l'APK.
+
+**Installez-la vous-même sur un vrai iPad avant d'aller plus loin**, comme
+pour le test interne de Play. Et prévenez le client : une build TestFlight
+**expire au bout de 90 jours**.
+
+### Étape 9 — Les informations pour le relecteur
+
+**C'est l'étape qui fait rejeter.** *Version → Informations pour la revue.*
+
+**a. Le compte de démonstration est obligatoire.** Kaissi exige une
+connexion : sans compte, le relecteur ne peut pas ouvrir l'application et
+rejette (*Guideline 2.1 — App Completeness*). Créez-le pour de bon avec
+`pnpm sync:nouveau-client`, sur un restaurant de démonstration, et donnez
+**aussi le code PIN de caisse** — l'e-mail et le mot de passe ouvrent le
+back-office, le PIN ouvre la caisse. Oublier le second est la version
+subtile du même rejet.
+
+**b. Les notes, en anglais.** Le reste de ce document est en français ; ces
+notes-là sont lues par le relecteur d'Apple, pas par un client. Un texte
+prêt à coller :
+
+```
+Kaissi is a point-of-sale application for restaurants in Tunisia.
+
+HOW TO TEST
+1. Launch the app. It opens offline — no network needed.
+2. Staff sign-in screen: pick "Salma Trabelsi", PIN 2468.
+3. Open the cash drawer with any amount, then take an order from
+   the floor plan and cash it. A receipt is shown on screen.
+4. To test synchronisation: Sync screen → sign in with the demo
+   account given in the "Sign-in required" fields above.
+
+THIS APP IS NOT A WEBSITE WRAPPER (Guideline 4.2)
+The entire application is bundled inside the IPA. There is no
+remote URL loaded at runtime: no `server.url`, no WebView pointing
+at a website. Please verify by enabling Airplane Mode before the
+first launch — the app starts, takes orders and completes a sale
+with no connectivity at all. This is the core purpose of the
+product: restaurants in Tunisia lose Internet access regularly,
+and a cash register that stops is a queue of customers leaving.
+
+BUSINESS MODEL (Guideline 3.1.3)
+Kaissi is sold directly by us to restaurant businesses, with
+on-site configuration of their menu, tax rates and staff. It is
+not sold to consumers, and no digital content or subscription is
+offered for sale inside the app. Accounts are created by us for
+the business owner.
+```
+
+> **Le paragraphe 4.2 n'est pas une formule, c'est notre argument.** Apple
+> refuse les sites emballés. Kaissi n'en est pas un — et le relecteur peut le
+> vérifier en trente secondes en coupant le réseau. Lui dire comment le faire
+> transforme la contrainte d'architecture du §1 en argument de revue.
+>
+> **Le paragraphe 3.1.3, lui, est une position à défendre, pas un fait
+> acquis.** Apple dispense d'achat intégré les services vendus directement à
+> des organisations (*Enterprise Services*), et Kaissi entre dans cette
+> description : on le vend à un restaurateur, on paramètre sa carte avec lui.
+> Mais c'est Apple qui tranche. Écrivez-le clairement dès la première
+> soumission plutôt que d'attendre la question — et attendez-vous, le cas
+> échéant, à un échange. C'est le seul risque de revue propre à iOS que
+> Kaissi ne contrôle pas.
+
+**c. Coordonnées.** Un e-mail et un téléphone qui répondent : Apple s'en sert
+si quelque chose bloque, et une revue en attente d'une réponse dort.
+
+### Étape 10 — Soumettre, et ce qui fait rejeter
+
+*Version → Ajouter pour la revue* → **Soumettre**. Comptez 24 à 48 h.
+
+Choisissez **Publication manuelle** plutôt qu'automatique : une application
+approuvée un vendredi soir ne devrait pas partir en ligne pendant que
+personne ne regarde.
+
+Les motifs de refus les plus fréquents, tous évitables :
+
+- **compte de démonstration absent, faux, ou sans le PIN** (étape 9a) — de
+  loin le premier ;
+- **captures d'écran qui ne correspondent pas à l'application**, ou
+  incomplètes pour un des deux types d'appareil déclarés (§4 quater) ;
+- **4.2 — fonctionnalité minimale** : levée par le paragraphe des notes, et
+  par le fait que l'application fonctionne réellement en mode avion ;
+- **3.1.1 — achat intégré** : voir l'étape 9b ;
+- **politique de confidentialité injoignable**, ou incohérente avec les
+  réponses de l'étape 5 ;
+- **métadonnées** : une capture qui montre un prix, ou un texte qui promet
+  une fonctionnalité absente.
+
+---
+
+## 4 quater. Les textes et les visuels de la fiche App Store
+
+### Ce qui change par rapport à Play, et pourquoi ça change le texte
+
+**Apple n'indexe PAS la description.** Play, si. Chez Apple, la recherche ne
+regarde que trois choses : le **nom** (30 car.), le **sous-titre** (30 car.)
+et un champ **mots-clés** de **100 caractères**, invisible du public.
+
+Conséquence pratique : la description longue de Play (§3.6) se réutilise
+telle quelle pour être *lue*, mais les mots-clés qu'elle porte n'y servent
+plus à rien. Ils déménagent dans le champ dédié.
+
+### Les textes
+
+**Nom** — 30 caractères, unique dans tout l'App Store :
+
+```
+Kaissi — Caisse restaurant
+```
+
+*(26 caractères.)*
+
+**Sous-titre** — 30 caractères, indexé, affiché sous le nom :
+
+```
+Encaisse même sans Internet
+```
+
+*(27 caractères.)* C'est l'argument, pas une description. Il est indexé :
+« encaisse » et « Internet » y travaillent deux fois.
+
+**Mots-clés** — 100 caractères, **séparés par des virgules SANS espace**, au
+singulier :
+
+```
+caisse,restaurant,snack,café,pos,encaissement,ticket,stock,tva,dinar,tunisie,addition,serveur
+```
+
+*(93 caractères.)*
+
+> **Trois règles qui font perdre des caractères pour rien.** Un espace après
+> une virgule compte comme un caractère et ne sert à rien. Les mots déjà
+> présents dans le **nom** et le **sous-titre** sont déjà indexés : les
+> répéter ici gaspille la place — c'est pourquoi « caisse » et « restaurant »
+> pourraient sortir de cette liste si l'on manquait de place. Et le pluriel
+> est inutile : Apple le gère.
+
+**Texte promotionnel** — 170 caractères, **modifiable sans nouvelle version**,
+affiché en tête de description :
+
+```
+Kaissi encaisse même quand Internet tombe : l'application est installée sur la tablette, pas sur un site web.
+```
+
+*(109 caractères.)* C'est le seul texte qu'on peut changer sans repasser par
+la revue — utile pour annoncer une nouveauté sans publier une version.
+
+**Description** — 4 000 caractères. **Reprenez celle du §3.6 telle quelle** :
+elle est écrite pour être lue, ce qui est exactement son rôle ici. Retirez la
+dernière ligne de contact si vous préférez la mettre dans l'URL de support.
+
+**URL de support** — **obligatoire**, et testée. Une page qui donne un e-mail
+et un téléphone suffit ; une URL morte fait rejeter la fiche.
+
+**URL marketing** — facultative. Le site de Res2Boost.
+
+**Copyright** — `2026 Res2Boost`.
+
+**Nouveautés de cette version** — obligatoire à partir de la deuxième
+version. Une phrase par changement visible, jamais « corrections diverses » :
+c'est ce que lit un client qui hésite à mettre à jour sa caisse un vendredi
+soir.
+
+### Les visuels
+
+**L'icône** — 1024 × 1024 PNG, **sans transparence et sans coins arrondis**
+(iOS les pose lui-même). `outils/visuels-store.html` la produit, à côté des
+formats de Play : ouvrez le fichier dans un navigateur, déposez votre image.
+Rien ne part sur Internet.
+
+**Les captures d'écran** — et c'est ici qu'une décision technique se paie.
+
+Le projet iOS déclare `TARGETED_DEVICE_FAMILY = "1,2"` : **iPhone ET iPad**.
+Apple exige alors un jeu de captures **pour chacun des deux**, et une fiche
+incomplète ne se soumet pas.
+
+Deux options, à trancher avant de préparer les visuels :
+
+| | Garder iPhone + iPad | Passer en iPad seul (`"2"`) |
+|---|---|---|
+| Captures à fournir | les deux jeux | un seul |
+| Ce que ça dit au client | « ça marche aussi sur iPhone » | « c'est une caisse, elle vit sur un comptoir » |
+| Travail | deux séries de captures à refaire à chaque refonte | une |
+
+> **Kaissi est une application de tablette**, comme le dit déjà le §3.6 pour
+> Play. Un iPhone de 6 pouces n'est pas un poste de caisse : la grille de
+> produits y devient inutilisable, et une capture d'iPhone donnerait une
+> mauvaise idée du produit. Si vous ne visez pas l'iPhone, le dire dans le
+> projet coûte une ligne et supprime la moitié du travail de fiche.
+>
+> Ce n'est pas une décision de documentation : elle change ce que le magasin
+> exige. Elle se prend une fois, avant la première soumission.
+
+Les tailles exactes attendues **changent avec les modèles d'iPad et
+d'iPhone** ; App Store Connect affiche, pour chaque emplacement, les
+dimensions qu'il accepte au moment où vous téléversez. C'est cette liste-là
+qui fait foi — pas un tableau écrit ici, qui vieillirait en silence. Le
+principe, lui, ne bouge pas : la plus grande taille de chaque famille suffit,
+Apple redimensionne pour les autres.
+
+> **Les captures se prennent, elles ne se fabriquent pas** — même règle que
+> pour Play. Sur un iPad : bouton du haut + volume haut (ou bouton principal
+> + bouton du haut sur les modèles qui en ont un) ; depuis le simulateur
+> Xcode : ⌘S, l'image atterrit sur le bureau. Montrez la prise de commande,
+> l'encaissement, le ticket, l'écran Stock — dans cet ordre, c'est le
+> parcours d'un restaurateur qui hésite.
+>
+> ⚠ Et **en paysage** : `UISupportedInterfaceOrientations~ipad` met le
+> paysage en premier parce qu'une caisse est posée sur un comptoir. Des
+> captures en portrait montreraient une application que personne n'utilise
+> comme ça.
+
+**Aperçu vidéo** — facultatif, jusqu'à trois, 15 à 30 secondes. À laisser de
+côté pour une première publication : une vidéo qui vieillit mal fait plus de
+mal qu'une absence de vidéo.
+
+> ⚠ Comme pour Play : ces textes décrivent ce que le logiciel **sait faire**.
+> Ni la fiche, ni la capture d'un ticket ne doivent affirmer un taux de TVA
+> ou une règle de timbre — ce sont des paramètres réglementaires, et ils se
+> valident avec un expert-comptable.
+
+---
+
 ## 5. Dans quel ordre
 
 1. **Maintenant** — l'APK signé, installé à la main. Zéro attente, correction
@@ -807,10 +1199,16 @@ un effet de bord d'un commit.
 2. **Quand deux ou trois clients tournent** — Google Play. La mise à jour
    automatique cesse d'être un confort et devient nécessaire : on ne va pas
    réinstaller à la main sur quinze tablettes.
-3. **iOS** — le projet et la chaîne de construction existent (§4 et §4 bis) ;
+3. **iOS** — le projet et la chaîne de construction existent (§4 et §4 bis),
+   et le parcours de publication est écrit clic par clic (§4 ter, §4 quater) ;
    il reste le compte développeur à 99 $/an et la fiche App Store. L'iPad
    reste rare en restauration tunisienne : à ouvrir quand un client le
    demande, sans travail technique à refaire ce jour-là.
+
+   > Deux réserves à connaître avant de promettre une date : le compte
+   > **Organisation** demande un numéro D-U-N-S, qui prend une à deux
+   > semaines à obtenir ; et il n'existe **aucun équivalent de l'APK** — avant
+   > publication, l'installation chez un client passe par TestFlight.
 
 Le back-office reste web, sur les trois étapes. Personne n'encaisse dans un
 back-office, et une page web s'ouvre depuis n'importe quel poste sans rien
