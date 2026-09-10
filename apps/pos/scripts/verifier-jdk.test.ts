@@ -11,8 +11,24 @@
  */
 
 import { describe, expect, it } from 'vitest'
-// @ts-expect-error — script Node en JS pur, sans déclarations de types.
-import { majeureJava, versionDeClasse, diagnostiquer } from './verifier-jdk.mjs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+/*
+ * Le script est du JavaScript pur : il doit tourner sous `node` sans étape de
+ * compilation, avant même que le projet ne soit construit. TypeScript n'a donc
+ * pas de déclarations pour lui, et `@ts-expect-error` doit porter sur la LIGNE
+ * du spécificateur de module — pas sur le mot-clé `import`, qui est plus haut
+ * quand la liste d'imports est multiligne.
+ */
+import {
+  majeureJava,
+  versionDeClasse,
+  diagnostiquer,
+  emplacementsProbables,
+  ecrireOverrideGradle,
+  // @ts-expect-error — script Node en JS pur, sans déclarations de types.
+} from './verifier-jdk.mjs'
 
 describe('lire la version de Java', () => {
   it('lit les versions modernes', () => {
@@ -57,20 +73,83 @@ describe('le diagnostic', () => {
   it('refuse le JDK 25 — et nomme le message que Gradle affiche', () => {
     const bilan = diagnostiquer(25)
     expect(bilan.ok).toBe(false)
-    // Le lien avec ce que le gérant a SOUS LES YEUX est tout l'intérêt.
+    expect(bilan.trop).toBe('recent')
+    // Le lien avec ce que le gérant a SOUS LES YEUX est tout l'intérêt : il
+    // ne cherche pas « JDK 25 » dans son terminal, il y lit « 69 ».
     expect(bilan.message).toContain('major version 69')
     expect(bilan.message).toContain('JDK 25')
-    // Et il doit dire quoi faire, pas seulement ce qui ne va pas.
-    expect(bilan.message).toContain('JAVA_HOME')
   })
 
   it('refuse aussi un JDK trop ancien', () => {
     const bilan = diagnostiquer(11)
     expect(bilan.ok).toBe(false)
+    expect(bilan.trop).toBe('ancien')
     expect(bilan.message).toContain('au moins 17')
+  })
+
+  it("ne mélange pas le DIAGNOSTIC et le REMÈDE", () => {
+    /*
+     * Le remède dépend de ce qu'on trouve sur le poste : le script cherche
+     * un JDK utilisable et donne SON chemin. Laisser en plus des chemins
+     * génériques dans le diagnostic affichait les deux à la suite — la
+     * première version faisait exactement cela, et le message devenait
+     * illisible à force d'être complet.
+     */
+    expect(diagnostiquer(25).message).not.toContain('JAVA_HOME')
   })
 
   it('ne prétend rien quand il ne sait pas', () => {
     expect(diagnostiquer(null).ok).toBe(false)
+  })
+})
+
+describe('trouver un JDK sur le poste', () => {
+  it("cherche d'abord là où Android Studio l'installe", () => {
+    // C'est le cas le plus fréquent : quelqu'un qui construit une
+    // application Android a Android Studio, donc un JDK 21, sans le savoir.
+    const windows = emplacementsProbables('win32', 'C:\\Users\\salem')
+    expect(windows[0]).toContain('Android Studio')
+    expect(emplacementsProbables('darwin', '/Users/salem')[0]).toContain('Android Studio')
+    // Linux n'a pas d'Android Studio à un emplacement canonique : on prend
+    // le répertoire standard des JVM.
+    expect(emplacementsProbables('linux', '/home/salem')[0]).toBe('/usr/lib/jvm')
+  })
+})
+
+describe("écrire l'override Gradle", () => {
+  it('écrit dans le gradle.properties de l’UTILISATEUR, jamais celui du projet', () => {
+    const home = mkdtempSync(join(tmpdir(), 'kaissi-jdk-'))
+    const resultat = ecrireOverrideGradle('/usr/lib/jvm/java-21-openjdk', home)
+
+    expect(resultat.ok).toBe(true)
+    /*
+     * `apps/pos/android/gradle.properties` est VERSIONNÉ : y écrire un
+     * chemin de poste le pousserait à tout le monde et casserait la
+     * construction partout ailleurs. Le fichier de l'utilisateur, lui,
+     * n'entre jamais dans git.
+     */
+    expect(resultat.fichier).toBe(join(home, '.gradle', 'gradle.properties'))
+    const contenu = readFileSync(resultat.fichier, 'utf8')
+    expect(contenu).toContain('org.gradle.java.home=/usr/lib/jvm/java-21-openjdk')
+    // La ligne doit dire d'où elle vient et comment la retirer.
+    expect(contenu).toContain('verifier:jdk')
+    expect(contenu).toContain('Retirez-la')
+  })
+
+  it("REFUSE d'écraser un réglage déjà posé", () => {
+    const home = mkdtempSync(join(tmpdir(), 'kaissi-jdk-'))
+    mkdirSync(join(home, '.gradle'), { recursive: true })
+    writeFileSync(
+      join(home, '.gradle', 'gradle.properties'),
+      'org.gradle.java.home=/un/autre/jdk\n',
+    )
+
+    const resultat = ecrireOverrideGradle('/usr/lib/jvm/java-21-openjdk', home)
+
+    // Ce fichier vaut pour TOUS les projets Gradle du poste : l'écraser
+    // casserait peut-être un autre projet, en silence.
+    expect(resultat.ok).toBe(false)
+    expect(resultat.message).toContain('déjà')
+    expect(readFileSync(resultat.fichier, 'utf8')).toContain('/un/autre/jdk')
   })
 })

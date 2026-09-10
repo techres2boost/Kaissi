@@ -284,8 +284,29 @@ SDK Android (Android Studio installe les deux).
 > sait pas lire ce bytecode et s'arrête avant d'avoir rien construit. C'est
 > `pnpm verifier:jdk` qui le dit maintenant, en une phrase et avant Gradle.
 >
-> **Le plus simple, sans rien désinstaller** : utiliser le JDK qu'Android
-> Studio embarque déjà (le « JBR »), le temps de la construction.
+> **La façon la plus courte — une commande :**
+>
+> ```bash
+> pnpm verifier:jdk --ecrire
+> ```
+>
+> Le script **cherche** un JDK utilisable sur votre poste (Android Studio en
+> embarque un, le « JBR » : vous en avez presque sûrement un sans le savoir),
+> puis écrit `org.gradle.java.home` dans **votre** `~/.gradle/gradle.properties`.
+> Gradle s'en sert alors tout seul, sans rien changer à votre `PATH`, et sans
+> avoir à y repenser à chaque terminal.
+>
+> Deux précautions, dans le script même : il écrit dans le fichier de
+> l'**utilisateur** et jamais dans celui du projet — `apps/pos/android/gradle.properties`
+> est versionné, un chemin `C:\Program Files\…` y casserait la construction
+> de tout le monde — et il **refuse d'écraser** un `org.gradle.java.home` déjà
+> présent, qui pourrait servir à un autre projet.
+>
+> Ce réglage vaut pour **tous** les projets Gradle du poste. Pour revenir en
+> arrière, retirez la ligne : elle porte un commentaire qui le dit.
+>
+> **Ou à la main, pour ce terminal seulement** — `pnpm verifier:jdk` (sans
+> `--ecrire`) affiche la commande exacte, avec le chemin trouvé chez vous :
 >
 > ```powershell
 > # Windows — PowerShell
@@ -298,17 +319,10 @@ SDK Android (Android Studio installe les deux).
 > # Windows — Git Bash
 > export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
 > export PATH="$JAVA_HOME/bin:$PATH"
->
-> # macOS
-> export JAVA_HOME=$(/usr/libexec/java_home -v 21)
->
-> # Linux
-> export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 > ```
 >
 > La variable ne vaut que pour le terminal en cours : rouvrir une fenêtre la
-> perd. C'est voulu — on ne change pas le Java de tout le poste pour
-> construire une application.
+> perd. C'est le prix de ne rien changer au poste.
 >
 > **Pourquoi ne pas simplement monter Gradle ?** Ce sera la vraie réponse, et
 > elle viendra : Gradle 9 accepte le JDK 25. Mais elle entraîne le plugin

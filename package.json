@@ -29,6 +29,7 @@
     "sync:reprojeter": "node --experimental-strip-types --import ./apps/sync/scripts/charger-ts.mjs apps/sync/scripts/reprojeter.mjs",
     "sync:cles": "node apps/sync/scripts/cles-vapid.mjs",
     "sync:acces": "node --experimental-strip-types --import ./apps/sync/scripts/charger-ts.mjs apps/sync/scripts/acces.mjs",
+    "sync:nouveau-client": "node --experimental-strip-types --import ./apps/sync/scripts/charger-ts.mjs apps/sync/scripts/nouveau-client.mjs",
     "backoffice:dev": "pnpm --filter @kaissi/backoffice dev",
     "verifier:natif": "pnpm --filter @kaissi/pos verifier:natif",
     "verifier:jdk": "pnpm --filter @kaissi/pos verifier:jdk",

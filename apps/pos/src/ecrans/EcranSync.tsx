@@ -13,7 +13,12 @@
  */
 
 import { useEffect, useState } from 'react'
-import type { EnregistrementOutbox } from '@kaissi/db-local'
+import {
+  motifDeRefus,
+  peutBasculer,
+  reinitialiserPourAutreEtablissement,
+  type EnregistrementOutbox,
+} from '@kaissi/db-local'
 import type { ResumeSync } from '@kaissi/sync-client'
 import { useApp } from '../etat/contexte.js'
 import { expliquerEchecReseau } from '../donnees/diagnostic-reseau.js'
@@ -231,13 +236,25 @@ export function EcranSync() {
         </p>
         <p>
           <button type="button" onClick={() => void oublierAppairage()}>
-            Ré-appairer ce terminal
+            Ré-appairer — ou changer d’établissement
           </button>
         </p>
         <p className="note">
-          Le formulaire réapparaîtra pour saisir une autre adresse ou un autre
-          jeton. Aucune vente n’est perdue : seuls l’adresse et le jeton sont
-          effacés.
+          Le formulaire réapparaîtra. Reconnectez-vous avec le compte du
+          gérant : si celui-ci gère <strong>plusieurs établissements</strong>,
+          la liste s’affichera et vous choisirez celui de cette caisse.
+        </p>
+        <p className="note">
+          <strong>Changer d’établissement vide la base locale</strong> — carte,
+          employés, stock et ventes de l’ancien. C’est indispensable : les
+          curseurs de synchronisation sont communs à toute la base, et sans
+          remise à zéro le catalogue du nouvel établissement ne serait jamais
+          reçu. Rien n’est perdu côté serveur, où tout a déjà été remonté.
+        </p>
+        <p className="note">
+          Le changement est <strong>refusé</strong> tant qu’il reste des ventes
+          à envoyer : elles portent l’identité de l’ancien terminal et seraient
+          refusées définitivement. Synchronisez d’abord.
         </p>
       </section>
 
@@ -427,6 +444,48 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
       }
 
       const ancienDevice = (await app.etat.lire('device_id')) || null
+
+      /*
+       * ── CHANGEMENT D'ÉTABLISSEMENT : la base locale doit être remise à zéro
+       *
+       * PANNE OBSERVÉE. Un gérant ouvre un second restaurant, y crée ses
+       * employés, rouvre la caisse — et retrouve la carte, les employés et le
+       * stock du PREMIER. L'appairage n'était pas en cause : c'est la base
+       * locale qui restait celle de l'ancien établissement.
+       *
+       * Deux mécanismes la figeaient, et aucun ne se voyait :
+       *
+       *   • `last_catalog_seq` suit `change_log.seq`, un `bigserial` GLOBAL
+       *     (RÈGLE 4). Le terminal l'avait déjà avancé loin ; les entrées du
+       *     second restaurant, écrites avant, portent des `seq` inférieurs et
+       *     n'étaient donc jamais tirées ;
+       *   • les tables miroir contenaient encore l'ancien référentiel. Même
+       *     en tirant le nouveau catalogue, on aurait obtenu l'UNION des
+       *     deux : une carte mélangée, sur une caisse.
+       *
+       * ⚑ On REFUSE tant que l'outbox n'est pas vide. Les opérations en
+       *   attente portent l'ancien `device_id` : le serveur les refuserait
+       *   « appareil_etranger », et un rejet ne se réessaie jamais tout seul.
+       *   Ces ventes n'arriveraient JAMAIS. Le refus est la bonne réponse —
+       *   perdre une vente coûte infiniment plus cher qu'une synchronisation
+       *   de plus.
+       */
+      const ancienResto = (await app.etat.lire('restaurant_id')) || null
+      const changeDEtablissement =
+        !!ancienResto && !!corps.restaurantId && ancienResto !== corps.restaurantId
+
+      if (changeDEtablissement) {
+        const attente = await app.journal.enAttente()
+        if (!peutBasculer(attente)) {
+          setEtat('erreur')
+          setMessage(motifDeRefus(attente))
+          return
+        }
+        // Rien n'est en attente : on peut vider sans rien perdre. Le journal
+        // local est déjà remonté, et il reste au serveur, immuable.
+        await reinitialiserPourAutreEtablissement(app.base.adaptateur)
+      }
+
       await app.etat.ecrire('url_sync', base)
       await app.etat.ecrire('jeton_appareil', corps.jeton)
       // On ADOPTE l'identité que le serveur vient d'attribuer. Les trois vont
@@ -454,7 +513,7 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
       // session de caisse. S'il vient de changer, un simple rafraîchir ne
       // suffit pas : on recharge la page pour que les ventes suivantes soient
       // signées correctement. La base est persistante, rien n'est perdu.
-      if (ancienDevice && ancienDevice !== corps.deviceId) {
+      if (changeDEtablissement || (ancienDevice && ancienDevice !== corps.deviceId)) {
         window.location.reload()
         return
       }
