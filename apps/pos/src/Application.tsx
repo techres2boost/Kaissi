@@ -119,7 +119,19 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
   }
 
   // ── Pas de caisse ouverte ──────────────────────────────────────────────
-  if (!shift && vue.nom !== 'diagnostic') {
+  //
+  // Deux écrans restent joignables sans caisse ouverte, et ce n'est pas un
+  // confort : ce sont ceux dont on a besoin AVANT de pouvoir encaisser.
+  //
+  //   • Diagnostic — savoir si la base et le réseau vont bien ;
+  //   • Sync — METTRE LE TERMINAL EN SERVICE. C'est le tout premier geste
+  //     d'une caisse neuve. L'exiger après une ouverture de caisse revenait
+  //     à demander de compter un fond avant d'avoir rattaché la tablette à
+  //     son établissement.
+  //
+  // Le bandeau proposait déjà les deux liens ; seul « Diagnostic » était
+  // exempté ici, donc cliquer « Sync » ne changeait rien à l'écran.
+  if (!shift && vue.nom !== 'diagnostic' && vue.nom !== 'sync') {
     return (
       <div className="application">
         <Bandeau

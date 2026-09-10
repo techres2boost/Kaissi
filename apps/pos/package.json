@@ -26,7 +26,11 @@
     "verifier:jdk": "node scripts/verifier-jdk.mjs",
     "test:parcours": "node tests/parcours-caisse.mjs",
     "test:persistance": "node tests/persistance-web.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:mise-en-service": "node tests/mise-en-service.mjs",
+    "verifier:gradle": "node scripts/verifier-gradle.mjs",
+    "aab": "node scripts/aab.mjs",
+    "apk": "node scripts/aab.mjs --apk"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "^7.0.0",

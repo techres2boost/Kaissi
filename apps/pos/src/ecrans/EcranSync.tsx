@@ -382,6 +382,32 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
     setMessage(null)
     const base = url.replace(/\/+$/, '')
     try {
+      /*
+       * Le refus se prononce AVANT d'appeler le serveur, quand la cible est
+       * connue — c'est-à-dire dès qu'on a cliqué un établissement dans la
+       * liste.
+       *
+       * Le contrôle existait déjà, mais après l'enrôlement : chaque clic
+       * refusé créait donc un appareil de plus dans l'établissement visé et
+       * lui brûlait un préfixe de tickets (P2, P3, P4…), pour une bascule qui
+       * n'aurait pas lieu. Rien d'irréparable, mais rien d'utile non plus.
+       *
+       * Le contrôle après l'appel RESTE : au premier appel, le compte peut
+       * n'avoir qu'un établissement, et c'est le serveur qui le désigne — on
+       * ne connaît la cible qu'en lisant sa réponse.
+       */
+      if (restaurantId) {
+        const ancien = (await app.etat.lire('restaurant_id')) || null
+        if (ancien && ancien !== restaurantId) {
+          const attente = await app.journal.enAttente()
+          if (!peutBasculer(attente)) {
+            setEtat('erreur')
+            setMessage(motifDeRefus(attente))
+            return
+          }
+        }
+      }
+
       // L'identité d'INSTALLATION, tirée une seule fois et conservée ici.
       //
       // C'est elle qui fait qu'une remise en service retrouve le MÊME
@@ -567,6 +593,27 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
           synchronisation entre terminaux et l’accès au back-office.
         </p>
 
+        {/*
+          Le message d'erreur est AU-DESSUS de la bifurcation, et c'est tout
+          l'objet du correctif.
+          
+          PANNE OBSERVÉE. Il vivait dans la branche « formulaire » seulement.
+          Un gérant qui gère deux établissements voyait donc la liste, cliquait
+          « Snack Lack 2 »… et rien. Le refus était bien calculé — l'outbox
+          n'était pas vide, ou le serveur répondait 403 — mais il s'écrivait
+          dans un état que cette branche n'affichait pas. Le bouton restait là,
+          muet, et on conclut que le second établissement n'existe pas.
+          
+          `pre-line` compte autant : `motifDeRefus()` sépare ses raisons par
+          des lignes vides, et sans cette règle elles se collaient en un seul
+          paragraphe illisible.
+        */}
+        {message && (
+          <p className="erreur" style={{ whiteSpace: 'pre-line' }} role="alert">
+            {message}
+          </p>
+        )}
+
         {choix.length > 0 ? (
           <>
             <p className="note">
@@ -585,6 +632,25 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
                   {e.nom}
                 </button>
               ))}
+            </div>
+            {/*
+              Une sortie. Sans elle, un mauvais compte ou un refus enferme sur
+              cet écran : la liste ne propose que des établissements, et rien
+              ne ramène à la saisie des identifiants.
+            */}
+            <div className="actions">
+              <button
+                type="button"
+                className="secondaire"
+                disabled={etat === 'test'}
+                onClick={() => {
+                  setChoix([])
+                  setMessage(null)
+                  setEtat('saisie')
+                }}
+              >
+                ‹ Changer de compte
+              </button>
             </div>
           </>
         ) : (
@@ -650,8 +716,6 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
                 </label>
               </details>
             )}
-
-            {message && <p className="erreur">{message}</p>}
 
             <div className="actions">
               <button

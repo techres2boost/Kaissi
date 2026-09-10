@@ -1815,8 +1815,11 @@ nomme ton JDK et donne la commande exacte pour en changer.
 1. Au back-office, en administrateur : **Administration → Établissements**,
    ouvrez « Snack Lac 2 ».
 2. Saisissez-y un ou deux articles, et embauchez un employé.
-3. Sur la caisse : **Diagnostic → Synchronisation → « Ré-appairer — ou changer
-   d'établissement »**.
+3. Sur la caisse : bandeau du haut → **Sync** → « Ré-appairer — ou changer
+   d'établissement ». Cet écran est joignable **même sans caisse ouverte** :
+   mettre un terminal neuf en service est le premier geste, avant de compter un
+   fond de caisse. Seul « Diagnostic » l'était jusqu'ici, si bien que cliquer
+   « Sync » sur une caisse fermée ne changeait rien à l'écran.
 4. Reconnectez-vous, et choisissez **Snack Lac 2** dans la liste.
 
 **Attendu** : la caisse redémarre sur la carte, les employés et le stock du
@@ -1847,6 +1850,31 @@ d'opérations attendent et quoi faire.
 > « appareil étranger », et un rejet ne se réessaie jamais tout seul. Elles
 > n'arriveraient **jamais**. Perdre une vente coûte infiniment plus cher que
 > de demander une synchronisation de plus.
+
+> **⚑ Le refus était MUET, et c'est ce qui a été corrigé.** On cliquait
+> « Snack Lac 2 » dans la liste, et rien ne se passait : ni message, ni
+> bascule. Le bouton restait là. On en concluait que le second établissement
+> n'existait pas vraiment.
+>
+> Le refus était pourtant bien calculé — il l'est depuis le premier jour. Mais
+> l'affichage du message vivait dans la branche « formulaire d'identifiants »
+> de cet écran, et la branche « liste d'établissements » ne le rendait nulle
+> part. Le code faisait tout juste, sauf être lu.
+>
+> Trois corrections : le message s'affiche **au-dessus** de la bifurcation,
+> donc dans les deux cas ; ses paragraphes ne se collent plus en une seule
+> ligne ; et un bouton **« ‹ Changer de compte »** offre une sortie — sans
+> lui, un mauvais compte enfermait sur un écran qui ne propose que des
+> établissements.
+>
+> Le contrôle se fait aussi désormais **avant** d'appeler le serveur, quand on
+> a cliqué un établissement : chaque clic refusé enrôlait sinon un appareil de
+> plus dans l'établissement visé et lui brûlait un préfixe de tickets (P2, P3,
+> P4…) pour une bascule qui n'aurait pas lieu.
+>
+> `pnpm mise-en-service` fige ce comportement dans un vrai navigateur, avec un
+> serveur bouchonné qui rend la liste puis un refus. Le test échoue sur le code
+> d'avant — c'est ce qui en fait un test.
 
 #### R.2 — Ouvrir un client entièrement nouveau
 
@@ -2000,6 +2028,8 @@ le geste qui répare un stock négatif.
 | « Failed to fetch » à l'appairage | `SYNC_ORIGINES` sur Railway doit contenir l'URL **exacte** du POS. |
 | Écran Cuisine vide, ou erreur `kitchen_ready` | Migration **0018** non appliquée. Toutes les migrations doivent passer, dans l'ordre. |
 | Push refusé sur une vente pourtant valide | Un employé du POS n'existe pas côté serveur (`orders.opened_by`). Migration **0020** les crée. |
+| Cliquer un établissement dans la liste de mise en service ne fait rien | Corrigé : le refus s'affiche désormais. S'il persiste, lisez le message — il dit combien d'opérations attendent d'être synchronisées. |
+| `Unexpected character: '"'` dans un `.gradle` | Un chemin collé par erreur dans un fichier versionné. `git checkout -- apps/pos/android/<fichier>`, puis `pnpm verifier:jdk --ecrire` pour désigner un JDK sans toucher au dépôt. |
 | Stock inchangé après une vente | La vente n'est pas synchronisée : l'écran **Sync** dit-il « À jour » ? |
 | Tableau de bord vide | Mauvaise période, ou vente non synchronisée. Vérifie d'abord **Tickets**. |
 | CA inférieur au total des tickets | **Normal** : le CA est HT, les tickets TTC. |
