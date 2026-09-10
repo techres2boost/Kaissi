@@ -25,10 +25,11 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { adaptateurNode } from './adaptateurs/node.js'
 import type { AdaptateurSqlite } from './adaptateur.js'
 import { migrer } from './migrateur.js'
-import { installerGraine } from './graine.js'
+import { installerGraine, DEMO_DEVICE, DEMO_ORG, DEMO_RESTO } from './graine.js'
 import { depotEtat } from './depots/etat.js'
 import { depotCatalogue } from './depots/catalogue.js'
 import {
+  dejaEnService,
   motifDeRefus,
   peutBasculer,
   reinitialiserPourAutreEtablissement,
@@ -45,6 +46,33 @@ beforeEach(async () => {
 async function compter(table: string): Promise<number> {
   const ligne = await db.lireUne<{ n: number }>(`SELECT count(*) AS n FROM ${table}`)
   return ligne?.n ?? 0
+}
+
+/**
+ * De l'ACTIVITÉ dans la base — et non des tables vides.
+ *
+ * C'est ce qui manquait, et c'est ce qui a laissé passer la panne : un
+ * `DELETE` sur une table vide ne déclenche aucun `BEFORE DELETE`. Les tests
+ * vidaient donc joyeusement une base où rien n'était protégé, pendant qu'en
+ * clientèle la toute première bascule mourait sur le déclencheur
+ * d'immuabilité de `order_events` (RÈGLE 6).
+ */
+async function poserUneVente(orderId = 'cmd-1'): Promise<void> {
+  await db.executer(
+    `INSERT INTO orders (id, organization_id, restaurant_id, device_id, status,
+                         ticket_number, opened_at, updated_at)
+     VALUES (?, ?, ?, ?, 'ouverte', 'P1-000001',
+             '2026-08-25T19:00:00.000Z', '2026-08-25T19:00:00.000Z')`,
+    [orderId, DEMO_ORG, DEMO_RESTO, DEMO_DEVICE],
+  )
+  for (const [i, type] of ['order.opened', 'line.added'].entries()) {
+    await db.executer(
+      `INSERT INTO order_events (event_id, order_id, organization_id, restaurant_id,
+                                 device_id, seq_device, type, payload, client_ts)
+       VALUES (?, ?, ?, ?, ?, ?, ?, '{}', '2026-08-25T19:00:00.000Z')`,
+      [`ev-${i}`, orderId, DEMO_ORG, DEMO_RESTO, DEMO_DEVICE, i + 1, type],
+    )
+  }
 }
 
 describe('ce que la bascule efface', () => {
@@ -111,6 +139,71 @@ describe('ce que la bascule efface', () => {
     expect(await etat.lire('installation_id')).toBe('installation-stable')
   })
 
+  it("vide le JOURNAL D'ÉVÉNEMENTS — malgré son déclencheur d'immuabilité", async () => {
+    /*
+     * ── La panne que ce test aurait dû attraper ──────────────────────────
+     *
+     * `order_events` est en insertion seule (RÈGLE 6, migration 001). Toute
+     * bascule mourait donc sur :
+     *
+     *   Échec de « DELETE FROM order_events »
+     *   — order_events est en insertion seule : aucune suppression
+     *
+     * Le déclencheur avait raison ; c'est la purge qui ignorait son
+     * existence. Et aucun test ne l'a vu, parce qu'aucun ne posait de ligne.
+     *
+     * Garder ces événements n'était pas une option : ils portent le
+     * `restaurant_id` de l'ancien établissement, et la projection les
+     * ferait réapparaître dans le chiffre du nouveau.
+     */
+    await poserUneVente()
+    expect(await compter('order_events')).toBe(2)
+
+    await reinitialiserPourAutreEtablissement(db)
+
+    expect(await compter('order_events')).toBe(0)
+    expect(await compter('orders')).toBe(0)
+  })
+
+  it('REFERME le journal derrière elle — la RÈGLE 6 reste entière', async () => {
+    await poserUneVente()
+    await reinitialiserPourAutreEtablissement(db)
+
+    // Le nouvel établissement encaisse ; son journal doit être aussi
+    // inviolable que l'ancien. Un drapeau resté posé ferait de la RÈGLE 6
+    // une politesse.
+    await poserUneVente('cmd-2')
+    await expect(db.executer('DELETE FROM order_events')).rejects.toThrow(
+      /insertion seule/,
+    )
+    expect(await compter('order_events')).toBe(2)
+
+    // Et le drapeau lui-même n'a rien laissé derrière lui.
+    expect(await depotEtat(db).lire('purge_etablissement')).toBeNull()
+  })
+
+  it("un ÉCHEC en cours de purge ne laisse pas le journal ouvert", async () => {
+    /*
+     * Le drapeau et la purge vivent dans la MÊME transaction : si quoi que
+     * ce soit échoue, l'annulation emporte le drapeau. Sans cela, une
+     * tablette pourrait rester indéfiniment dans un état où n'importe quel
+     * `DELETE` sur le journal passerait — et rien ne le dirait.
+     *
+     * On provoque l'échec en retirant une table que la purge attend.
+     */
+    await poserUneVente()
+    await db.executer('DROP TABLE print_queue')
+
+    await expect(reinitialiserPourAutreEtablissement(db)).rejects.toThrow()
+
+    expect(await depotEtat(db).lire('purge_etablissement')).toBeNull()
+    // Rien n'a été perdu : la transaction entière a été annulée.
+    expect(await compter('order_events')).toBe(2)
+    await expect(db.executer('DELETE FROM order_events')).rejects.toThrow(
+      /insertion seule/,
+    )
+  })
+
   it('tient en UNE transaction — une base à moitié vidée serait irréparable', async () => {
     // Le contrat est celui des migrations locales : sur la tablette d'un
     // restaurant à Sfax, on ne répare pas à distance.
@@ -145,5 +238,54 @@ describe('quand on REFUSE de basculer', () => {
     // l'effacer reviendrait à jeter une vente que le gérant doit voir.
     expect(peutBasculer({ enAttente: 0, rejetes: 1 })).toBe(false)
     expect(motifDeRefus({ enAttente: 0, rejetes: 1 })).toContain('refusées')
+  })
+})
+
+/*
+ * ── « Snack Lac 2 ne marche pas en cliquant dessus » ──────────────────────
+ *
+ * PANNE OBSERVÉE, en clientèle. Le gérant se connecte sur une tablette qui a
+ * déjà servi en local, choisit son second établissement dans la liste… et il
+ * ne se passe rien. Aucun message, aucun mouvement. On en conclut que le
+ * second restaurant n'existe pas.
+ *
+ * Deux défauts se superposaient, et le second cachait le premier :
+ *
+ *   • la caisse n'avait jamais été mise en service, mais la graine locale
+ *     écrit `DEMO_DEVICE` dans `sync_state` : le garde-fou de bascule voyait
+ *     un changement d'établissement, trouvait l'outbox pleine des ventes de
+ *     démonstration, et refusait ;
+ *   • ce refus était rangé dans un message que la liste des établissements
+ *     ne rendait nulle part.
+ *
+ * Le refus était de surcroît un cul-de-sac : ces opérations portent une
+ * identité d'appareil qu'aucun serveur n'a jamais délivrée. Elles ne
+ * partiront JAMAIS, quel que soit le nombre de synchronisations.
+ */
+describe('en service, ou pas encore', () => {
+  it('une caisse neuve porte le device de la DÉMONSTRATION', () => {
+    expect(dejaEnService(DEMO_DEVICE)).toBe(false)
+  })
+
+  it('une caisse sans device du tout n’a jamais été en service', () => {
+    expect(dejaEnService(null)).toBe(false)
+    expect(dejaEnService('')).toBe(false)
+    expect(dejaEnService(undefined)).toBe(false)
+  })
+
+  it('un device attribué par le SERVEUR dit « en service »', () => {
+    expect(dejaEnService('0199f0aa-1111-7000-8000-abcdefabcdef')).toBe(true)
+  })
+
+  it('la graine écrit bien DEMO_DEVICE — c’est ce qui rend le test utile', async () => {
+    /*
+     * Si la graine cessait d'écrire cette valeur, `dejaEnService()` rendrait
+     * « vrai » sur une caisse neuve et on reviendrait au cul-de-sac, sans
+     * qu'aucun test ne bouge. On le vérifie donc sur la vraie graine.
+     */
+    // `db` sort du `beforeEach` : migrations de production + vraie graine.
+    const etat = depotEtat(db)
+    expect(await etat.lire('device_id')).toBe(DEMO_DEVICE)
+    expect(dejaEnService(await etat.lire('device_id'))).toBe(false)
   })
 })

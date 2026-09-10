@@ -28,7 +28,7 @@ renvoi les donne tous : c'est précisément ce qui rend le patron visible.
 Un patron sans renvoi n'existe pas dans ce dépôt. S'il en manque un, c'est un
 défaut de ce document, pas une abstraction.
 
-### Les 32 patrons, en un coup d'œil
+### Les 33 patrons, en un coup d'œil
 
 - [0. La contrainte qui décide de tout](#0-la-contrainte-qui-décide-de-tout)
 
@@ -50,6 +50,7 @@ défaut de ce document, pas une abstraction.
 - [11. Multi-tenance — la colonne discriminante, partout](#11-multi-tenance--la-colonne-discriminante-partout)
 - [12. Horloge logique — un curseur, jamais un timestamp](#12-horloge-logique--un-curseur-jamais-un-timestamp)
 - [13. Journal append-only + chaînage par hash](#13-journal-append-only--chaînage-par-hash)
+- [13 bis. L'exception nommée — lever une invariance sans la perdre](#13-bis-lexception-nommée--comment-on-lève-une-invariance-sans-la-perdre)
 - [14. UUIDv7 — l'identifiant vient de celui qui crée](#14-uuidv7--lidentifiant-vient-de-celui-qui-crée)
 - [15. Instantané ponctuel — copier plutôt que joindre](#15-instantané-ponctuel--copier-plutôt-que-joindre)
 - [16. Index unique partiel — la contrainte qui sait faire une exception](#16-index-unique-partiel--la-contrainte-qui-sait-faire-une-exception)
@@ -471,6 +472,52 @@ registre chaîné, sans rien emprunter aux chaînes de blocs.
 > **Une annulation n'efface jamais rien.** Elle ajoute un événement
 > d'annulation. L'état visible change ; l'historique ne perd jamais
 > d'information.
+
+---
+
+## 13 bis. L'exception nommée — comment on lève une invariance sans la perdre
+> ⟶ `packages/db-local/src/migrations/010_purge_etablissement.ts:49` — le déclencheur conditionnel
+> ⟶ `packages/db-local/src/bascule-etablissement.ts:210` — le drapeau, posé et retiré
+
+**Le problème.** Une invariance absolue finit toujours par croiser un cas
+légitime. Ici : `order_events` est en insertion seule (§13) — et changer une
+caisse d'établissement exige de vider sa base locale, journal compris.
+
+Les deux réponses spontanées sont mauvaises :
+
+- **contourner en silence** (un `DROP TRIGGER` le temps de l'opération) : un
+  plantage entre le DROP et le CREATE laisse la table sans protection, et plus
+  rien ne le dit ;
+- **ne rien effacer** : les événements gardent le `restaurant_id` de l'ancien
+  établissement, et la projection les fait réapparaître dans le chiffre du
+  nouveau — un chiffre faux qui a l'air juste.
+
+**Le patron.** Le déclencheur reste en place et consulte un **drapeau nommé**,
+posé et retiré **dans la transaction** de purge :
+
+```sql
+CREATE TRIGGER order_events_pas_delete
+BEFORE DELETE ON order_events
+WHEN (SELECT valeur FROM sync_state WHERE cle = 'purge_etablissement') IS NULL
+BEGIN
+  SELECT RAISE(ABORT, 'order_events est en insertion seule : aucune suppression');
+END;
+```
+
+Trois propriétés, et il faut les trois :
+
+1. la suppression n'est jamais permise **par défaut** — seulement pendant les
+   millisecondes où quelqu'un l'a demandée **par son nom** ;
+2. un échec quelconque annule tout, **drapeau compris** : la table ne peut pas
+   rester ouverte ;
+3. l'exception est **lisible** : elle porte un nom qui dit pourquoi elle
+   existe, au lieu d'être un contournement qu'on retrouve deux ans plus tard.
+
+> **Ce qui l'a rendue nécessaire — et pourquoi les tests l'avaient ratée.**
+> La bascule d'établissement échouait à tous les coups sur « order_events est
+> en insertion seule ». Les tests unitaires passaient : ils vidaient des
+> tables **vides**, et un déclencheur `BEFORE DELETE` ne se déclenche sur
+> aucune ligne. Un test de purge qui ne pose rien à purger ne prouve rien.
 
 ---
 

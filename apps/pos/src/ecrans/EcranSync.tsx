@@ -14,10 +14,13 @@
 
 import { useEffect, useState } from 'react'
 import {
+  dejaEnService,
+  ErreurSqlite,
   motifDeRefus,
   peutBasculer,
   reinitialiserPourAutreEtablissement,
   type EnregistrementOutbox,
+  type EtatBascule,
 } from '@kaissi/db-local'
 import type { ResumeSync } from '@kaissi/sync-client'
 import { useApp } from '../etat/contexte.js'
@@ -365,6 +368,13 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
   const [etat, setEtat] = useState<'saisie' | 'test' | 'erreur'>('saisie')
   const [message, setMessage] = useState<string | null>(null)
   const [choix, setChoix] = useState<{ restaurantId: string; nom: string }[]>([])
+  /*
+   * Ce qu'une mise en service EFFACERAIT, quand la caisse n'a jamais été
+   * appairée. Non nul = on attend un « oui » explicite, jamais un délai.
+   */
+  const [aEffacer, setAEffacer] = useState<
+    (EtatBascule & { restaurantId?: string; nom: string }) | null
+  >(null)
 
   useEffect(() => {
     void app.etat.lire('url_sync').then((u) => u && setUrl(u))
@@ -377,9 +387,10 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
    * plusieurs établissements : enrôler la caisse dans le mauvais restaurant
    * enverrait ses ventes au mauvais endroit, donc on ne devine pas.
    */
-  const appairer = async (restaurantId?: string) => {
+  const appairer = async (restaurantId?: string, effacerLeLocal = false) => {
     setEtat('test')
     setMessage(null)
+    setAEffacer(null)
     const base = url.replace(/\/+$/, '')
     try {
       // L'identité d'INSTALLATION, tirée une seule fois et conservée ici.
@@ -476,13 +487,48 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
 
       if (changeDEtablissement) {
         const attente = await app.journal.enAttente()
-        if (!peutBasculer(attente)) {
+        if (!peutBasculer(attente) && !effacerLeLocal) {
+          /*
+           * ── BASCULE ou PREMIÈRE MISE EN SERVICE ? ─────────────────────
+           *
+           * PANNE OBSERVÉE. On clique sur son établissement, et il ne se
+           * passe rien. La caisse avait servi en local avant d'être mise en
+           * service : son outbox n'était pas vide, le garde-fou de bascule
+           * refusait — et le refus ne s'affichait nulle part.
+           *
+           * Le garde-fou avait raison sur une VRAIE bascule : les opérations
+           * en attente portent l'ancien `device_id`, mais ce device existe
+           * chez le serveur, donc une synchronisation les fait partir.
+           *
+           * Il a tort sur la PREMIÈRE mise en service, et c'est un
+           * cul-de-sac. La graine locale écrit `DEMO_RESTO` et `DEMO_DEVICE`
+           * dans `sync_state` : tout terminal neuf paraît donc « changer
+           * d'établissement ». Or ses opérations portent l'identité de la
+           * caisse de DÉMONSTRATION, qu'aucun serveur n'a jamais délivrée.
+           * Elles ne partiront jamais — « synchronisez puis recommencez »
+           * envoie faire une chose impossible, indéfiniment.
+           *
+           * Ce qui sépare les deux cas n'est pas l'outbox : c'est que le
+           * serveur ait DÉJÀ attribué un `device_id` à cette caisse.
+           */
+          if (dejaEnService(ancienDevice)) {
+            setEtat('erreur')
+            setMessage(motifDeRefus(attente))
+            return
+          }
+          // Jamais en service : on n'efface pas en silence pour autant. On
+          // dit ce qui va disparaître, et on attend un « oui ».
           setEtat('erreur')
-          setMessage(motifDeRefus(attente))
+          setAEffacer({
+            ...attente,
+            ...(restaurantId ? { restaurantId } : {}),
+            nom: corps.nomEtablissement ?? 'cet établissement',
+          })
           return
         }
-        // Rien n'est en attente : on peut vider sans rien perdre. Le journal
-        // local est déjà remonté, et il reste au serveur, immuable.
+        // Rien en attente — ou un « oui » explicite sur des opérations qui
+        // ne pouvaient de toute façon plus partir. Le journal d'une caisse
+        // déjà en service, lui, est remonté : il reste au serveur, immuable.
         await reinitialiserPourAutreEtablissement(app.base.adaptateur)
       }
 
@@ -521,17 +567,34 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
       onAppaire()
     } catch (erreur) {
       setEtat('erreur')
+      // La trace complète, toujours : le message ci-dessous est écrit pour un
+      // gérant, pas pour celui qui devra un jour comprendre la panne.
+      console.error('appairage', erreur)
       // Un abandon sur délai n'est pas une adresse fausse : le distinguer
       // évite d'envoyer chercher l'erreur là où elle n'est pas.
       const expire =
         erreur instanceof DOMException &&
         (erreur.name === 'TimeoutError' || erreur.name === 'AbortError')
+      /*
+       * ── Une panne LOCALE n'est pas une panne de réseau ────────────────
+       *
+       * Tout ce bloc ne faisait pas que des requêtes : il vide aussi la base
+       * locale. Un échec de ce côté-là ressortait en « blocage CORS » —
+       * un diagnostic qui envoie fouiller la configuration du serveur pendant
+       * que la cause est dans la tablette. `ErreurSqlite` le dit.
+       */
+      const locale = erreur instanceof ErreurSqlite
       setMessage(
         expire
           ? `Le serveur n'a pas répondu en 15 secondes. Il est probablement en ` +
             `cours de redéploiement — vérifie que ${base}/sante répond, puis ` +
             `réessaie. La caisse fonctionne normalement en attendant.`
-          : expliquerEchecReseau(erreur, url),
+          : locale
+            ? `La base locale de cette caisse a refusé l'opération : ` +
+              `${erreur.message}\n\nRien n'a été modifié — la transaction a été ` +
+              `annulée. Le serveur n'est pas en cause. Relevez ce message sur ` +
+              `l'écran Diagnostic avant de recommencer.`
+            : expliquerEchecReseau(erreur, url),
       )
     }
   }
@@ -585,6 +648,21 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
                   {e.nom}
                 </button>
               ))}
+            </div>
+            <div className="actions">
+              <button
+                type="button"
+                className="secondaire"
+                disabled={etat === 'test'}
+                onClick={() => {
+                  setChoix([])
+                  setMessage(null)
+                  setAEffacer(null)
+                  setEtat('saisie')
+                }}
+              >
+                Revenir aux identifiants
+              </button>
             </div>
           </>
         ) : (
@@ -651,8 +729,6 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
               </details>
             )}
 
-            {message && <p className="erreur">{message}</p>}
-
             <div className="actions">
               <button
                 type="button"
@@ -667,6 +743,59 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
               <p className="note">Il manque encore {manquant}.</p>
             )}
           </>
+        )}
+
+        {/*
+          * Hors du ternaire, et c'est tout le correctif.
+          *
+          * PANNE OBSERVÉE. Ce message ne vivait que dans la branche du
+          * FORMULAIRE. Dans la liste des établissements, on cliquait sur le
+          * sien et il ne se passait rien : le refus était calculé, rangé
+          * dans `message`, et jamais rendu. Un écran qui ne répond pas au
+          * clic est pire qu'un écran qui refuse — on reclique, on conclut
+          * que le second restaurant n'existe pas.
+          *
+          * `pre-line` parce que ces messages ont des paragraphes ; sans
+          * cela, tout se recolle en une seule ligne illisible.
+          */}
+        {etat === 'test' && <p className="note">Connexion au serveur…</p>}
+        {message && (
+          <p className="erreur" style={{ whiteSpace: 'pre-line' }}>
+            {message}
+          </p>
+        )}
+
+        {aEffacer && (
+          <div className="bloc">
+            <p className="erreur" style={{ whiteSpace: 'pre-line' }}>
+              {`Cette caisse a servi en local avant d’être mise en service.\n\n` +
+                `Elle contient ${aEffacer.enAttente + aEffacer.rejetes} opération(s) ` +
+                `qui n’ont jamais été envoyées — et qui ne peuvent plus l’être : ` +
+                `elles portent l’identité de la caisse de démonstration, qu’aucun ` +
+                `serveur ne connaît.\n\n` +
+                `La mise en service repart d’une base vide : la carte, les employés ` +
+                `et le stock viendront de « ${aEffacer.nom} ». Les commandes et les ` +
+                `services de caisse enregistrés ici seront effacés.`}
+            </p>
+            <div className="actions">
+              <button
+                type="button"
+                className="principal"
+                disabled={etat === 'test'}
+                onClick={() => void appairer(aEffacer.restaurantId, true)}
+              >
+                Effacer et mettre en service
+              </button>
+              <button
+                type="button"
+                className="secondaire"
+                disabled={etat === 'test'}
+                onClick={() => setAEffacer(null)}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
         )}
       </section>
     </div>

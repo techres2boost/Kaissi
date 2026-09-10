@@ -268,6 +268,30 @@ cd apps/pos/android && ./gradlew bundleRelease
 Prérequis : **JDK 17 à 23** — 21 de préférence, c'est celui de la CI — et le
 SDK Android (Android Studio installe les deux).
 
+> ### ⚠ Ne mettez jamais un chemin dans `settings.gradle`
+>
+> C'est le seul fichier que Gradle nomme dans son erreur, donc celui qu'on
+> ouvre — et l'y coller donne :
+>
+> ```
+> settings file '…\apps\pos\android\settings.gradle': 8:
+>   Unexpected character: '"' @ line 8, column 1.
+>      "C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot"
+> ```
+>
+> Ce fichier est du **Groovy**, pas une liste de réglages : une chaîne seule
+> sur sa ligne n'y veut rien dire. Il est de surcroît **versionné** — la ligne
+> casserait la construction de tous les autres postes.
+>
+> Le chemin d'un JDK va dans le `gradle.properties` de **votre** poste, et
+> `pnpm verifier:jdk --ecrire` l'y écrit pour vous. Si le fichier a déjà été
+> modifié, `pnpm verifier:jdk` le détecte **avant** Gradle, nomme la ligne et
+> donne la réparation :
+>
+> ```bash
+> git checkout -- apps/pos/android/settings.gradle
+> ```
+
 > ### ⚠ « Unsupported class file major version 69 »
 >
 > Si `./gradlew` s'arrête là-dessus, **ton JDK est trop récent** — et rien
@@ -304,6 +328,12 @@ SDK Android (Android Studio installe les deux).
 >
 > Ce réglage vaut pour **tous** les projets Gradle du poste. Pour revenir en
 > arrière, retirez la ligne : elle porte un commentaire qui le dit.
+>
+> **`--ecrire` fonctionne aussi quand votre JDK est déjà le bon**, et c'est
+> volontaire : Gradle peut prendre un **autre** Java que celui de votre
+> `PATH` (une variable `JAVA_HOME`, un réglage d'Android Studio, un démon
+> déjà démarré). La commande vous dit alors ce qu'elle a écrit, ou pourquoi
+> elle n'a rien pu écrire. Elle ne se tait jamais.
 >
 > **Ou à la main, pour ce terminal seulement** — `pnpm verifier:jdk` (sans
 > `--ecrire`) affiche la commande exacte, avec le chemin trouvé chez vous :

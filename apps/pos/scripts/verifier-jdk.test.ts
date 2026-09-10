@@ -27,6 +27,7 @@ import {
   diagnostiquer,
   emplacementsProbables,
   ecrireOverrideGradle,
+  analyserSettingsGradle,
   // @ts-expect-error — script Node en JS pur, sans déclarations de types.
 } from './verifier-jdk.mjs'
 
@@ -151,5 +152,72 @@ describe("écrire l'override Gradle", () => {
     expect(resultat.ok).toBe(false)
     expect(resultat.message).toContain('déjà')
     expect(readFileSync(resultat.fichier, 'utf8')).toContain('/un/autre/jdk')
+  })
+})
+
+/*
+ * ── Le fichier qu'on finit par casser quand l'outil ne répond pas ─────────
+ *
+ * PANNE RÉELLE, la suite de la précédente. `pnpm verifier:jdk --ecrire` ne
+ * répondait rien sur un poste dont le JDK du PATH était déjà bon : il sortait
+ * en 0 avant même de lire l'option. L'opérateur a donc collé le chemin de son
+ * JDK dans `apps/pos/android/settings.gradle` — le seul fichier que Gradle
+ * nomme dans son erreur — et obtenu :
+ *
+ *     settings file '…': 8: Unexpected character: '"' @ line 8, column 1.
+ *        "C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot"
+ *
+ * Ce fichier est VERSIONNÉ : la ligne aurait cassé tous les autres postes.
+ */
+describe('settings.gradle — le fichier qu’il ne faut pas toucher', () => {
+  const INTACT = [
+    "include ':app'",
+    "include ':capacitor-cordova-android-plugins'",
+    "project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')",
+    '',
+    "apply from: 'capacitor.settings.gradle'",
+    '',
+  ].join('\n')
+
+  it('laisse passer le fichier du dépôt', () => {
+    expect(analyserSettingsGradle(INTACT).ok).toBe(true)
+  })
+
+  it('le VRAI fichier du dépôt passe — sinon ce test ne prouve rien', () => {
+    /*
+     * Sans cela, `LIGNES_ATTENDUES` pourrait dériver du fichier réel sans
+     * qu'on le voie : le garde-fou refuserait alors une base saine, ce qui
+     * est la seule façon de le rendre nuisible.
+     */
+    const reel = readFileSync(
+      new URL('../android/settings.gradle', import.meta.url),
+      'utf8',
+    )
+    expect(analyserSettingsGradle(reel).ok).toBe(true)
+  })
+
+  it('attrape le chemin collé tel quel — la panne exacte du terrain', () => {
+    const casse = INTACT + '\n"C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.12.101-hotspot"\n'
+    const bilan = analyserSettingsGradle(casse)
+
+    expect(bilan.ok).toBe(false)
+    expect(bilan.anomalies[0].numero).toBe(7)
+    // Le message doit dire comment REPARER, et où va vraiment ce chemin.
+    expect(bilan.message).toContain('git checkout')
+    expect(bilan.message).toContain('verifier:jdk --ecrire')
+  })
+
+  it('attrape aussi le réglage mis dans le mauvais fichier', () => {
+    // `org.gradle.java.home` ne s'applique PAS depuis settings.gradle : on
+    // croirait avoir réglé le problème, et Gradle prendrait le même Java.
+    const bilan = analyserSettingsGradle(
+      INTACT + '\norg.gradle.java.home=C:/jdk-21\n',
+    )
+    expect(bilan.ok).toBe(false)
+    expect(bilan.anomalies[0].quoi).toContain('gradle.properties')
+  })
+
+  it('ne se plaint ni des lignes vides ni des commentaires', () => {
+    expect(analyserSettingsGradle(`// un commentaire\n\n${INTACT}`).ok).toBe(true)
   })
 })

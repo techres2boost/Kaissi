@@ -34,6 +34,16 @@ export type CleEtat =
   // et c'est exactement ce qu'on regarde quand un PIN réinitialisé est
   // refusé par la caisse.
   | 'catalogue_applique_a'
+  /*
+   * Drapeau de PURGE, posé et retiré dans la seule transaction de
+   * `reinitialiserPourAutreEtablissement()` (migration locale 010).
+   *
+   * Tant qu'il est là, le déclencheur d'immuabilité de `order_events` laisse
+   * passer une suppression — et LUI SEUL le permet. Il n'a donc rien à faire
+   * dans du code applicatif : il n'est déclaré ici que pour que les tests
+   * puissent vérifier qu'il ne reste JAMAIS posé après coup.
+   */
+  | 'purge_etablissement'
 
 export function depotEtat(db: AdaptateurSqlite) {
   return {

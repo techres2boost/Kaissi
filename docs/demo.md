@@ -1805,6 +1805,41 @@ nomme ton JDK et donne la commande exacte pour en changer.
 > s'exécute. Il est posé devant, dans les commandes du dépôt. Le détail
 > complet est dans [`docs/stores.md`](stores.md).
 
+6. Puis : `pnpm verifier:jdk --ecrire`.
+
+**Attendu** : la ligne est écrite dans **ton** `~/.gradle/gradle.properties`,
+et le script te le dit — **même si ton JDK est déjà le bon**.
+
+> **Le silence qui a fini par casser un fichier versionné.** Sur un poste
+> dont le JDK du PATH convenait, `--ecrire` n'écrivait rien… et ne disait
+> rien non plus : le script sortait sur « ✓ JDK 21 » avant même de regarder
+> l'option. On cherche alors ailleurs — et l'endroit où l'on cherche, c'est
+> `settings.gradle`, le seul fichier que Gradle nomme dans son erreur. Le
+> chemin du JDK y a atterri, et Gradle a répondu :
+>
+> ```
+> settings file '…\apps\pos\android\settings.gradle': 8:
+>   Unexpected character: '"' @ line 8, column 1.
+>      "C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot"
+> ```
+>
+> Deux corrections. `--ecrire` fait maintenant ce qu'on lui demande, ou
+> explique pourquoi il ne peut pas — jamais rien. Et `pnpm verifier:jdk`
+> contrôle `settings.gradle` **avant** le JDK : ce fichier est versionné, une
+> ligne de ce genre casserait la construction de tous les autres postes.
+>
+> Le réglage vaut pour **tous** les projets Gradle du poste : c'est pour cela
+> qu'il n'est jamais posé sans qu'on le demande, et que la ligne écrite dit
+> comment la retirer.
+
+7. Pour voir le garde-fou à l'œuvre : ajoute une ligne `"C:\un\chemin"` à
+   la fin de `apps/pos/android/settings.gradle`, puis relance
+   `pnpm verifier:jdk`.
+
+**Attendu** : il nomme la ligne, son numéro, et donne la réparation
+(`git checkout -- apps/pos/android/settings.gradle`). Ce contrôle tourne
+aussi en CI, sur le fichier réel du dépôt.
+
 
 ---
 
@@ -1847,6 +1882,60 @@ d'opérations attendent et quoi faire.
 > « appareil étranger », et un rejet ne se réessaie jamais tout seul. Elles
 > n'arriveraient **jamais**. Perdre une vente coûte infiniment plus cher que
 > de demander une synchronisation de plus.
+
+#### R.1 bis — Une caisse qui a servi en DÉMONSTRATION avant sa mise en service
+
+C'est le cas normal : on déballe la tablette, on montre le produit au
+restaurateur, on prend deux commandes pour de faux — puis on la met en
+service.
+
+6. Sur une caisse neuve (`pnpm pos:dev`), prenez un poste, ouvrez la caisse,
+   ajoutez un article à une table. **Ne synchronisez pas** : il n'y a pas
+   encore de jeton.
+7. **Sync → Mettre en service**, e-mail et mot de passe du gérant, puis
+   choisissez votre établissement dans la liste.
+
+**Attendu** : la caisse **répond**. Elle dit combien d'opérations de
+démonstration elle contient, pourquoi elles ne partiront jamais, et ce
+qu'elle va effacer — puis attend un **« Effacer et mettre en service »**.
+Après confirmation, elle repart sur la carte du bon établissement.
+
+> **« Snack Lac 2 ne marche pas en cliquant dessus. »** Remonté du terrain,
+> et c'était vrai : on cliquait sur son établissement, et il ne se passait
+> **rien**. Ni message, ni mouvement. On en concluait, logiquement, que le
+> second restaurant n'existait pas.
+>
+> Trois défauts se superposaient, chacun cachant le suivant :
+>
+> 1. la graine locale écrit l'identité de la caisse de **démonstration** dans
+>    la base. Une première mise en service ressemblait donc à un
+>    **changement** d'établissement, et le garde-fou du §5 la refusait — avec
+>    un conseil impossible à suivre, « synchronisez puis recommencez », alors
+>    que la caisse n'a pas encore de jeton et ne peut RIEN synchroniser ;
+> 2. ce refus n'était affiché **nulle part** : le message n'existait que dans
+>    la branche du formulaire, pas dans celle de la liste des établissements ;
+> 3. et même en le levant, la remise à zéro mourait sur le déclencheur
+>    d'immuabilité du journal (`order_events` est en insertion seule) — un
+>    échec qui ressortait en « blocage CORS », c'est-à-dire qui envoyait
+>    fouiller la configuration du serveur pendant que la cause était dans la
+>    tablette.
+>
+> Ce qui sépare les deux situations n'est pas l'outbox, c'est le
+> `device_id` : une caisse à qui le **serveur** en a déjà attribué un a des
+> ventes récupérables, et le refus la protège. Une caisse encore sur celui de
+> la démonstration n'en a aucune — ses événements seraient refusés
+> « appareil étranger », définitivement.
+>
+> La purge du journal, elle, reste une exception **nommée** : un drapeau posé
+> et retiré dans la même transaction, jamais un déclencheur désactivé. Un
+> échec en cours de route annule tout, drapeau compris.
+
+Pour rejouer ce parcours dans un vrai navigateur :
+
+```bash
+pnpm --filter @kaissi/pos dev              # dans un terminal
+pnpm --filter @kaissi/pos test:mise-en-service
+```
 
 #### R.2 — Ouvrir un client entièrement nouveau
 

@@ -42,7 +42,36 @@
  */
 
 import type { AdaptateurSqlite } from './adaptateur.js'
+import { DEMO_DEVICE } from './graine.js'
 import { TABLES_MIROIR } from './miroir.js'
+
+/**
+ * Cette caisse a-t-elle DÉJÀ été mise en service ?
+ *
+ * ── Pourquoi la question n'est pas cosmétique ─────────────────────────────
+ *
+ * `peutBasculer()` refuse de changer d'établissement tant que l'outbox n'est
+ * pas vide, et il a raison : sur une caisse EN SERVICE, ces opérations
+ * portent un `device_id` que le serveur connaît, donc une synchronisation de
+ * plus les fait partir. Le refus protège une vente récupérable.
+ *
+ * Sur une caisse qui n'a JAMAIS été mise en service, le même refus est un
+ * cul-de-sac. La graine locale écrit `DEMO_DEVICE` dans `sync_state` : ses
+ * opérations sont signées par une caisse de démonstration qu'aucun serveur
+ * n'a jamais délivrée. Elles seraient refusées « appareil_etranger », et un
+ * rejet ne se réessaie jamais tout seul. « Synchronisez, puis recommencez »
+ * envoie faire une chose impossible — indéfiniment.
+ *
+ * ── Pourquoi le `device_id` et pas le jeton ───────────────────────────────
+ *
+ * Le bouton « Ré-appairer » EFFACE `jeton_appareil` pour réafficher le
+ * formulaire. S'y fier ferait passer une caisse en service pour une caisse
+ * neuve, et proposerait d'effacer des ventes parfaitement récupérables.
+ * Le `device_id`, lui, n'est réécrit que par le serveur.
+ */
+export function dejaEnService(deviceId: string | null | undefined): boolean {
+  return !!deviceId && deviceId !== DEMO_DEVICE
+}
 
 /**
  * Les tables TRANSACTIONNELLES purgées à la bascule.
@@ -164,6 +193,25 @@ export async function reinitialiserPourAutreEtablissement(
     await db.executer('PRAGMA defer_foreign_keys = ON')
 
     /*
+     * ── Le DRAPEAU de purge, posé par son nom ─────────────────────────────
+     *
+     * `order_events` est en INSERTION SEULE (RÈGLE 6), et un déclencheur le
+     * fait respecter. La première version de cette fonction l'avait oublié :
+     * toute bascule mourait sur « order_events est en insertion seule :
+     * aucune suppression » — et les tests ne le voyaient pas, parce qu'ils
+     * vidaient des tables vides.
+     *
+     * La migration locale 010 laisse passer la suppression tant que cette
+     * clé est posée, et ELLE SEULE. On la pose ici, on la retire plus bas :
+     * les deux sont dans la même transaction, donc un échec quelconque
+     * annule aussi le drapeau. La table ne peut pas rester ouverte.
+     */
+    await db.executer(
+      `INSERT INTO sync_state (cle, valeur) VALUES ('purge_etablissement', '1')
+         ON CONFLICT (cle) DO UPDATE SET valeur = '1'`,
+    )
+
+    /*
      * L'ACTIVITÉ d'abord, le RÉFÉRENTIEL ensuite. L'ordre n'est plus imposé
      * par la base, mais il reste celui qui se lit : on retire ce que le
      * terminal a produit, puis ce qu'il avait reçu.
@@ -188,5 +236,8 @@ export async function reinitialiserPourAutreEtablissement(
     for (const cle of CLES_A_EFFACER) {
       await db.executer('DELETE FROM sync_state WHERE cle = ?', [cle])
     }
+
+    // On REFERME. `order_events` redevient inviolable avant même le commit.
+    await db.executer(`DELETE FROM sync_state WHERE cle = 'purge_etablissement'`)
   })
 }
