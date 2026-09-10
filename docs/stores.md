@@ -258,13 +258,63 @@ la version npm, on ne touche à rien d'autre.
 
 ```bash
 pnpm install
+pnpm verifier:jdk                                 # ⚠ À FAIRE EN PREMIER
 pnpm pos:build                                    # + garde du mode avion
 pnpm --filter @kaissi/pos exec cap sync android
 cd apps/pos/android && ./gradlew bundleRelease
 # → app/build/outputs/bundle/release/app-release.aab
 ```
 
-Prérequis : JDK 21 et le SDK Android (Android Studio les installe).
+Prérequis : **JDK 17 à 23** — 21 de préférence, c'est celui de la CI — et le
+SDK Android (Android Studio installe les deux).
+
+> ### ⚠ « Unsupported class file major version 69 »
+>
+> Si `./gradlew` s'arrête là-dessus, **ton JDK est trop récent** — et rien
+> dans le message ne le dit :
+>
+> ```
+> A problem occurred evaluating settings 'android'.
+> > BUG! exception in phase 'semantic analysis' in source unit '_BuildScript_'
+>   Unsupported class file major version 69
+> ```
+>
+> Le mot « BUG! » vient de Groovy et désigne le poste, pas le projet. Le
+> nombre se traduit en retirant 44 : **69 − 44 = JDK 25**. Gradle 8.11.1 ne
+> sait pas lire ce bytecode et s'arrête avant d'avoir rien construit. C'est
+> `pnpm verifier:jdk` qui le dit maintenant, en une phrase et avant Gradle.
+>
+> **Le plus simple, sans rien désinstaller** : utiliser le JDK qu'Android
+> Studio embarque déjà (le « JBR »), le temps de la construction.
+>
+> ```powershell
+> # Windows — PowerShell
+> $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+> $env:Path = "$env:JAVA_HOME\bin;$env:Path"
+> java -version        # doit afficher 21
+> ```
+>
+> ```bash
+> # Windows — Git Bash
+> export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
+> export PATH="$JAVA_HOME/bin:$PATH"
+>
+> # macOS
+> export JAVA_HOME=$(/usr/libexec/java_home -v 21)
+>
+> # Linux
+> export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+> ```
+>
+> La variable ne vaut que pour le terminal en cours : rouvrir une fenêtre la
+> perd. C'est voulu — on ne change pas le Java de tout le poste pour
+> construire une application.
+>
+> **Pourquoi ne pas simplement monter Gradle ?** Ce sera la vraie réponse, et
+> elle viendra : Gradle 9 accepte le JDK 25. Mais elle entraîne le plugin
+> Android avec elle, et un couple Gradle/AGP ne se change pas sans construire
+> un APK pour le vérifier. Tant que ce n'est pas fait ET éprouvé, un message
+> clair vaut mieux qu'une montée de version non testée.
 
 ### 3.4 Ce que Play demande, et qui n'est pas du code
 

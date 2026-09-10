@@ -30,6 +30,7 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "vite.config.ts",
-    "capacitor.config.ts"
+    "capacitor.config.ts",
+    "scripts/**/*.test.ts"
   ]
 }

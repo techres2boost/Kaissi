@@ -1738,6 +1738,76 @@ tentatives », avec un délai avant de pouvoir réessayer.
 
 ---
 
+### Q. Trois pannes remontées du terrain, et ce qu'on en a fait
+
+#### Q.1 — L'alerte de rupture arrive AUSSI sans changement de carte
+
+1. Choisis un produit suivi, mets-le à **6** et fixe son seuil d'alerte à **5**
+   (Articles → Stock → Ajuster, puis le seuil).
+2. Vends-en **un** sur la caisse, et synchronise.
+
+**Attendu** : la notification arrive dans les **secondes**. Le produit reste
+en carte — il en reste cinq, on peut encore le vendre.
+
+> **Ce qui ne marchait pas, et pourquoi ça ne se voyait pas.** Le réveil de
+> l'alerte était accroché à « la carte vient de changer » : un produit retiré
+> parce qu'il tombait à zéro. C'est vrai d'une rupture, et faux de tout le
+> reste. Deux cas courants attendaient donc le balayage suivant — jusqu'à un
+> quart d'heure — sans que rien nulle part ne l'explique :
+>
+> - **le seuil bas franchi** : « il ne reste qu'une pizza » est une alerte, et
+>   pourtant rien ne sort de la carte ;
+> - **un produit retiré à la main** qui tombe à zéro : l'automatisme ne défait
+>   jamais une décision humaine, donc il ne bouge rien.
+>
+> Le réveil pose maintenant la question du balayage lui-même — « y a-t-il une
+> alerte à ouvrir sur ces produits ? » — avec **sa** requête. Un seul
+> prédicat pour les deux : deux copies auraient fini par diverger, et on
+> réveillerait alors sur des cas que le balayage ignore.
+
+3. Refais l'essai sur un produit **retiré à la main** (Articles → le produit →
+   « Retirer de la carte »), puis vends-le jusqu'à zéro.
+
+**Attendu** : la notification arrive, et le motif reste « retiré à la main ».
+
+#### Q.2 — Administration → Établissements s'affiche
+
+4. En tant qu'**administrateur** : menu latéral → **Établissements**.
+
+**Attendu** : la liste de tes établissements, et le formulaire d'ouverture
+avec sa liste de fuseaux horaires.
+
+> **Ce qui cassait.** La page rendait l'écran d'erreur, sans un mot de plus.
+> La liste des fuseaux était déclarée dans le fichier des *actions serveur* —
+> et un tel fichier ne peut exporter que des fonctions. Next.js remplace tous
+> ses autres exports, côté navigateur, par des mandataires : le formulaire
+> recevait un mandataire là où il attendait un tableau.
+>
+> Ni TypeScript, ni `next build`, ni les dix contrôles de la CI ne le
+> voyaient — le remplacement a lieu à l'empaquetage, après eux tous. Un test
+> le refuse désormais dans **tout** le dépôt.
+
+#### Q.3 — Le build Android dit enfin ce qui ne va pas
+
+5. Avant de construire l'APK : `pnpm verifier:jdk`.
+
+**Attendu** : « JDK 21 — dans la plage éprouvée (17–23) », ou un message qui
+nomme ton JDK et donne la commande exacte pour en changer.
+
+> **Ce qu'on voyait avant** : `BUG! exception in phase 'semantic analysis' …
+> Unsupported class file major version 69`. Rien ne nomme Java, rien ne dit
+> 25, et le mot « BUG! » accuse le projet alors que la cause est sur le
+> poste. Le nombre se traduit en retirant 44 : 69 − 44 = **JDK 25**, que
+> Gradle 8.11 ne sait pas lire.
+>
+> Le contrôle ne pouvait pas vivre dans Gradle : l'échec a lieu en compilant
+> `settings.gradle` lui-même, donc avant que la moindre de nos lignes ne
+> s'exécute. Il est posé devant, dans les commandes du dépôt. Le détail
+> complet est dans [`docs/stores.md`](stores.md).
+
+
+---
+
 ## 6. Gérer le menu et le stock
 
 ### Changer un prix ou un coût

@@ -401,6 +401,10 @@ pnpm --filter @kaissi/pos test:parcours
 # pnpm db:test le prépare : base jetable + migrations de production telles quelles.
 pnpm db:test && pnpm --filter @kaissi/sync test && pnpm db:test:stop
 
+# Le JDK du poste est-il dans la plage éprouvée ? (17–23, Gradle 8.11 ne lit
+# pas au-delà — « Unsupported class file major version 69 » = JDK 25)
+pnpm verifier:jdk
+
 # Le plugin Java d'impression compile — un JDK suffit, aucun SDK Android
 pnpm verifier:natif
 

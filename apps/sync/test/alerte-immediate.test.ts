@@ -21,6 +21,21 @@
  *      personne. Sans cela, chaque encaissement déclencherait un balayage,
  *      et le service passerait son service à lire la table des alertes ;
  *   3. une rafale d'encaissements fait UNE annonce, pas cinq.
+ *
+ * ── Ce que la PREMIÈRE version de ce correctif laissait passer ────────────
+ *
+ * Elle réveillait sur « la carte a changé », c'est-à-dire quand un produit
+ * venait d'être retiré. Deux situations courantes n'en font pas partie, et
+ * le gérant les a rencontrées avant nous :
+ *
+ *   4. le SEUIL BAS franchi — « il ne reste qu'une pizza » est une alerte,
+ *      et pourtant rien ne sort de la carte : on peut encore la vendre ;
+ *   5. un produit retiré À LA MAIN qui tombe à zéro — l'automatisme ne défait
+ *      jamais une décision humaine, donc il ne bouge rien.
+ *
+ * Le réveil pose désormais la question du balayage lui-même — « y a-t-il une
+ * alerte à ouvrir sur ces produits ? » — avec SA requête, restreinte aux
+ * produits que la vente vient de toucher.
  */
 
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
@@ -90,7 +105,7 @@ afterAll(async () => {
  *     test selon l'ordre d'exécution — le pire des échecs, celui qui
  *     n'apprend rien.
  */
-async function poserStock(restant: number) {
+async function poserStock(restant: number, seuil: number | null = null) {
   await client.query('delete from kaissi.stock_items where product_id = $1', [PRODUIT])
   const { rows } = await client.query<{ vendu: string }>(
     `select coalesce(sum(oi.qty), 0) as vendu
@@ -103,9 +118,10 @@ async function poserStock(restant: number) {
   const dejaVendu = Number(rows[0]?.vendu ?? 0)
   await client.query(
     `insert into kaissi.stock_items
-       (product_id, organization_id, restaurant_id, qty_reference, counted_at, auto_rupture)
-     values ($1, $2, $3, $4, timestamptz '2026-01-01', true)`,
-    [PRODUIT, DEMO_ORG, DEMO_RESTO, dejaVendu + restant],
+       (product_id, organization_id, restaurant_id, qty_reference, counted_at,
+        auto_rupture, min_qty)
+     values ($1, $2, $3, $4, timestamptz '2026-01-01', true, $5)`,
+    [PRODUIT, DEMO_ORG, DEMO_RESTO, dejaVendu + restant, seuil],
   )
   await client.query(
     "update kaissi.products set is_available = true, unavailable_reason = null where id = $1",
@@ -219,5 +235,57 @@ describe('la vente qui vide le stock réveille l’alerte', () => {
       [PRODUIT],
     )
     expect(rows[0]?.is_available).toBe(true)
+  })
+})
+
+/*
+ * ── Les deux cas que la première version laissait attendre ────────────────
+ *
+ * Tous deux ont la même forme : il y a bien une alerte à annoncer, et
+ * pourtant RIEN ne sort de la carte. Réveiller sur « la carte a changé » les
+ * manquait donc l'un comme l'autre, et le gérant attendait le quart d'heure
+ * suivant sans que rien, nulle part, ne l'explique.
+ */
+describe('il y a une alerte à annoncer, mais la carte ne change pas', () => {
+  it('réveille quand le SEUIL BAS est franchi', async () => {
+    const appareil = await creerAppareil('A6')
+    // Six en stock, seuil à cinq : la vente suivante passe SOUS le seuil.
+    await poserStock(6, 5)
+
+    await vendreUne(appareil)
+
+    const { rows } = await client.query<{ is_available: boolean }>(
+      'select is_available from kaissi.products where id = $1',
+      [PRODUIT],
+    )
+    // Le produit reste vendable — il en reste cinq — donc l'ancienne
+    // condition ne voyait rien à faire.
+    expect(rows[0]?.is_available, 'il en reste : rien ne sort de la carte').toBe(true)
+    // Et pourtant il y a bien quelque chose à dire au gérant.
+    expect(reveils, 'le seuil bas est une alerte, il doit réveiller').toEqual([DEMO_RESTO])
+  })
+
+  it("réveille quand un produit retiré À LA MAIN tombe à zéro", async () => {
+    const appareil = await creerAppareil('A7')
+    await poserStock(1)
+    /*
+     * Retiré de la carte par une décision HUMAINE. `appliquer_rupture_auto`
+     * ne défait jamais une telle décision — c'est un garde-fou voulu — donc
+     * elle ne bouge aucune ligne, et l'ancienne condition ne réveillait pas.
+     * La rupture, elle, est bien réelle et mérite d'être annoncée.
+     */
+    await client.query(
+      "update kaissi.products set is_available = false, unavailable_reason = 'manuel' where id = $1",
+      [PRODUIT],
+    )
+
+    await vendreUne(appareil)
+
+    const { rows } = await client.query<{ unavailable_reason: string | null }>(
+      'select unavailable_reason from kaissi.products where id = $1',
+      [PRODUIT],
+    )
+    expect(rows[0]?.unavailable_reason, 'la décision humaine est intacte').toBe('manuel')
+    expect(reveils, 'la rupture reste une nouvelle, même hors carte').toEqual([DEMO_RESTO])
   })
 })

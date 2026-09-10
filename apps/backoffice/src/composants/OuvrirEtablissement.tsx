@@ -20,7 +20,13 @@
 
 import { useActionState } from 'react'
 import Link from 'next/link'
-import { ouvrirEtablissement, FUSEAUX, type Resultat } from '../app/administration/actions.js'
+/*
+ * Deux imports, et la séparation est la correction elle-même : l'ACTION
+ * vient du module `'use server'`, les CONSTANTES d'un module ordinaire. Les
+ * mélanger a coûté un écran mort en production — voir `fuseaux.ts`.
+ */
+import { ouvrirEtablissement } from '../app/administration/actions.js'
+import { FUSEAUX, type Resultat } from '../app/administration/fuseaux.js'
 
 export function OuvrirEtablissement({
   modeles,

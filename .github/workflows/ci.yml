@@ -106,6 +106,11 @@ jobs:
       # elles-memes verifiees face aux sources reelles de Capacitor.
       # Ce job ne remplace pas un build Gradle : il fait tomber tot les fautes
       # de signature, qui sinon n'apparaissent que sur un poste equipe.
+      - name: Le JDK installé est dans la plage éprouvée
+        # Le même contrôle que celui posé devant `pnpm pos:android`, avec un
+        # VRAI JDK : si la plage du script cesse de correspondre à celle que
+        # la CI utilise, on l'apprend ici et pas sur le poste d'un gérant.
+        run: pnpm verifier:jdk
       - name: Verification du plugin natif
         run: pnpm --filter @kaissi/pos verifier:natif
 

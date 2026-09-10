@@ -31,6 +31,7 @@
     "sync:acces": "node --experimental-strip-types --import ./apps/sync/scripts/charger-ts.mjs apps/sync/scripts/acces.mjs",
     "backoffice:dev": "pnpm --filter @kaissi/backoffice dev",
     "verifier:natif": "pnpm --filter @kaissi/pos verifier:natif",
+    "verifier:jdk": "pnpm --filter @kaissi/pos verifier:jdk",
     "verifier:avion": "pnpm --filter @kaissi/pos verifier:avion",
     "parcours": "pnpm --filter @kaissi/pos test:parcours",
     "persistance": "pnpm --filter @kaissi/pos test:persistance",

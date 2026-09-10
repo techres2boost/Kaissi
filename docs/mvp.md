@@ -578,7 +578,7 @@ cd apps/pos/android && ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Prérequis : JDK 21 et le SDK Android. La tablette s'appaire exactement comme
+Prérequis : JDK 17 à 23 (21 conseillé, `pnpm verifier:jdk`) et le SDK Android. La tablette s'appaire exactement comme
 au §7. La signature pour distribution est décrite dans
 [`deploiement.md` §4.3](deploiement.md).
 

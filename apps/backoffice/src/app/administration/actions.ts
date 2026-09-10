@@ -29,16 +29,14 @@ import { revalidatePath } from 'next/cache'
 import { sessionObligatoire } from '../../serveur/session.js'
 import { appelerService } from '../../serveur/service-sync.js'
 import { ErreurSaisie, texteObligatoire } from '../../serveur/formulaire.js'
-
-export interface Resultat {
-  erreur?: string
-  succes?: string
-  /** L'établissement tout juste créé, pour y aller d'un clic. */
-  restaurantId?: string
-}
-
-/** Les fuseaux qu'un restaurant tunisien peut légitimement vouloir. */
-export const FUSEAUX = ['Africa/Tunis', 'Africa/Algiers', 'Africa/Casablanca', 'Europe/Paris']
+/*
+ * `FUSEAUX` et `Resultat` vivent dans un module ORDINAIRE, et ce n'est pas
+ * un rangement : ce fichier porte `'use server'`, et un tel fichier ne peut
+ * exporter QUE des fonctions asynchrones. Y laisser le tableau des fuseaux
+ * a fait tomber l'écran en production — le composant client recevait un
+ * mandataire d'action là où il attendait un tableau. Voir `fuseaux.ts`.
+ */
+import { estFuseauConnu, type Resultat } from './fuseaux.js'
 
 export async function ouvrirEtablissement(
   _precedent: Resultat | null,
@@ -66,7 +64,7 @@ export async function ouvrirEtablissement(
     const timezone = String(donnees.get('timezone') ?? 'Africa/Tunis')
     const bascule = String(donnees.get('bascule') ?? '04:00')
 
-    if (!FUSEAUX.includes(timezone)) {
+    if (!estFuseauConnu(timezone)) {
       throw new ErreurSaisie('timezone', 'Fuseau horaire inconnu.')
     }
     if (!/^\d{2}:\d{2}$/.test(bascule)) {

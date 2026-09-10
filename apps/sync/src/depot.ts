@@ -308,7 +308,17 @@ export interface DepotSync {
    * cents références sous le seuil d'un coup ; les suivantes attendent le
    * balayage d'après, et le back-office les montre toutes de toute façon.
    */
-  produitsEnAlerte(plafond: number): Promise<readonly ProduitEnAlerte[]>
+  /**
+   * Les produits qui méritent une alerte non encore ouverte.
+   *
+   * Le `filtre` sert à poser la MÊME question sur une poignée de produits :
+   * « la vente qui vient d'arriver donne-t-elle lieu à une alerte ? ». Une
+   * seule requête pour les deux usages — deux prédicats divergeraient.
+   */
+  produitsEnAlerte(
+    plafond: number,
+    filtre?: { readonly restaurantId: string; readonly produits: readonly string[] },
+  ): Promise<readonly ProduitEnAlerte[]>
 
   /**
    * Clôt les alertes dont le motif a disparu, et rend leur nombre.

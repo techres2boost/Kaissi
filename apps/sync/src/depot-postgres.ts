@@ -904,27 +904,71 @@ export class DepotPostgres implements DepotSync {
        */
       if (produitsTouches.size > 0) {
         try {
+          // Le retrait de la carte d'abord : c'est lui qui empêche de
+          // continuer à vendre un plat qu'on n'a plus.
           const { rows } = await client.query<{ appliquer_rupture_auto: number }>(
             'select kaissi.appliquer_rupture_auto($1, $2::uuid[])',
             [restaurantId, [...produitsTouches]],
           )
+          const carteChangee = (rows[0]?.appliquer_rupture_auto ?? 0) > 0
           /*
-           * La fonction rend le nombre de lignes qu'elle a bougées. Zéro est
-           * le cas courant — on vend des produits qui restent en stock — et
-           * il ne doit réveiller personne.
+           * ── Ce qui réveille le balayage, et pourquoi ce n'est PAS le
+           *    nombre de lignes bougées ───────────────────────────────────
            *
-           * Appel SYNCHRONE et sans `await` : ce qui suit ne doit ni
-           * ralentir la réponse à la caisse, ni pouvoir la faire échouer.
+           * La première version réveillait quand `appliquer_rupture_auto`
+           * avait retiré au moins un produit de la carte. C'était trop
+           * étroit, et le gérant l'a vu avant nous : DEUX cas courants
+           * attendaient le quart d'heure suivant sans rien pour l'expliquer.
+           *
+           *   • Le seuil BAS franchi. « Il ne reste qu'une pizza » est une
+           *     alerte — et pourtant `is_available` ne bouge pas, puisqu'on
+           *     peut encore la vendre. Zéro ligne bougée, donc aucun réveil,
+           *     alors qu'il y avait bien quelque chose à annoncer.
+           *   • Le produit retiré À LA MAIN (`unavailable_reason = 'manuel'`)
+           *     qui tombe ensuite à zéro. L'automatisme ne défait jamais une
+           *     décision humaine — à dessein — donc il ne bouge rien, et
+           *     l'alerte de rupture n'était annoncée qu'au tour suivant.
+           *
+           * On AJOUTE donc une seconde raison de réveiller, sans retirer la
+           * première — c'est une union, et elle ne peut rien faire perdre.
+           * La nouvelle pose la vraie question, celle du balayage lui-même :
+           * « ces produits donnent-ils lieu à une alerte qui n'est pas déjà
+           * ouverte ? » — avec SA requête, restreinte aux produits touchés.
+           * Un seul prédicat pour les deux, sans quoi ils divergeraient.
+           *
+           * ⚑ L'ancienne raison reste INDISPENSABLE, et pas par prudence :
+           *   elle seule couvre le RETOUR en carte. Une réception ne crée
+           *   aucune alerte à ouvrir — elle en CLÔT une — et c'est cette
+           *   clôture qui autorise la suivante. Sans réveil, l'alerte
+           *   resterait ouverte jusqu'au prochain quart d'heure, et une
+           *   nouvelle rupture survenue entre-temps serait avalée en
+           *   silence : `produitsEnAlerte` masque un produit dont une alerte
+           *   de niveau égal est déjà ouverte.
+           *
+           * Le coût est borné des deux côtés : la question porte sur une
+           * poignée de produits et suit les index, et le réveil lui-même est
+           * groupé sur quelques secondes (`GROUPEMENT_IMMEDIAT_MS`). Une
+           * rafale d'encaissements ne produit donc qu'un balayage, et une
+           * notification.
+           *
+           * HORS de la transaction, et sans jamais la faire échouer : perdre
+           * une vente pour une notification serait absurde.
            */
-          if ((rows[0]?.appliquer_rupture_auto ?? 0) > 0) {
-            try {
-              this.surCarteModifiee?.(restaurantId)
-            } catch (erreur) {
-              journal.avertissement('signal de carte modifiée non délivré', {
-                restaurantId,
-                erreur,
-              })
-            }
+          try {
+            const aAnnoncer =
+              carteChangee ||
+              (
+                await this.produitsEnAlerte(1, {
+                  restaurantId,
+                  produits: [...produitsTouches],
+                })
+              ).length > 0
+            if (aAnnoncer) this.surCarteModifiee?.(restaurantId)
+          } catch (erreur) {
+            journal.avertissement('signal de carte modifiée non délivré', {
+              restaurantId,
+              erreur,
+            })
           }
         } catch (erreur) {
           journal.avertissement('rupture automatique non appliquée', {
@@ -1247,7 +1291,26 @@ export class DepotPostgres implements DepotSync {
   // travail de service, jamais déclenché par une requête d'appareil, et donc
   // jamais un chemin par lequel un restaurant pourrait lire un autre.
 
-  async produitsEnAlerte(plafond: number): Promise<readonly ProduitEnAlerte[]> {
+  /**
+   * Les produits qui MÉRITENT une alerte, et dont aucune n'est déjà ouverte.
+   *
+   * Deux appelants, une seule requête — et ce n'est pas une économie, c'est
+   * la correction elle-même :
+   *
+   *   • le BALAYAGE l'appelle sans filtre, pour tous les établissements ;
+   *   • la REPROJECTION l'appelle restreinte aux produits qu'une vente vient
+   *     de toucher, juste pour savoir s'il y a lieu de réveiller le balayage.
+   *
+   * Écrire le prédicat deux fois aurait garanti qu'ils divergent un jour :
+   * on réveillerait alors sur des cas que le balayage ignore, ou — bien pire
+   * — on ne réveillerait pas sur des cas qu'il traiterait, et l'alerte
+   * attendrait le quart d'heure suivant sans que rien ne l'explique.
+   */
+  async produitsEnAlerte(
+    plafond: number,
+    /** Restreint aux produits d'UN établissement. Sans filtre : tous. */
+    filtre?: { readonly restaurantId: string; readonly produits: readonly string[] },
+  ): Promise<readonly ProduitEnAlerte[]> {
     const { rows } = await this.pool.query<{
       restaurant_id: string
       organization_id: string
@@ -1271,6 +1334,10 @@ export class DepotPostgres implements DepotSync {
             and i.auto_rupture
             and (s.qty_on_hand <= 0
                  or (s.min_qty is not null and s.qty_on_hand <= s.min_qty))
+            -- Le filtre facultatif : un paramètre nul laisse passer tout le
+            -- monde, donc le balayage garde EXACTEMENT la requête qu'il avait.
+            and ($2::uuid is null or s.restaurant_id = $2::uuid)
+            and ($3::uuid[] is null or s.product_id = any($3::uuid[]))
        )
        select restaurant_id, organization_id, product_id, name, niveau,
               qty_on_hand, min_qty
@@ -1287,7 +1354,7 @@ export class DepotPostgres implements DepotSync {
               )
         order by e.restaurant_id, e.niveau, e.name
         limit $1`,
-      [plafond],
+      [plafond, filtre?.restaurantId ?? null, filtre ? [...filtre.produits] : null],
     )
     return rows.map((l) => ({
       restaurantId: l.restaurant_id,

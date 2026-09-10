@@ -67,7 +67,7 @@ base et le back-office se parlent déjà directement.
 |---|---|---|
 | Node | ≥ 22 | `node -v` |
 | pnpm | ≥ 10 | `pnpm -v` |
-| JDK | 21 | `java -version` |
+| JDK | **17 à 23** (21 conseillé) | `pnpm verifier:jdk` |
 | Android Studio | Ladybug+ | — |
 | Compte Railway (ou Fly.io) | gratuit pour démarrer | — |
 | Compte Vercel | gratuit | — |

@@ -18,13 +18,15 @@
     "cap:sync:ios": "pnpm build && cap sync ios",
     "android:add": "cap add android",
     "android:open": "cap open android",
-    "android": "pnpm cap:sync && cap run android",
+    "android": "pnpm verifier:jdk && pnpm cap:sync && cap run android",
     "ios:add": "cap add ios",
     "ios:open": "cap open ios",
     "verifier:avion": "node scripts/verifier-mode-avion.mjs",
     "verifier:natif": "node scripts/verifier-plugin-natif.mjs",
+    "verifier:jdk": "node scripts/verifier-jdk.mjs",
     "test:parcours": "node tests/parcours-caisse.mjs",
-    "test:persistance": "node tests/persistance-web.mjs"
+    "test:persistance": "node tests/persistance-web.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "^7.0.0",

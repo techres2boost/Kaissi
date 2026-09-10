@@ -22,7 +22,7 @@ application rouverte**.
 |---|---|---|
 | Node | ≥ 22 | `node -v` |
 | pnpm | ≥ 10 | `pnpm -v` |
-| JDK | 21 | `java -version` |
+| JDK | **17 à 23** (21 conseillé) | `pnpm verifier:jdk` |
 | Android Studio | Ladybug ou plus récent | — |
 | Android SDK | API 34+ | `sdkmanager --list_installed` |
 
