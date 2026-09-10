@@ -1868,9 +1868,14 @@ d'opérations attendent et quoi faire.
 > établissements.
 >
 > Le contrôle se fait aussi désormais **avant** d'appeler le serveur, quand on
-> a cliqué un établissement : chaque clic refusé enrôlait sinon un appareil de
-> plus dans l'établissement visé et lui brûlait un préfixe de tickets (P2, P3,
-> P4…) pour une bascule qui n'aurait pas lieu.
+> a cliqué un établissement. Il ne s'y faisait qu'après l'enrôlement : un clic
+> refusé créait donc, dans l'établissement visé, une caisse qui n'a jamais
+> servi — avec son préfixe de tickets. C'est vérifiable dans la base : le
+> terminal « P1 » de Snack Lac 2 porte le MÊME `installation_id` que la caisse
+> active, a été créé à 12:26:12, et son `last_seen_at` est resté nul — la
+> caisse, elle, a continué de synchroniser trois secondes plus tard. Les clics
+> suivants réutilisent cette ligne (`installation_id`, migration 0021), donc la
+> liste ne s'allonge pas : il reste un terminal fantôme, pas dix.
 >
 > `pnpm mise-en-service` fige ce comportement dans un vrai navigateur, avec un
 > serveur bouchonné qui rend la liste puis un refus. Le test échoue sur le code

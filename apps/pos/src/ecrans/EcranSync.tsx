@@ -387,10 +387,12 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
        * connue — c'est-à-dire dès qu'on a cliqué un établissement dans la
        * liste.
        *
-       * Le contrôle existait déjà, mais après l'enrôlement : chaque clic
-       * refusé créait donc un appareil de plus dans l'établissement visé et
-       * lui brûlait un préfixe de tickets (P2, P3, P4…), pour une bascule qui
-       * n'aurait pas lieu. Rien d'irréparable, mais rien d'utile non plus.
+       * Le contrôle existait déjà, mais après l'enrôlement : un clic refusé
+       * créait donc un appareil dans l'établissement visé — avec son préfixe
+       * de tickets — pour une bascule qui n'aurait pas lieu. Les clics
+       * suivants réutilisent cette ligne, `installation_id` faisant son
+       * travail (0021), donc la liste ne s'allonge pas ; il reste un terminal
+       * fantôme, jamais vu, dans la liste des caisses du gérant.
        *
        * Le contrôle après l'appel RESTE : au premier appel, le compte peut
        * n'avoir qu'un établissement, et c'est le serveur qui le désigne — on
