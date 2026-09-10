@@ -330,28 +330,292 @@ SDK Android (Android Studio installe les deux).
 > un APK pour le vérifier. Tant que ce n'est pas fait ET éprouvé, un message
 > clair vaut mieux qu'une montée de version non testée.
 
-### 3.4 Ce que Play demande, et qui n'est pas du code
+### 3.4 Où est l'AAB, et comment l'installer chez un client
+
+C'est la question qui vient en premier, et la section précédente y répondait
+mal. **L'AAB n'est pas installable** : c'est un format destiné au Play Store,
+qui en dérive lui-même les APK adaptés à chaque appareil. Pour installer
+directement sur une tablette, il faut un **APK**.
+
+#### Le fichier, après `./gradlew bundleRelease`
+
+```
+apps/pos/android/app/build/outputs/bundle/release/app-release.aab
+```
+
+Sous Windows, en toutes lettres :
+`C:\Users\salem\PycharmProjects\Kaissi\apps\pos\android\app\build\outputs\bundle\release\app-release.aab`
+
+Ce fichier-là part sur Play Console, et **nulle part ailleurs**.
+
+#### Pour installer chez un client : construisez un APK, pas un AAB
+
+```bash
+cd apps/pos/android
+./gradlew assembleRelease
+# → app/build/outputs/apk/release/app-release.apk
+```
+
+`assembleRelease` (APK, installable) et `bundleRelease` (AAB, pour Play) sont
+deux commandes différentes qui lisent la **même** signature. Vous pouvez faire
+les deux à la suite ; ce sont les mêmes octets d'application.
+
+> **Sans keystore, `assembleRelease` échoue** — voir 3.1. C'est voulu : un APK
+> non signé ne s'installe pas, et un APK signé par une clé DIFFÉRENTE ne peut
+> pas remplacer le précédent. Android refuse alors la mise à jour, et il faut
+> désinstaller — donc perdre les données locales de la caisse.
+
+#### Installer l'APK sur la tablette
+
+Trois chemins, du plus simple au plus outillé.
+
+**① Par câble USB, avec `adb`** — le plus rapide quand la tablette est là.
+
+```bash
+# Sur la tablette : Paramètres → À propos → taper 7 fois sur « Numéro de build »
+#                  puis Options pour développeurs → Débogage USB : activé
+adb devices                     # la tablette doit apparaître
+adb install -r app-release.apk  # -r = remplace la version installée
+```
+
+`adb` est fourni avec Android Studio
+(`C:\Users\<vous>\AppData\Local\Android\Sdk\platform-tools\adb.exe`).
+
+**② Par fichier** — quand la tablette est chez le client et vous non.
+
+1. Envoyez l'APK (clé USB, Drive, WeTransfer — il fait ~15 Mo) ;
+2. sur la tablette, ouvrez le fichier ;
+3. Android demande d'autoriser « Installer des applications inconnues » pour
+   l'application qui l'ouvre (le gestionnaire de fichiers, ou Chrome).
+   Autorisez : c'est un réglage **par application source**, pas un
+   affaiblissement global de l'appareil.
+
+**③ Par Play Console, en test interne** — le meilleur des deux mondes quand le
+compte développeur existe déjà. On téléverse l'**AAB**, on ajoute l'adresse
+Gmail du client comme testeur, et il installe depuis le Play Store comme
+n'importe quelle application — avec les mises à jour automatiques. **Aucune
+validation à attendre** : le test interne est disponible en quelques minutes.
+
+> **Vous n'avez pas besoin du Play Store pour ouvrir chez un client.**
+> L'APK direct prend dix minutes et permet de corriger un bug le jour même au
+> lieu d'attendre une revue. Le store sert la crédibilité commerciale et les
+> mises à jour automatiques — deux vraies raisons, mais pas des raisons
+> d'attendre pour vendre.
+
+---
+
+### 3.5 Publier : le parcours Play Console, clic par clic
 
 Compte développeur : **25 $, une fois**. Première validation : compter **une à
-deux semaines**, parfois plus pour un premier compte.
+deux semaines**, parfois plus pour un premier compte. Le test interne, lui,
+est disponible tout de suite.
 
-À préparer :
+#### Étape 1 — Créer le compte développeur
 
-- icône 512×512, bannière 1024×500 ;
-- 2 à 8 captures d'écran par format (téléphone **et** tablette 7"/10" — Kaissi
-  est une application de tablette, Play le vérifie) ;
-- une description courte et une longue, en français ;
-- une **politique de confidentialité** accessible publiquement : obligatoire,
-  et refusée si l'URL ne répond pas ;
-- le questionnaire **Data safety** : Kaissi collecte des données de vente et
-  un identifiant d'appareil, il faut le déclarer ;
-- la catégorie (Entreprise) et le classement de contenu.
+1. <https://play.google.com/console> → « Créer un compte développeur » ;
+2. choisissez **Organisation** si vous facturez au nom d'une société —
+   Google demandera un numéro D-U-N-S, à obtenir gratuitement mais qui prend
+   **une à deux semaines**. En **Personne physique**, c'est immédiat ;
+3. 25 $ par carte, une seule fois pour la vie du compte ;
+4. vérification d'identité : pièce d'identité, parfois une adresse. Comptez
+   quelques jours.
 
-> **Tu n'as pas besoin du Play Store pour ouvrir chez un client.** Installer
-> l'AAB converti en APK, ou l'APK signé directement, prend dix minutes et
-> permet de corriger un bug le jour même au lieu d'attendre une revue. Le
-> store sert la crédibilité commerciale et les mises à jour automatiques —
-> deux vraies raisons, mais pas des raisons d'attendre pour vendre.
+> **Commencez par là.** C'est la seule étape dont le délai ne dépend pas de
+> vous, et tout le reste attend derrière.
+
+#### Étape 2 — Créer l'application
+
+Play Console → **Créer une application**.
+
+| Champ | Ce qu'on met | Pourquoi |
+|---|---|---|
+| Nom | `Kaissi — Caisse restaurant` | 30 caractères maximum |
+| Langue par défaut | Français (France) | le marché est tunisien |
+| Application ou jeu | Application | |
+| Gratuite ou payante | **Gratuite** | Kaissi se vend en abonnement hors Play : l'application seule ne se vend pas |
+
+> ⚠ **Gratuite → payante est IRRÉVERSIBLE dans ce sens seulement.** On peut
+> passer de payant à gratuit, jamais l'inverse. Gratuit est le bon choix ici.
+
+#### Étape 3 — Le tableau de bord vous guide
+
+Play Console affiche une liste de tâches à cocher. Dans l'ordre où elles
+bloquent la publication :
+
+**a. Accès à l'application.** Kaissi exige une connexion : il faut le déclarer
+et **donner un compte de démonstration** à l'équipe de validation, sinon
+elle refuse — elle ne peut pas tester ce qu'elle ne peut pas ouvrir.
+
+Créez-le pour de bon, avec `pnpm sync:nouveau-client`, sur un restaurant de
+démonstration. Donnez l'e-mail et le mot de passe dans le champ prévu, avec
+une note : *« Se connecter, puis Diagnostic → Synchronisation pour appairer.
+La caisse fonctionne aussi sans réseau. »*
+
+**b. Publicités.** Non, Kaissi n'en contient aucune.
+
+**c. Classification du contenu.** Un questionnaire. Réponses : aucune
+violence, aucun contenu sexuel, aucun jeu d'argent. Catégorie **Utilitaire /
+Productivité / Entreprise**. Résultat attendu : tous publics.
+
+**d. Public cible.** **18 ans et plus.** C'est un outil professionnel ;
+déclarer un public enfant déclencherait des obligations (Families Policy) qui
+n'ont aucun sens ici.
+
+**e. Sécurité des données (Data safety).** Le formulaire le plus long, et le
+seul où une réponse fausse se paie. Ce que Kaissi collecte réellement :
+
+| Donnée | Collectée ? | À déclarer |
+|---|---|---|
+| Adresse e-mail | oui — le compte du gérant | *Informations personnelles → Adresse e-mail*. Chiffré en transit. Suppression sur demande. |
+| Nom | oui — l'employé | *Informations personnelles → Nom* |
+| Identifiants d'appareil | oui — `device_id`, pour la synchronisation | *Identifiants de l'appareil ou d'autres identifiants* |
+| Ventes, tickets | oui | *Informations financières → Autres informations financières* |
+| Position | **non** | |
+| Contacts, photos, micro | **non** | |
+| Publicité, suivi | **non** | à cocher explicitement : « Ces données ne sont pas utilisées pour le suivi » |
+
+Pour chaque donnée : **chiffrée en transit — oui** (HTTPS partout) et
+**l'utilisateur peut demander la suppression — oui**.
+
+**f. Politique de confidentialité.** Une **URL publique qui répond** ;
+Google la teste, et un lien mort fait refuser la fiche. Une page statique sur
+votre domaine suffit. Elle doit dire : quelles données, pourquoi, combien de
+temps, et comment demander la suppression.
+
+**g. Fiche du magasin.** Voir 3.6 pour les textes, et l'outil de visuels.
+
+#### Étape 4 — Téléverser, et commencer par le test interne
+
+1. **Tests → Test interne → Créer une version** ;
+2. téléversez `app-release.aab` ;
+3. la première fois, Google propose de **gérer la clé de signature**.
+   Acceptez **Play App Signing** : Google conserve la clé de distribution, et
+   la vôtre (`kaissi-release.jks`) devient la clé de *téléversement*. Si vous
+   la perdez, Google peut la réinitialiser — sans Play App Signing, un
+   keystore perdu signifie **ne plus jamais mettre à jour l'application** ;
+4. ajoutez les testeurs par adresse Gmail, partagez le lien d'inscription ;
+5. **installez vous-même depuis ce lien, sur une vraie tablette**, avant
+   d'aller plus loin.
+
+#### Étape 5 — Production
+
+**Production → Créer une version**, même AAB, puis « Envoyer pour examen ».
+Comptez une à deux semaines la première fois, quelques heures ensuite.
+
+Les motifs de refus les plus fréquents, tous évitables :
+
+- **pas de compte de démonstration** — l'équipe ne peut pas ouvrir
+  l'application (étape 3a) ;
+- **politique de confidentialité injoignable** (3f) ;
+- **Data safety incohérent** avec ce que l'application demande réellement ;
+- **captures d'écran de téléphone uniquement**, alors que l'application est
+  déclarée compatible tablette. Play le vérifie.
+
+---
+
+### 3.6 Les textes et les visuels de la fiche
+
+#### Les visuels — un outil est fourni
+
+`outils/visuels-store.html` : ouvrez ce fichier dans votre navigateur, déposez
+une image, récupérez les formats exacts que Play exige. Rien ne part sur
+Internet — le redimensionnement se fait dans la page.
+
+| Visuel | Format exigé | Note |
+|---|---|---|
+| Icône | 512 × 512 PNG | pas de transparence, pas de coins arrondis (Android les pose) |
+| Bannière | 1024 × 500 PNG ou JPEG | s'affiche en haut de la fiche |
+| Captures téléphone | 2 à 8, min. 320 px de côté | |
+| Captures tablette 7" | 2 à 8 | Kaissi est une application de tablette |
+| Captures tablette 10" | 2 à 8 | |
+
+> **Les captures se prennent, elles ne se fabriquent pas.** `adb exec-out
+> screencap -p > capture.png` sur une vraie tablette. Montrez la prise de
+> commande, l'encaissement, le ticket, l'écran Stock — dans cet ordre : c'est
+> le parcours d'un restaurateur qui hésite.
+
+#### Description courte — 80 caractères maximum
+
+```
+Caisse pour restaurant. Fonctionne même sans Internet.
+```
+
+*(54 caractères.)* C'est la seule phrase que la plupart des gens liront. Elle
+dit le produit et l'argument, dans cet ordre.
+
+#### Description longue — 4 000 caractères maximum
+
+```
+Kaissi est une caisse enregistreuse conçue pour les restaurants, les snacks
+et les cafés tunisiens.
+
+━━ ELLE NE S'ARRÊTE JAMAIS ━━
+
+La coupure Internet est la panne la plus fréquente, et la plus coûteuse : une
+caisse à l'arrêt, c'est une file d'attente et des clients qui repartent.
+
+Kaissi est installée SUR la tablette, pas sur un site web. Elle démarre,
+prend les commandes, encaisse et imprime sans aucune connexion. Dès que le
+réseau revient, tout remonte automatiquement — sans double encaissement, sans
+vente perdue, sans rien à faire.
+
+━━ CE QU'ELLE FAIT ━━
+
+• Prise de commande sur plan de salle, ou en vente à emporter
+• Encaissement en espèces, carte ou chèque restaurant, avec calcul du rendu
+• Ticket client et bon de cuisine
+• Écran de préparation pour la cuisine et le bar
+• Suivi du stock, avec alerte de rupture qui prévient le gérant
+• Réductions justifiées et tracées, par motif
+• Fichier clients
+• Ouverture et clôture de caisse, avec écart constaté
+• Plusieurs tablettes dans le même restaurant, synchronisées entre elles
+
+━━ LE BACK-OFFICE ━━
+
+Depuis un navigateur, sur ordinateur ou téléphone :
+
+• Chiffre d'affaires du jour, de la semaine, du mois
+• Ventes par article, par catégorie, par employé, par moyen de paiement
+• Marges, sur le chiffre d'affaires hors taxe
+• Historique des tickets, avec le détail de chacun
+• Stock, réapprovisionnement et inventaire
+• Équipe, rôles et codes PIN
+• Exports CSV pour le comptable
+
+━━ PENSÉE POUR LA TUNISIE ━━
+
+• Dinar tunisien, avec ses TROIS décimales — 24,500 TND, pas 24,50
+• TVA paramétrable par article, plusieurs taux sur le même ticket
+• Droit de timbre
+• Interface entièrement en français
+
+━━ VOS DONNÉES SONT À VOUS ━━
+
+Chaque restaurant est isolé des autres au niveau de la base de données.
+Chaque encaissement est tracé : qui, quand, quel montant. Une annulation
+n'efface jamais rien — elle s'ajoute à l'historique.
+
+━━ POUR COMMENCER ━━
+
+Kaissi s'installe avec accompagnement : nous paramétrons votre carte, vos
+taux de TVA et votre équipe avec vous.
+
+Res2Boost — contact@res2boost.com
+```
+
+*(~2 100 caractères — la moitié de la limite, ce qui laisse de la place.)*
+
+**Les mots-clés comptent**, et ils sont placés naturellement : *caisse,
+restaurant, snack, café, tunisien, hors ligne, stock, TVA, dinar, ticket*.
+Play indexe ce texte ; le bourrer de mots-clés est en revanche un motif de
+refus.
+
+> ⚠ La ligne « TVA paramétrable » et le « droit de timbre » décrivent ce que
+> le logiciel SAIT FAIRE, jamais un taux précis. Les taux applicables à la
+> restauration sont un paramètre réglementaire — ils se valident avec un
+> expert-comptable, et ne s'affirment ni dans le code, ni sur une fiche
+> Play.
 
 ---
 

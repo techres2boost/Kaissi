@@ -1808,6 +1808,81 @@ nomme ton JDK et donne la commande exacte pour en changer.
 
 ---
 
+### R. Ouvrir un deuxième client, et changer une caisse d'établissement
+
+#### R.1 — La caisse suit VRAIMENT le nouvel établissement
+
+1. Au back-office, en administrateur : **Administration → Établissements**,
+   ouvrez « Snack Lac 2 ».
+2. Saisissez-y un ou deux articles, et embauchez un employé.
+3. Sur la caisse : **Diagnostic → Synchronisation → « Ré-appairer — ou changer
+   d'établissement »**.
+4. Reconnectez-vous, et choisissez **Snack Lac 2** dans la liste.
+
+**Attendu** : la caisse redémarre sur la carte, les employés et le stock du
+**second** établissement. Plus rien du premier.
+
+> **Ce qui ne marchait pas.** L'appairage fonctionnait déjà — le serveur
+> rendait bien un appareil du second restaurant. C'est la base LOCALE qui
+> restait celle du premier, et deux mécanismes invisibles la figeaient :
+>
+> - le curseur du catalogue suit `change_log.seq`, un compteur **global à
+>   toute la base**. La caisse l'avait déjà avancé loin ; les entrées du
+>   second restaurant, écrites avant, portaient des numéros inférieurs et
+>   n'auraient **jamais** été tirées ;
+> - les tables locales contenaient encore l'ancien référentiel. Même en
+>   tirant le nouveau catalogue, on aurait obtenu l'**union** des deux : une
+>   carte mélangée, sur une caisse.
+>
+> Le changement remet donc la base locale à zéro.
+
+5. Refaites l'essai **avec une vente non synchronisée** : encaissez hors
+   ligne, puis tentez de changer d'établissement sans synchroniser.
+
+**Attendu** : le changement est **refusé**, et le message dit combien
+d'opérations attendent et quoi faire.
+
+> **Pourquoi refuser plutôt que prévenir.** Ces ventes portent l'identité de
+> l'ancien terminal : après la bascule, le serveur les refuserait
+> « appareil étranger », et un rejet ne se réessaie jamais tout seul. Elles
+> n'arriveraient **jamais**. Perdre une vente coûte infiniment plus cher que
+> de demander une synchronisation de plus.
+
+#### R.2 — Ouvrir un client entièrement nouveau
+
+Un **nouvel établissement** s'ouvre au back-office. Une **nouvelle
+organisation** — un autre restaurateur, une autre société — se fait depuis le
+poste de l'exploitant :
+
+```bash
+pnpm sync:nouveau-client                    # liste les clients existants
+
+pnpm sync:nouveau-client \
+  --organisation "Chez Fatma SARL" \
+  --restaurant "Chez Fatma — Menzah 6" \
+  --email fatma@chezfatma.tn \
+  --tva "TVA 19 %:1900,TVA 7 %:700"
+```
+
+**Attendu** : organisation, établissement et premier administrateur créés en
+une transaction. Le client se connecte ensuite avec son e-mail et fait le
+reste tout seul.
+
+> **Il n'y a pas de page « Créer mon compte », et c'est une décision.**
+> Kaissi n'est pas un logiciel auquel on s'inscrit : c'est un POS qu'on vend,
+> qu'on installe, et dont on paramètre les taux de TVA avec le restaurateur.
+> Une inscription ouverte laisserait n'importe qui créer une organisation
+> dans la base qui porte les ventes des clients existants — et le nouveau
+> venu se retrouverait avec une caisse sans TVA, incapable d'encaisser.
+>
+> Le script **refuse d'ailleurs d'inventer des taux** : soit vous les
+> donnez (`--tva`, en points de base — 1900, jamais 0.19), soit vous les
+> reprenez d'un client existant (`--modele`), soit il vous dit en toutes
+> lettres que la caisse refusera la première vente.
+
+
+---
+
 ## 6. Gérer le menu et le stock
 
 ### Changer un prix ou un coût

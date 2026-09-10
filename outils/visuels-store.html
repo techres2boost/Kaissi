@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Visuels pour les stores — Kaissi</title>
+<!--
+  Fabrique les visuels exigés par Google Play et l'App Store à partir d'une
+  seule image.
+
+  ── Pourquoi un fichier HTML, et pas un service en ligne ──────────────────
+
+  Parce qu'on y dépose le logo d'un client. Un convertisseur en ligne, c'est
+  une image de marque téléversée chez un tiers dont on ne sait rien, pour un
+  redimensionnement que le navigateur sait faire depuis quinze ans.
+
+  RIEN NE SORT DE CETTE PAGE. Elle n'a aucune balise <script src>, aucun
+  appel réseau, aucune police distante : ouvrez-la hors ligne, elle marche
+  pareil. C'est la même règle que pour le POS — le code ne vient jamais du
+  réseau.
+
+  ── Ce qu'elle fait, et qui n'est pas qu'un redimensionnement ─────────────
+
+  • L'icône Play est en 512×512 SANS transparence : Play refuse un PNG à fond
+    alpha, et Android pose lui-même les coins arrondis. On aplatit donc sur
+    une couleur choisie, plutôt que de laisser le client découvrir le refus.
+  • La bannière 1024×500 n'a presque jamais le rapport de l'image d'origine :
+    on la recadre au centre au lieu de la déformer.
+  • Les tailles iOS sont là aussi, tant qu'à faire : le jour venu, elles ne
+    se redemanderont pas.
+-->
+<style>
+  :root {
+    color-scheme: light dark;
+    --fond: #f6f7f5;
+    --carte: #ffffff;
+    --texte: #16241c;
+    --doux: #5c6b62;
+    --accent: #1f7a4d;
+    --bord: #dfe5e0;
+    --alerte: #8a5a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fond: #0b1310;
+      --carte: #12201a;
+      --texte: #e8f0ea;
+      --doux: #9db0a5;
+      --accent: #7fd6a3;
+      --bord: #21362c;
+      --alerte: #e0b062;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 2rem 1.25rem 4rem;
+    background: var(--fond);
+    color: var(--texte);
+    font: 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  .enveloppe { max-width: 68rem; margin: 0 auto; }
+  h1 { font-size: 1.7rem; margin: 0 0 .35rem; letter-spacing: -.02em; }
+  .sous { color: var(--doux); margin: 0 0 2rem; max-width: 46rem; }
+  .carte {
+    background: var(--carte);
+    border: 1px solid var(--bord);
+    border-radius: 14px;
+    padding: 1.25rem 1.4rem;
+    margin-bottom: 1.25rem;
+  }
+  h2 { font-size: 1.05rem; margin: 0 0 .8rem; }
+  .zone {
+    border: 2px dashed var(--bord);
+    border-radius: 12px;
+    padding: 2.5rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .zone:hover, .zone.survol { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .zone strong { display: block; font-size: 1.05rem; margin-bottom: .3rem; }
+  .zone span { color: var(--doux); font-size: .9rem; }
+  input[type=file] { display: none; }
+  .reglages { display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: center; margin-top: 1rem; }
+  label { display: flex; align-items: center; gap: .5rem; font-size: .92rem; }
+  input[type=color] { width: 2.4rem; height: 2.4rem; border: 1px solid var(--bord); border-radius: 8px; padding: 2px; background: none; cursor: pointer; }
+  input[type=range] { width: 9rem; }
+  .grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 1rem; }
+  .vignette { border: 1px solid var(--bord); border-radius: 12px; padding: .9rem; background: var(--carte); }
+  .vignette h3 { font-size: .95rem; margin: 0 0 .15rem; }
+  .vignette p { margin: 0 0 .7rem; color: var(--doux); font-size: .82rem; }
+  .apercu { background-image: linear-gradient(45deg,#0000000d 25%,transparent 25%,transparent 75%,#0000000d 75%),linear-gradient(45deg,#0000000d 25%,transparent 25%,transparent 75%,#0000000d 75%); background-size: 16px 16px; background-position: 0 0,8px 8px; border-radius: 8px; display: flex; align-items: center; justify-content: center; min-height: 8rem; margin-bottom: .7rem; overflow: hidden; }
+  .apercu canvas { max-width: 100%; height: auto; display: block; align-self: center; }
+  a.bouton, button {
+    display: inline-block; font: inherit; font-weight: 600; cursor: pointer;
+    background: var(--accent); color: #05130c; border: none;
+    padding: .5rem .9rem; border-radius: 8px; text-decoration: none;
+  }
+  @media (prefers-color-scheme: dark) { a.bouton, button { color: #05130c; } }
+  button.secondaire { background: none; color: var(--texte); border: 1px solid var(--bord); }
+  .note { color: var(--doux); font-size: .87rem; }
+  .avert { color: var(--alerte); font-size: .87rem; margin-top: .6rem; }
+  table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--bord); }
+  th { color: var(--doux); font-weight: 600; }
+  code { background: color-mix(in srgb, var(--doux) 15%, transparent); padding: .1rem .35rem; border-radius: 5px; font-size: .88em; }
+  #resultats { display: none; }
+  .actions-groupe { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: 1rem; }
+</style>
+</head>
+<body>
+<div class="enveloppe">
+
+  <h1>Visuels pour les stores</h1>
+  <p class="sous">
+    Déposez une image — un logo, une photo, une capture. Cette page produit les
+    formats exacts que Google Play et l'App Store exigent, prêts à téléverser.
+    <strong>Rien ne quitte votre ordinateur</strong> : tout se fait dans le
+    navigateur, et la page fonctionne hors ligne.
+  </p>
+
+  <div class="carte">
+    <h2>1. L'image de départ</h2>
+    <div class="zone" id="zone" tabindex="0" role="button"
+         aria-label="Choisir une image">
+      <strong>Cliquez, ou déposez une image ici</strong>
+      <span>PNG, JPEG, WebP ou SVG — le plus grand que vous ayez</span>
+    </div>
+    <input type="file" id="fichier" accept="image/*" />
+    <p class="note" style="margin-top:.8rem">
+      Partez du <strong>plus grand fichier disponible</strong> : on peut
+      toujours réduire, jamais inventer des pixels. Un logo vectoriel (SVG)
+      donne le meilleur résultat.
+    </p>
+    <div class="reglages">
+      <label>
+        Fond de l'icône
+        <input type="color" id="fond" value="#0b1310" />
+      </label>
+      <label>
+        Marge <input type="range" id="marge" min="0" max="25" value="10" />
+        <span id="margeValeur" class="note">10 %</span>
+      </label>
+      <button type="button" class="secondaire" id="fondClair">Fond blanc</button>
+    </div>
+    <p class="avert" id="avertAlpha" hidden>
+      ⚠ Votre image a un fond transparent. Play <strong>refuse</strong> une
+      icône transparente : elle est donc aplatie sur la couleur ci-dessus.
+      Choisissez-la avec soin — c'est elle qu'on verra derrière le logo.
+    </p>
+  </div>
+
+  <div id="resultats">
+    <div class="carte">
+      <h2>2. Ce que Google Play demande</h2>
+      <div class="grille" id="grillePlay"></div>
+      <div class="actions-groupe">
+        <button type="button" id="toutPlay">Tout télécharger (Play)</button>
+      </div>
+    </div>
+
+    <div class="carte">
+      <h2>3. Pour l'App Store, tant qu'à faire</h2>
+      <p class="note" style="margin-top:-.4rem">
+        L'icône de l'App Store est <strong>carrée : 1024 × 1024</strong>, sans
+        transparence et <strong>sans coins arrondis</strong> — iOS les pose
+        lui-même, et un PNG déjà arrondi est refusé.
+      </p>
+      <div class="grille" id="grilleIos"></div>
+    </div>
+
+    <div class="carte">
+      <h2>4. Ce qui reste à faire à la main</h2>
+      <table>
+        <tr><th>Visuel</th><th>Format</th><th>Comment</th></tr>
+        <tr>
+          <td>Captures téléphone</td><td>2 à 8, min. 320 px</td>
+          <td rowspan="3" class="note">
+            Elles se <strong>prennent</strong>, elles ne se fabriquent pas :<br />
+            <code>adb exec-out screencap -p &gt; capture.png</code><br />
+            sur une vraie tablette. Montrez la prise de commande,
+            l'encaissement, le ticket, puis le stock — dans cet ordre.
+          </td>
+        </tr>
+        <tr><td>Captures tablette 7"</td><td>2 à 8</td></tr>
+        <tr><td>Captures tablette 10"</td><td>2 à 8</td></tr>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/*
+ * Aucune dépendance : `canvas` suffit, et il est dans tous les navigateurs
+ * depuis longtemps. Une bibliothèque de redimensionnement ajouterait un
+ * fichier à télécharger — donc une raison de ne pas marcher hors ligne.
+ */
+const FORMATS_PLAY = [
+  { cle: 'icone',    l: 512,  h: 512,  titre: 'Icône',    note: '512 × 512 — sans transparence', mode: 'contenir', opaque: true },
+  { cle: 'banniere', l: 1024, h: 500,  titre: 'Bannière', note: '1024 × 500 — recadrée au centre', mode: 'couvrir', opaque: true },
+]
+const FORMATS_IOS = [
+  { cle: 'ios-1024', l: 1024, h: 1024, titre: 'Icône App Store', note: '1024 × 1024 — sans transparence', mode: 'contenir', opaque: true },
+  { cle: 'ios-180',  l: 180,  h: 180,  titre: 'Écran d’accueil', note: '180 × 180 (iPhone @3x)', mode: 'contenir', opaque: true },
+  { cle: 'ios-167',  l: 167,  h: 167,  titre: 'iPad Pro',        note: '167 × 167', mode: 'contenir', opaque: true },
+]
+
+const zone = document.getElementById('zone')
+const champ = document.getElementById('fichier')
+const fond = document.getElementById('fond')
+const marge = document.getElementById('marge')
+const margeValeur = document.getElementById('margeValeur')
+const resultats = document.getElementById('resultats')
+const avertAlpha = document.getElementById('avertAlpha')
+
+let imageSource = null
+let nomBase = 'kaissi'
+
+zone.addEventListener('click', () => champ.click())
+zone.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); champ.click() }
+})
+for (const evt of ['dragenter', 'dragover']) {
+  zone.addEventListener(evt, (e) => { e.preventDefault(); zone.classList.add('survol') })
+}
+for (const evt of ['dragleave', 'drop']) {
+  zone.addEventListener(evt, (e) => { e.preventDefault(); zone.classList.remove('survol') })
+}
+zone.addEventListener('drop', (e) => {
+  const f = e.dataTransfer?.files?.[0]
+  if (f) charger(f)
+})
+champ.addEventListener('change', () => {
+  const f = champ.files?.[0]
+  if (f) charger(f)
+})
+document.getElementById('fondClair').addEventListener('click', () => {
+  fond.value = '#ffffff'
+  rendre()
+})
+fond.addEventListener('input', rendre)
+marge.addEventListener('input', () => {
+  margeValeur.textContent = marge.value + ' %'
+  rendre()
+})
+
+function charger(fichier) {
+  nomBase = (fichier.name || 'kaissi').replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9-]+/g, '-').toLowerCase() || 'kaissi'
+  const lecteur = new FileReader()
+  lecteur.onload = () => {
+    const img = new Image()
+    img.onload = () => {
+      imageSource = img
+      avertAlpha.hidden = !aDeLaTransparence(img)
+      resultats.style.display = 'block'
+      rendre()
+    }
+    img.onerror = () => alert("Cette image n'a pas pu être lue. Essayez un PNG ou un JPEG.")
+    img.src = lecteur.result
+  }
+  lecteur.readAsDataURL(fichier)
+}
+
+/** Un seul pixel non opaque suffit : Play refuse alors l'icône. */
+function aDeLaTransparence(img) {
+  const taille = 64
+  const c = document.createElement('canvas')
+  c.width = c.height = taille
+  const ctx = c.getContext('2d', { willReadFrequently: true })
+  ctx.drawImage(img, 0, 0, taille, taille)
+  try {
+    const d = ctx.getImageData(0, 0, taille, taille).data
+    for (let i = 3; i < d.length; i += 4) if (d[i] < 250) return true
+  } catch {
+    // Une image d'une autre origine « salit » le canvas. Ici tout vient d'un
+    // fichier local, donc le cas ne se produit pas — mais mieux vaut ne rien
+    // affirmer que d'afficher un avertissement faux.
+    return false
+  }
+  return false
+}
+
+function dessiner(format) {
+  const c = document.createElement('canvas')
+  c.width = format.l
+  c.height = format.h
+  const ctx = c.getContext('2d')
+  ctx.imageSmoothingQuality = 'high'
+
+  if (format.opaque) {
+    ctx.fillStyle = fond.value
+    ctx.fillRect(0, 0, format.l, format.h)
+  }
+
+  const m = format.mode === 'contenir' ? Number(marge.value) / 100 : 0
+  const dispoL = format.l * (1 - m * 2)
+  const dispoH = format.h * (1 - m * 2)
+  const rapport = imageSource.width / imageSource.height
+
+  let largeur, hauteur
+  if (format.mode === 'couvrir') {
+    // La bannière n'a presque jamais le rapport de l'original : on RECADRE au
+    // centre plutôt que de déformer. Un logo étiré se voit immédiatement.
+    const echelle = Math.max(format.l / imageSource.width, format.h / imageSource.height)
+    largeur = imageSource.width * echelle
+    hauteur = imageSource.height * echelle
+  } else if (rapport > dispoL / dispoH) {
+    largeur = dispoL
+    hauteur = dispoL / rapport
+  } else {
+    hauteur = dispoH
+    largeur = dispoH * rapport
+  }
+
+  ctx.drawImage(imageSource, (format.l - largeur) / 2, (format.h - hauteur) / 2, largeur, hauteur)
+  return c
+}
+
+function rendre() {
+  if (!imageSource) return
+  peupler(document.getElementById('grillePlay'), FORMATS_PLAY)
+  peupler(document.getElementById('grilleIos'), FORMATS_IOS)
+}
+
+function peupler(grille, formats) {
+  grille.textContent = ''
+  for (const format of formats) {
+    const canevas = dessiner(format)
+    const bloc = document.createElement('div')
+    bloc.className = 'vignette'
+
+    const titre = document.createElement('h3')
+    titre.textContent = format.titre
+    const note = document.createElement('p')
+    note.textContent = format.note
+
+    const apercu = document.createElement('div')
+    apercu.className = 'apercu'
+    /*
+     * Un aperçu à taille réelle déborderait pour le 1024 : on borne l'AFFICHÉ,
+     * jamais le fichier téléchargé.
+     *
+     * `width` explicite, et pas seulement `max-width` : sur un élément
+     * remplacé placé dans un conteneur flex, `height: auto` ne rétablit pas
+     * le rapport quand la largeur n'est que bornée — le canevas s'affichait
+     * étiré en hauteur, et une icône carrée paraissait rectangulaire.
+     */
+    const affiche = Math.min(format.l, 300)
+    canevas.style.width = affiche + 'px'
+    canevas.style.maxWidth = '100%'
+    canevas.style.height = 'auto'
+    apercu.append(canevas)
+
+    const lien = document.createElement('a')
+    lien.className = 'bouton'
+    lien.textContent = 'Télécharger'
+    lien.download = `${nomBase}-${format.cle}-${format.l}x${format.h}.png`
+    lien.href = canevas.toDataURL('image/png')
+
+    bloc.append(titre, note, apercu, lien)
+    grille.append(bloc)
+  }
+}
+
+document.getElementById('toutPlay').addEventListener('click', () => {
+  // Un ZIP demanderait une bibliothèque, donc un fichier à télécharger, donc
+  // une raison de ne plus marcher hors ligne. Deux clics valent mieux.
+  for (const lien of document.querySelectorAll('#grillePlay a.bouton')) lien.click()
+})
+</script>
+</body>
+</html>

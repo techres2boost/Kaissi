@@ -53,6 +53,7 @@ mode avion — le seul test qui compte vraiment.
 | [`docs/tester.md`](docs/tester.md) | **Tester** en détail — de l'automatique à la tablette |
 | [`docs/deploiement.md`](docs/deploiement.md) | **Déployer** — Supabase, Railway, Vercel, APK Android |
 | [`docs/stores.md`](docs/stores.md) | **Publier sur Google Play et l'App Store** — le parcours clic par clic, et pourquoi surtout pas une TWA Bubblewrap |
+| [`outils/visuels-store.html`](outils/visuels-store.html) | **Fabriquer les visuels des stores** — une page à ouvrir en local, rien ne part sur Internet |
 | [`docs/notifications.md`](docs/notifications.md) | **Allumer les alertes de rupture** — clés VAPID, Railway, Vercel, en dix minutes |
 | [`docs/tester-sans-tablette.md`](docs/tester-sans-tablette.md) | **Tester Android et l'impression sans matériel** — émulateur + imprimante virtuelle |
 | [`docs/tester-mode-avion.md`](docs/tester-mode-avion.md) | Le critère de sortie : démarrer sans réseau |
