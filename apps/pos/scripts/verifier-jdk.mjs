@@ -163,99 +163,6 @@ export function jdkUtilisables() {
   )
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
- * LE FICHIER QU'ON NE DOIT PAS TOUCHER — `android/settings.gradle`
- *
- * PANNE OBSERVÉE, en clientèle :
- *
- *     Settings file '…\\apps\\pos\\android\\settings.gradle' line: 8
- *     > startup failed:
- *       settings file '…': 8: Unexpected character: '"' @ line 8, column 1.
- *          "C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.12.101-hotspot"
- *
- * Le chemin du JDK avait été collé là, faute d'avoir été écrit ailleurs. Ce
- * n'est pas une maladresse isolée : c'est le seul fichier du projet dont
- * l'erreur de Gradle donne le nom, donc celui qu'on ouvre. Et le message
- * qu'on obtient ensuite ne parle NI de Java NI de chemin — juste d'un
- * guillemet inattendu.
- *
- * Deux raisons de l'attraper ici plutôt que de laisser Gradle le faire :
- *
- *   • `settings.gradle` est VERSIONNÉ. Une ligne de ce genre, poussée, casse
- *     la construction de tous les autres postes — avec un chemin qui
- *     n'existe que chez son auteur ;
- *   • ce script tourne AVANT Gradle (`pnpm pos:android`), donc il peut
- *     nommer la cause et la réparation, ce que Gradle ne fera jamais.
- * ───────────────────────────────────────────────────────────────────────── */
-
-/** Le fichier tel qu'il doit rester — ni plus, ni moins. */
-const LIGNES_ATTENDUES = [
-  "include ':app'",
-  "include ':capacitor-cordova-android-plugins'",
-  "project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')",
-  "apply from: 'capacitor.settings.gradle'",
-]
-
-/**
- * Analyse le contenu de `settings.gradle`. Pure : c'est elle que les tests
- * exercent, sur des contenus fabriqués.
- */
-export function analyserSettingsGradle(contenu) {
-  const lignes = contenu.split(/\r?\n/)
-  const anomalies = []
-
-  lignes.forEach((ligne, index) => {
-    const nu = ligne.trim()
-    if (nu === '' || nu.startsWith('//')) return
-    // Une chaîne SEULE sur sa ligne : c'est exactement ce que Groovy refuse.
-    if (/^["'].*["']\s*$/.test(nu)) {
-      anomalies.push({ numero: index + 1, ligne: nu, quoi: 'un chemin collé tel quel' })
-      return
-    }
-    // Un réglage de JDK n'a rien à faire ici — il ne s'y applique même pas.
-    if (/org\.gradle\.java\.home/.test(nu)) {
-      anomalies.push({ numero: index + 1, ligne: nu, quoi: 'un réglage de gradle.properties' })
-      return
-    }
-    if (!LIGNES_ATTENDUES.includes(nu)) {
-      anomalies.push({ numero: index + 1, ligne: nu, quoi: 'une ligne inattendue' })
-    }
-  })
-
-  if (anomalies.length === 0) return { ok: true, message: 'settings.gradle est intact.' }
-
-  const detail = anomalies
-    .map((a) => `      ligne ${a.numero} — ${a.quoi} :\n        ${a.ligne}`)
-    .join('\n')
-
-  return {
-    ok: false,
-    anomalies,
-    message:
-      `apps/pos/android/settings.gradle a été modifié :\n\n${detail}\n\n` +
-      "  Gradle s'arrêtera dessus avec « Unexpected character », sans jamais\n" +
-      '  nommer Java. Ce fichier est VERSIONNÉ : la ligne casserait aussi la\n' +
-      '  construction des autres postes.\n\n' +
-      '  Pour le remettre en état :\n\n' +
-      '      git checkout -- apps/pos/android/settings.gradle\n\n' +
-      "  Le chemin d'un JDK ne se met pas là. Il va dans le\n" +
-      '  `gradle.properties` de votre poste, et cette commande l’y écrit :\n\n' +
-      '      pnpm verifier:jdk --ecrire\n',
-  }
-}
-
-/** La même, sur le vrai fichier du dépôt. Absent = rien à vérifier. */
-export function verifierSettingsGradle(
-  chemin = new URL('../android/settings.gradle', import.meta.url),
-) {
-  if (!existsSync(chemin)) {
-    // `android/` n'existe qu'après `cap add android`. Son absence n'est pas
-    // une anomalie : on ne fabrique pas une erreur là où il n'y a rien.
-    return { ok: true, message: 'Pas de projet Android ici — rien à vérifier.' }
-  }
-  return analyserSettingsGradle(readFileSync(chemin, 'utf8'))
-}
-
 /**
  * Écrit `org.gradle.java.home` dans le `gradle.properties` de l'UTILISATEUR.
  *
@@ -317,24 +224,6 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '
   const sortie = `${lance.stderr ?? ''}${lance.stdout ?? ''}`
 
   const veutEcrire = process.argv.includes('--ecrire')
-
-  /*
-   * ── L'ordre des deux contrôles, et pourquoi il compte ─────────────────
-   *
-   * Le fichier `settings.gradle` d'ABORD, avant même de regarder le JDK.
-   *
-   * PANNE OBSERVÉE. Un opérateur, à qui `--ecrire` n'avait rien répondu
-   * (voir plus bas), a collé le chemin de son JDK dans `settings.gradle`.
-   * Gradle s'est alors arrêté sur « Unexpected character: '\"' @ line 8 » —
-   * un message qui ne parle pas de Java, dans un fichier VERSIONNÉ, donc
-   * cassé pour tout le monde à la première récupération. Un contrôle du JDK
-   * qui répondrait « ✓ tout va bien » à ce moment-là serait pire qu'inutile.
-   */
-  const gradle = verifierSettingsGradle()
-  if (!gradle.ok) {
-    console.error(`\n✗ ${gradle.message}\n`)
-    process.exit(1)
-  }
 
   const bilan = diagnostiquer(majeureJava(sortie))
   if (bilan.ok) {

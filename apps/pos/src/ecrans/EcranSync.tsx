@@ -392,7 +392,79 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
     setMessage(null)
     setAEffacer(null)
     const base = url.replace(/\/+$/, '')
+
+    /**
+     * Peut-on repartir sur un autre établissement, et sinon que dit-on ?
+     *
+     * Le MÊME verdict est prononcé à deux moments (voir plus bas pourquoi) :
+     * il ne peut donc pas être écrit deux fois. Deux versions qui divergent
+     * donneraient un refus avant l'appel et une acceptation après, ou
+     * l'inverse — et le désaccord se verrait en clientèle, pas ici.
+     *
+     * Rend `false` quand il faut s'arrêter ; il a déjà tout affiché.
+     */
+    const bascultePossible = async (cible: string | undefined, nom: string) => {
+      const attente = await app.journal.enAttente()
+      if (peutBasculer(attente) || effacerLeLocal) return true
+
+      /*
+       * ── BASCULE, ou PREMIÈRE MISE EN SERVICE ? ────────────────────────
+       *
+       * PANNE OBSERVÉE. Une caisse qui a servi en local avant d'être mise en
+       * service se voyait refuser sa mise en service, avec un conseil
+       * impossible à suivre : « synchronisez, puis recommencez » — alors
+       * qu'elle n'a pas de jeton et ne peut RIEN synchroniser. C'est
+       * pourtant le parcours normal : on montre le POS au restaurateur, puis
+       * on le met en service.
+       *
+       * La graine locale écrit l'identité de la caisse de DÉMONSTRATION :
+       * toute caisse neuve paraît donc « changer d'établissement ». Ce qui
+       * sépare vraiment les deux cas est le `device_id` — une caisse à qui
+       * le SERVEUR en a attribué un a des ventes RÉCUPÉRABLES, et le refus
+       * les protège. Une caisse encore sur celui de la démonstration n'en a
+       * aucune : ses événements seraient refusés « appareil_etranger »,
+       * définitivement.
+       */
+      if (dejaEnService(await app.etat.lire('device_id'))) {
+        setEtat('erreur')
+        setMessage(motifDeRefus(attente))
+        return false
+      }
+
+      // On n'efface pas en silence pour autant : on dit ce qui disparaît, et
+      // on attend un « oui ».
+      setEtat('erreur')
+      setAEffacer({ ...attente, ...(cible ? { restaurantId: cible } : {}), nom })
+      return false
+    }
+
     try {
+      /*
+       * Le refus se prononce AVANT d'appeler le serveur, quand la cible est
+       * connue — c'est-à-dire dès qu'on a cliqué un établissement dans la
+       * liste.
+       *
+       * Le contrôle existait déjà, mais après l'enrôlement : un clic refusé
+       * créait donc un appareil dans l'établissement visé — avec son préfixe
+       * de tickets — pour une bascule qui n'aurait pas lieu. Les clics
+       * suivants réutilisent cette ligne, `installation_id` faisant son
+       * travail (0021), donc la liste ne s'allonge pas ; il reste un terminal
+       * fantôme, jamais vu, dans la liste des caisses du gérant.
+       *
+       * Le contrôle après l'appel RESTE : au premier appel, le compte peut
+       * n'avoir qu'un établissement, et c'est le serveur qui le désigne — on
+       * ne connaît la cible qu'en lisant sa réponse.
+       */
+      if (restaurantId) {
+        const ancien = (await app.etat.lire('restaurant_id')) || null
+        if (ancien && ancien !== restaurantId) {
+          // Le nom vient de la liste qu'on vient d'afficher : à cet instant,
+          // le serveur n'a encore rien dit de l'établissement visé.
+          const nom = choix.find((e) => e.restaurantId === restaurantId)?.nom
+          if (!(await bascultePossible(restaurantId, nom ?? 'cet établissement'))) return
+        }
+      }
+
       // L'identité d'INSTALLATION, tirée une seule fois et conservée ici.
       //
       // C'est elle qui fait qu'une remise en service retrouve le MÊME
@@ -486,46 +558,15 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
         !!ancienResto && !!corps.restaurantId && ancienResto !== corps.restaurantId
 
       if (changeDEtablissement) {
-        const attente = await app.journal.enAttente()
-        if (!peutBasculer(attente) && !effacerLeLocal) {
-          /*
-           * ── BASCULE ou PREMIÈRE MISE EN SERVICE ? ─────────────────────
-           *
-           * PANNE OBSERVÉE. On clique sur son établissement, et il ne se
-           * passe rien. La caisse avait servi en local avant d'être mise en
-           * service : son outbox n'était pas vide, le garde-fou de bascule
-           * refusait — et le refus ne s'affichait nulle part.
-           *
-           * Le garde-fou avait raison sur une VRAIE bascule : les opérations
-           * en attente portent l'ancien `device_id`, mais ce device existe
-           * chez le serveur, donc une synchronisation les fait partir.
-           *
-           * Il a tort sur la PREMIÈRE mise en service, et c'est un
-           * cul-de-sac. La graine locale écrit `DEMO_RESTO` et `DEMO_DEVICE`
-           * dans `sync_state` : tout terminal neuf paraît donc « changer
-           * d'établissement ». Or ses opérations portent l'identité de la
-           * caisse de DÉMONSTRATION, qu'aucun serveur n'a jamais délivrée.
-           * Elles ne partiront jamais — « synchronisez puis recommencez »
-           * envoie faire une chose impossible, indéfiniment.
-           *
-           * Ce qui sépare les deux cas n'est pas l'outbox : c'est que le
-           * serveur ait DÉJÀ attribué un `device_id` à cette caisse.
-           */
-          if (dejaEnService(ancienDevice)) {
-            setEtat('erreur')
-            setMessage(motifDeRefus(attente))
-            return
-          }
-          // Jamais en service : on n'efface pas en silence pour autant. On
-          // dit ce qui va disparaître, et on attend un « oui ».
-          setEtat('erreur')
-          setAEffacer({
-            ...attente,
-            ...(restaurantId ? { restaurantId } : {}),
-            nom: corps.nomEtablissement ?? 'cet établissement',
-          })
-          return
-        }
+        /*
+         * Le MÊME verdict qu'avant l'appel — et il est indispensable ici
+         * aussi : quand le compte n'a qu'un seul établissement, aucune liste
+         * ne s'affiche, et c'est la réponse du serveur qui désigne la cible.
+         * On ne pouvait donc pas la connaître plus tôt.
+         */
+        const nom = corps.nomEtablissement ?? 'cet établissement'
+        if (!(await bascultePossible(corps.restaurantId, nom))) return
+
         // Rien en attente — ou un « oui » explicite sur des opérations qui
         // ne pouvaient de toute façon plus partir. Le journal d'une caisse
         // déjà en service, lui, est remonté : il reste au serveur, immuable.
@@ -630,6 +671,27 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
           synchronisation entre terminaux et l’accès au back-office.
         </p>
 
+        {/*
+          Le message d'erreur est AU-DESSUS de la bifurcation, et c'est tout
+          l'objet du correctif.
+          
+          PANNE OBSERVÉE. Il vivait dans la branche « formulaire » seulement.
+          Un gérant qui gère deux établissements voyait donc la liste, cliquait
+          « Snack Lack 2 »… et rien. Le refus était bien calculé — l'outbox
+          n'était pas vide, ou le serveur répondait 403 — mais il s'écrivait
+          dans un état que cette branche n'affichait pas. Le bouton restait là,
+          muet, et on conclut que le second établissement n'existe pas.
+          
+          `pre-line` compte autant : `motifDeRefus()` sépare ses raisons par
+          des lignes vides, et sans cette règle elles se collaient en un seul
+          paragraphe illisible.
+        */}
+        {message && (
+          <p className="erreur" style={{ whiteSpace: 'pre-line' }} role="alert">
+            {message}
+          </p>
+        )}
+
         {choix.length > 0 ? (
           <>
             <p className="note">
@@ -649,6 +711,11 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
                 </button>
               ))}
             </div>
+            {/*
+              Une sortie. Sans elle, un mauvais compte ou un refus enferme sur
+              cet écran : la liste ne propose que des établissements, et rien
+              ne ramène à la saisie des identifiants.
+            */}
             <div className="actions">
               <button
                 type="button"
@@ -661,7 +728,7 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
                   setEtat('saisie')
                 }}
               >
-                Revenir aux identifiants
+                ‹ Changer de compte
               </button>
             </div>
           </>
@@ -746,24 +813,12 @@ function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
         )}
 
         {/*
-          * Hors du ternaire, et c'est tout le correctif.
-          *
-          * PANNE OBSERVÉE. Ce message ne vivait que dans la branche du
-          * FORMULAIRE. Dans la liste des établissements, on cliquait sur le
-          * sien et il ne se passait rien : le refus était calculé, rangé
-          * dans `message`, et jamais rendu. Un écran qui ne répond pas au
-          * clic est pire qu'un écran qui refuse — on reclique, on conclut
-          * que le second restaurant n'existe pas.
-          *
-          * `pre-line` parce que ces messages ont des paragraphes ; sans
-          * cela, tout se recolle en une seule ligne illisible.
-          */}
+          Hors du ternaire, comme le message ci-dessus, et pour la même
+          raison : la liste des établissements ne rendait AUCUN retour. Un
+          écran qui ne répond pas au clic est pire qu'un écran qui refuse —
+          on reclique, et on conclut que l'établissement n'existe pas.
+        */}
         {etat === 'test' && <p className="note">Connexion au serveur…</p>}
-        {message && (
-          <p className="erreur" style={{ whiteSpace: 'pre-line' }}>
-            {message}
-          </p>
-        )}
 
         {aEffacer && (
           <div className="bloc">

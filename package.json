@@ -37,7 +37,11 @@
     "parcours": "pnpm --filter @kaissi/pos test:parcours",
     "persistance": "pnpm --filter @kaissi/pos test:persistance",
     "imprimante": "node apps/pos/scripts/imprimante-virtuelle.mjs",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "mise-en-service": "pnpm --filter @kaissi/pos test:mise-en-service",
+    "verifier:gradle": "pnpm --filter @kaissi/pos verifier:gradle",
+    "pos:aab": "pnpm --filter @kaissi/pos aab",
+    "pos:apk": "pnpm --filter @kaissi/pos apk"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

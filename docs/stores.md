@@ -118,6 +118,11 @@ Deux listes. Chaque ligne renvoie au détail plus bas quand il y en a un.
 Compter **une à deux semaines** pour la première validation, quelques heures
 pour les suivantes.
 
+> **Construire sur ton PC plutôt que sur Codemagic** (étape 9) : `pnpm pos:aab`.
+> Une commande, les cinq étapes dans l'ordre, et les deux contrôles qui ont
+> coûté une soirée chacun posés AVANT Gradle (§3.3). Il faut alors le SDK
+> Android en local — Codemagic, lui, n'a besoin de rien sur ton poste.
+
 ### iOS — de zéro à TestFlight
 
 | # | Où | Quoi | Une seule fois ? |
@@ -254,19 +259,39 @@ Play refuse un envoi dont le `versionCode` n'est pas **strictement supérieur**
 au précédent, et un numéro consommé l'est définitivement. Donc : on incrémente
 la version npm, on ne touche à rien d'autre.
 
-### 3.3 Construire le bundle
+### 3.3 Construire le bundle — une commande
 
 ```bash
 pnpm install
-pnpm verifier:jdk                                 # ⚠ À FAIRE EN PREMIER
-pnpm pos:build                                    # + garde du mode avion
-pnpm --filter @kaissi/pos exec cap sync android
-cd apps/pos/android && ./gradlew bundleRelease
-# → app/build/outputs/bundle/release/app-release.aab
+pnpm pos:aab
+# → apps/pos/android/app/build/outputs/bundle/release/app-release.aab
 ```
+
+`pos:aab` enchaîne les cinq étapes **dans l'ordre**, et pose les contrôles
+avant Gradle plutôt qu'après :
+
+| | Étape | Ce qu'elle empêche |
+|---|---|---|
+| 1 | `verifier:jdk` | « Unsupported class file major version 69 » (voir l'encadré ci-dessous) |
+| 2 | `verifier:gradle` | un chemin collé par erreur dans un `.gradle` (voir 3.3 bis) |
+| 3 | `pos:build` | un bundle qui dépend du réseau — c'est la garde du mode avion |
+| 4 | `cap sync android` | un APK qui embarque la version d'avant |
+| 5 | `gradlew bundleRelease` | — |
+
+`pnpm pos:apk` fait la même chose en produisant un **APK signé**, installable
+directement : c'est le chemin le plus rapide pour un premier client.
 
 Prérequis : **JDK 17 à 23** — 21 de préférence, c'est celui de la CI — et le
 SDK Android (Android Studio installe les deux).
+
+La séquence à la main reste valable, si l'on veut voir chaque étape :
+
+```bash
+pnpm verifier:jdk && pnpm verifier:gradle
+pnpm pos:build
+pnpm --filter @kaissi/pos exec cap sync android
+cd apps/pos/android && ./gradlew bundleRelease
+```
 
 > ### ⚠ Ne mettez jamais un chemin dans `settings.gradle`
 >
@@ -291,6 +316,11 @@ SDK Android (Android Studio installe les deux).
 > ```bash
 > git checkout -- apps/pos/android/settings.gradle
 > ```
+>
+> C'est `pnpm verifier:gradle` qui le contrôle — sur les cinq scripts Gradle
+> versionnés, pas seulement celui-là — et il tourne d'office dans
+> `pnpm pos:aab`. Un test le tient aussi sur les fichiers réels du dépôt : la
+> ligne ne peut pas passer la porte de la CI.
 
 > ### ⚠ « Unsupported class file major version 69 »
 >
@@ -359,6 +389,50 @@ SDK Android (Android Studio installe les deux).
 > Android avec elle, et un couple Gradle/AGP ne se change pas sans construire
 > un APK pour le vérifier. Tant que ce n'est pas fait ET éprouvé, un message
 > clair vaut mieux qu'une montée de version non testée.
+
+### 3.3 bis « Unexpected character: '"' » — un chemin collé dans un `.gradle`
+
+Le second piège du terrain, et il ne ressemble à rien :
+
+```
+* Where:
+Settings file '…\android\settings.gradle' line: 8
+
+* What went wrong:
+Could not compile settings file '…\android\settings.gradle'.
+> startup failed:
+  settings file '…': 8: Unexpected character: '"' @ line 8, column 1.
+     "C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot"
+```
+
+Le JDK est bon, `pnpm verifier:jdk` répond ✓ — et pourtant Gradle refuse. La
+cause est dans le message, à condition de la voir : **le chemin du JDK s'est
+retrouvé collé dans `settings.gradle`**, pendant le dépannage de l'étape
+précédente. Le fichier du dépôt en fait quatre lignes ; il n'en a pas de
+huitième.
+
+**Le remède, une ligne :**
+
+```bash
+git checkout -- apps/pos/android/settings.gradle
+```
+
+Puis pour désigner un JDK à Gradle **sans toucher au dépôt** —
+`pnpm verifier:jdk --ecrire`, qui écrit dans *votre* `~/.gradle/gradle.properties`.
+
+> `pnpm verifier:gradle` détecte désormais ce cas et nomme la ligne fautive
+> avec **le même numéro que Gradle**. Il est enchaîné par `pnpm pos:aab`, donc
+> il tourne de lui-même.
+>
+> Pourquoi ce contrôle ne peut pas vivre dans Gradle : l'erreur survient en
+> **compilant** le script de settings, avant que la moindre ligne de Gradle ne
+> s'exécute. Un test écrit dans ce fichier ne serait jamais atteint. Même
+> raison que pour le contrôle du JDK.
+>
+> Il ne refuse pas toute modification — on touche légitimement à
+> `app/build.gradle` pour la signature. Il refuse ce qui **ne peut pas** être
+> voulu : une ligne qui, hors commentaire, commence par un guillemet ou par un
+> chemin Windows. Ce n'est pas du Groovy, et ça n'a jamais compilé.
 
 ### 3.4 Où est l'AAB, et comment l'installer chez un client
 

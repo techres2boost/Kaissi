@@ -11,7 +11,9 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 /*
@@ -27,7 +29,6 @@ import {
   diagnostiquer,
   emplacementsProbables,
   ecrireOverrideGradle,
-  analyserSettingsGradle,
   // @ts-expect-error — script Node en JS pur, sans déclarations de types.
 } from './verifier-jdk.mjs'
 
@@ -156,68 +157,57 @@ describe("écrire l'override Gradle", () => {
 })
 
 /*
- * ── Le fichier qu'on finit par casser quand l'outil ne répond pas ─────────
+ * ── Le silence qui a fini par casser un fichier versionné ────────────────
  *
- * PANNE RÉELLE, la suite de la précédente. `pnpm verifier:jdk --ecrire` ne
- * répondait rien sur un poste dont le JDK du PATH était déjà bon : il sortait
- * en 0 avant même de lire l'option. L'opérateur a donc collé le chemin de son
- * JDK dans `apps/pos/android/settings.gradle` — le seul fichier que Gradle
- * nomme dans son erreur — et obtenu :
+ * PANNE RÉELLE. Sur un poste dont le JDK du PATH convenait, l'opérateur
+ * lançait `pnpm verifier:jdk --ecrire` et n'obtenait que « ✓ JDK 21 ». Rien
+ * n'était écrit, et RIEN NE DISAIT que rien n'avait été écrit : le script
+ * sortait en 0 avant même de regarder l'option.
  *
- *     settings file '…': 8: Unexpected character: '"' @ line 8, column 1.
- *        "C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot"
+ * On cherche alors ailleurs — et l'endroit où l'on cherche, c'est
+ * `settings.gradle`, le seul fichier que Gradle nomme dans son erreur. Le
+ * chemin du JDK y a atterri, et Gradle a répondu « Unexpected character:
+ * '"' @ line 8 », dans un fichier VERSIONNÉ.
  *
- * Ce fichier est VERSIONNÉ : la ligne aurait cassé tous les autres postes.
+ * On lance donc le VRAI script, avec un `HOME` jetable : c'est un
+ * comportement de ligne de commande, il ne se prouve pas en important une
+ * fonction.
  */
-describe('settings.gradle — le fichier qu’il ne faut pas toucher', () => {
-  const INTACT = [
-    "include ':app'",
-    "include ':capacitor-cordova-android-plugins'",
-    "project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')",
-    '',
-    "apply from: 'capacitor.settings.gradle'",
-    '',
-  ].join('\n')
+describe('`--ecrire` quand le JDK courant est DÉJÀ le bon', () => {
+  const script = fileURLToPath(new URL('./verifier-jdk.mjs', import.meta.url))
 
-  it('laisse passer le fichier du dépôt', () => {
-    expect(analyserSettingsGradle(INTACT).ok).toBe(true)
+  function lancer(args: string[], home: string) {
+    return spawnSync(process.execPath, [script, ...args], {
+      encoding: 'utf8',
+      env: { ...process.env, HOME: home, USERPROFILE: home },
+    })
+  }
+
+  it('écrit vraiment le réglage, au lieu de se taire', () => {
+    const home = mkdtempSync(join(tmpdir(), 'kaissi-jdk-cli-'))
+    const lance = lancer(['--ecrire'], home)
+    const sortie = `${lance.stdout}${lance.stderr}`
+
+    // Ce poste peut n'avoir aucun JDK LOCALISABLE (le `java` du PATH suffit
+    // à `java -version`, mais `org.gradle.java.home` demande un chemin). Le
+    // contrat porte sur les deux issues : écrire, ou dire pourquoi non.
+    const fichier = join(home, '.gradle', 'gradle.properties')
+    if (existsSync(fichier)) {
+      expect(readFileSync(fichier, 'utf8')).toContain('org.gradle.java.home=')
+      expect(lance.status).toBe(0)
+    } else {
+      expect(sortie).toContain("--ecrire n'a rien écrit")
+      expect(lance.status).toBe(1)
+    }
+    // Dans les deux cas : le script a PARLÉ de l'option.
+    expect(sortie).toMatch(/gradle\.properties|--ecrire/)
   })
 
-  it('le VRAI fichier du dépôt passe — sinon ce test ne prouve rien', () => {
-    /*
-     * Sans cela, `LIGNES_ATTENDUES` pourrait dériver du fichier réel sans
-     * qu'on le voie : le garde-fou refuserait alors une base saine, ce qui
-     * est la seule façon de le rendre nuisible.
-     */
-    const reel = readFileSync(
-      new URL('../android/settings.gradle', import.meta.url),
-      'utf8',
-    )
-    expect(analyserSettingsGradle(reel).ok).toBe(true)
-  })
-
-  it('attrape le chemin collé tel quel — la panne exacte du terrain', () => {
-    const casse = INTACT + '\n"C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.12.101-hotspot"\n'
-    const bilan = analyserSettingsGradle(casse)
-
-    expect(bilan.ok).toBe(false)
-    expect(bilan.anomalies[0].numero).toBe(7)
-    // Le message doit dire comment REPARER, et où va vraiment ce chemin.
-    expect(bilan.message).toContain('git checkout')
-    expect(bilan.message).toContain('verifier:jdk --ecrire')
-  })
-
-  it('attrape aussi le réglage mis dans le mauvais fichier', () => {
-    // `org.gradle.java.home` ne s'applique PAS depuis settings.gradle : on
-    // croirait avoir réglé le problème, et Gradle prendrait le même Java.
-    const bilan = analyserSettingsGradle(
-      INTACT + '\norg.gradle.java.home=C:/jdk-21\n',
-    )
-    expect(bilan.ok).toBe(false)
-    expect(bilan.anomalies[0].quoi).toContain('gradle.properties')
-  })
-
-  it('ne se plaint ni des lignes vides ni des commentaires', () => {
-    expect(analyserSettingsGradle(`// un commentaire\n\n${INTACT}`).ok).toBe(true)
+  it("sans l'option, il n'écrit rien — un réglage ne se pose pas tout seul", () => {
+    // Il vaut pour TOUS les projets Gradle du poste : il ne se pose que
+    // lorsqu'on le demande.
+    const home = mkdtempSync(join(tmpdir(), 'kaissi-jdk-cli-'))
+    lancer([], home)
+    expect(existsSync(join(home, '.gradle', 'gradle.properties'))).toBe(false)
   })
 })

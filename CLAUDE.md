@@ -406,6 +406,15 @@ pnpm db:test && pnpm --filter @kaissi/sync test && pnpm db:test:stop
 # `--ecrire` trouve un JDK utilisable et le désigne à Gradle, sans toucher au PATH.
 pnpm verifier:jdk [--ecrire]
 
+# Les scripts .gradle sont-ils encore du Groovy ? Un chemin de JDK collé par
+# erreur dans settings.gradle fait échouer Gradle à la COMPILATION du fichier,
+# donc avant tout contrôle qu'on pourrait y écrire.
+pnpm verifier:gradle
+
+# Un AAB signé pour le Play Store, en une commande : les deux contrôles
+# ci-dessus, la garde du mode avion, cap sync, puis bundleRelease.
+pnpm pos:aab        # ou pnpm pos:apk pour un APK signé, installable
+
 # Le plugin Java d'impression compile — un JDK suffit, aucun SDK Android
 pnpm verifier:natif
 
