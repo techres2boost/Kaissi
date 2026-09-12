@@ -97,15 +97,30 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
 
             /*
-             * Les SYMBOLES NATIFS, eux, s'ajoutent sans risque — et ils
-             * répondent au second avertissement de Play.
+             * Les symboles natifs — demandés, mais SANS EFFET aujourd'hui, et
+             * il faut le dire plutôt que de le croire réglé.
              *
-             * Le bundle embarque du code natif : la bibliothèque SQLite de
-             * `@capacitor-community/sqlite`. Sans table de symboles, un
-             * plantage dedans remonte en adresses hexadécimales — illisible,
-             * donc introuvable. `SYMBOL_TABLE` suffit à nommer les fonctions
-             * et ne pèse que quelques centaines de kio ; `FULL` embarquerait
-             * aussi les numéros de ligne, pour plusieurs mégaoctets.
+             * Ce réglage demande à AGP d'empaqueter la version NON DÉPOUILLÉE
+             * des bibliothèques natives. Encore faut-il qu'elle existe. Or le
+             * seul code natif du bundle vient d'un AAR PRÉCOMPILÉ —
+             * `net.zetetic:sqlcipher-android`, tiré par
+             * `@capacitor-community/sqlite` — et ses quatre `.so` sont
+             * publiées déjà dépouillées :
+             *
+             *     $ file jni/arm64-v8a/libsqlcipher.so
+             *     … ARM aarch64, dynamically linked, stripped
+             *     $ readelf -S …            → .dynsym seul, pas de .symtab
+             *
+             * AGP n'a donc rien à empaqueter, et Play continue d'avertir. Le
+             * vérifié : l'avertissement est toujours là sur le versionCode 102,
+             * ce réglage étant en place. Il ne se lèvera pas depuis ce dépôt.
+             *
+             * On garde la ligne : elle est inoffensive, et elle deviendra
+             * vraie le jour où l'application aura du code natif à elle —
+             * c'est alors qu'un plantage remonterait en adresses
+             * hexadécimales faute de symboles. `SYMBOL_TABLE` nomme les
+             * fonctions pour quelques centaines de kio ; `FULL` ajouterait
+             * les numéros de ligne, pour plusieurs mégaoctets.
              */
             ndk {
                 debugSymbolLevel 'SYMBOL_TABLE'

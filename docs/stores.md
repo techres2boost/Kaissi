@@ -560,8 +560,9 @@ au précédent**, et un numéro consommé l'est définitivement. Le premier envo
 portait le code **100**.
 
 Le numéro est dérivé de `apps/pos/package.json` — `0.1.0` → `100`. Il est
-passé à **`0.1.1` → 101**. À chaque envoi suivant, incrémentez cette version,
-jamais le fichier Gradle.
+passé à **`0.1.1` → 101**, puis à **`0.1.2` → 102** — le 101 ayant été brûlé
+par un téléversement suivi d'un « Discard draft release » (§3.2). À chaque
+envoi, `pnpm pos:version --monter` ; jamais le fichier Gradle.
 
 #### Les deux avertissements, et lequel mérite qu'on s'en occupe
 
@@ -574,10 +575,35 @@ par plugin, et cela se vérifie sur un appareil. Tant que ce n'est pas fait, un
 avertissement vaut mieux qu'une caisse morte en service.
 
 **« This App Bundle contains native code, and you've not uploaded debug
-symbols »** — celui-là est réglé. Le bundle embarque la bibliothèque SQLite ;
-sans table de symboles, un plantage dedans remonte en adresses hexadécimales.
-`debugSymbolLevel 'SYMBOL_TABLE'` a été ajouté au bloc `release` : les
-symboles partent **dans l'AAB**, il n'y a aucun fichier à téléverser à part.
+symbols »** — **il restera, et j'ai eu tort d'annoncer le contraire.**
+
+`debugSymbolLevel 'SYMBOL_TABLE'` a bien été ajouté au bloc `release`, et le
+réglage est au bon endroit. Mais il demande à AGP d'empaqueter la version
+**non dépouillée** des bibliothèques natives — encore faut-il qu'elle existe.
+
+Le seul code natif du bundle vient d'un AAR **précompilé** :
+`net.zetetic:sqlcipher-android`, tiré par `@capacitor-community/sqlite`. Ses
+quatre `.so` sont publiées déjà dépouillées. Vérifié sur l'artefact réel :
+
+```
+$ file jni/arm64-v8a/libsqlcipher.so
+… ELF 64-bit LSB shared object, ARM aarch64, dynamically linked, stripped
+$ readelf -S jni/arm64-v8a/libsqlcipher.so
+… .dynsym seul — aucune .symtab, aucune section .debug_*
+```
+
+Les quatre architectures (`armeabi-v7a`, `arm64-v8a`, `x86`, `x86_64`) sont
+dans le même état, et aucun autre plugin Capacitor n'embarque de `.so`. AGP
+n'a donc **rien** à empaqueter, et Play continue d'avertir. Constaté : le
+versionCode **102** porte encore cet avertissement, ce réglage étant en place.
+
+**Conséquence pratique : aucune.** Si SQLCipher plantait, la trace remonterait
+en adresses hexadécimales — mais ce serait un plantage dans la bibliothèque
+d'un tiers, pas dans notre code, et c'est à Zetetic qu'il faudrait le
+rapporter. Kaissi n'a pas de code natif à elle.
+
+La ligne reste dans `build.gradle` : elle est inoffensive, et elle deviendra
+vraie le jour où l'application en aura.
 
 #### Régénérer l'AAB — la marche à suivre
 
@@ -623,7 +649,8 @@ l'API 36 : le SDK se télécharge depuis Android Studio, pas depuis le projet.
 > Cette montée de version a été faite sans construire — ce dépôt n'a pas de
 > SDK Android. Ce qui A été vérifié : que les trois versions se tiennent
 > d'après la table de compatibilité d'Android Studio, que `compileSdk` suit
-> `targetSdk`, que les symboles natifs sont demandés, et que les deux
+> `targetSdk`, que les symboles natifs sont demandés (sans effet tant que le
+> seul code natif vient d'un AAR déjà dépouillé — voir §3.5), et que les deux
 > changements de comportement d'Android 16 les plus cassants ne nous
 > concernent pas (voir juste en dessous).
 >
