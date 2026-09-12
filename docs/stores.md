@@ -1452,6 +1452,45 @@ qu'ici.
 > aujourd'hui. Prends-en un expiré ; à défaut, un dont tu reconnais le nom
 > comme abandonné.
 
+#### Trois endroits différents dans Codemagic, et on s'y trompe une fois
+
+C'est la confusion qui coûte le plus de temps, parce que les trois écrans
+portent tous le mot « signing » ou « key ».
+
+| Ce que tu as en main | Où ça va | Pour quelle plateforme |
+|---|---|---|
+| `*.keystore` / `*.jks` + 2 mots de passe + alias | *Settings → Code signing identities →* **Android keystores** | Android |
+| `*.p12` (certificat **et** sa clé privée, exporté d'un Mac) | *Code signing identities →* **iOS certificates** | iOS — **non utilisé ici**, notre `codemagic.yaml` récupère les certificats par l'API |
+| `ios_distribution_private_key`, `cert_key`, `*.pem` — une clé privée RSA nue | *l'application →* **Environment variables**, sous le nom `CERTIFICATE_PRIVATE_KEY` | iOS |
+| `AuthKey_XXXXXXXXXX.p8` | *l'application →* **Environment variables**, sous le nom `ASC_PRIVATE_KEY` | iOS |
+
+**Une clé privée nue n'est pas un keystore.** Un keystore Android est un
+conteneur Java (`.jks`) protégé par deux mots de passe ; la clé iOS est un
+fichier texte qui commence par `-----BEGIN`. L'écran « Android keystores »
+refuse le second, et c'est tant mieux.
+
+> ### ⚠ Et `*.pub`, jamais
+>
+> `ssh-keygen` produit toujours **deux** fichiers : la clé privée et son
+> pendant `.pub`, qui est la moitié **publique**. C'est celle qu'on donne, pas
+> celle qu'on garde — elle ne sert à rien ici, et une variable qui la contient
+> échoue sans dire qu'on s'est trompé de fichier d'un caractère.
+>
+> Et si la clé a été créée **sans** `-m PEM`, elle commence par
+> `-----BEGIN OPENSSH PRIVATE KEY-----` : c'est une clé privée valide, mais
+> dans un format que les outils de signature ne lisent pas. Le contrôle tient
+> en une ligne :
+>
+> ```bash
+> head -1 ios_distribution_private_key
+> # attendu : -----BEGIN RSA PRIVATE KEY-----
+> ```
+>
+> Un dossier qui contient à la fois `ma_cle`, `ma_cle.pem` et `ma_cle.pub`
+> raconte d'ailleurs cette histoire : la première au format OpenSSH, la
+> deuxième sa conversion en PEM — c'est **celle-là** qu'il faut.
+
+
 #### Les trois pièges de la saisie, vus en vrai
 
 > ### ⚠ 1. `cat cert_key` n'est pas de la clé
