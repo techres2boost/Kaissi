@@ -342,6 +342,36 @@ cd apps/pos/android && ./gradlew bundleRelease
 > sait pas lire ce bytecode et s'arrête avant d'avoir rien construit. C'est
 > `pnpm verifier:jdk` qui le dit maintenant, en une phrase et avant Gradle.
 >
+> #### ⚑ Si `verifier:jdk` a répondu ✓ et que Gradle échoue quand même
+>
+> C'est arrivé, et le script était en tort. Il lisait le `java` de votre
+> **PATH** ; Gradle ne le consulte qu'en **dernier**. Son ordre à lui :
+>
+> | | Où Gradle regarde | Se corrige |
+> |---|---|---|
+> | 1 | `org.gradle.java.home` de `~/.gradle/gradle.properties` | `pnpm verifier:jdk --ecrire` |
+> | 2 | `org.gradle.java.home` du `gradle.properties` du projet | dans le fichier |
+> | 3 | `gradle/gradle-daemon-jvm.properties` (`toolchainVersion`) | dans le fichier |
+> | 4 | **`JAVA_HOME`** | variables d'environnement du poste |
+> | 5 | le `java` du `PATH` | `PATH` |
+>
+> Un `JAVA_HOME` posé une fois dans les variables Windows suffisait donc à
+> rendre le garde-fou inopérant : `java -version` affichait 21, Gradle
+> prenait le 25, et les deux avaient raison.
+>
+> `verifier:jdk` applique désormais **cet ordre-là**, et **nomme la source
+> retenue** :
+>
+> ```
+> ✓ JDK 21 — dans la plage éprouvée (17–23).
+>   Source retenue par Gradle : JAVA_HOME.
+> ```
+>
+> Quand la source diverge du `PATH`, il le dit explicitement — c'est la
+> phrase qui manquait. Trois tests de bout en bout fabriquent un faux JDK 25,
+> le désignent par `JAVA_HOME`, et exigent le refus ; ils échouent sur
+> l'ancien code.
+>
 > **La façon la plus courte — une commande :**
 >
 > ```bash
@@ -359,6 +389,19 @@ cd apps/pos/android && ./gradlew bundleRelease
 > est versionné, un chemin `C:\Program Files\…` y casserait la construction
 > de tout le monde — et il **refuse d'écraser** un `org.gradle.java.home` déjà
 > présent, qui pourrait servir à un autre projet.
+>
+> Il honore aussi `GRADLE_USER_HOME`, quand cette variable déplace le dossier
+> de Gradle. Ce détail a été trouvé en TESTANT le correctif ci-dessus :
+> l'écriture visait `~/.gradle` en dur, donc sur un poste qui pose cette
+> variable elle annonçait « ✓ ligne ajoutée » dans un fichier que Gradle ne
+> lit pas — le même mensonge, sous une autre forme.
+>
+> **Ce que `pos:aab` ne fait PAS, et c'est un choix.** Il pourrait passer le
+> bon JDK à Gradle en ligne de commande (`-Dorg.gradle.java.home=…`) et
+> construire malgré un `JAVA_HOME` fautif. Il s'arrête à la place, parce que
+> le contourner laisserait votre poste cassé pour Android Studio et pour tout
+> autre projet Gradle. Une commande (`--ecrire`) le règle une fois pour
+> toutes ; un contournement le règle pour un seul appel.
 >
 > Ce réglage vaut pour **tous** les projets Gradle du poste. Pour revenir en
 > arrière, retirez la ligne : elle porte un commentaire qui le dit.
@@ -532,6 +575,7 @@ C'est ce fichier qu'on téléverse.
 | Message | Cause | Réponse |
 |---|---|---|
 | `Unsupported class file major version 69` | JDK 25, que Gradle ne lit pas | `pnpm verifier:jdk --ecrire` (§3.3 bis) |
+| Le même message **alors que `verifier:jdk` répond ✓** | `JAVA_HOME` désigne un autre Java que le `PATH`. Le script le détecte et nomme la source depuis le correctif ; s'il répond encore ✓, votre dépôt est en retard — `git pull`. | `pnpm verifier:jdk --ecrire` |
 | `… requires Android Gradle plugin 8.x or higher` | le couple AGP/Gradle a divergé | `pnpm verifier:gradle` le dit avant Gradle |
 | `Failed to find target with hash string 'android-36'` | le SDK 36 n'est pas installé | Android Studio → *SDK Manager* → cocher **Android 16 (API 36)** → *Apply* |
 

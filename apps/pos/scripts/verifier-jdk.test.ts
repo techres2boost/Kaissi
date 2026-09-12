@@ -29,6 +29,9 @@ import {
   diagnostiquer,
   emplacementsProbables,
   ecrireOverrideGradle,
+  dossierGradleUtilisateur,
+  jvmDeGradle,
+  lireJavaHomeDesProprietes,
   // @ts-expect-error — script Node en JS pur, sans déclarations de types.
 } from './verifier-jdk.mjs'
 
@@ -121,7 +124,9 @@ describe('trouver un JDK sur le poste', () => {
 describe("écrire l'override Gradle", () => {
   it('écrit dans le gradle.properties de l’UTILISATEUR, jamais celui du projet', () => {
     const home = mkdtempSync(join(tmpdir(), 'kaissi-jdk-'))
-    const resultat = ecrireOverrideGradle('/usr/lib/jvm/java-21-openjdk', home)
+    // `env` explicite : un poste qui pose GRADLE_USER_HOME ferait sinon
+    // écrire ce test ailleurs, et échouer pour une raison sans rapport.
+    const resultat = ecrireOverrideGradle('/usr/lib/jvm/java-21-openjdk', home, {})
 
     expect(resultat.ok).toBe(true)
     /*
@@ -146,7 +151,7 @@ describe("écrire l'override Gradle", () => {
       'org.gradle.java.home=/un/autre/jdk\n',
     )
 
-    const resultat = ecrireOverrideGradle('/usr/lib/jvm/java-21-openjdk', home)
+    const resultat = ecrireOverrideGradle('/usr/lib/jvm/java-21-openjdk', home, {})
 
     // Ce fichier vaut pour TOUS les projets Gradle du poste : l'écraser
     // casserait peut-être un autre projet, en silence.
@@ -176,11 +181,22 @@ describe("écrire l'override Gradle", () => {
 describe('`--ecrire` quand le JDK courant est DÉJÀ le bon', () => {
   const script = fileURLToPath(new URL('./verifier-jdk.mjs', import.meta.url))
 
-  function lancer(args: string[], home: string) {
-    return spawnSync(process.execPath, [script, ...args], {
-      encoding: 'utf8',
-      env: { ...process.env, HOME: home, USERPROFILE: home },
-    })
+  function lancer(args: string[], home: string, extra: Record<string, string> = {}) {
+    const env: Record<string, string | undefined> = {
+      ...process.env,
+      HOME: home,
+      USERPROFILE: home,
+      ...extra,
+    }
+    /*
+     * `GRADLE_USER_HOME` est RETIRÉ, sauf si le test le pose lui-même.
+     *
+     * Le script l'honore désormais — c'est le correctif — donc un poste qui
+     * la pose enverrait l'écriture ailleurs que dans le `home` jetable, et ce
+     * test lirait un fichier qui n'a pas bougé.
+     */
+    if (!('GRADLE_USER_HOME' in extra)) delete env['GRADLE_USER_HOME']
+    return spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', env })
   }
 
   it('écrit vraiment le réglage, au lieu de se taire', () => {
@@ -210,4 +226,264 @@ describe('`--ecrire` quand le JDK courant est DÉJÀ le bon', () => {
     lancer([], home)
     expect(existsSync(join(home, '.gradle', 'gradle.properties'))).toBe(false)
   })
+})
+
+/*
+ * ── Le ✓ qui mentait ─────────────────────────────────────────────────────
+ *
+ * PANNE RÉELLE, sur le poste du gérant, deux semaines après la première.
+ * `pnpm verifier:jdk` répondait « ✓ JDK 21 — dans la plage éprouvée », et
+ * Gradle échouait à la ligne suivante sur « Unsupported class file major
+ * version 69 » — un JDK 25.
+ *
+ * Les deux disaient vrai. Le script lisait le `java` du PATH ; Gradle ne le
+ * consulte qu'en DERNIER, après `org.gradle.java.home` et après `JAVA_HOME`.
+ * Un `JAVA_HOME` posé une fois dans les variables d'environnement Windows
+ * rendait donc le garde-fou inopérant, sans que rien ne le signale.
+ *
+ * Ces tests figent l'ORDRE de Gradle. S'ils tombent, le script est revenu à
+ * regarder au mauvais endroit — et il répondra ✓ à un poste qui va échouer.
+ */
+describe('quel Java Gradle va-t-il prendre', () => {
+  const ANDROID = '/depot/apps/pos/android'
+  const HOME = '/home/salem'
+
+  /** Un faux disque : seuls les fichiers listés existent. */
+  const disque = (fichiers: Record<string, string>) => ({
+    existe: (f: string) => Object.prototype.hasOwnProperty.call(fichiers, f),
+    lire: (f: string) => fichiers[f] ?? '',
+  })
+
+  it('préfère org.gradle.java.home de l’UTILISATEUR à tout le reste', () => {
+    const resolu = jvmDeGradle({
+      home: HOME,
+      projetAndroid: ANDROID,
+      env: { JAVA_HOME: '/jdk25' },
+      ...disque({
+        '/home/salem/.gradle/gradle.properties': 'org.gradle.java.home=/jdk21\n',
+        '/depot/apps/pos/android/gradle.properties': 'org.gradle.java.home=/jdk17\n',
+      }),
+    })
+    expect(resolu.chemin).toBe('/jdk21')
+    expect(resolu.source).toContain('org.gradle.java.home')
+  })
+
+  it('puis celui du PROJET — l’utilisateur l’emporte, pas l’inverse', () => {
+    const resolu = jvmDeGradle({
+      home: HOME,
+      projetAndroid: ANDROID,
+      env: { JAVA_HOME: '/jdk25' },
+      ...disque({ '/depot/apps/pos/android/gradle.properties': 'org.gradle.java.home=/jdk17\n' }),
+    })
+    expect(resolu.chemin).toBe('/jdk17')
+    expect(resolu.source).toContain('projet')
+  })
+
+  it('puis le JVM du démon épinglé DANS le dépôt, en version et non en chemin', () => {
+    const resolu = jvmDeGradle({
+      home: HOME,
+      projetAndroid: ANDROID,
+      env: { JAVA_HOME: '/jdk25' },
+      ...disque({
+        '/depot/apps/pos/android/gradle/gradle-daemon-jvm.properties': 'toolchainVersion=21\n',
+      }),
+    })
+    expect(resolu.versionExigee).toBe(21)
+    expect(resolu.chemin).toBeNull()
+  })
+
+  it('puis JAVA_HOME — LE coupable du terrain', () => {
+    const resolu = jvmDeGradle({
+      home: HOME,
+      projetAndroid: ANDROID,
+      env: { JAVA_HOME: '/jdk25' },
+      ...disque({}),
+    })
+    expect(resolu.chemin).toBe('/jdk25')
+    expect(resolu.source).toBe('JAVA_HOME')
+  })
+
+  it('le PATH en DERNIER, et seulement alors', () => {
+    const resolu = jvmDeGradle({ home: HOME, projetAndroid: ANDROID, env: {}, ...disque({}) })
+    expect(resolu.chemin).toBeNull()
+    expect(resolu.source).toContain('PATH')
+  })
+
+  it('ignore un JAVA_HOME vide ou réduit à des espaces', () => {
+    for (const vide of ['', '   ']) {
+      expect(jvmDeGradle({ home: HOME, env: { JAVA_HOME: vide }, ...disque({}) }).source).toContain(
+        'PATH',
+      )
+    }
+  })
+
+  it('retire les guillemets qu’un JAVA_HOME Windows traîne parfois', () => {
+    const resolu = jvmDeGradle({
+      home: HOME,
+      env: { JAVA_HOME: '"C:\\Program Files\\Java\\jdk-21"' },
+      ...disque({}),
+    })
+    expect(resolu.chemin).toBe('C:\\Program Files\\Java\\jdk-21')
+  })
+
+  it('lit le gradle.properties que GRADLE_USER_HOME désigne, pas ~/.gradle', () => {
+    const resolu = jvmDeGradle({
+      home: HOME,
+      env: { GRADLE_USER_HOME: '/ailleurs/gradle', JAVA_HOME: '/jdk25' },
+      ...disque({ '/ailleurs/gradle/gradle.properties': 'org.gradle.java.home=/jdk21\n' }),
+    })
+    expect(resolu.chemin).toBe('/jdk21')
+  })
+})
+
+describe('lire org.gradle.java.home d’un .properties', () => {
+  it('dédouble les antislashs, comme Java le fait', () => {
+    // Un chemin Windows correctement écrit dans un .properties est échappé.
+    // Ne pas le dédoubler ferait chercher un dossier inexistant, et conclure
+    // à tort que la ligne est fausse.
+    expect(
+      lireJavaHomeDesProprietes(
+        'org.gradle.java.home=C:\\\\Program Files\\\\Eclipse Adoptium\\\\jdk-21\n',
+      ),
+    ).toBe('C:\\Program Files\\Eclipse Adoptium\\jdk-21')
+  })
+
+  it('IGNORE une ligne commentée — la désactiver doit la désactiver', () => {
+    expect(lireJavaHomeDesProprietes('# org.gradle.java.home=/jdk25\n')).toBeNull()
+    expect(lireJavaHomeDesProprietes('! org.gradle.java.home=/jdk25\n')).toBeNull()
+  })
+
+  it('accepte la forme « : » et les espaces autour', () => {
+    expect(lireJavaHomeDesProprietes('  org.gradle.java.home : /jdk21  \n')).toBe('/jdk21')
+  })
+
+  it('rend null quand la propriété est absente ou vide', () => {
+    expect(lireJavaHomeDesProprietes('org.gradle.jvmargs=-Xmx1536m\n')).toBeNull()
+    expect(lireJavaHomeDesProprietes('org.gradle.java.home=\n')).toBeNull()
+    expect(lireJavaHomeDesProprietes('')).toBeNull()
+  })
+
+  it('ne se laisse pas prendre par une propriété au nom proche', () => {
+    expect(lireJavaHomeDesProprietes('org.gradle.java.home.autre=/jdk25\n')).toBeNull()
+  })
+})
+
+describe('où vit le dossier Gradle de l’utilisateur', () => {
+  it('~/.gradle par défaut', () => {
+    expect(dossierGradleUtilisateur({}, '/home/salem')).toBe(join('/home/salem', '.gradle'))
+  })
+
+  it('GRADLE_USER_HOME quand il est posé — sinon « --ecrire » écrit dans le vide', () => {
+    // DÉFAUT TROUVÉ EN TESTANT : `ecrireOverrideGradle` codait `~/.gradle` en
+    // dur. Sur un poste qui pose cette variable, il annonçait « ✓ ligne
+    // ajoutée » dans un fichier que Gradle ne lit pas.
+    expect(dossierGradleUtilisateur({ GRADLE_USER_HOME: '/ailleurs' }, '/home/salem')).toBe(
+      '/ailleurs',
+    )
+  })
+
+  it('ignore une variable vide', () => {
+    expect(dossierGradleUtilisateur({ GRADLE_USER_HOME: '  ' }, '/home/salem')).toBe(
+      join('/home/salem', '.gradle'),
+    )
+  })
+})
+
+/*
+ * Le contrat de bout en bout, sur la panne exacte du terrain.
+ *
+ * On fabrique un faux JDK 25 — un `bin/java` qui imite la bannière — et on le
+ * désigne par `JAVA_HOME`, le PATH gardant son JDK 21. C'est la configuration
+ * du poste du gérant, au caractère près.
+ */
+describe('le CLI, sur la configuration exacte qui a échoué', () => {
+  const script = fileURLToPath(new URL('./verifier-jdk.mjs', import.meta.url))
+
+  /** Un JDK de théâtre : il ne sait que dire sa version. */
+  function fauxJdk(majeure: number): string {
+    const racine = mkdtempSync(join(tmpdir(), `kaissi-faux-jdk${majeure}-`))
+    mkdirSync(join(racine, 'bin'), { recursive: true })
+    const java = join(racine, 'bin', 'java')
+    writeFileSync(
+      java,
+      `#!/bin/sh\necho 'openjdk version "${majeure}.0.1" 2026-10-21' 1>&2\n`,
+      { mode: 0o755 },
+    )
+    return racine
+  }
+
+  it.skipIf(process.platform === 'win32')(
+    'REFUSE un JAVA_HOME en JDK 25, même quand le `java` du PATH est bon',
+    () => {
+      const home = mkdtempSync(join(tmpdir(), 'kaissi-jdk-cli-'))
+      const lance = spawnSync(process.execPath, [script], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          HOME: home,
+          USERPROFILE: home,
+          JAVA_HOME: fauxJdk(25),
+          GRADLE_USER_HOME: join(home, '.gradle'),
+        },
+      })
+      const sortie = `${lance.stdout}${lance.stderr}`
+
+      // AVANT le correctif, ce script sortait en 0 avec « ✓ JDK 21 ».
+      expect(lance.status).toBe(1)
+      expect(sortie).toContain('JDK 25')
+      expect(sortie).toContain('major version 69')
+      // Et il NOMME la source : « JAVA_HOME » et « le java du PATH » ne se
+      // corrigent pas au même endroit.
+      expect(sortie).toContain('JAVA_HOME')
+    },
+  )
+
+  it.skipIf(process.platform === 'win32')(
+    'l’override écrit par --ecrire l’emporte ENSUITE sur ce JAVA_HOME',
+    () => {
+      const home = mkdtempSync(join(tmpdir(), 'kaissi-jdk-cli-'))
+      const gradleHome = join(home, '.gradle')
+      const env = {
+        ...process.env,
+        HOME: home,
+        USERPROFILE: home,
+        JAVA_HOME: fauxJdk(25),
+        GRADLE_USER_HOME: gradleHome,
+      }
+
+      const ecriture = spawnSync(process.execPath, [script, '--ecrire'], { encoding: 'utf8', env })
+      const fichier = join(gradleHome, 'gradle.properties')
+      // Ce poste peut n'avoir aucun JDK localisable : le contrat porte alors
+      // sur le refus explicite, jamais sur un silence.
+      if (!existsSync(fichier)) {
+        expect(`${ecriture.stdout}${ecriture.stderr}`).toContain("--ecrire n'a rien écrit")
+        return
+      }
+
+      // Le réglage doit maintenant DÉCIDER, JAVA_HOME restant mauvais.
+      const apres = spawnSync(process.execPath, [script], { encoding: 'utf8', env })
+      expect(apres.status).toBe(0)
+      expect(`${apres.stdout}${apres.stderr}`).toContain('org.gradle.java.home')
+    },
+  )
+
+  it.skipIf(process.platform === 'win32')(
+    'dit qu’un JAVA_HOME qui ne désigne pas un JDK n’en est pas un',
+    () => {
+      const home = mkdtempSync(join(tmpdir(), 'kaissi-jdk-cli-'))
+      // Le cas banal : la variable pointe un dossier déplacé ou désinstallé.
+      const lance = spawnSync(process.execPath, [script], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          HOME: home,
+          USERPROFILE: home,
+          JAVA_HOME: join(home, 'jdk-qui-nexiste-pas'),
+          GRADLE_USER_HOME: join(home, '.gradle'),
+        },
+      })
+      expect(lance.status).toBe(1)
+      expect(`${lance.stdout}${lance.stderr}`).toContain("n'est pas un JDK")
+    },
+  )
 })

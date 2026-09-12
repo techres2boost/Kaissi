@@ -29,12 +29,37 @@
  * Gradle/AGP ne se change pas sans construire un APK pour le vérifier — ce
  * qui demande le SDK Android. Tant que ce n'est pas fait ET vérifié, un
  * message clair vaut mieux qu'une montée de version non éprouvée.
+ *
+ * ── La SECONDE panne : ce script a menti ──────────────────────────────────
+ *
+ * Même poste, deux semaines plus tard. `pnpm verifier:jdk` répond
+ * « ✓ JDK 21 — dans la plage éprouvée », et Gradle échoue à la ligne suivante
+ * sur « Unsupported class file major version 69 » — donc sur un JDK 25.
+ *
+ * Les deux avaient raison. Le script interrogeait le `java` du **PATH** ;
+ * Gradle, lui, ne le consulte qu'en DERNIER. Son ordre est :
+ *
+ *   1. `org.gradle.java.home` de ~/.gradle/gradle.properties   ← gagne toujours
+ *   2. `org.gradle.java.home` du gradle.properties du projet
+ *   3. gradle/gradle-daemon-jvm.properties (toolchainVersion)
+ *   4. JAVA_HOME                                               ← le coupable ici
+ *   5. le `java` du PATH                                       ← ce qu'on lisait
+ *
+ * Un `JAVA_HOME` posé une fois dans les variables d'environnement Windows
+ * suffit donc à rendre le contrôle inopérant, sans que rien ne le signale.
+ * Un garde-fou qui répond ✓ sur un poste qui va échouer est pire que pas de
+ * garde-fou : il déplace la recherche du côté du dépôt.
+ *
+ * `jvmDeGradle()` réplique donc cet ordre, et le message NOMME la source
+ * retenue. Quand elle diverge du PATH, il le dit — c'est cette phrase-là qui
+ * manquait.
  */
 
 import { spawnSync } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { homedir, platform } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 /**
  * La plage éprouvée. 17 est le minimum d'AGP 8.7 ; 23 est le dernier JDK que
@@ -102,6 +127,129 @@ export function diagnostiquer(majeure) {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+ * QUEL Java Gradle va-t-il prendre ?
+ *
+ * Pas celui du PATH, sauf en dernier recours. Tout ce fichier repose sur
+ * cette distinction — voir l'en-tête, « la SECONDE panne ».
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Le dossier de Gradle pour CET utilisateur.
+ *
+ * `GRADLE_USER_HOME` le déplace, et ce n'est pas rare — postes d'entreprise,
+ * CI, seconde partition. Un seul endroit décide, parce que deux réponses
+ * différentes suffiraient à écrire le réglage dans un fichier que Gradle ne
+ * lit pas, tout en annonçant que c'est fait. C'est la panne qu'on corrige,
+ * sous une autre forme.
+ */
+export function dossierGradleUtilisateur(env = process.env, home = homedir()) {
+  const pose = (env['GRADLE_USER_HOME'] ?? '').trim().replace(/^"|"$/g, '')
+  return pose !== '' ? pose : join(home, '.gradle')
+}
+
+/**
+ * Lit `org.gradle.java.home` dans le contenu d'un `.properties`.
+ *
+ * Gradle lit ces fichiers avec les règles Java : l'antislash y est un
+ * ÉCHAPPEMENT. Un chemin Windows correctement écrit vaut donc
+ * `C:\\Program Files\\...`, et il faut le dédoubler pour retrouver le chemin
+ * réel. Ne pas le faire ferait chercher un dossier qui n'existe pas, et
+ * conclure à tort que la ligne est fausse.
+ *
+ * Les lignes commentées (`#` ou `!`) sont ignorées : une ligne mise en
+ * commentaire pour la désactiver ne doit pas continuer de compter.
+ */
+export function lireJavaHomeDesProprietes(contenu) {
+  for (const ligne of contenu.split(/\r?\n/)) {
+    const nu = ligne.trim()
+    if (nu === '' || nu.startsWith('#') || nu.startsWith('!')) continue
+    const trouve = /^org\.gradle\.java\.home\s*[=:]\s*(.+)$/.exec(nu)
+    if (!trouve) continue
+    const brut = trouve[1].trim()
+    if (brut === '') continue
+    return brut.replace(/\\\\/g, '\\')
+  }
+  return null
+}
+
+/**
+ * Le JVM que GRADLE utilisera, et D'OÙ il le tient.
+ *
+ * Rend `{ source, chemin, versionExigee }` :
+ *   • `chemin` — la racine du JDK, quand elle est connue ;
+ *   • `versionExigee` — un NUMÉRO au lieu d'un chemin, quand le dépôt épingle
+ *     le JVM du démon par `gradle-daemon-jvm.properties` ;
+ *   • `source` — l'étiquette à afficher. C'est elle qui rend le diagnostic
+ *     actionnable : « JAVA_HOME » et « le `java` du PATH » ne se corrigent
+ *     pas au même endroit.
+ *
+ * Les accès au disque sont injectables pour que les tests n'aient pas à
+ * fabriquer une arborescence entière.
+ */
+export function jvmDeGradle({
+  home = homedir(),
+  projetAndroid,
+  env = process.env,
+  existe = existsSync,
+  lire = (f) => readFileSync(f, 'utf8'),
+} = {}) {
+  const dossierGradle = dossierGradleUtilisateur(env, home)
+
+  // 1 et 2 — `org.gradle.java.home`. Le fichier de l'UTILISATEUR l'emporte sur
+  // celui du projet : c'est l'ordre de précédence des propriétés Gradle, et
+  // l'inverser désignerait la mauvaise ligne à corriger.
+  const candidats = [
+    { fichier: join(dossierGradle, 'gradle.properties'), source: `org.gradle.java.home (${join(dossierGradle, 'gradle.properties')})` },
+    ...(projetAndroid
+      ? [{ fichier: join(projetAndroid, 'gradle.properties'), source: 'org.gradle.java.home (gradle.properties du projet)' }]
+      : []),
+  ]
+  for (const { fichier, source } of candidats) {
+    if (!existe(fichier)) continue
+    let contenu
+    try {
+      contenu = lire(fichier)
+    } catch {
+      continue
+    }
+    const chemin = lireJavaHomeDesProprietes(contenu)
+    if (chemin) return { source, chemin, versionExigee: null, fichier }
+  }
+
+  // 3 — le JVM du démon épinglé DANS le dépôt (Gradle 8.8+, encore incubant).
+  // Il n'y en a pas aujourd'hui ; le reconnaître évite qu'un contrôle devenu
+  // faux ne survive au jour où on en posera un.
+  if (projetAndroid) {
+    const fichier = join(projetAndroid, 'gradle', 'gradle-daemon-jvm.properties')
+    if (existe(fichier)) {
+      try {
+        const trouve = /^\s*toolchainVersion\s*[=:]\s*(\d+)/m.exec(lire(fichier))
+        if (trouve) {
+          return {
+            source: 'gradle/gradle-daemon-jvm.properties (toolchainVersion)',
+            chemin: null,
+            versionExigee: Number(trouve[1]),
+            fichier,
+          }
+        }
+      } catch {
+        /* illisible : on continue, JAVA_HOME décidera */
+      }
+    }
+  }
+
+  // 4 — `JAVA_HOME`. LE coupable du terrain : posé une fois dans les variables
+  // d'environnement Windows, il l'emporte sur le PATH sans rien dire.
+  const javaHome = (env['JAVA_HOME'] ?? '').trim().replace(/^"|"$/g, '')
+  if (javaHome !== '') {
+    return { source: 'JAVA_HOME', chemin: javaHome, versionExigee: null, fichier: null }
+  }
+
+  // 5 — le PATH, en dernier. C'est le seul cas où `java -version` répond juste.
+  return { source: 'le « java » du PATH', chemin: null, versionExigee: null, fichier: null }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
  * TROUVER un JDK utilisable — plutôt que de demander d'en installer un
  *
  * Le message « installez un JDK 21 » est correct et inutile : sur presque
@@ -132,7 +280,7 @@ export function emplacementsProbables(os = platform(), home = homedir()) {
 }
 
 /** Un dossier est-il une racine de JDK ? On lit sa version, on ne la devine pas. */
-function versionDuJdk(racine) {
+export function versionDuJdk(racine) {
   const java = join(racine, 'bin', platform() === 'win32' ? 'java.exe' : 'java')
   if (!existsSync(java)) return null
   const lance = spawnSync(java, ['-version'], { encoding: 'utf8' })
@@ -168,7 +316,8 @@ export function jdkUtilisables() {
 }
 
 /**
- * Écrit `org.gradle.java.home` dans le `gradle.properties` de l'UTILISATEUR.
+ * Écrit `org.gradle.java.home` dans le `gradle.properties` de l'UTILISATEUR —
+ * celui que Gradle lit réellement, `GRADLE_USER_HOME` compris.
  *
  * ── Pourquoi là, et pas dans le projet ───────────────────────────────────
  *
@@ -183,8 +332,17 @@ export function jdkUtilisables() {
  *   décide, et la ligne écrite porte un commentaire qui dit comment la
  *   retirer.
  */
-export function ecrireOverrideGradle(racineJdk, home = homedir()) {
-  const dossier = join(home, '.gradle')
+export function ecrireOverrideGradle(racineJdk, home = homedir(), env = process.env) {
+  /*
+   * `GRADLE_USER_HOME`, et pas `~/.gradle` en dur.
+   *
+   * DÉFAUT TROUVÉ EN TESTANT le correctif ci-dessus : cette fonction écrivait
+   * toujours dans `~/.gradle`, même quand Gradle lit ailleurs. Sur un poste
+   * qui pose cette variable, `--ecrire` annonçait donc « ✓ ligne ajoutée » et
+   * ne changeait rien — exactement le mensonge que ce fichier existe pour
+   * supprimer, sous une autre forme.
+   */
+  const dossier = dossierGradleUtilisateur(env, home)
   const fichier = join(dossier, 'gradle.properties')
   if (existsSync(fichier)) {
     const contenu = readFileSync(fichier, 'utf8')
@@ -216,22 +374,77 @@ export function ecrireOverrideGradle(racineJdk, home = homedir()) {
   return { ok: true, fichier, message: `Ligne ajoutée à ${fichier}.` }
 }
 
+/** La version du `java` du PATH. Écrit sur **stderr**, pas sur stdout. */
+function versionDuPath() {
+  const lance = spawnSync('java', ['-version'], { encoding: 'utf8' })
+  return majeureJava(`${lance.stderr ?? ''}${lance.stdout ?? ''}`)
+}
+
 /** Point d'entrée : uniquement quand le script est lancé, jamais à l'import. */
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'))) {
-  /*
-   * `java -version` écrit sur **stderr**, pas sur stdout. C'est historique, et
-   * c'est le piège de ce script : `execFileSync` ne rend que stdout, donc la
-   * version paraissait illisible sur un poste parfaitement configuré. On lit
-   * donc les DEUX flux.
-   */
-  const lance = spawnSync('java', ['-version'], { encoding: 'utf8' })
-  const sortie = `${lance.stderr ?? ''}${lance.stdout ?? ''}`
-
   const veutEcrire = process.argv.includes('--ecrire')
 
-  const bilan = diagnostiquer(majeureJava(sortie))
+  /*
+   * On interroge le JVM DE GRADLE, pas celui du PATH.
+   *
+   * C'est toute la correction : la version précédente lisait `java -version`,
+   * répondait ✓ sur un poste dont `JAVA_HOME` désignait un JDK 25, et Gradle
+   * échouait à la ligne suivante. Voir l'en-tête.
+   */
+  const origine = jvmDeGradle({
+    projetAndroid: resolve(dirname(fileURLToPath(import.meta.url)), '..', 'android'),
+  })
+  const versionPath = versionDuPath()
+
+  let majeure
+  if (origine.versionExigee !== null) {
+    // Le dépôt épingle la version : c'est ELLE qui compte, quel que soit le
+    // Java du poste. Gradle ira la chercher, ou échouera en le disant.
+    majeure = origine.versionExigee
+  } else if (origine.chemin) {
+    majeure = versionDuJdk(origine.chemin)
+    if (majeure === null) {
+      console.error(
+        `\n✗ ${origine.source} désigne un dossier qui n'est pas un JDK utilisable :\n\n` +
+          `    ${origine.chemin}\n\n` +
+          '  Aucun `bin/java` lisible à cet endroit. Gradle échouera dessus —\n' +
+          "  et il le fera même si `java -version` répond parfaitement, parce\n" +
+          `  qu'il ne consulte le PATH qu'en dernier recours.\n\n` +
+          (origine.fichier
+            ? `  Corrigez ou retirez la ligne dans :\n    ${origine.fichier}\n`
+            : platform() === 'win32'
+              ? '  Corrigez ou supprimez la variable JAVA_HOME (Paramètres →\n' +
+                "    Variables d'environnement).\n"
+              : '  Corrigez ou retirez JAVA_HOME de votre shell.\n') +
+          '\n  Ou laissez ce script désigner un JDK valide :  pnpm verifier:jdk --ecrire\n',
+      )
+      process.exit(1)
+    }
+  } else {
+    majeure = versionPath
+  }
+
+  /*
+   * La DIVERGENCE, dite à voix haute.
+   *
+   * C'est la phrase qui manquait : « ✓ JDK 21 » était vrai du PATH et faux de
+   * Gradle, et rien ne permettait de s'en apercevoir.
+   */
+  const divergence =
+    origine.source !== 'le « java » du PATH' &&
+    versionPath !== null &&
+    majeure !== null &&
+    majeure !== versionPath
+      ? `\n    ⚠ Le « java » de votre PATH est un JDK ${versionPath} — Gradle ne s'en\n` +
+        `      sert PAS : ${origine.source} l'emporte. C'est exactement ce qui\n` +
+        '      faisait répondre ✓ à un poste qui allait échouer.\n'
+      : ''
+
+  const bilan = diagnostiquer(majeure)
   if (bilan.ok) {
     console.log(`  ✓ ${bilan.message}`)
+    console.log(`    Source retenue par Gradle : ${origine.source}.`)
+    if (divergence) console.log(divergence)
     /*
      * ── `--ecrire` ne doit PAS être ignoré ici ────────────────────────────
      *
@@ -281,6 +494,9 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '
   }
 
   console.error(`\n✗ ${bilan.message}\n`)
+  console.error(`  Source retenue par Gradle : ${origine.source}.`)
+  if (origine.chemin) console.error(`    ${origine.chemin}`)
+  console.error(divergence || '')
 
   /*
    * On ne s'arrête pas au refus : on CHERCHE. Un poste qui construit une

@@ -401,9 +401,18 @@ pnpm --filter @kaissi/pos test:parcours
 # pnpm db:test le prépare : base jetable + migrations de production telles quelles.
 pnpm db:test && pnpm --filter @kaissi/sync test && pnpm db:test:stop
 
-# Le JDK du poste est-il dans la plage éprouvée ? (17–23, Gradle 8.13 ne lit
-# pas au-delà — « Unsupported class file major version 69 » = JDK 25)
-# `--ecrire` trouve un JDK utilisable et le désigne à Gradle, sans toucher au PATH.
+# Le JDK que GRADLE utilisera est-il dans la plage éprouvée ? (17–23, Gradle
+# 8.13 ne lit pas au-delà — « Unsupported class file major version 69 » = JDK 25)
+#
+# ⚑ Il interroge le JVM DE GRADLE, dans l'ordre de Gradle : org.gradle.java.home
+#   (utilisateur puis projet), gradle-daemon-jvm.properties, JAVA_HOME, et le
+#   PATH en DERNIER. Lire `java -version` faisait répondre ✓ à un poste dont
+#   JAVA_HOME désignait un JDK 25 — et Gradle échouait à la ligne suivante.
+#   Un garde-fou qui dit ✓ à un poste qui va échouer est pire que pas de
+#   garde-fou : il déplace la recherche du côté du dépôt.
+# `--ecrire` trouve un JDK utilisable et le désigne à Gradle sans toucher au
+#   PATH, dans le gradle.properties que Gradle lit VRAIMENT (GRADLE_USER_HOME
+#   compris).
 pnpm verifier:jdk [--ecrire]
 
 # Les scripts .gradle sont-ils encore du Groovy ? Un chemin de JDK collé par
