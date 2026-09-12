@@ -7,6 +7,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { Printer, TriangleAlert } from 'lucide-react'
 import type { Shift } from '@kaissi/domain'
 import { IMPRESSION_ACTIVE } from './config.js'
 import { demarrer, type ContexteApplication } from './donnees/demarrage.js'
@@ -330,7 +331,19 @@ function Bandeau({
                 : `${impression.enAttente} ticket(s) en attente`
             }
           >
-            {impression.echecs > 0 ? '⚠' : '🖨'}{' '}
+            {/*
+              Une icône au TRAIT, pas un emoji.
+              Le 🖨 était rendu par la police du système : plat sur Windows,
+              en relief sur macOS, absent de certains Android — où il tombait
+              en carré vide, sur le badge qui annonce justement une panne
+              d'imprimante. Et il ne prenait pas la couleur du texte, donc il
+              restait identique que le badge soit en attente ou en échec.
+            */}
+            {impression.echecs > 0 ? (
+              <TriangleAlert size={15} strokeWidth={2} aria-hidden="true" />
+            ) : (
+              <Printer size={15} strokeWidth={2} aria-hidden="true" />
+            )}{' '}
             {impression.echecs > 0 ? impression.echecs : impression.enAttente}
           </span>
         )}
@@ -375,15 +388,38 @@ function Bandeau({
           écran. C'est exactement quand tout va bien qu'on cherche à vérifier
           que tout va bien.
         */}
-        <button type="button" className="lien" onClick={onSync}>
+        {/*
+          `data-actif` marque l'écran COURANT.
+          Les quatre liens se ressemblaient trait pour trait, quel que soit
+          l'endroit où l'on se trouvait : depuis Diagnostic, rien ne disait
+          qu'on y était — sinon le contenu, qu'il faut lire. La charte pose un
+          trait terracotta sous l'onglet courant, exactement comme la colonne
+          du back-office pose une barre à gauche du sien.
+        */}
+        <button
+          type="button"
+          className="lien"
+          data-actif={vue === 'sync'}
+          onClick={onSync}
+        >
           Sync
         </button>
 
-        <button type="button" className="lien" onClick={onDiagnostic}>
+        <button
+          type="button"
+          className="lien"
+          data-actif={vue === 'diagnostic'}
+          onClick={onDiagnostic}
+        >
           Diagnostic
         </button>
         {shift && (
-          <button type="button" className="lien" onClick={onCloturer}>
+          <button
+            type="button"
+            className="lien"
+            data-actif={vue === 'cloture'}
+            onClick={onCloturer}
+          >
             Clôturer
           </button>
         )}

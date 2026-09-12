@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { UserRound } from 'lucide-react'
 import {
   calculerTotaux,
   formaterPourcentage,
@@ -392,7 +393,13 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
             disabled={!modifiable}
             onClick={() => setClientOuvert(true)}
           >
-            {etat?.clientNom ? `👤 ${etat.clientNom}` : 'Client'}
+            {etat?.clientNom ? (
+              <>
+                <UserRound size={15} strokeWidth={2} aria-hidden="true" /> {etat.clientNom}
+              </>
+            ) : (
+              'Client'
+            )}
           </button>
           <button
             type="button"

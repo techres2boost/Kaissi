@@ -48,8 +48,9 @@
   --bordure: #DED7C7;
 
   --texte: #1B1F1C;         /* Rich Charcoal */
-  --attenue: #586560;       /* Olive Gray, assombri pour tenir le 4,5:1
-                               jusque sur le beige (#ECE7DC) */
+  --attenue: #414D48;       /* Olive Gray, assombri pour tenir le 4,5:1 sur le
+                               beige ET sur le halo menthe du fond ombré —
+                               voir la règle plus bas */
 
   /* L'accent d'ACTION — boutons, liens, focus. Émeraude et non menthe : la
      menthe #7EC694 ne fait que 1,9:1 sur blanc, elle disparaît. */
@@ -119,6 +120,29 @@ body {
  *
  * `z-index: -1` : la couche passe derrière tout le contenu en flux, mais
  * devant le fond du `body`.
+ */
+/*
+ * ── LE DÉGRADÉ EST UN FOND, PAS UN SUPPORT DE TEXTE ──────────────────────
+ *
+ * Mesuré, et c'est une contrainte dont il faut se souvenir : au plus dense du
+ * halo terracotta (coin bas-droit), AUCUNE couleur de texte atténué ne tient
+ * le 4,5:1 — même très assombrie, on plafonne vers 3,7:1. Le halo menthe,
+ * lui, pardonne davantage.
+ *
+ * La règle est donc structurelle, pas chromatique, et c'est celle de Digital
+ * Fidelity : tout ce qui porte du texte est posé sur une SURFACE opaque —
+ * carte, barre, pastille. Le dégradé ne se voit qu'entre elles.
+ *
+ * Deux conséquences pratiques :
+ *   • `--attenue` / `--texte-2` est assombri pour tenir sur le halo MENTHE
+ *     (4,6:1), parce que c'est là que se posent les titres et sous-titres de
+ *     chaque écran — coin haut-gauche ;
+ *   • une barre de contrôles ne flotte jamais sur le dégradé : elle a son
+ *     propre fond. Une commande doit se lire, pas se deviner.
+ *
+ * Les jetons ne sont certifiés que contre les surfaces déclarées dans
+ * `palette.test.ts`. Poser du texte atténué à même le dégradé sort de ce que
+ * ce test garantit.
  */
 body::before {
   content: '';

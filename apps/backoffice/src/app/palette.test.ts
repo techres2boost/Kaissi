@@ -178,3 +178,75 @@ describe('la page de secours ne dérive pas de la charte', () => {
     }
   })
 })
+
+describe('le fond ombré, qui n’est PAS une surface de texte', () => {
+  /*
+   * ── Ce que ce test fige, et pourquoi il a fallu le mesurer ──────────────
+   *
+   * Le dégradé de Digital Fidelity porte deux halos denses : menthe au coin
+   * haut-gauche, terracotta au coin bas-droit. Un texte posé DESSUS ne voit
+   * pas la même surface qu'un texte posé sur une carte — et personne ne s'en
+   * aperçoit à l'œil, parce que les deux « ont l'air » lisibles.
+   *
+   * Mesure faite : sur le halo terracotta au maximum, AUCUNE couleur de texte
+   * atténué ne tient le 4,5:1. Même assombrie jusqu'à #333D39, on plafonne à
+   * 3,7:1. Ce n'est donc pas un réglage de couleur : c'est que ce coin-là
+   * n'est pas un support de texte, et la règle en découle — tout ce qui porte
+   * du texte est posé sur une surface opaque.
+   *
+   * Le halo MENTHE, lui, pardonne : c'est là que se posent les titres de
+   * chaque écran, et `--attenue` est calibré pour y tenir. Ce test le fige.
+   */
+  const CREME = '#F2EDDD'
+
+  /** Une couche translucide aplatie sur le fond crème. */
+  function aplati(couche: string, alpha: number): string {
+    const c = (h: string) => {
+      const n = Number.parseInt(h.slice(1), 16)
+      return [(n >> 16) & 255, (n >> 8) & 255, n & 255] as const
+    }
+    const [f, b] = [c(couche), c(CREME)]
+    const v = [0, 1, 2].map((i) => Math.round(f[i]! * alpha + b[i]! * (1 - alpha)))
+    return `#${v.map((x) => x.toString(16).padStart(2, '0')).join('')}`
+  }
+
+  // Les valeurs viennent du CSS lui-même : si quelqu'un change l'opacité du
+  // halo, c'est ce test qui doit le dire, pas un écran en clientèle.
+  // Ancrés sur le `radial-gradient` lui-même : la même menthe sert ailleurs
+  // en filet de bordure à 12 %, et une regex trop large attrapait celle-là.
+  const MENTHE = /at 0% 0%, rgba\(126, 198, 148, ([\d.]+)\)/.exec(CSS)?.[1]
+  const TERRACOTTA = /at 100% 100%, rgba\(201, 120, 54, ([\d.]+)\)/.exec(CSS)?.[1]
+
+  it('les deux halos sont bien ceux de Digital Fidelity', () => {
+    expect(MENTHE, 'halo menthe').toBe('0.92')
+    expect(TERRACOTTA, 'halo terracotta').toBe('0.9')
+  })
+
+  it('le texte ATTÉNUÉ tient sur le halo menthe — là où sont les titres', () => {
+    const pire = aplati('#7EC694', Number(MENTHE))
+    expect(contraste(jeton('attenue'), pire), `${jeton('attenue')} sur ${pire}`)
+      .toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('le texte PRINCIPAL tient sur les deux halos', () => {
+    for (const [nom, couche, alpha] of [
+      ['menthe', '#7EC694', Number(MENTHE)],
+      ['terracotta', '#C97836', Number(TERRACOTTA)],
+    ] as const) {
+      const pire = aplati(couche, alpha)
+      expect(contraste(jeton('texte'), pire), `texte sur le halo ${nom} (${pire})`)
+        .toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
+  it('… et le halo TERRACOTTA reste hors de portée du texte atténué', () => {
+    /*
+     * Une assertion INVERSÉE, et c'est volontaire. Elle documente la limite
+     * plutôt que de la laisser se redécouvrir : si un jour ce test tombe,
+     * c'est que le halo a été adouci — et la règle « pas de texte sur le
+     * dégradé » peut alors être rediscutée, en connaissance de cause.
+     */
+    const pire = aplati('#C97836', Number(TERRACOTTA))
+    expect(contraste(jeton('attenue'), pire)).toBeLessThan(4.5)
+  })
+})

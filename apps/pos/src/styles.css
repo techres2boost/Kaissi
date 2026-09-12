@@ -8,37 +8,86 @@
  *  • aucune animation coûteuse — tablettes Android d'entrée de gamme.
  */
 
-/*
- * Palette Res2Boost. Les jetons gardent leurs noms : seules les VALEURS
- * changent, donc rien d'autre dans cette feuille n'a eu à bouger.
- *
- * L'accent passe de l'ambre au vert de marque. Un seul écart assumé : le
- * badge d'alerte et le rouge d'erreur restent chauds. Signaler une imprimante
- * hors service dans le vert de la marque serait joli et illisible — sous les
- * néons d'un snack, une alerte doit sauter aux yeux avant d'être « à la
- * charte ».
- */
+/* ══════════════════════════════════════════════════════════════════════════
+   CHARTE Res2Boost — la même que le back-office et Digital Fidelity
+   ══════════════════════════════════════════════════════════════════════════
+
+   ── Pourquoi la caisse passe au CLAIR, elle aussi ────────────────────────
+
+   Elle était vert sombre, et l'argument tenait : « écran de tablette sous les
+   néons d'un snack », donc contraste maximal. Il tient toujours — et c'est
+   précisément pourquoi le clair ne le trahit pas : l'anthracite sur blanc
+   donne 16,7:1, là où l'ivoire sur vert profond en donnait 14,0. On ne perd
+   pas de contraste, on en gagne.
+
+   Ce qu'on gagne surtout, c'est qu'un restaurateur qui ouvre son back-office
+   puis sa caisse voit le MÊME produit. Deux thèmes opposés sur deux écrans
+   du même logiciel, c'est une incohérence qu'on remarque sans savoir la
+   nommer.
+
+   ⚠ La réserve, écrite noir sur blanc parce qu'elle est réelle : un écran
+     clair en salle le soir éblouit davantage. Le commentaire de
+     `.recherche-client`, plus bas, le disait déjà — d'un champ blanc isolé
+     au milieu d'un écran sombre, ce qui est le pire des cas. Une interface
+     claire COHÉRENTE se règle par la luminosité de la tablette, et c'est ce
+     que font Loyverse, Square et Toast. Si le terrain dit le contraire, tout
+     est dans ces jetons : rebasculer coûte ce bloc-ci, rien d'autre.
+
+   ── Le CHROME reste sombre ───────────────────────────────────────────────
+
+   Le bandeau du haut garde le vert forêt, comme la colonne du back-office et
+   la `dash-bar-top` de Digital Fidelity. Il redéfinit les jetons pour
+   lui-même : un composant qui utilise `--texte` ou `--texte-2` s'habille
+   correctement des deux côtés sans savoir où il est rendu.
+
+   ── Les contrastes sont VÉRIFIÉS ─────────────────────────────────────────
+
+   `src/palette.test.ts` lit ce fichier et refuse tout jeton sous 4,5:1 sur
+   les surfaces où il est réellement posé. Trois couleurs ont dû être
+   assombries au passage : la menthe néon d'« OK » faisait 1,3:1 sur blanc,
+   le rouge d'alerte 2,6:1, l'or 2,3:1. Elles s'affichaient encore ; elles ne
+   se lisaient plus.
+   ══════════════════════════════════════════════════════════════════════════ */
 :root {
-  /* Fonds — du plus profond au plus clair */
-  --fond: #07150F;          /* Near Black Green */
-  --surface: #0D2B1F;       /* Deep Forest */
-  --surface-2: #174634;     /* Emerald Dark */
-  --bordure: #1F5842;
+  /* Fonds — du plus clair au plus marqué */
+  --fond: #F6F3EA;          /* Warm Ivory — la base */
+  --surface: #FFFFFF;       /* les cartes : produits, ticket, blocs */
+  --surface-2: #ECE7DC;     /* Soft Beige — boutons secondaires, pavé, champs */
+  --bordure: #DED7C7;
 
   /* Textes */
-  --texte: #F6F3EA;         /* Warm Ivory — jamais du blanc pur sur du vert
-                               foncé : le blanc pur vibre et fatigue en service */
-  --texte-2: #8FA79A;
+  --texte: #1B1F1C;         /* Rich Charcoal */
+  --texte-2: #414D48;       /* Olive Gray, assombri pour tenir le 4,5:1 sur le
+                               beige ET sur le halo menthe du fond ombré —
+                               voir la règle plus bas */
 
-  /* Accent de marque */
-  --accent: #7EC694;        /* Signature Mint */
-  --accent-clair: #9BE3AE;  /* Bright Mint */
-  --accent-fonce: #0B3626;
-  --or: #C9A86B;            /* Soft Gold — réservé aux montants encaissés */
+  /* Accent d'ACTION — encaisser, valider, les montants. Émeraude et non
+     menthe : la menthe #7EC694 ne fait que 1,9:1 sur blanc, elle disparaît. */
+  --accent: #174634;        /* Emerald Dark */
+  --accent-clair: #0D2B1F;  /* Deep Forest — appui : plus SOMBRE. Sur fond
+                               clair, « enfoncer » assombrit. */
+  --accent-fonce: #C9DFD2;  /* le liseré pâle d'une catégorie active — il
+                               était sombre quand le fond l'était */
+  --sur-accent: #F1FAF4;    /* le texte posé SUR l'accent */
+
+  /* Accent de NAVIGATION — terracotta, celui de Digital Fidelity. Distinct
+     de l'accent d'action : le bandeau dit où l'on est, les boutons disent
+     quoi faire. Les confondre ferait de chaque onglet un appel à cliquer. */
+  --orange: #C4562B;
+  --orange-texte: #B84E24;  /* le même, assombri pour être LU sur du clair */
+  --orange-clair: #E88A5E;  /* dégradés, et l'onglet actif sur le bandeau */
+
+  --or: #8A6A1F;            /* Soft Gold assombri — montants encaissés */
 
   /* États. Volontairement hors charte : ils doivent trancher. */
-  --ok: #8FFFBC;            /* Neon Mint */
-  --alerte: #E4756A;
+  --ok: #10714A;
+  --alerte: #B3261E;
+
+  /* Lavis d'état — des fonds clairs, plus les teintes sur noir d'avant. */
+  --fond-ok: #E4F4EC;
+  --fond-alerte: #FBEAE8;
+  --fond-or: #FAF0DA;
+  --fond-accent: #E7F0EB;
 
   --rayon: 10px;
 }
@@ -51,7 +100,9 @@ html, body, #racine {
 }
 
 body {
-  background: var(--fond);
+  /* La base crème de Digital Fidelity (`.dash-shell`) : elle évite une bande
+     blanche si un écran est plus court que la tablette. */
+  background: #F2EDDD;
   color: var(--texte);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 16px;
@@ -97,33 +148,61 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ── Coque ──────────────────────────────────────────────────────────────── */
 .application { height: 100%; display: flex; flex-direction: column; }
 
+/*
+ * ── Le bandeau, et son SECOND jeu de jetons ──────────────────────────────
+ *
+ * Il reste vert forêt pendant que la caisse passe au clair — c'est le
+ * contraste qui structure l'écran chez Digital Fidelity, et c'est ce qu'on
+ * reprend. Le back-office fait exactement pareil avec sa colonne de gauche ;
+ * ici, le chrome est en haut, la mécanique est la même.
+ *
+ * Les jetons sont REDÉFINIS ici : `--texte` redevient ivoire, `--texte-2`
+ * olive clair, `--bordure` un filet de menthe transparente. Un composant posé
+ * dans le bandeau s'habille donc pour le sombre sans le savoir.
+ */
 .bandeau {
   display: flex;
   align-items: center;
   gap: 1rem;
   padding: 0.6rem 1rem;
-  background: var(--surface);
-  border-bottom: 1px solid var(--bordure);
+  background: linear-gradient(180deg, #0b2016 0%, #0f2e1f 55%, #123725 100%);
+  border-bottom: 1px solid rgba(126, 198, 148, 0.12);
   flex-shrink: 0;
-}
-.bandeau-marque { display: flex; flex-direction: column; line-height: 1.2; }
-.logo { font-weight: 800; letter-spacing: -0.02em; color: var(--accent); }
-.etablissement { font-size: 0.75rem; color: var(--texte-2); }
 
-.onglets { display: flex; gap: 0.25rem; margin-left: auto; }
-.onglets button {
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--rayon);
-  padding: 0.6rem 1.1rem;
-  color: var(--texte-2);
-  min-height: 44px;
-}
-.onglets button.actif {
-  background: var(--surface-2);
-  border-color: var(--bordure);
+  --texte: #F6F3EA;
+  --texte-2: #8FA79A;
+  --bordure: rgba(126, 198, 148, 0.12);
+  --surface: rgba(255, 255, 255, 0.05);
+  --surface-2: rgba(255, 255, 255, 0.08);
+
+  /*
+   * Les lavis d'état AUSSI — et c'est le piège de cette bascule.
+   *
+   * `.badge-sync`, `.badge-impression` et l'étiquette « démo » vivent dans le
+   * bandeau, mais leurs couleurs sont celles d'un fond clair : un aplat
+   * #E7F0EB posé sur le vert forêt devient la tache la plus lumineuse de
+   * l'écran, plus voyante que le bouton « Encaisser ». Un badge doit se voir,
+   * pas crier.
+   *
+   * Les textes suivent : sur ces lavis translucides, le vert émeraude
+   * redevient illisible — on reprend les teintes claires d'avant, qui sont
+   * chez elles sur du sombre.
+   */
+  --fond-accent: rgba(126, 198, 148, 0.14);
+  --fond-or: rgba(201, 168, 107, 0.16);
+  --fond-alerte: rgba(228, 117, 106, 0.16);
+  --accent: #9BE3AE;
+  --or: #D8BE86;
+  --alerte: #F0A099;
   color: var(--texte);
 }
+.bandeau-marque { display: flex; flex-direction: column; line-height: 1.2; }
+/* La menthe RESTE la marque : elle n'était illisible que sur du clair. Sur le
+   vert forêt du bandeau, elle est chez elle. */
+.logo { font-weight: 800; letter-spacing: -0.02em; color: #7EC694; }
+.etablissement { font-size: 0.75rem; color: var(--texte-2); }
+
+
 
 .etat-reseau {
   display: flex; align-items: center; gap: 0.45rem;
@@ -137,6 +216,54 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .etat-reseau.en-ligne .point { background: var(--ok); }
 .etat-reseau.hors-ligne { color: var(--accent); }
 .etat-reseau.hors-ligne .point { background: var(--accent); }
+
+/*
+ * ── Le fond ombré crème / menthe / terracotta ────────────────────────────
+ *
+ * Repris tel quel de Digital Fidelity : halo menthe au coin haut-gauche,
+ * terracotta au coin bas-droit, sur une base crème.
+ *
+ * Porté par `.contenu`, qui est l'équivalent EXACT de leur `.dash-main` : la
+ * zone de travail, sous le chrome. Le poser sur `body` l'aurait glissé sous
+ * le bandeau, dont l'opacité aurait mangé le coin menthe — c'est la raison
+ * pour laquelle DF le met sur sa zone de contenu et pas sur sa coquille.
+ *
+ * Quatre couches de dégradé, peintes UNE fois : `.contenu` ne défile pas
+ * (c'est son enfant qui défile), donc rien n'est repeint au doigt. Sur une
+ * tablette Android d'entrée de gamme, c'est ce qui compte.
+ */
+/*
+ * ── LE DÉGRADÉ EST UN FOND, PAS UN SUPPORT DE TEXTE ──────────────────────
+ *
+ * Mesuré, et c'est une contrainte dont il faut se souvenir : au plus dense du
+ * halo terracotta (coin bas-droit), AUCUNE couleur de texte atténué ne tient
+ * le 4,5:1 — même très assombrie, on plafonne vers 3,7:1. Le halo menthe,
+ * lui, pardonne davantage.
+ *
+ * La règle est donc structurelle, pas chromatique, et c'est celle de Digital
+ * Fidelity : tout ce qui porte du texte est posé sur une SURFACE opaque —
+ * carte, barre, pastille. Le dégradé ne se voit qu'entre elles.
+ *
+ * Deux conséquences pratiques :
+ *   • `--attenue` / `--texte-2` est assombri pour tenir sur le halo MENTHE
+ *     (4,6:1), parce que c'est là que se posent les titres et sous-titres de
+ *     chaque écran — coin haut-gauche ;
+ *   • une barre de contrôles ne flotte jamais sur le dégradé : elle a son
+ *     propre fond. Une commande doit se lire, pas se deviner.
+ *
+ * Les jetons ne sont certifiés que contre les surfaces déclarées dans
+ * `palette.test.ts`. Poser du texte atténué à même le dégradé sort de ce que
+ * ce test garantit.
+ */
+.contenu,
+.ecran-bloquant,
+.ecran-centre {
+  background:
+    radial-gradient(95% 60% at 0% 0%, rgba(126, 198, 148, 0.92), transparent 58%),
+    radial-gradient(98% 66% at 100% 100%, rgba(201, 120, 54, 0.9), transparent 60%),
+    radial-gradient(55% 38% at 97% 100%, rgba(196, 86, 43, 0.32), transparent 55%),
+    linear-gradient(150deg, #f2eddd 0%, #f4efe1 50%, #ece4cf 100%);
+}
 
 .contenu { flex: 1; min-height: 0; overflow: hidden; }
 
@@ -163,10 +290,24 @@ button { font: inherit; color: inherit; cursor: pointer; }
   min-height: 48px;
   border-left: 4px solid var(--teinte, var(--bordure));
 }
+/*
+ * ── La catégorie courante — un rapport INVERSÉ par le passage au clair ───
+ *
+ * Sur fond sombre, `--surface-2` était plus CLAIR que le fond : l'onglet actif
+ * paraissait soulevé, et c'était juste. Sur fond clair, le beige est plus
+ * SOMBRE que le blanc des onglets voisins : le même code faisait paraître
+ * l'onglet courant enfoncé, presque désactivé. Le report mécanique d'un jeton
+ * avait retourné le sens de l'indication.
+ *
+ * L'accent le dit maintenant explicitement — lavis émeraude, anneau de deux
+ * pixels, libellé à l'accent. Il ne dépend plus d'une hiérarchie de clarté
+ * qui s'inverse avec le thème.
+ */
 .categories button.actif {
-  background: var(--surface-2);
-  color: var(--texte);
-  box-shadow: inset 0 0 0 1px var(--accent-fonce);
+  background: var(--fond-accent);
+  color: var(--accent);
+  font-weight: 650;
+  box-shadow: inset 0 0 0 2px var(--accent);
 }
 
 .grille-produits {
@@ -192,6 +333,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background: var(--surface);
   border: 1px solid var(--bordure);
   border-radius: var(--rayon);
+  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
 }
 .carte-produit:active { background: var(--surface-2); }
 .carte-produit:disabled { opacity: 0.4; }
@@ -223,6 +365,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ticket {
   background: var(--surface);
   border-left: 1px solid var(--bordure);
+  /* Un panneau collé au bord, pas une carte posée : une ombre portée vers la
+     gauche le détache du fond ombré sans faire flotter un rectangle. */
+  box-shadow: -12px 0 28px -22px rgba(27, 31, 28, 0.5);
   padding: 1rem;
   display: flex;
   flex-direction: column;
@@ -316,12 +461,15 @@ button { font: inherit; color: inherit; cursor: pointer; }
   border-left: 1px solid var(--bordure);
 }
 .diagnostic::-webkit-scrollbar-thumb {
-  background: var(--accent-fonce); border-radius: 999px;
+  /* `--texte-2` et non l'accent pâle : un pouce de barre est un objet
+     graphique, il lui faut 3:1. Et le survol l'ASSOMBRIT — il l'éclaircissait
+     vers `--bordure`, donc le faisait disparaître au moment où on le vise. */
+  background: var(--texte-2); border-radius: 999px;
   border: 5px solid var(--surface);
   min-height: 44px;
 }
 .diagnostic::-webkit-scrollbar-thumb:hover,
-.diagnostic::-webkit-scrollbar-thumb:active { background: var(--bordure); }
+.diagnostic::-webkit-scrollbar-thumb:active { background: var(--accent); }
 .bloc {
   background: var(--surface);
   border: 1px solid var(--bordure);
@@ -331,8 +479,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .bloc h2 { margin: 0 0 0.75rem; font-size: 0.95rem; }
 
 .verdict { padding: 0.85rem; border-radius: 6px; line-height: 1.55; font-size: 0.9rem; }
-.verdict.ok { background: rgba(63, 191, 143, 0.12); border: 1px solid rgba(63, 191, 143, 0.35); }
-.verdict.ko { background: rgba(228, 117, 106, 0.12); border: 1px solid rgba(228, 117, 106, 0.35); }
+.verdict.ok { background: var(--fond-ok); border: 1px solid rgba(16, 113, 74, 0.35); }
+.verdict.ko { background: var(--fond-alerte); border: 1px solid rgba(179, 38, 30, 0.35); }
 
 .bloc table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
 .bloc th {
@@ -384,9 +532,40 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .bandeau-actions { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; }
 .bandeau-actions .lien {
+  position: relative;
   background: transparent; border: 1px solid var(--bordure);
   border-radius: var(--rayon); padding: 0.55rem 0.9rem;
   color: var(--texte-2); min-height: 44px;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+/*
+ * ── L'écran COURANT, en terracotta ───────────────────────────────────────
+ *
+ * Les quatre liens se ressemblaient trait pour trait quel que soit l'endroit
+ * où l'on se trouvait : depuis Diagnostic, rien ne disait qu'on y était.
+ *
+ * Un trait SOUS le mot, pas un aplat autour : le bandeau est horizontal, la
+ * colonne du back-office verticale — la barre indicatrice tourne d'un quart
+ * de tour, elle ne change pas de nature. Et un aplat plein pèse, dans un
+ * bandeau qu'on regarde toute la journée.
+ */
+.bandeau-actions .lien[data-actif='true'] {
+  background: linear-gradient(180deg, rgba(196, 86, 43, 0.04), rgba(196, 86, 43, 0.2));
+  border-color: rgba(196, 86, 43, 0.28);
+  color: #FFB694;
+  font-weight: 650;
+}
+.bandeau-actions .lien[data-actif='true']::after {
+  content: '';
+  position: absolute;
+  left: 0.6rem; right: 0.6rem; bottom: -1px;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(90deg, var(--orange-clair), var(--orange));
+  box-shadow: 0 0 12px rgba(196, 86, 43, 0.6);
+}
+@media (prefers-reduced-motion: reduce) {
+  .bandeau-actions .lien { transition: none; }
 }
 .bandeau-actions .employe {
   display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15;
@@ -398,12 +577,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .badge-impression {
   display: inline-flex; align-items: center; gap: 0.3rem;
   padding: 0.4rem 0.7rem; border-radius: 999px;
-  background: rgba(224, 163, 63, 0.15); color: var(--accent);
-  border: 1px solid rgba(224, 163, 63, 0.4); font-size: 0.8rem;
+  background: var(--fond-or); color: var(--or);
+  border: 1px solid rgba(138, 106, 31, 0.4); font-size: 0.8rem;
 }
 .badge-impression.echec {
-  background: rgba(228, 117, 106, 0.15); color: var(--alerte);
-  border-color: rgba(228, 117, 106, 0.45);
+  background: var(--fond-alerte); color: var(--alerte);
+  border-color: rgba(179, 38, 30, 0.45);
 }
 
 /* ── Boutons génériques ──────────────────────────────────────────────────── */
@@ -411,7 +590,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   border-radius: var(--rayon); padding: 0.85rem 1.2rem;
   min-height: var(--cible-tactile, 56px); font-weight: 700; border: 1px solid transparent;
 }
-.principal { background: var(--accent); color: var(--fond); }
+.principal { background: var(--accent); color: var(--sur-accent); }
+.principal:active { background: var(--accent-clair); }
 .principal:disabled { opacity: 0.35; }
 .principal.grand { width: 100%; font-size: 1.1rem; min-height: 64px; }
 .secondaire { background: var(--surface-2); color: var(--texte); border-color: var(--bordure); }
@@ -429,6 +609,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .carte-action {
   background: var(--surface); border: 1px solid var(--bordure);
   border-radius: var(--rayon); padding: 1.5rem; width: min(26rem, 100%);
+  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
 }
 .carte-action h1 { margin: 0 0 0.5rem; font-size: 1.3rem; }
 .aide { color: var(--texte-2); font-size: 0.85rem; line-height: 1.5; margin: 0 0 1rem; }
@@ -451,7 +632,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .pave button:active { background: var(--bordure); }
 .pave button.inactif { opacity: 0.25; }
 .pave .effacer { color: var(--accent); }
-.pave .valider { grid-column: 1 / -1; background: var(--accent); color: var(--fond); }
+.pave .valider { grid-column: 1 / -1; background: var(--accent); color: var(--sur-accent); }
 .pave .valider:disabled { opacity: 0.35; }
 
 /* ── Modale ──────────────────────────────────────────────────────────────── */
@@ -462,6 +643,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .modale {
   background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--rayon);
   width: min(30rem, 100%); max-height: 92vh; display: flex; flex-direction: column;
+  box-shadow: 0 24px 60px -20px rgba(27, 31, 28, 0.45);
 }
 .modale.large { width: min(52rem, 100%); }
 .modale header {
@@ -489,7 +671,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background: var(--surface-2); border: 1px solid var(--bordure);
   border-radius: var(--rayon); padding: 0.7rem 1rem; min-height: 52px;
 }
-.options button.actif { border-color: var(--accent); background: rgba(224, 163, 63, 0.12); }
+.options button.actif { border-color: var(--accent); background: var(--fond-accent); }
 .options button small { color: var(--texte-2); font-size: 0.72rem; }
 .options.grand button { flex: 1 1 5rem; align-items: center; font-size: 1.05rem; min-height: 60px; }
 
@@ -524,17 +706,26 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ── Salle ───────────────────────────────────────────────────────────────── */
 .salle { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+/* Une barre de CONTRÔLES, donc une surface opaque : posée à même le dégradé,
+   elle tombait en plein dans le halo menthe — l'onglet inactif y faisait
+   2,9:1, l'onglet courant 2,4:1. */
 .barre-salle {
   display: flex; align-items: center; gap: 0.75rem;
   padding: 0.75rem 1rem; border-bottom: 1px solid var(--bordure); flex-shrink: 0;
+  background: var(--surface);
 }
 .onglets-vue { display: flex; gap: 0.25rem; }
 .onglets-vue button {
   background: transparent; border: 1px solid transparent; border-radius: var(--rayon);
   padding: 0.6rem 1rem; color: var(--texte-2); min-height: 44px;
 }
+/* Même terracotta que le bandeau, en version LISIBLE sur clair : le #FFB694
+   du bandeau y ferait 1,9:1. C'est à ça que sert `--orange-texte`. */
 .onglets-vue button.actif {
-  background: var(--surface-2); border-color: var(--bordure); color: var(--texte);
+  background: rgba(196, 86, 43, 0.1);
+  border-color: rgba(196, 86, 43, 0.35);
+  color: var(--orange-texte);
+  font-weight: 650;
 }
 .barre-salle .principal { margin-left: auto; }
 
@@ -547,8 +738,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start;
   min-height: 6.5rem; padding: 0.8rem;
   background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--rayon);
+  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
 }
-.grille-tables .table.occupee { border-color: var(--accent); background: rgba(224, 163, 63, 0.09); }
+.grille-tables .table.occupee { border-color: var(--accent); background: var(--fond-accent); }
 /*
  * La tuile ENTIÈRE change quand le plat est prêt.
  *
@@ -557,7 +749,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
  * doublé du mot « Prêt », parce que la couleur seule n'est pas une
  * information pour tout le monde.
  */
-.grille-tables .table.prete { border-color: var(--ok); background: rgba(143, 255, 188, 0.1); }
+.grille-tables .table.prete { border-color: var(--ok); background: var(--fond-ok); }
 .grille-tables .numero { font-size: 1.4rem; font-weight: 800; }
 .grille-tables .places, .grille-tables .libre-libelle { color: var(--texte-2); font-size: 0.72rem; }
 .grille-tables .montant {
@@ -568,8 +760,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   font-size: 0.66rem; padding: 0.15rem 0.45rem; border-radius: 999px;
   background: var(--surface-3, var(--bordure)); color: var(--texte-2);
 }
-.badge.envoyee { background: rgba(63, 191, 143, 0.15); color: var(--ok); }
-.badge.ouverte { background: rgba(224, 163, 63, 0.15); color: var(--accent); }
+.badge.envoyee { background: var(--fond-ok); color: var(--ok); }
+.badge.ouverte { background: var(--fond-accent); color: var(--accent); }
 /*
  * « Prêt » est PLEIN, là où les autres états sont teintés.
  *
@@ -577,19 +769,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
  * menthe d'« Envoyée » pour tout le monde — un daltonisme deutan les
  * confondrait. C'est le REMPLISSAGE qui tranche, et il tranche pour tous.
  */
-.badge.pret { background: var(--ok); color: var(--fond); font-weight: 700; }
+.badge.pret { background: var(--ok); color: var(--sur-accent); font-weight: 700; }
 
 /* ── Bandeau « prêt à servir » ───────────────────────────────────────────── */
 .bandeau-prets {
   display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem;
   padding: 0.6rem 1rem; margin: 0 1rem;
   border-radius: var(--rayon);
-  background: rgba(143, 255, 188, 0.12);
-  border: 1px solid rgba(143, 255, 188, 0.4);
+  background: var(--fond-ok);
+  border: 1px solid rgba(16, 113, 74, 0.4);
 }
 .bandeau-prets strong { color: var(--ok); font-size: 0.85rem; letter-spacing: 0.02em; }
 .bandeau-prets button {
-  background: var(--ok); color: var(--fond); font-weight: 700;
+  background: var(--ok); color: var(--sur-accent); font-weight: 700;
   border: none; border-radius: 999px;
   /* La cible reste tactile : on la vise en marchant, une assiette en main. */
   padding: 0.45rem 0.9rem; min-height: 40px;
@@ -600,13 +792,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: grid; grid-template-columns: 1fr auto auto auto; gap: 1rem; align-items: center;
   background: var(--surface); border: 1px solid var(--bordure);
   border-radius: var(--rayon); padding: 0.9rem 1rem; min-height: 60px; text-align: left;
+  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
 }
 .liste-commandes .ref { display: flex; flex-direction: column; }
 .liste-commandes .ref small { color: var(--texte-2); font-size: 0.7rem; }
 .liste-commandes .articles, .liste-commandes .montant { font-variant-numeric: tabular-nums; }
 .liste-commandes .montant { font-weight: 700; }
 
-.bande-emporter { border-top: 1px solid var(--bordure); padding: 0.75rem 1rem; flex-shrink: 0; }
+/* Même raison : son titre est en texte atténué. */
+.bande-emporter {
+  border-top: 1px solid var(--bordure); padding: 0.75rem 1rem; flex-shrink: 0;
+  background: var(--surface);
+}
 .bande-emporter h3 { margin: 0 0 0.5rem; font-size: 0.8rem; color: var(--texte-2); }
 .liste-emporter { display: flex; gap: 0.5rem; overflow-x: auto; }
 .liste-emporter button {
@@ -643,12 +840,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .colonne-recap { padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; overflow-y: auto; }
 .colonne-saisie {
   background: var(--surface); border-left: 1px solid var(--bordure);
+  box-shadow: -12px 0 28px -22px rgba(27, 31, 28, 0.5);
   padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; overflow-y: auto;
 }
 
 .bloc-total, .bloc-reste {
   background: var(--surface); border: 1px solid var(--bordure);
   border-radius: var(--rayon); padding: 1.1rem;
+  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
   display: flex; flex-direction: column; gap: 0.3rem;
 }
 .bloc-total .libelle, .bloc-reste .libelle { color: var(--texte-2); font-size: 0.82rem; }
@@ -669,7 +868,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   flex: 1 1 6rem; background: var(--surface-2); border: 1px solid var(--bordure);
   border-radius: var(--rayon); padding: 0.7rem; min-height: 52px;
 }
-.modes button.actif { border-color: var(--accent); background: rgba(224, 163, 63, 0.12); }
+.modes button.actif { border-color: var(--accent); background: var(--fond-accent); }
 
 .suggestions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .suggestions button {
@@ -687,6 +886,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .bloc-cloture {
   background: var(--surface); border: 1px solid var(--bordure);
   border-radius: var(--rayon); padding: 1.2rem;
+  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
 }
 .bloc-cloture h1 { margin: 0 0 1rem; font-size: 1.25rem; }
 .bloc-cloture h2 { margin: 0 0 0.5rem; font-size: 1rem; }
@@ -721,12 +921,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .badge-sync {
   display: inline-flex; align-items: center; gap: 0.3rem;
   padding: 0.4rem 0.7rem; border-radius: 999px;
-  background: rgba(126, 198, 148, 0.14); color: var(--accent);
-  border: 1px solid rgba(126, 198, 148, 0.38); font-size: 0.8rem; min-height: 40px;
+  background: var(--fond-accent); color: var(--accent);
+  border: 1px solid rgba(23, 70, 52, 0.3); font-size: 0.8rem; min-height: 40px;
 }
 .badge-sync.alerte {
-  background: rgba(228, 117, 106, 0.15); color: var(--alerte);
-  border-color: rgba(228, 117, 106, 0.45);
+  background: var(--fond-alerte); color: var(--alerte);
+  border-color: rgba(179, 38, 30, 0.45);
 }
 
 /* Signale sans ambiguïté une base en mémoire : ni persistance, ni
@@ -737,9 +937,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   border-radius: 999px;
   font-size: 0.7rem;
   letter-spacing: 0.02em;
-  background: rgba(201, 168, 107, 0.16);
+  background: var(--fond-or);
   color: var(--or);
-  border: 1px solid rgba(201, 168, 107, 0.4);
+  border: 1px solid rgba(138, 106, 31, 0.4);
   cursor: help;
 }
 
@@ -797,8 +997,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* Pleine largeur et haute : on la vise au doigt, en tenant un téléphone de
    l'autre main.
    Les couleurs sont posées EXPLICITEMENT : un `input[type=search]` prend
-   sinon l'apparence du système — fond blanc sur une caisse en thème sombre,
-   ce qui éblouit en salle le soir. */
+   sinon l'apparence du système, et elle ne suit aucune charte — ni la nôtre,
+   ni celle de la tablette d'à côté.
+
+   C'est ce même champ qui, du temps où la caisse était sombre, imposait un
+   rectangle blanc au milieu de l'écran et éblouissait en salle le soir. Le
+   défaut a disparu avec le passage au clair — mais la règle reste, parce que
+   la cause, elle, n'a pas changé : l'apparence par défaut n'est pas une
+   décision, c'est une absence de décision. */
 .recherche-client {
   width: 100%; min-height: 52px; margin-bottom: 0.75rem;
   font-size: 1.05rem; font: inherit; padding: 0.7rem;

@@ -132,8 +132,17 @@ export function EcranDiagnostic({ contexte, reseau }: Props) {
             </>
           ) : (
             <>
+              {/*
+                « en rouge » et non « en orange » : la couleur d'alerte était
+                un corail chaud (#E4756A) qui se lisait comme de l'orange sur
+                fond sombre. Passée au rouge franc pour tenir le contraste sur
+                fond clair, elle a rendu cette phrase FAUSSE — elle envoie
+                chercher une ligne d'une couleur qui n'existe plus à l'écran.
+                Un texte qui nomme une couleur se relit quand la palette
+                change.
+              */}
               <strong>Un point demande votre attention.</strong> Voyez la ligne
-              en orange ci-dessous.
+              en rouge ci-dessous.
             </>
           )}
         </div>

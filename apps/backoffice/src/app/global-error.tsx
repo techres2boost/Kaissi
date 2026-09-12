@@ -65,7 +65,7 @@ export default function ErreurGlobale({
             Réessayer
           </button>
           {error.digest && (
-            <p style={{ color: '#586560', fontSize: '0.85rem', marginTop: '1.5rem' }}>
+            <p style={{ color: '#414D48', fontSize: '0.85rem', marginTop: '1.5rem' }}>
               Code à communiquer au support : <code>{error.digest}</code>
             </p>
           )}

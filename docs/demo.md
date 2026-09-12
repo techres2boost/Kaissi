@@ -1843,7 +1843,7 @@ aussi en CI, sur le fichier réel du dépôt.
 
 ---
 
-### Q bis. Le back-office a la tête de Digital Fidelity
+### Q bis. Le back-office ET la caisse ont la tête de Digital Fidelity
 
 1. Ouvre n'importe quel écran du back-office.
 
@@ -1890,6 +1890,64 @@ courante, la barre est à pleine hauteur et l'icône passe orange.
 **Attendu** : la colonne se replie derrière une barre **vert forêt** portant
 « ☰ Menu » ; le halo menthe repart alors du bord de l'écran, et le tiroir
 ouvert laisse voir la marque au lieu de la cacher sous la barre.
+
+4. Ouvre la **caisse** (`pnpm pos:dev`), à côté.
+
+**Attendu** : le **même** habillage. Bandeau vert forêt en haut, zone de
+travail claire, cartes blanches, terracotta sur l'écran courant. Un
+restaurateur qui passe de ses rapports à sa caisse voit un seul produit.
+
+> **La caisse aussi, et l'argument qui semblait s'y opposer.** Sa feuille de
+> styles disait « contraste élevé — écran de tablette sous les néons d'un
+> snack ». L'argument tient toujours — et c'est justement pourquoi le clair ne
+> le trahit pas : l'anthracite sur blanc donne **16,7:1**, là où l'ivoire sur
+> vert profond en donnait 14,0. On ne perd pas de contraste, on en gagne.
+>
+> ⚠ La réserve, réelle : un écran clair en salle le soir éblouit davantage.
+> C'est la luminosité de la tablette qui règle cela, comme sur Loyverse,
+> Square et Toast, qui sont tous clairs. Si le terrain dit le contraire, tout
+> est dans les jetons en tête de `apps/pos/src/styles.css` : rebasculer coûte
+> ce bloc-là, rien d'autre.
+
+5. Clique une catégorie, puis **Diagnostic**.
+
+**Attendu** : la catégorie courante porte un anneau émeraude et son libellé à
+l'accent ; l'onglet **Diagnostic** porte un trait terracotta sous le mot.
+
+> **Deux indications étaient fausses, et le fond clair les a révélées.**
+>
+> La catégorie active se peignait avec `--surface-2`. Sur fond sombre, ce
+> jeton est plus CLAIR que le fond : l'onglet courant paraissait soulevé, et
+> c'était juste. Sur fond clair, le beige est plus SOMBRE que le blanc des
+> onglets voisins — le même code faisait donc paraître l'onglet courant
+> **enfoncé, presque désactivé**. Le report d'un jeton avait retourné le sens
+> de l'indication.
+>
+> Et les quatre liens du bandeau — Salle, Sync, Diagnostic, Clôturer — se
+> ressemblaient trait pour trait quel que soit l'écran ouvert. Depuis
+> Diagnostic, rien ne disait qu'on y était.
+
+6. Regarde le **coin bas-droit** de n'importe quel écran.
+
+**Attendu** : le halo terracotta, et **aucun texte dessus**.
+
+> **Le dégradé est un fond, pas un support de texte** — mesuré, pas supposé.
+> Au plus dense du halo terracotta, AUCUNE couleur de texte atténué ne tient
+> le 4,5:1 : même assombrie jusqu'à `#333D39`, on plafonne vers 3,7:1. Ce
+> n'est donc pas un réglage de couleur, c'est une règle de structure, et c'est
+> celle de Digital Fidelity : tout ce qui porte du texte est posé sur une
+> surface opaque.
+>
+> Le halo MENTHE, lui, pardonne — et c'est heureux, parce que c'est là que se
+> pose le titre de chaque écran. `--attenue` a été assombri pour y tenir, ce
+> qui a du même coup rattrapé le sous-titre de chaque rapport du back-office,
+> qui y était à **2,9:1** sans que rien ne le signale. La barre d'onglets de
+> la salle, elle, flottait à même le dégradé : elle a désormais son propre
+> fond.
+>
+> Les deux tests de palette figent la règle, halo compris — y compris par une
+> assertion **inversée** qui documente la limite du coin terracotta plutôt que
+> de la laisser se redécouvrir.
 
 ---
 
