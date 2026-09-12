@@ -419,11 +419,28 @@ cd apps/pos/android && ./gradlew bundleRelease
 > Gradle s'en sert alors tout seul, sans rien changer à votre `PATH`, et sans
 > avoir à y repenser à chaque terminal.
 >
-> Deux précautions, dans le script même : il écrit dans le fichier de
+> Une précaution, dans le script même : il écrit dans le fichier de
 > l'**utilisateur** et jamais dans celui du projet — `apps/pos/android/gradle.properties`
 > est versionné, un chemin `C:\Program Files\…` y casserait la construction
-> de tout le monde — et il **refuse d'écraser** un `org.gradle.java.home` déjà
-> présent, qui pourrait servir à un autre projet.
+> de tout le monde.
+>
+> **Et si `org.gradle.java.home` est déjà là ?** Elle est **remplacée si et
+> seulement si** le JDK qu'elle désigne ne construit pas ce projet — trop
+> récent, trop ancien, ou dossier disparu. Si elle désigne un JDK utilisable,
+> le script n'y touche pas et le dit : ce fichier vaut pour **tous** les
+> projets Gradle du poste, et l'écraser casserait peut-être un autre projet,
+> en silence.
+>
+> La règle précédente était « refuser sans condition », et elle bloquait
+> exactement la personne venue chercher de l'aide. Ce fichier est le **rang 1**
+> du tableau ci-dessus : quand une ligne y est posée, c'est elle qui décide —
+> donc quand la construction échoue sur « major version 69 », c'est elle la
+> cause. « Corrigez-la à la main » renvoyait au problème qu'on demandait de
+> régler. La frontière n'est pas « la ligne existe-t-elle » mais « le JDK
+> qu'elle désigne construit-il ce projet ». Même chose pour le refus qui
+> concluait par « laissez ce script désigner un JDK valide :
+> `pnpm verifier:jdk --ecrire` » — il le conseillait à quelqu'un qui venait de
+> le taper. Cette branche honore désormais l'option.
 >
 > Il honore aussi `GRADLE_USER_HOME`, quand cette variable déplace le dossier
 > de Gradle. Ce détail a été trouvé en TESTANT le correctif ci-dessus :

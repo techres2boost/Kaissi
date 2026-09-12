@@ -56,7 +56,14 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs'
 import { homedir, platform } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -332,7 +339,12 @@ export function jdkUtilisables() {
  *   décide, et la ligne écrite porte un commentaire qui dit comment la
  *   retirer.
  */
-export function ecrireOverrideGradle(racineJdk, home = homedir(), env = process.env) {
+export function ecrireOverrideGradle(
+  racineJdk,
+  home = homedir(),
+  env = process.env,
+  lireVersion = versionDuJdk,
+) {
   /*
    * `GRADLE_USER_HOME`, et pas `~/.gradle` en dur.
    *
@@ -344,24 +356,63 @@ export function ecrireOverrideGradle(racineJdk, home = homedir(), env = process.
    */
   const dossier = dossierGradleUtilisateur(env, home)
   const fichier = join(dossier, 'gradle.properties')
+  // Gradle lit ce fichier comme des `.properties` Java : sous Windows, les
+  // antislashs y sont des échappements. On les double.
+  const chemin = racineJdk.replace(/\\/g, '\\\\')
+
   if (existsSync(fichier)) {
     const contenu = readFileSync(fichier, 'utf8')
-    if (/^\s*org\.gradle\.java\.home\s*=/m.test(contenu)) {
-      return {
-        ok: false,
+    const actuel = lireJavaHomeDesProprietes(contenu)
+    if (actuel) {
+      const majeure = lireVersion(actuel)
+      /*
+       * ── Refuser, ou REMPLACER ? ──────────────────────────────────────────
+       *
+       * Refuser sans condition était la règle prudente, et elle bloquait
+       * exactement la personne venue chercher de l'aide : ce fichier est le
+       * RANG 1 de l'ordre de Gradle, donc quand `--ecrire` y trouve déjà une
+       * ligne, c'est elle qui décide — et si la construction échoue sur
+       * « major version 69 », c'est elle la cause. « Corrigez-la à la main »
+       * renvoyait l'opérateur au problème qu'il demandait de régler.
+       *
+       * La frontière n'est donc pas « la ligne existe-t-elle » mais « le JDK
+       * qu'elle désigne construit-il ce projet ». S'il le construit, on n'y
+       * touche pas : c'est peut-être un réglage posé pour un autre projet, et
+       * l'écraser serait un dégât silencieux. S'il ne le construit pas — trop
+       * récent, trop ancien, ou dossier disparu — la remplacer est le service
+       * rendu.
+       */
+      if (majeure !== null && majeure >= MINIMUM && majeure <= MAXIMUM) {
+        return {
+          ok: false,
+          fichier,
+          message:
+            `${fichier} désigne déjà un JDK ${majeure}, qui convient.\n` +
+            '  Rien n’a été modifié : cette ligne n’est pas la cause de l’échec,\n' +
+            '  et l’écraser effacerait un réglage posé pour un autre projet.',
+        }
+      }
+      writeFileSync(
         fichier,
+        contenu.replace(
+          /^[ \t]*org\.gradle\.java\.home[ \t]*[=:].*$/m,
+          `org.gradle.java.home=${chemin}`,
+        ),
+        'utf8',
+      )
+      return {
+        ok: true,
+        fichier,
+        remplace: true,
         message:
-          `${fichier} contient déjà « org.gradle.java.home ».\n` +
-          '  Ouvrez-le et corrigez la ligne à la main — l’écraser effacerait un\n' +
-          '  réglage que vous avez peut-être posé pour un autre projet.',
+          `Ligne remplacée dans ${fichier}.\n` +
+          `    Elle désignait ${majeure === null ? 'un dossier introuvable' : `un JDK ${majeure}`} :\n` +
+          `      ${actuel}`,
       }
     }
   } else {
     mkdirSync(dossier, { recursive: true })
   }
-  // Gradle lit ce fichier comme des `.properties` Java : sous Windows, les
-  // antislashs y sont des échappements. On les double.
-  const chemin = racineJdk.replace(/\\/g, '\\\\')
   appendFileSync(
     fichier,
     `\n# Ajouté par « pnpm verifier:jdk --ecrire » (Kaissi).\n` +
@@ -415,8 +466,45 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '
             : platform() === 'win32'
               ? '  Corrigez ou supprimez la variable JAVA_HOME (Paramètres →\n' +
                 "    Variables d'environnement).\n"
-              : '  Corrigez ou retirez JAVA_HOME de votre shell.\n') +
-          '\n  Ou laissez ce script désigner un JDK valide :  pnpm verifier:jdk --ecrire\n',
+              : '  Corrigez ou retirez JAVA_HOME de votre shell.\n'),
+      )
+      /*
+       * ── `--ecrire` vaut ICI AUSSI ────────────────────────────────────────
+       *
+       * Ce chemin sortait en 1 après avoir conseillé « pnpm verifier:jdk
+       * --ecrire »… à quelqu'un qui venait précisément de le taper. Le même
+       * défaut que la fois d'avant, déplacé d'une branche : une commande
+       * explicitement demandée fait ce qu'on lui demande, ou dit pourquoi
+       * elle ne le fait pas — elle ne renvoie jamais à elle-même.
+       *
+       * Et c'est le cas le plus fréquent en clientèle : la ligne fautive est
+       * dans le fichier de l'utilisateur, donc au RANG 1. Rien d'autre ne
+       * peut la corriger.
+       */
+      if (veutEcrire) {
+        const choisi = jdkUtilisables()[0]
+        if (choisi) {
+          const resultat = ecrireOverrideGradle(choisi.racine)
+          console.error(
+            resultat.ok
+              ? `  ✓ ${resultat.message}\n\n` +
+                  `    Gradle utilisera désormais le JDK ${choisi.majeure} de :\n` +
+                  `      ${choisi.racine}\n\n` +
+                  '    Relancez la construction : elle doit repartir.\n\n' +
+                  '    ⚠ Ce réglage vaut pour TOUS les projets Gradle de ce poste.\n'
+              : `  ✗ ${resultat.message}\n`,
+          )
+          process.exit(resultat.ok ? 0 : 1)
+        }
+        console.error(
+          "  ✗ --ecrire n'a rien écrit : aucun JDK de la plage éprouvée n'a été\n" +
+            '    TROUVÉ sur ce poste. Installez-en un — Android Studio embarque un\n' +
+            '    JDK 21 (le « JBR »), qui suffit — puis relancez la commande.\n',
+        )
+        process.exit(1)
+      }
+      console.error(
+        '  Ou laissez ce script désigner un JDK valide :  pnpm verifier:jdk --ecrire\n',
       )
       process.exit(1)
     }

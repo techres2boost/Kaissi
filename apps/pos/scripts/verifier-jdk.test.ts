@@ -143,7 +143,7 @@ describe("écrire l'override Gradle", () => {
     expect(contenu).toContain('Retirez-la')
   })
 
-  it("REFUSE d'écraser un réglage déjà posé", () => {
+  it("REFUSE d'écraser un réglage qui CONVIENT", () => {
     const home = mkdtempSync(join(tmpdir(), 'kaissi-jdk-'))
     mkdirSync(join(home, '.gradle'), { recursive: true })
     writeFileSync(
@@ -151,13 +151,75 @@ describe("écrire l'override Gradle", () => {
       'org.gradle.java.home=/un/autre/jdk\n',
     )
 
-    const resultat = ecrireOverrideGradle('/usr/lib/jvm/java-21-openjdk', home, {})
-
     // Ce fichier vaut pour TOUS les projets Gradle du poste : l'écraser
     // casserait peut-être un autre projet, en silence.
+    const resultat = ecrireOverrideGradle('/usr/lib/jvm/java-21-openjdk', home, {}, () => 21)
+
     expect(resultat.ok).toBe(false)
     expect(resultat.message).toContain('déjà')
     expect(readFileSync(resultat.fichier, 'utf8')).toContain('/un/autre/jdk')
+  })
+
+  /*
+   * ── Le refus qui bloquait la personne venue chercher de l'aide ──────────
+   *
+   * Ce fichier est le RANG 1 de l'ordre de Gradle : quand `--ecrire` y trouve
+   * déjà une ligne, c'est elle qui décide. Sur le poste de la panne, elle
+   * désignait le JDK 25 — elle ÉTAIT la cause de « major version 69 ». Un
+   * refus sans condition répondait « corrigez-la à la main », c'est-à-dire
+   * exactement le problème que la commande était censée régler.
+   *
+   * La frontière n'est pas « la ligne existe-t-elle » mais « le JDK qu'elle
+   * désigne construit-il ce projet ».
+   */
+  it('REMPLACE un réglage qui désigne un JDK hors plage', () => {
+    const home = mkdtempSync(join(tmpdir(), 'kaissi-jdk-'))
+    mkdirSync(join(home, '.gradle'), { recursive: true })
+    writeFileSync(
+      join(home, '.gradle', 'gradle.properties'),
+      '# un réglage à moi\norg.gradle.jvmargs=-Xmx4g\norg.gradle.java.home=/jdk-25\n',
+    )
+
+    const resultat = ecrireOverrideGradle('/usr/lib/jvm/java-21-openjdk', home, {}, () => 25)
+
+    expect(resultat.ok).toBe(true)
+    const contenu = readFileSync(resultat.fichier, 'utf8')
+    expect(contenu).toContain('org.gradle.java.home=/usr/lib/jvm/java-21-openjdk')
+    expect(contenu).not.toContain('/jdk-25')
+    // Les AUTRES lignes du fichier ne sont pas des victimes collatérales.
+    expect(contenu).toContain('org.gradle.jvmargs=-Xmx4g')
+    // Et le message dit ce qui a disparu — sinon on ne le saurait jamais.
+    expect(resultat.message).toContain('/jdk-25')
+  })
+
+  it('REMPLACE aussi un réglage qui ne désigne plus rien', () => {
+    // Un JDK désinstallé laisse une ligne qui pointe dans le vide. Gradle
+    // échoue alors sur « Value '…' given for org.gradle.java.home is not a
+    // valid Java home », et le remède est le même.
+    const home = mkdtempSync(join(tmpdir(), 'kaissi-jdk-'))
+    mkdirSync(join(home, '.gradle'), { recursive: true })
+    writeFileSync(join(home, '.gradle', 'gradle.properties'), 'org.gradle.java.home=/parti\n')
+
+    const resultat = ecrireOverrideGradle('/usr/lib/jvm/java-21-openjdk', home, {}, () => null)
+
+    expect(resultat.ok).toBe(true)
+    expect(readFileSync(resultat.fichier, 'utf8')).toContain('java-21-openjdk')
+  })
+
+  it('ne prend pas une ligne COMMENTÉE pour un réglage posé', () => {
+    // Une ligne mise en commentaire pour la désactiver ne décide plus rien :
+    // la remplacer laisserait le fichier sans réglage actif.
+    const home = mkdtempSync(join(tmpdir(), 'kaissi-jdk-'))
+    mkdirSync(join(home, '.gradle'), { recursive: true })
+    writeFileSync(join(home, '.gradle', 'gradle.properties'), '# org.gradle.java.home=/jdk-25\n')
+
+    const resultat = ecrireOverrideGradle('/usr/lib/jvm/java-21-openjdk', home, {}, () => 25)
+
+    expect(resultat.ok).toBe(true)
+    const contenu = readFileSync(resultat.fichier, 'utf8')
+    // Le commentaire est intact, et la ligne a été AJOUTÉE.
+    expect(contenu).toContain('# org.gradle.java.home=/jdk-25')
+    expect(contenu).toContain('org.gradle.java.home=/usr/lib/jvm/java-21-openjdk')
   })
 })
 
@@ -464,6 +526,47 @@ describe('le CLI, sur la configuration exacte qui a échoué', () => {
       const apres = spawnSync(process.execPath, [script], { encoding: 'utf8', env })
       expect(apres.status).toBe(0)
       expect(`${apres.stdout}${apres.stderr}`).toContain('org.gradle.java.home')
+    },
+  )
+
+  it.skipIf(process.platform === 'win32')(
+    '--ecrire RÉPARE une ligne fautive, au lieu de conseiller --ecrire',
+    () => {
+      /*
+       * Le conseil qui renvoyait à lui-même. Sur ce chemin, le script sortait
+       * en 1 après avoir écrit « Ou laissez ce script désigner un JDK valide :
+       * pnpm verifier:jdk --ecrire » — à quelqu'un qui venait de le taper.
+       *
+       * Et c'est le cas le plus fréquent en clientèle : la ligne fautive est
+       * dans le fichier de l'utilisateur, donc au RANG 1 de l'ordre de Gradle.
+       * Rien d'autre ne peut la corriger.
+       */
+      const home = mkdtempSync(join(tmpdir(), 'kaissi-jdk-cli-'))
+      const gradleHome = join(home, '.gradle')
+      mkdirSync(gradleHome, { recursive: true })
+      const fichier = join(gradleHome, 'gradle.properties')
+      writeFileSync(fichier, `org.gradle.jvmargs=-Xmx4g\norg.gradle.java.home=${fauxJdk(25)}\n`)
+      const env = { ...process.env, HOME: home, USERPROFILE: home, GRADLE_USER_HOME: gradleHome }
+
+      // Sans l'option : il refuse, et ne touche à RIEN.
+      const sans = spawnSync(process.execPath, [script], { encoding: 'utf8', env })
+      expect(sans.status).toBe(1)
+      expect(readFileSync(fichier, 'utf8')).toContain('kaissi-faux-jdk25-')
+
+      const avec = spawnSync(process.execPath, [script, '--ecrire'], { encoding: 'utf8', env })
+      const sortie = `${avec.stdout}${avec.stderr}`
+      // Ce poste peut n'avoir aucun JDK localisable : le contrat porte alors
+      // sur le refus explicite, jamais sur un silence.
+      if (avec.status !== 0) {
+        expect(sortie).toContain("n'a rien écrit")
+        return
+      }
+      const apres = readFileSync(fichier, 'utf8')
+      expect(apres).not.toContain('kaissi-faux-jdk25-')
+      // Les autres réglages du fichier ne sont pas des victimes collatérales.
+      expect(apres).toContain('org.gradle.jvmargs=-Xmx4g')
+      // Et la vérification repasse au vert, sans rien changer d'autre.
+      expect(spawnSync(process.execPath, [script], { encoding: 'utf8', env }).status).toBe(0)
     },
   )
 
