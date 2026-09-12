@@ -582,9 +582,9 @@ Pour chaque donnée : **chiffrée en transit — oui** (HTTPS partout) et
 **l'utilisateur peut demander la suppression — oui**.
 
 **f. Politique de confidentialité.** Une **URL publique qui répond** ;
-Google la teste, et un lien mort fait refuser la fiche. Une page statique sur
-votre domaine suffit. Elle doit dire : quelles données, pourquoi, combien de
-temps, et comment demander la suppression.
+Google la teste, et un lien mort fait refuser la fiche. **Elle existe déjà** :
+`https://‹votre-domaine-vercel›/confidentialite`, servie par le back-office.
+Le §3.5 ter explique le piège qui la rendait injoignable malgré tout.
 
 **g. Fiche du magasin.** Voir 3.6 pour les textes, et l'outil de visuels.
 
@@ -614,6 +614,183 @@ Les motifs de refus les plus fréquents, tous évitables :
 - **Data safety incohérent** avec ce que l'application demande réellement ;
 - **captures d'écran de téléphone uniquement**, alors que l'application est
   déclarée compatible tablette. Play le vérifie.
+
+---
+
+### 3.5 bis Les quatre champs que Play refuse de laisser vides
+
+Play Console bloque la publication tant que quatre cases ne sont pas
+remplies. Toutes les quatre sont produites par le dépôt — rien à dessiner à
+la main, rien à photographier avec un téléphone.
+
+| Ce que Play demande | D'où ça sort |
+|---|---|
+| **URL de politique de confidentialité** | une page du back-office, déjà en ligne — §3.5 ter |
+| **Icône 512 × 512** | `pnpm visuels` → `ressources-store/icone-512.png` |
+| **Image mise en avant 1024 × 500** | `pnpm visuels` → `ressources-store/banniere-1024x500.png` |
+| **Captures téléphone et tablettes** | `pnpm captures` → `ressources-store/captures/` |
+
+---
+
+### 3.5 ter La politique de confidentialité — une page, et une URL qui répond
+
+Google exige une URL **publique**, et il la teste. La page existe :
+
+```
+https://‹votre-domaine-vercel›/confidentialite
+```
+
+C'est une page du back-office (`apps/backoffice/src/app/confidentialite/`),
+donc déjà déployée avec lui — aucun site à créer, aucun hébergement de plus.
+
+> ### ⚠ Le piège qui fait rejeter une fiche alors que la page existe
+>
+> Le middleware du back-office redirige tout visiteur sans session vers
+> `/connexion`. Servie ainsi, la politique aurait rendu **un écran de
+> connexion** au robot de Google — qui aurait conclu « politique
+> injoignable » et rejeté la fiche. Le plus agaçant est qu'on ne le voit
+> pas : on ouvre l'URL dans son propre navigateur, on est connecté, la page
+> s'affiche, et on cherche ailleurs.
+>
+> `apps/backoffice/src/serveur/routes-publiques.ts` ouvre donc ce chemin
+> **explicitement**, et `routes-publiques.test.ts` vérifie les deux sens :
+> que la politique est bien publique, et que rien d'autre ne l'est devenu —
+> y compris qu'un `startsWith` ne laisse pas passer
+> `/confidentialite-interne`.
+>
+> Pour le vérifier vous-même, comme Google le fera :
+>
+> ```bash
+> curl -s -o /dev/null -w "%{http_code} %{num_redirects}\n" \
+>   -L https://‹votre-domaine›/confidentialite
+> ```
+>
+> Attendu : **`200 0`**. Un `200 1` signifie qu'il y a eu une redirection —
+> donc que la page rendue est l'écran de connexion.
+
+**Deux choses à compléter avant publication**, marquées dans le fichier : la
+raison sociale exacte de l'éditeur et son adresse de contact. Elles ne
+s'inventent pas depuis le code.
+
+> **Le contenu doit correspondre au formulaire « Sécurité des données ».**
+> C'est le troisième motif de refus le plus fréquent : une politique qui parle
+> de données que l'application ne collecte pas, ou l'inverse. Celle-ci décrit
+> exactement les cinq catégories du tableau du §3.5 — e-mail, nom d'employé,
+> identifiant d'appareil, ventes, et le nom de client facultatif — et rien de
+> plus.
+
+---
+
+### 3.5 quater L'icône et l'image mise en avant
+
+```bash
+pnpm visuels
+```
+
+Une commande, quatre fichiers dans `ressources-store/` :
+
+| Fichier | Format | Pour |
+|---|---|---|
+| `icone-512.png` | 512 × 512 | **Play — icône** |
+| `banniere-1024x500.png` | 1024 × 500 | **Play — image mise en avant** |
+| `icone-1024.png` | 1024 × 1024 | App Store — icône |
+| `icone-48-apercu.png` | — | contrôle, voir plus bas |
+
+Les deux premiers sont ceux que Play réclame. Ils pèsent une centaine de kio,
+très loin des limites (1 Mio pour l'icône, 15 Mio pour la bannière).
+
+> **Pourquoi un script plutôt qu'un PNG posé dans le dépôt.** Parce qu'une
+> image binaire ne se relit pas. Le jour où la charte bouge — elle vient de
+> bouger — un PNG reste en arrière sans que rien ne le signale, et on publie
+> une icône d'une palette qui n'existe plus. Ici les couleurs sont les mêmes
+> littéraux que les feuilles de styles, la marque est du SVG, et régénérer
+> prend trois secondes.
+
+**Deux règles que les magasins imposent, et que le script tient :**
+
+- **aucune transparence, aucun coin arrondi.** Les deux magasins masquent
+  l'icône eux-mêmes ; un arrondi dessiné dedans en donne deux, et un fond
+  transparent devient noir sur certains thèmes. Le fond est un aplat opaque
+  jusqu'au bord ;
+- **la marque tient dans les 78 % centraux**, la zone qu'aucun masque ne
+  rogne quelle que soit la forme retenue par le lanceur.
+
+> ### `icone-48-apercu.png` — le fichier qui n'est pas à téléverser
+>
+> Il rend l'icône à 48, 72 et 112 px, côte à côte. 48 px, c'est sa taille dans
+> la liste des applications d'un téléphone : c'est là qu'elle sera vue, pas en
+> 512.
+>
+> Il a servi tout de suite. La première version du dessin exprimait
+> l'épaisseur du trait **deux fois à l'échelle** — juste à 512, dix fois trop
+> fin dès qu'on réduisait. En 512 l'icône était parfaite ; en 48, un K en fil
+> de fer. Sans cet aperçu, elle partait sur le magasin.
+
+Si vous préférez partir d'un logo à vous plutôt que de la marque dessinée,
+`outils/visuels-store.html` fait la conversion : ouvrez-le dans un
+navigateur, déposez une image, récupérez les formats exacts. Rien ne part sur
+Internet — le redimensionnement se fait dans la page.
+
+---
+
+### 3.5 quinquies Les captures d'écran, sans téléphone
+
+> **« Comment je fais, je n'ai pas encore l'application sur un téléphone ? »**
+>
+> On n'en a pas besoin, et ce n'est pas un contournement. Kaissi a **deux
+> cibles de build qui servent le même bundle** : `android` l'empaquette dans
+> l'APK, `web` le sert comme site statique. Une capture prise sur la cible web
+> montre donc, au pixel près, ce que le magasin installera. Ce ne sont pas des
+> maquettes — c'est l'application.
+>
+> C'est d'ailleurs ce que les magasins demandent : une capture doit montrer
+> l'application telle qu'elle est. Une image retouchée, ou un écran fabriqué
+> dans un outil de dessin, est un motif de refus.
+
+```bash
+# Un terminal : servir le build web
+pnpm pos:build:web
+pnpm --filter @kaissi/pos preview:web
+
+# Un autre : prendre les captures
+pnpm captures
+```
+
+Douze fichiers, quatre par format, dans `ressources-store/captures/` :
+
+| Dossier | Taille produite | Case Play |
+|---|---|---|
+| `telephone/` | 1920 × 1080 | **Captures téléphone** (2 à 8) |
+| `tablette-7/` | 2048 × 1152 | **Captures tablette 7 pouces** |
+| `tablette-10/` | 2560 × 1440 | Captures tablette 10 pouces |
+
+Toutes en **16:9**, tous les côtés entre 320 et 3840 px, bien en dessous des
+8 Mio par image. Le parcours capturé est celui d'un service : plan de salle,
+prise de commande, encaissement, ticket client — dans cet ordre, qui est
+celui d'un restaurateur qui hésite.
+
+> ### ⚠ L'étiquette « démo — mémoire », et pourquoi le script refuse de continuer
+>
+> `pnpm pos:dev` travaille sur une base **en mémoire** et affiche, à côté du
+> nom de l'établissement, une étiquette « démo — mémoire ». Sur une fiche
+> Play, c'est exactement la mention qu'il ne faut pas : elle dit au visiteur
+> que ce qu'il regarde n'est pas une caisse.
+>
+> Le script part donc du build `web` servi par `preview`, qui persiste dans
+> IndexedDB — l'étiquette disparaît. Et il **vérifie son absence** avant
+> d'écrire quoi que ce soit : lancé par erreur contre `pos:dev`, il s'arrête
+> et dit quoi lancer à la place.
+
+**Kaissi est une application de PAYSAGE** — une caisse est posée sur un
+comptoir — d'où le 16:9 partout, y compris dans la case « téléphone ». Play
+accepte les deux orientations ; montrer un portrait donnerait une fausse idée
+du produit.
+
+> **Les captures ne sont pas versionnées**, contrairement à l'icône et à la
+> bannière. Ce qui est DESSINÉ est dans le dépôt : ça change rarement et ça
+> pèse peu. Ce qui est CAPTURÉ est un reflet de l'interface : ça change à
+> chaque retouche, ça pèse cinq mégaoctets, et ça se refait en une commande.
+> `.gitignore` le dit.
 
 ---
 

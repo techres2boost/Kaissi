@@ -1951,6 +1951,54 @@ l'accent ; l'onglet **Diagnostic** porte un trait terracotta sous le mot.
 
 ---
 
+### Q ter. La fiche Play : la page publique, l'icône, les captures
+
+1. Sans être connecté — fenêtre privée — ouvre `/confidentialite` du
+   back-office.
+
+**Attendu** : la politique de confidentialité s'affiche. **Pas** l'écran de
+connexion.
+
+> **C'est exactement ce que Google teste, et c'est ce qui fait rejeter une
+> fiche alors que la page existe.** Le middleware redirige tout visiteur sans
+> session vers `/connexion` ; la politique aurait donc rendu un écran de
+> connexion au robot de Google. On ne le voit pas soi-même : on ouvre l'URL
+> dans son navigateur, on est connecté, la page s'affiche. Le chemin est
+> maintenant ouvert **explicitement**, et un test vérifie les deux sens — que
+> la politique est publique, et que rien d'autre ne l'est devenu.
+
+2. `pnpm visuels`
+
+**Attendu** : quatre fichiers dans `ressources-store/` — l'icône 512 pour
+Play, l'icône 1024 pour l'App Store, la bannière 1024 × 500, et un aperçu.
+
+> **Regarde `icone-48-apercu.png` avant de téléverser quoi que ce soit.** Il
+> rend l'icône à 48, 72 et 112 px — 48, c'est sa taille réelle dans la liste
+> des applications d'un téléphone. Il a servi immédiatement : la première
+> version du dessin exprimait l'épaisseur du trait deux fois à l'échelle.
+> Parfaite en 512, un K en fil de fer en 48. Sans cet aperçu, elle partait sur
+> le magasin.
+
+3. Dans un terminal : `pnpm pos:build:web` puis
+   `pnpm --filter @kaissi/pos preview:web`.
+   Dans un autre : `pnpm captures`.
+
+**Attendu** : douze captures — quatre par format — en 1920 × 1080,
+2048 × 1152 et 2560 × 1440. Toutes en 16:9, ce que Play exige.
+
+> **Pas besoin d'un téléphone.** Les deux cibles de build servent le MÊME
+> bundle : `android` l'empaquette dans l'APK, `web` le sert comme site
+> statique. Une capture prise sur la cible web montre au pixel près ce que le
+> magasin installera.
+>
+> **Et le script refuse de travailler sur `pos:dev`.** Cette cible affiche une
+> étiquette « démo — mémoire » à côté du nom de l'établissement — sur une
+> fiche Play, la mention qui dit au visiteur que ce n'est pas une caisse. Le
+> script vérifie son absence avant d'écrire, et s'arrête en disant quoi lancer
+> à la place.
+
+---
+
 ### R. Ouvrir un deuxième client, et changer une caisse d'établissement
 
 #### R.1 — La caisse suit VRAIMENT le nouvel établissement

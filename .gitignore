@@ -48,3 +48,14 @@ coverage/
 .vscode/
 .idea/
 supabase/.temp/
+
+# Visuels de fiche — ce qui est DESSINÉ est versionné, ce qui est CAPTURÉ ne
+# l'est pas.
+#
+# L'icône et la bannière sortent d'un script de dessin : elles changent
+# rarement, pèsent peu, et on veut pouvoir les télécharger sans rien lancer.
+# Les captures d'écran, elles, sont un reflet de l'interface : elles changent
+# à chaque retouche, pèsent cinq mégaoctets, et se refont en une commande —
+# `pnpm captures`. Les versionner remplirait l'historique de binaires que
+# personne ne relit jamais.
+ressources-store/captures/

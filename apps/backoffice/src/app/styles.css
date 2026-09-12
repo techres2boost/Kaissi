@@ -579,6 +579,18 @@ button.danger { color: var(--danger); }
 /* ── Écran de cuisine ──────────────────────────────────────────────────────
    Lu à un mètre cinquante, les mains occupées : tout est plus gros qu'ailleurs
    dans le back-office, et l'attente est l'information la plus visible du bon. */
+
+/*
+ * `.note` n'avait AUCUN style — et elle est utilisée trois fois sur cet écran :
+ * la consigne sous le titre, la ligne « commande vidée en salle », et le
+ * plafond d'affichage. Elle se rendait donc en texte courant, au même poids
+ * que le contenu du bon, dans un écran dont tout l'objet est de hiérarchiser
+ * ce qu'on lit en passant. Troisième classe fantôme trouvée dans cette
+ * feuille, après `.barre` et `.marque`.
+ */
+.note { color: var(--attenue); font-size: 0.88rem; line-height: 1.5; margin: 0 0 0.75rem; }
+li.note { font-style: italic; margin: 0; }
+
 .cuisine-entete { margin-bottom: 1.2rem; }
 .cuisine-entete h1 { display: flex; align-items: center; gap: 0.6rem; margin: 0 0 0.3rem; }
 .cuisine-entete .compteur {
@@ -592,9 +604,13 @@ button.danger { color: var(--danger); }
 .onglets-postes {
   display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.8rem;
 }
+/* Une surface OPAQUE, pas le dégradé : ces pastilles se posent en haut à
+   gauche, en plein dans le halo menthe. La règle est celle du fond ombré —
+   tout ce qui porte du texte a son propre fond. */
 .onglets-postes a {
   padding: 0.35rem 0.9rem; border-radius: 999px; text-decoration: none;
   border: 1px solid var(--bordure); color: var(--texte); font-weight: 600;
+  background: var(--panneau);
 }
 .onglets-postes a.actif {
   background: var(--accent); border-color: var(--accent); color: var(--sur-accent);
@@ -616,7 +632,29 @@ button.danger { color: var(--danger); }
    pas seulement celle d'un chiffre qu'on ne regarde pas. */
 .bon.tard { border-left-color: var(--or); }
 .bon.tres-tard { border-left-color: var(--danger); }
-.bon.prete { opacity: 0.5; border-left-color: var(--succes); }
+/*
+ * ── Un bon PRÊT ──────────────────────────────────────────────────────────
+ *
+ * Il s'effaçait à `opacity: 0.5`. Sur le vert profond, cela le faisait
+ * simplement reculer. Sur une carte blanche posée sur du crème, la même
+ * valeur délave TOUT — le numéro de table, les plats, et le bouton
+ * « Annuler prêt » qui reste pourtant le seul recours si on s'est trompé.
+ *
+ * Un bon prêt n'est pas un bon DÉSACTIVÉ : il est fait. Il recule donc par
+ * son fond, pas par son opacité — et il porte une coche, parce qu'à un mètre
+ * cinquante la nuance de fond entre deux cartes se voit moins qu'un signe.
+ */
+.bon.prete {
+  border-left-color: var(--succes);
+  background: var(--fond-succes);
+  box-shadow: none;
+}
+.bon.prete .place::after {
+  content: ' ✓';
+  color: var(--succes);
+  font-weight: 800;
+}
+.bon.prete .plats { opacity: 0.75; }
 
 .bon > header { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
 .bon .place { font-family: var(--titre); font-size: 1.15rem; font-weight: 700; }

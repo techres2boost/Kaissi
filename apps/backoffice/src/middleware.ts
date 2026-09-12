@@ -12,6 +12,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { clePublique, urlSupabase } from './serveur/supabase.js'
+import { estPublique } from './serveur/routes-publiques.js'
 
 /**
  * La politique de contenu, avec un nonce RENOUVELÉ à chaque réponse.
@@ -116,7 +117,7 @@ export async function middleware(requete: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user && !requete.nextUrl.pathname.startsWith('/connexion')) {
+  if (!user && !estPublique(requete.nextUrl.pathname)) {
     const versConnexion = requete.nextUrl.clone()
     versConnexion.pathname = '/connexion'
     // On garde la destination : après connexion, l'utilisateur revient là où
