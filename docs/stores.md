@@ -2049,6 +2049,53 @@ fabriquer une exprès.
 
 ---
 
+## 4 septies. Le coffre — ce qu'il faut garder, et ce qu'on peut jeter
+
+Après une première publication, on se retrouve avec une dizaine de fichiers
+qui se ressemblent tous. Trois seulement comptent, et **un seul** est
+vraiment irremplaçable.
+
+| Fichier | Garder ? | Si perdu |
+|---|---|---|
+| `kaissi-release.keystore` **+ ses 2 mots de passe + l'alias** | ⚑ **OUI — pour la vie du produit** | plus **jamais** de mise à jour de l'application déjà installée |
+| `ios_distribution_private_key.pem` (la clé RSA) | **oui** | récupérable, mais au prix d'un certificat de distribution brûlé — et le compte en admet deux |
+| `AuthKey_XXXXXXXXXX.p8` **+ son Key ID + l'Issuer ID** | oui, par confort | se révoque et se recrée en deux minutes, sans conséquence |
+| `*.pub` | **non** | c'est la moitié publique : elle ne sert à rien ici |
+| une clé RSA fabriquée qui n'a jamais reçu de certificat | **non** | elle ne correspond à rien ; la garder ne fait qu'entretenir le doute au prochain dépannage |
+| `*.keystore` d'un AUTRE produit | à part | ne jamais les mélanger dans un même dossier : ils ont le même nom de famille et pas la même valeur |
+
+### Pourquoi le keystore Android est le seul vraiment irremplaçable
+
+Google identifie une application par la **clé qui la signe**. Une mise à jour
+signée par une autre clé n'est pas « une version à valider » : c'est, pour
+Play, une autre application. Il n'existe aucun recours, aucun support à
+contacter, aucune vérification d'identité qui rende la main. Les utilisateurs
+installés restent sur la dernière version pour toujours.
+
+> **Une nuance, et elle ne change pas la consigne.** Si *Play App Signing* est
+> activé — c'est le défaut aujourd'hui — Google détient la clé de signature
+> finale, et le keystore n'est plus que la clé de **téléversement**. Celle-là,
+> Google peut la réinitialiser sur demande. Mais cela suppose un dossier, des
+> délais, et un compte en règle : traite-le comme irremplaçable, la différence
+> n'apparaît que le jour où tu n'as plus le choix.
+
+### Les trois règles de rangement
+
+1. **Hors du dépôt.** `.gitignore` refuse `cert_key`, `*.p8`, `*.pem`,
+   `*.keystore` — mais le prochain nom de fichier ne sera peut-être pas dans
+   la liste.
+2. **Avec les mots de passe, au même endroit.** Un keystore dont on a perdu le
+   mot de passe est exactement aussi inutile qu'un keystore perdu.
+3. **À deux endroits au moins**, dont un hors de la machine de travail. Un
+   disque qui meurt ne prévient pas.
+
+> Et **jamais dans une conversation**, un courriel ou un ticket — une clé
+> privée qui a quitté ta machine ne redevient pas privée. Le seul remède est
+> la révocation, qui pour le keystore Android n'existe pas.
+
+---
+
+
 ## 5. Dans quel ordre
 
 1. **Maintenant** — l'APK signé, installé à la main. Zéro attente, correction
