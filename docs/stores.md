@@ -1407,18 +1407,50 @@ que les outils de signature ne lisent pas. Colle le contenu de `cert_key` —
 le fichier SANS `.pub` — dans la variable, puis **conserve-le** ailleurs
 qu'ici.
 
-> **Si tu retrouves celle de Stampi, préfère-la.** Un certificat de
-> distribution est lié à une clé privée, et Apple en limite le nombre par
-> compte (deux pour *Apple Distribution*). Réutiliser la clé de Stampi
-> réutilise son certificat ; en fabriquer une nouvelle en fait créer un
-> **second**.
+> ### ⚠ Si tu retrouves la clé d'un projet existant, PRENDS-LA
 >
-> Ce n'est un problème que si le compte est déjà au plafond : `fetch-signing-files`
-> répond alors *« Maximum number of certificates generated »*. Le remède est
-> dans *Certificates, Identifiers & Profiles → Certificates* : révoquer un
-> certificat inutilisé. Révoquer un certificat de distribution **ne retire
-> aucune application du magasin** et ne casse aucune build déjà envoyée — il
-> ne sert qu'à signer les prochaines.
+> Ce n'est pas une préférence, c'est la seule voie qui ne demande rien à
+> personne — et l'ignorer coûte une build, comme ici :
+>
+> ```
+> Found 3 Signing Certificates matching filters: certificateType=DISTRIBUTION,IOS_DISTRIBUTION.
+> Did not find any Signing Certificates for given private key
+> Creating new Signing Certificate: certificate type: DISTRIBUTION
+> POST …/v1/certificates returned 409: There is a problem with the request
+> entity - You already have a current Distribution certificate or a pending
+> certificate request.
+> ```
+>
+> Les trois lignes se lisent ensemble, et aucune ne suffit seule. Le compte a
+> **déjà trois** certificats de distribution — donc son plafond. **Aucun ne
+> correspond à la clé fournie** : un certificat est la moitié publique d'une
+> paire, et une clé fraîchement fabriquée n'en a aucun. L'outil en demande
+> donc un quatrième, et Apple refuse.
+>
+> Autrement dit : **fabriquer une nouvelle clé, c'est demander un certificat
+> de plus.** Sur un compte neuf cela passe inaperçu ; sur un compte qui porte
+> déjà deux ou trois projets, c'est un mur.
+>
+> **Le remède à préférer** — retrouver le `cert_key` d'un projet déjà signé
+> sur ce compte (Stampi, Digital_Fidelity) et le coller tel quel. Aucun
+> certificat n'est créé, rien n'est révoqué, rien ne casse ailleurs :
+>
+> ```powershell
+> Get-ChildItem -Path $HOME -Recurse -Include cert_key,*_private_key `
+>   -ErrorAction SilentlyContinue | Select-Object FullName, LastWriteTime
+> ```
+>
+> **Le remède de repli** — *developer.apple.com → Certificates, Identifiers &
+> Profiles → Certificates*, révoquer un certificat de distribution
+> **expiré ou inutilisé**, puis relancer la build : la ligne
+> `--create` en fabriquera un qui correspond à ta clé.
+>
+> Révoquer un certificat de distribution **ne retire aucune application du
+> magasin** et ne casse aucune build déjà envoyée : il ne sert qu'à signer les
+> prochaines. Mais il les signe **pour tous les projets du compte** — révoquer
+> celui dont Stampi se sert casse la prochaine build de Stampi, sans rien dire
+> aujourd'hui. Prends-en un expiré ; à défaut, un dont tu reconnais le nom
+> comme abandonné.
 
 #### Les trois pièges de la saisie, vus en vrai
 
@@ -1889,7 +1921,7 @@ mal qu'une absence de vidéo.
 | `Configuration file error: … ensure this value has at least 1 characters` | une variable déclarée à vide dans `codemagic.yaml` | ne pas la déclarer ; la poser dans les variables d'environnement Codemagic (§4 bis) |
 | `Cannot save Signing Certificates without certificate private key` | `CERTIFICATE_PRIVATE_KEY` absente, ou sa valeur ne commence pas par `-----BEGIN` | §4 bis (suite), piège n° 1 |
 | 401 d'Apple sur `fetch-signing-files` | la `.p8` n'est pas une clé d'**API App Store Connect** | §4 bis (suite), piège n° 2 |
-| `Maximum number of certificates generated` | le compte est à son plafond de certificats de distribution | révoquer un certificat inutilisé dans *Certificates, Identifiers & Profiles* |
+| `409: You already have a current Distribution certificate or a pending certificate request` | le compte est à son plafond de certificats, et aucun ne correspond à `CERTIFICATE_PRIVATE_KEY` | reprendre le `cert_key` d'un projet déjà signé sur ce compte ; à défaut révoquer un certificat expiré (§4 bis suite) |
 
 > **Le keystore de Codemagic et celui de ton PC doivent être LE MÊME
 > fichier.** Play identifie une application par la clé qui la signe : un
