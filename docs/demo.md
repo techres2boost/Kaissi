@@ -1832,6 +1832,54 @@ et le script te le dit — **même si ton JDK est déjà le bon**.
 > qu'il n'est jamais posé sans qu'on le demande, et que la ligne écrite dit
 > comment la retirer.
 
+6 bis. Regarde la **deuxième** ligne de la réponse : « Source retenue par
+   Gradle : … ».
+
+**Attendu** : elle nomme *qui* désigne ce JDK — `JAVA_HOME`, votre
+`~/.gradle/gradle.properties`, celui du projet, ou le PATH. Et quand la source
+retenue n'est PAS le PATH, le script le dit en toutes lettres.
+
+> **Le garde-fou qui mentait.** Le script interrogeait `java` — celui du
+> **PATH**. Gradle ne le consulte qu'**en dernier** :
+>
+> | | Où Gradle regarde |
+> |---|---|
+> | 1 | `org.gradle.java.home` de `~/.gradle/gradle.properties` (ou `GRADLE_USER_HOME`) |
+> | 2 | `org.gradle.java.home` du `gradle.properties` du projet |
+> | 3 | `gradle/gradle-daemon-jvm.properties` |
+> | 4 | **`JAVA_HOME`** |
+> | 5 | le `java` du **PATH** — ce qu'on lisait |
+>
+> Sur un poste où `JAVA_HOME` pointait un JDK 25 et le PATH un JDK 21, on
+> lisait donc, dans la même sortie :
+>
+> ```
+> ✓ JDK 21 — dans la plage éprouvée (17–23).
+> …
+> BUG! … Unsupported class file major version 69
+> ```
+>
+> Les deux affirmations étaient exactes — elles ne parlaient pas du même
+> Java. Un contrôle qui ne mesure pas ce que fait l'outil qu'il protège est
+> pire qu'absent : il déplace la recherche du côté du dépôt, et c'est
+> littéralement ce qui a fini par mettre un chemin Windows dans
+> `settings.gradle`. « JDK 25 » dit *quoi* ; « JAVA_HOME » dit *où aller le
+> corriger*.
+
+6 ter. Si `--ecrire` répond que `org.gradle.java.home` existe déjà, regarde
+   ce qu'il en dit.
+
+**Attendu** : la ligne est **remplacée** si le JDK qu'elle désigne ne
+construit pas ce projet, et **laissée telle quelle** — avec un message qui
+l'explique — s'il convient.
+
+> La frontière n'est pas « la ligne existe-t-elle » mais « le JDK qu'elle
+> désigne construit-il ce projet ». Un refus sans condition bloquait
+> exactement la personne venue chercher de l'aide : sur le poste de la panne,
+> la ligne existait déjà et désignait le JDK 25 — elle ÉTAIT la cause. À
+> l'inverse, un réglage utilisable n'est jamais écrasé : ce fichier vaut pour
+> tous les projets Gradle du poste.
+
 7. Pour voir le garde-fou à l'œuvre : ajoute une ligne `"C:\un\chemin"` à
    la fin de `apps/pos/android/settings.gradle`, puis relance
    `pnpm verifier:jdk`.

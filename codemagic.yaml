@@ -146,12 +146,19 @@ workflows:
         XCODE_WORKSPACE: "apps/pos/ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
         APP_ID: "tn.res2boost.kaissi"
-        # À renseigner APRÈS avoir créé la fiche dans App Store Connect
-        # (l'« Apple ID » à dix chiffres de l'application). Laissé vide, le
-        # numéro de build retombe sur le compteur de Codemagic — la première
-        # construction n'échoue donc pas faute d'une fiche qui n'existe pas
-        # encore.
-        APP_STORE_APPLE_ID: ""
+        # ⚠ APP_STORE_APPLE_ID n'est PAS déclaré ici, et c'est voulu.
+        #
+        # Codemagic valide ce fichier avec un schéma qui refuse une valeur
+        # vide : « ensure this value has at least 1 characters ». Toute la
+        # construction est alors bloquée par un champ qu'on ne PEUT pas
+        # remplir — l'« Apple ID » à dix chiffres n'existe qu'une fois la
+        # fiche créée dans App Store Connect, ce qui vient après.
+        #
+        # Les scripts le lisent donc en `${APP_STORE_APPLE_ID:-}` : absent, il
+        # vaut la chaîne vide et le numéro de build retombe sur le compteur de
+        # Codemagic. Quand la fiche existe, on l'ajoute SANS toucher à ce
+        # fichier : Codemagic → l'application → Environment variables →
+        # groupe `ios_signing`.
       node: 20.11.0
       xcode: latest
       cocoapods: default
@@ -226,7 +233,10 @@ workflows:
           cd apps/pos/ios/App
           agvtool new-marketing-version "$VERSION"
 
-          if [ -n "$APP_STORE_APPLE_ID" ]; then
+          # `:-` : la variable peut être absente de l’environnement, pas
+          # seulement vide. Sans lui, `set -e` ferait échouer le build sur
+          # une variable non définie.
+          if [ -n "${APP_STORE_APPLE_ID:-}" ]; then
             DERNIER=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" \
               --issuer-id "$ASC_ISSUER_ID" \
               --key-id "$ASC_KEY_ID" \
@@ -236,8 +246,8 @@ workflows:
             # Première construction : la fiche n'existe pas encore, donc
             # aucun build à interroger. Le compteur de Codemagic fait
             # l'affaire — il est monotone, ce qui est tout ce qu'Apple exige.
-            echo "APP_STORE_APPLE_ID vide — numéro de build = $BUILD_NUMBER."
-            echo "Renseigne-le dans ce fichier dès que la fiche existe."
+            echo "APP_STORE_APPLE_ID absent — numéro de build = $BUILD_NUMBER."
+            echo "Ajoute-le dans les variables d'environnement Codemagic dès que la fiche existe."
             agvtool new-version -all "$BUILD_NUMBER"
           fi
 
