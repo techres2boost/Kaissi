@@ -104,7 +104,7 @@ Deux listes. Chaque ligne renvoie au détail plus bas quand il y en a un.
 | # | Où | Quoi | Une seule fois ? |
 |---|---|---|---|
 | 1 | ton PC | `keytool …` → le keystore, **et sa sauvegarde** (§3.1) | oui, **pour la vie du produit** |
-| 2 | Codemagic | *Teams → Code signing identities → Android keystores* → téléverser sous le nom **`kaissi_keystore`** | oui |
+| 2 | Codemagic | *Settings (ou Teams) → Code signing identities → Android keystores* → téléverser sous le **Reference name** `kaissi_keystore` | oui |
 | 3 | play.google.com/console | créer le compte développeur, **25 $** | oui |
 | 4 | Play Console | *Créer une application* → nom, langue par défaut **français**, gratuite | oui |
 | 5 | Play Console | *Configuration → Intégrité de l'application* → activer **Play App Signing** | oui |
@@ -246,7 +246,7 @@ keyPassword=TON_MOT_DE_PASSE
 > perdu le mot de passe est exactement aussi inutile qu'un keystore perdu.
 
 **Si tu construis par Codemagic, ce fichier ne te sert pas.** Codemagic
-reçoit le keystore et ses mots de passe dans *Teams → Code signing identities*
+reçoit le keystore et ses mots de passe dans *Code signing identities*
 (§2 bis, étape 2) et fabrique lui-même l'équivalent. `keystore.properties` ne
 sert qu'à signer **depuis ton PC**.
 
@@ -1264,8 +1264,13 @@ un effet de bord d'un commit.
 
 **Ce qu'il faut poser dans Codemagic, une fois :**
 
-1. *Teams → Code signing identities → Android keystores* : téléverser le
-   keystore sous le nom **`kaissi_keystore`**.
+1. *Code signing identities → Android keystores* : téléverser le keystore
+   sous le **Reference name** `kaissi_keystore`. Sur un compte d'équipe, c'est
+   sous *Teams* ; sur un **compte personnel**, c'est sous **Settings**, dans
+   la colonne de gauche. Sans lui, le workflow Android échoue d'entrée sur
+   *« No keystores with reference 'kaissi_keystore' were found from code
+   signing identities »* — le nom doit correspondre **au caractère près** à
+   `android_signing` dans `codemagic.yaml`.
 2. Groupe de variables **`ios_signing`**, avec les mêmes noms que Stampi
    (`ASC_ISSUER_ID`, `ASC_KEY_ID`, `ASC_PRIVATE_KEY`,
    `CERTIFICATE_PRIVATE_KEY`). ⚠ Mêmes **noms**, pas même **groupe** : un
@@ -1414,6 +1419,63 @@ qu'ici.
 > certificat inutilisé. Révoquer un certificat de distribution **ne retire
 > aucune application du magasin** et ne casse aucune build déjà envoyée — il
 > ne sert qu'à signer les prochaines.
+
+#### Les trois pièges de la saisie, vus en vrai
+
+> ### ⚠ 1. `cat cert_key` n'est pas de la clé
+>
+> La commande affiche la clé sous elle-même, et la sélection à la souris part
+> une ligne trop haut. La valeur collée commence alors par :
+>
+> ```
+> cat cert_key
+> -----BEGIN RSA PRIVATE KEY-----
+> ```
+>
+> Codemagic accepte : il ne lit pas le contenu, il le chiffre. L'échec arrive
+> plus tard, à la signature, avec un message qui ne parle ni de `cat` ni de
+> copier-coller. **La valeur doit commencer exactement par `-----BEGIN`** et
+> finir par `-----END RSA PRIVATE KEY-----`.
+>
+> Le contournement, qui ne laisse rien à la souris — dans Git Bash :
+>
+> ```bash
+> clip < cert_key      # Windows : met le fichier entier dans le presse-papier
+> ```
+
+> ### ⚠ 2. Toutes les clés `.p8` ne sont pas des clés d'API App Store Connect
+>
+> Apple délivre des `.p8` à **deux endroits différents**, et ils ne servent
+> pas à la même chose :
+>
+> | Créée dans | Sert à | Reconnaissable à |
+> |---|---|---|
+> | *Users and Access → Integrations → App Store Connect API* | envoyer des builds, récupérer les profils de signature | l'Issuer ID est affiché **au-dessus de la liste** |
+> | *Certificates, Identifiers & Profiles → Keys* | Sign in with Apple, APNs, MusicKit | pas d'Issuer ID ; on y choisit un **Services ID** et un **Team ID** |
+>
+> Une clé « Sign in with Apple » mise dans `ASC_PRIVATE_KEY` donne un **401**
+> d'Apple qui ne dit pas laquelle des trois valeurs est en cause. Le contrôle
+> qui tranche en dix secondes : **le `ASC_KEY_ID` doit apparaître dans la
+> liste de *Users and Access → Integrations***. S'il n'y est pas, c'est
+> l'autre sorte de clé.
+
+> ### ⚠ 3. La clé fabriquée reste à la racine du dépôt
+>
+> `ssh-keygen -f cert_key` écrit `cert_key` et `cert_key.pub` **là où la
+> commande est lancée** — c'est-à-dire à côté de `package.json`. Rien ne les
+> distingue d'un fichier de travail, et un `git add -A` les pousse sur GitHub.
+>
+> Une clé privée poussée sur un dépôt est publique **pour toujours** : la
+> retirer d'un commit ne la retire ni des copies déjà clonées, ni des caches
+> de GitHub. Le seul remède est de la **révoquer**. Le `.gitignore` du dépôt
+> les refuse désormais (`cert_key`, `*.p8`, `*.pem`, `AuthKey_*`) — mais
+> range-les quand même ailleurs, parce que le prochain nom de fichier ne sera
+> peut-être pas dans la liste.
+>
+> ```bash
+> git check-ignore -v cert_key cert_key.pub    # doit répondre, sinon danger
+> ```
+
 
 #### Le tableau, en une ligne chacune
 
@@ -1816,6 +1878,29 @@ mal qu'une absence de vidéo.
 > Ni la fiche, ni la capture d'un ticket ne doivent affirmer un taux de TVA
 > ou une règle de timbre — ce sont des paramètres réglementaires, et ils se
 > valident avec un expert-comptable.
+
+---
+
+## 4 quinquies. Ce qui fait échouer un build Codemagic avant la première étape
+
+| Message | Cause | Remède |
+|---|---|---|
+| `No keystores with reference 'kaissi_keystore' were found from code signing identities` | aucun keystore n'a été téléversé sous ce **Reference name** | *Settings → Code signing identities → Android keystores* → ajouter le `.keystore`, ses deux mots de passe, l'alias, et le Reference name `kaissi_keystore` |
+| `Configuration file error: … ensure this value has at least 1 characters` | une variable déclarée à vide dans `codemagic.yaml` | ne pas la déclarer ; la poser dans les variables d'environnement Codemagic (§4 bis) |
+| `Cannot save Signing Certificates without certificate private key` | `CERTIFICATE_PRIVATE_KEY` absente, ou sa valeur ne commence pas par `-----BEGIN` | §4 bis (suite), piège n° 1 |
+| 401 d'Apple sur `fetch-signing-files` | la `.p8` n'est pas une clé d'**API App Store Connect** | §4 bis (suite), piège n° 2 |
+| `Maximum number of certificates generated` | le compte est à son plafond de certificats de distribution | révoquer un certificat inutilisé dans *Certificates, Identifiers & Profiles* |
+
+> **Le keystore de Codemagic et celui de ton PC doivent être LE MÊME
+> fichier.** Play identifie une application par la clé qui la signe : un
+> second keystore produit un AAB que Play refuse avec *« Your Android App
+> Bundle is signed with the wrong key »*, et il n'y a pas de correction — il
+> faut resigner avec le bon. C'est le même fichier `.keystore` que celui du
+> §3.1, avec les mêmes mots de passe.
+>
+> Codemagic ne permet pas de **retélécharger** un keystore téléversé. Ce n'est
+> donc pas une sauvegarde : la tienne reste la tienne, et sa perte reste
+> définitive.
 
 ---
 

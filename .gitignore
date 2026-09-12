@@ -41,6 +41,22 @@ local.properties
 .env.*
 !.env.example
 
+# Clés de signature. Elles se fabriquent À LA RACINE du dépôt — c'est là que
+# la commande est lancée — et rien ne les distingue d'un fichier de travail :
+# `ssh-keygen -f cert_key` dépose `cert_key` à côté de `package.json`, un
+# `git add -A` plus loin elles sont sur GitHub.
+#
+# Une clé privée poussée sur un dépôt est publique pour toujours : la retirer
+# d'un commit ne la retire pas des copies déjà clonées, ni du cache de GitHub.
+# Le seul remède est de la RÉVOQUER. D'où ces lignes, écrites avant l'accident.
+cert_key
+cert_key.pub
+*.p8
+*.pem
+id_rsa
+id_rsa.pub
+AuthKey_*
+
 # Outils
 .DS_Store
 coverage/
