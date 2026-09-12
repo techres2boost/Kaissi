@@ -636,6 +636,7 @@ C'est ce fichier qu'on téléverse.
 | Message | Cause | Réponse |
 |---|---|---|
 | `Version code N has already been used` | Le numéro est consommé au téléversement ; « Discard draft » ne le rend pas | `pnpm pos:version --monter` puis `pnpm pos:aab` (§3.2) |
+| Pas de lien d'inscription, alors que la version est « available to selected testers » | La VERSION est déployée, l'APPLICATION n'est pas encore publiée | Vider « Modifications en cours d'examen », compléter « Configurer votre application » (§3.5) |
 | `Unsupported class file major version 69` | JDK 25, que Gradle ne lit pas | `pnpm verifier:jdk --ecrire` (§3.3 bis) |
 | Le même message **alors que `verifier:jdk` répond ✓** | `JAVA_HOME` désigne un autre Java que le `PATH`. Le script le détecte et nomme la source depuis le correctif ; s'il répond encore ✓, votre dépôt est en retard — `git pull`. | `pnpm verifier:jdk --ecrire` |
 | `… requires Android Gradle plugin 8.x or higher` | le couple AGP/Gradle a divergé | `pnpm verifier:gradle` le dit avant Gradle |
@@ -842,6 +843,49 @@ Le §3.5 ter explique le piège qui la rendait injoignable malgré tout.
 4. ajoutez les testeurs par adresse Gmail, partagez le lien d'inscription ;
 5. **installez vous-même depuis ce lien, sur une vraie tablette**, avant
    d'aller plus loin.
+
+#### ⚠ « The link will be shown here when you publish your app »
+
+La version est en ligne — *Available to selected testers*, une date de
+publication, « Available on 20 284 devices » — et l'onglet **Testeurs** affiche
+pourtant encore cette phrase, sans lien d'inscription. Rien n'est cassé : les
+deux écrans ne parlent pas de la même chose.
+
+| Ce que dit l'écran | Ce que ça veut dire |
+|---|---|
+| *Available to selected testers* | la **version** est déployée sur la piste |
+| *…when you publish your app* | l'**application** n'est pas encore publiée |
+
+Le lien d'inscription — `https://play.google.com/apps/testing/‹package›`,
+soit `https://play.google.com/apps/testing/tn.res2boost.kaissi` — n'est
+fabriqué qu'une fois l'application publiée. Pour une application neuve, ce
+n'est pas la mise en ligne de l'AAB qui déclenche cela.
+
+**À vérifier, dans cet ordre :**
+
+1. **Aperçu des publications → « Modifications en cours d'examen ».** Tant
+   qu'il reste une ligne — *Start full rollout*, *Countries / regions*,
+   *Resume track* —, la configuration de la piste n'est pas appliquée. Les
+   contrôles automatiques annoncent « up to 13 minutes » ; l'examen lui-même
+   prend de quelques heures à quelques jours au **premier** envoi.
+2. **Tableau de bord → « Configurer votre application ».** La liste doit être
+   **entièrement** cochée : contenu de l'application, Data safety, classement
+   de contenu, public cible, politique de confidentialité. Une seule case
+   manquante suffit à laisser l'application non publiée.
+3. **Pays / régions de la piste.** Un testeur situé hors des pays ciblés ne
+   voit rien, même avec le lien.
+
+**Pour tester tout de suite, sans attendre.** La piste **Test interne** est
+disponible en quelques minutes, sans examen, jusqu'à 100 testeurs — et son
+lien d'inscription apparaît immédiatement. C'est la bonne piste pour mettre
+l'application entre les mains de l'équipe le jour même.
+
+> ⚠ Elle ne compte **pas** pour l'exigence d'accès à la production des
+> comptes ouverts depuis fin 2023 — 12 testeurs pendant 14 jours en test
+> **fermé**. Le test interne débloque l'essai, pas le compteur : gardez la
+> piste fermée en parallèle, c'est elle qui fait courir les 14 jours.
+
+---
 
 #### Étape 5 — Production
 
