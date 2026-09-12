@@ -7,7 +7,26 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.7.2'
+        /*
+         * ── AGP 8.11.1, et le couple qu'il impose ────────────────────────
+         *
+         * Le plugin Android refuse de compiler contre une API qu'il ne
+         * connaît pas : la 8.7.2 s'arrête sur `compileSdk 36` avec un message
+         * qui nomme la version minimale attendue. Viser l'API 36 force donc
+         * la montée.
+         *
+         * Un couple AGP/Gradle ne se choisit pas librement — chaque AGP
+         * exige un Gradle minimal, et c'est la source d'erreur la plus
+         * courante de cette manœuvre :
+         *
+         *     AGP 8.7  → Gradle 8.9      AGP 8.11 → Gradle 8.13
+         *     AGP 8.9  → Gradle 8.11.1   AGP 8.12 → Gradle 8.13
+         *
+         * Le wrapper est donc passé à 8.13 dans le même mouvement
+         * (`gradle/wrapper/gradle-wrapper.properties`). Les deux se tiennent :
+         * `scripts/verifier-gradle.mjs` refuse de les laisser diverger.
+         */
+        classpath 'com.android.tools.build:gradle:8.11.1'
         classpath 'com.google.gms:google-services:4.4.2'
 
         // NOTE: Do not place your application dependencies here; they belong

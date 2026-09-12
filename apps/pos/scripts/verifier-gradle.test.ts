@@ -11,6 +11,10 @@ import {
   lignePlausible,
   lignesSuspectes,
   FICHIERS,
+  auMoins,
+  gradleMinimal,
+  verifierCouple,
+  versionsDuProjet,
   // @ts-expect-error — script Node en JS pur, sans déclarations de types.
 } from './verifier-gradle.mjs'
 
@@ -91,5 +95,83 @@ describe('reconnaître un copier-coller égaré dans un script Gradle', () => {
 
   it('tolère les fins de ligne Windows', () => {
     expect(lignesSuspectes("include ':app'\r\napply from: 'x.gradle'\r\n")).toHaveLength(0)
+  })
+})
+
+/*
+ * ── Le couple AGP / Gradle / API ─────────────────────────────────────────
+ *
+ * Google Play a refusé un bundle qui visait l'API 35 : « must target at
+ * least API level 36 ». Le message se lit à l'envers la première fois — Play
+ * ne demande pas de descendre à 35, il exige de monter à 36.
+ *
+ * Monter enchaîne trois versions qui ne se choisissent pas séparément :
+ * viser 36 oblige à compiler contre 36, compiler contre 36 oblige à un
+ * plugin Android qui la connaît, et ce plugin exige un Gradle minimal. Rater
+ * un maillon donne une erreur qui ne nomme JAMAIS celui qu'il faut bouger.
+ */
+describe('les trois versions de construction se tiennent', () => {
+  it('compare des versions sans se laisser piéger par les segments', () => {
+    // Le piège classique : « 8.9 » > « 8.11 » en comparaison de chaînes.
+    expect(auMoins('8.11.1', '8.9')).toBe(true)
+    expect(auMoins('8.9', '8.11.1')).toBe(false)
+    expect(auMoins('8.13', '8.13')).toBe(true)
+    expect(auMoins('8.13', '8.11.1')).toBe(true)
+  })
+
+  it('connaît le Gradle minimal de chaque plugin Android', () => {
+    expect(gradleMinimal('8.7.2')).toBe('8.9')
+    expect(gradleMinimal('8.9.2')).toBe('8.11.1')
+    expect(gradleMinimal('8.11.1')).toBe('8.13')
+    expect(gradleMinimal('8.12.0')).toBe('8.13')
+  })
+
+  it('attrape un Gradle resté en arrière', () => {
+    // C'est l'erreur qu'on commet en montant l'AGP sans toucher au wrapper.
+    const bilan = verifierCouple({
+      agp: '8.11.1',
+      gradle: '8.11.1',
+      compileSdk: 36,
+      targetSdk: 36,
+    })
+    expect(bilan.ok).toBe(false)
+    expect(bilan.soucis[0]).toContain('Gradle 8.13')
+    // Le message doit dire OÙ corriger, pas seulement quoi.
+    expect(bilan.soucis[0]).toContain('gradle-wrapper.properties')
+  })
+
+  it('attrape un compileSdk laissé derrière le targetSdk', () => {
+    const bilan = verifierCouple({ agp: '8.11.1', gradle: '8.13', compileSdk: 35, targetSdk: 36 })
+    expect(bilan.ok).toBe(false)
+    expect(bilan.soucis[0]).toContain('INFÉRIEUR')
+  })
+
+  it('laisse passer le couple du projet', () => {
+    expect(verifierCouple(versionsDuProjet()).ok).toBe(true)
+  })
+
+  it('le projet vise bien au moins l’API 36 — ce que Play exige', () => {
+    /*
+     * Cette assertion-ci a une date de péremption, et c'est voulu : Play
+     * relève son plancher chaque année. Le jour où il passe à 37, ce test
+     * reste vert — il ne dit que « pas moins de 36 ». C'est le refus de Play
+     * qui rappellera de monter, comme il vient de le faire.
+     */
+    const { compileSdk, targetSdk } = versionsDuProjet()
+    expect(targetSdk).toBeGreaterThanOrEqual(36)
+    expect(compileSdk).toBeGreaterThanOrEqual(targetSdk)
+  })
+
+  it('les symboles natifs partent avec le bundle', () => {
+    /*
+     * Second avertissement de Play : « This App Bundle contains native code,
+     * and you've not uploaded debug symbols ». Sans eux, un plantage dans la
+     * bibliothèque SQLite remonte en adresses hexadécimales.
+     */
+    const source = readFileSync(
+      new URL('../android/app/build.gradle', import.meta.url),
+      'utf8',
+    )
+    expect(source).toContain("debugSymbolLevel 'SYMBOL_TABLE'")
   })
 })

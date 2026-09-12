@@ -1,7 +1,37 @@
+/*
+ * ── API 36, et pourquoi ce n'est pas négociable ──────────────────────────
+ *
+ * Google Play REFUSE l'envoi d'un bundle qui vise moins que le niveau d'API
+ * exigé du moment :
+ *
+ *     Your app currently targets API level 35 and must target at least
+ *     API level 36 to ensure it is built on the latest APIs optimized for
+ *     security and performance.
+ *
+ * Le message se lit à l'envers la première fois : Play ne demande pas de
+ * DESCENDRE à 35, il constate qu'on y est et exige de MONTER à 36.
+ *
+ * ── Ce que viser 36 change au comportement d'Android ─────────────────────
+ *
+ * Deux changements d'Android 16 s'appliquent dès qu'on vise 36, et ce sont
+ * ceux qui cassent le plus d'applications :
+ *
+ *   • l'affichage BORD À BORD est imposé — le contenu passe sous la barre
+ *     d'état et sous la barre de navigation, sans possibilité de s'y
+ *     soustraire. Vérifié avant de monter : `index.html` porte déjà
+ *     `viewport-fit=cover` et `styles.css` applique
+ *     `env(safe-area-inset-*)` sur le `body`. Rien à faire ;
+ *   • le VERROU D'ORIENTATION est ignoré sur les grands écrans. Vérifié
+ *     aussi : le manifeste n'en pose aucun, et la caisse est de toute façon
+ *     responsive (bascule à 820 px). Rien à faire non plus.
+ *
+ * ⚑ `compileSdkVersion` doit suivre `targetSdkVersion` : on ne peut pas
+ *   VISER une API contre laquelle on ne compile pas.
+ */
 ext {
     minSdkVersion = 23
-    compileSdkVersion = 35
-    targetSdkVersion = 35
+    compileSdkVersion = 36
+    targetSdkVersion = 36
     androidxActivityVersion = '1.9.2'
     androidxAppCompatVersion = '1.7.0'
     androidxCoordinatorLayoutVersion = '1.2.0'

@@ -259,6 +259,10 @@ Play refuse un envoi dont le `versionCode` n'est pas **strictement supérieur**
 au précédent, et un numéro consommé l'est définitivement. Donc : on incrémente
 la version npm, on ne touche à rien d'autre.
 
+> **Où en est-on.** Le premier envoi portait le code **100** (`0.1.0`). La
+> version est passée à **`0.1.1` → 101** pour l'envoi qui corrige le niveau
+> d'API (§3.3 ter). Le prochain sera `0.1.2` → 102.
+
 ### 3.3 Construire le bundle — une commande
 
 ```bash
@@ -334,7 +338,7 @@ cd apps/pos/android && ./gradlew bundleRelease
 > ```
 >
 > Le mot « BUG! » vient de Groovy et désigne le poste, pas le projet. Le
-> nombre se traduit en retirant 44 : **69 − 44 = JDK 25**. Gradle 8.11.1 ne
+> nombre se traduit en retirant 44 : **69 − 44 = JDK 25**. Gradle 8.13 ne
 > sait pas lire ce bytecode et s'arrête avant d'avoir rien construit. C'est
 > `pnpm verifier:jdk` qui le dit maintenant, en une phrase et avant Gradle.
 >
@@ -433,6 +437,137 @@ Puis pour désigner un JDK à Gradle **sans toucher au dépôt** —
 > `app/build.gradle` pour la signature. Il refuse ce qui **ne peut pas** être
 > voulu : une ligne qui, hors commentaire, commence par un guillemet ou par un
 > chemin Windows. Ce n'est pas du Groovy, et ça n'a jamais compilé.
+
+### 3.3 ter « must target at least API level 36 » — et régénérer l'AAB
+
+Play a refusé un bundle avec ceci :
+
+```
+Your app currently targets API level 35 and must target at least
+API level 36 to ensure it is built on the latest APIs optimized for
+security and performance.
+```
+
+> ### ⚠ Le message se lit à l'envers la première fois
+>
+> Play ne demande PAS de descendre à 35. Il CONSTATE qu'on y est, et exige de
+> monter à **36**. La phrase nomme les deux nombres dans cet ordre, et c'est
+> le premier qu'on retient.
+
+#### Ce qui a été changé, et pourquoi les trois vont ensemble
+
+Monter d'un niveau d'API enchaîne trois versions qui ne se choisissent pas
+séparément. C'est la partie qui coûte du temps, parce que chaque erreur donne
+un message qui ne nomme **que la version qu'il a sous les yeux** — jamais
+celle qu'il faut bouger.
+
+| Fichier | Avant | Après | Pourquoi |
+|---|---|---|---|
+| `android/variables.gradle` | `compileSdk`/`targetSdk` **35** | **36** | ce que Play exige |
+| `android/build.gradle` | AGP **8.7.2** | **8.11.1** | la 8.7 ne connaît pas l'API 36 et refuse de compiler contre elle |
+| `android/gradle/wrapper/…properties` | Gradle **8.11.1** | **8.13** | l'AGP 8.11 l'exige |
+| `apps/pos/package.json` | `0.1.0` | **`0.1.1`** | le `versionCode` doit augmenter — voir plus bas |
+
+`pnpm verifier:gradle` lit désormais les trois et refuse de les laisser
+diverger :
+
+```
+✓ AGP 8.11.1 · Gradle 8.13 · compileSdk 36 · targetSdk 36
+```
+
+#### ⚠ Le versionCode, l'erreur qui coûte un aller-retour
+
+Play **refuse un bundle dont le `versionCode` n'est pas strictement supérieur
+au précédent**, et un numéro consommé l'est définitivement. Le premier envoi
+portait le code **100**.
+
+Le numéro est dérivé de `apps/pos/package.json` — `0.1.0` → `100`. Il est
+passé à **`0.1.1` → 101**. À chaque envoi suivant, incrémentez cette version,
+jamais le fichier Gradle.
+
+#### Les deux avertissements, et lequel mérite qu'on s'en occupe
+
+**« There is no deobfuscation file »** — exact, et sans conséquence. Il n'y a
+rien à déobfusquer : `minifyEnabled false`. Activer R8 réduirait la taille et
+**casserait silencieusement les plugins Capacitor**, qui se résolvent par
+réflexion — leurs classes n'ont aucune référence statique, R8 les supprime, et
+la caisse s'ouvre sur un écran blanc. Cela se règle par des règles `-keep`, une
+par plugin, et cela se vérifie sur un appareil. Tant que ce n'est pas fait, un
+avertissement vaut mieux qu'une caisse morte en service.
+
+**« This App Bundle contains native code, and you've not uploaded debug
+symbols »** — celui-là est réglé. Le bundle embarque la bibliothèque SQLite ;
+sans table de symboles, un plantage dedans remonte en adresses hexadécimales.
+`debugSymbolLevel 'SYMBOL_TABLE'` a été ajouté au bloc `release` : les
+symboles partent **dans l'AAB**, il n'y a aucun fichier à téléverser à part.
+
+#### Régénérer l'AAB — la marche à suivre
+
+```powershell
+# 1. Récupérer les corrections
+git pull
+
+# 2. Réinstaller — le numéro de version a changé
+pnpm install
+
+# 3. Tout enchaîner : contrôles, mode avion, cap sync, bundleRelease
+pnpm pos:aab
+```
+
+`pnpm pos:aab` fait les cinq étapes dans l'ordre et s'arrête au premier
+problème. À la fin :
+
+```
+apps/pos/android/app/build/outputs/bundle/release/app-release.aab
+```
+
+C'est ce fichier qu'on téléverse.
+
+> **La toute première construction sera longue.** Gradle télécharge sa
+> distribution 8.13 (≈ 130 Mio) et le SDK Android 36 s'il manque. Comptez
+> cinq à dix minutes, et une seule fois.
+
+#### Si Gradle proteste — les trois messages possibles, et leur réponse
+
+| Message | Cause | Réponse |
+|---|---|---|
+| `Unsupported class file major version 69` | JDK 25, que Gradle ne lit pas | `pnpm verifier:jdk --ecrire` (§3.3 bis) |
+| `… requires Android Gradle plugin 8.x or higher` | le couple AGP/Gradle a divergé | `pnpm verifier:gradle` le dit avant Gradle |
+| `Failed to find target with hash string 'android-36'` | le SDK 36 n'est pas installé | Android Studio → *SDK Manager* → cocher **Android 16 (API 36)** → *Apply* |
+
+Le troisième est le plus probable sur un poste qui n'a jamais construit pour
+l'API 36 : le SDK se télécharge depuis Android Studio, pas depuis le projet.
+
+> ### ⚠ Ce qui n'a PAS pu être vérifié ici, et qu'il faut faire une fois
+>
+> Cette montée de version a été faite sans construire — ce dépôt n'a pas de
+> SDK Android. Ce qui A été vérifié : que les trois versions se tiennent
+> d'après la table de compatibilité d'Android Studio, que `compileSdk` suit
+> `targetSdk`, que les symboles natifs sont demandés, et que les deux
+> changements de comportement d'Android 16 les plus cassants ne nous
+> concernent pas (voir juste en dessous).
+>
+> Ce qui reste à faire une fois, chez vous : **lancer `pnpm pos:aab` et
+> installer l'APK sur une vraie tablette** avant de publier. Une montée
+> d'API ne se valide pas sur le papier.
+
+#### Ce que viser l'API 36 change au comportement — et pourquoi ça passe ici
+
+Deux changements d'Android 16 s'appliquent dès qu'on vise 36. Ce sont ceux
+qui cassent le plus d'applications, et ils ont été vérifiés avant de monter :
+
+- **l'affichage bord à bord est imposé** — le contenu passe sous la barre
+  d'état et sous la barre de navigation, sans possibilité de s'y soustraire.
+  `apps/pos/index.html` porte déjà `viewport-fit=cover`, et `styles.css`
+  applique `env(safe-area-inset-*)` sur le `body`. **Rien à faire** ;
+- **le verrou d'orientation est ignoré sur les grands écrans.** Le manifeste
+  n'en pose aucun, et la caisse est responsive (bascule à 820 px). **Rien à
+  faire non plus.**
+
+C'est le genre de vérification qui paraît inutile jusqu'au jour où l'on
+découvre le bandeau de la caisse coupé par l'heure du téléphone.
+
+---
 
 ### 3.4 Où est l'AAB, et comment l'installer chez un client
 

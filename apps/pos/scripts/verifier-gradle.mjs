@@ -70,6 +70,103 @@ export function lignePlausible(ligne) {
   return true
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+ * LE COUPLE AGP / GRADLE / API — trois versions qui ne se choisissent pas
+ * séparément
+ *
+ * PANNE ANTICIPÉE, celle qui suit toujours une montée de niveau d'API. Play
+ * exige de viser l'API 36 ; viser 36 oblige à compiler contre 36 ; compiler
+ * contre 36 oblige à un plugin Android qui la connaît ; et ce plugin exige à
+ * son tour un Gradle minimal. Toucher une seule des trois lignes casse la
+ * construction, avec un message qui ne parle que de la version qu'il a sous
+ * les yeux — jamais de celle qu'il aurait fallu bouger.
+ *
+ * Ce contrôle les lit toutes les trois et dit laquelle est en retard. Il ne
+ * remplace PAS une vraie construction : il attrape l'incohérence évidente,
+ * en une seconde, avant les quatre minutes de Gradle.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Le Gradle minimal exigé par chaque plugin Android, par ordre croissant.
+ *
+ * Source : la table de compatibilité d'Android Studio. Elle est recopiée ici
+ * parce qu'aucun fichier du projet ne la porte — et c'est précisément ce qui
+ * rend l'erreur si facile à commettre.
+ */
+export const COUPLES = [
+  { agp: '8.7', gradle: '8.9' },
+  { agp: '8.9', gradle: '8.11.1' },
+  { agp: '8.11', gradle: '8.13' },
+  { agp: '8.12', gradle: '8.13' },
+]
+
+/** « 8.11.1 » → [8, 11, 1], pour comparer des versions sans se tromper. */
+export function segments(version) {
+  return String(version)
+    .split('.')
+    .map((n) => Number.parseInt(n, 10) || 0)
+}
+
+/** a ≥ b ? */
+export function auMoins(a, b) {
+  const [x, y] = [segments(a), segments(b)]
+  for (let i = 0; i < Math.max(x.length, y.length); i += 1) {
+    const d = (x[i] ?? 0) - (y[i] ?? 0)
+    if (d !== 0) return d > 0
+  }
+  return true
+}
+
+/** Le Gradle minimal pour un AGP donné — la dernière règle qui s'applique. */
+export function gradleMinimal(agp) {
+  let minimal = null
+  for (const couple of COUPLES) if (auMoins(agp, couple.agp)) minimal = couple.gradle
+  return minimal
+}
+
+/**
+ * Les trois versions se tiennent-elles ?
+ *
+ * Pure, pour être testable sur des valeurs fabriquées : c'est la seule façon
+ * de vérifier qu'elle attrape une incohérence sans casser le vrai projet.
+ */
+export function verifierCouple({ agp, gradle, compileSdk, targetSdk }) {
+  const soucis = []
+
+  if (compileSdk < targetSdk) {
+    soucis.push(
+      `compileSdk ${compileSdk} est INFÉRIEUR à targetSdk ${targetSdk} : on ne ` +
+        `peut pas viser une API contre laquelle on ne compile pas.`,
+    )
+  }
+
+  const minimal = gradleMinimal(agp)
+  if (minimal && !auMoins(gradle, minimal)) {
+    soucis.push(
+      `AGP ${agp} exige Gradle ${minimal} ou plus, or le wrapper est en ${gradle}.\n` +
+        `      → corrigez « distributionUrl » dans ` +
+        `android/gradle/wrapper/gradle-wrapper.properties`,
+    )
+  }
+
+  return { ok: soucis.length === 0, soucis }
+}
+
+/** Lit les trois versions dans les fichiers du projet. */
+export function versionsDuProjet(racine = ANDROID) {
+  const lire = (relatif) => readFileSync(join(racine, relatif), 'utf8')
+  const agp = /com\.android\.tools\.build:gradle:([\d.]+)/.exec(lire('build.gradle'))?.[1]
+  const gradle = /gradle-([\d.]+)-(?:all|bin)\.zip/.exec(
+    lire('gradle/wrapper/gradle-wrapper.properties'),
+  )?.[1]
+  const variables = lire('variables.gradle')
+  const nombre = (nom) => {
+    const t = new RegExp(`${nom}\\s*=\\s*(\\d+)`).exec(variables)
+    return t ? Number.parseInt(t[1], 10) : null
+  }
+  return { agp, gradle, compileSdk: nombre('compileSdkVersion'), targetSdk: nombre('targetSdkVersion') }
+}
+
 /** Les lignes suspectes d'un fichier, avec leur numéro — comme Gradle les compte. */
 export function lignesSuspectes(contenu) {
   return contenu
@@ -119,6 +216,26 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '
   }
 
   if (refus > 0) process.exit(1)
+
+  /*
+   * Le couple de versions, une fois la syntaxe assurée : inutile de vérifier
+   * la cohérence de fichiers qu'on vient de déclarer illisibles.
+   */
+  const versions = versionsDuProjet()
+  const couple = verifierCouple(versions)
+  if (!couple.ok) {
+    console.error('\n✗ Les versions de construction ne se tiennent pas :\n')
+    for (const souci of couple.soucis) console.error(`    • ${souci}`)
+    console.error(
+      '\n  Gradle échouerait plus tard, avec un message qui ne nomme que la\n' +
+        '  version qu\'il a sous les yeux — jamais celle qu\'il faut bouger.\n',
+    )
+    process.exit(1)
+  }
+  console.log(
+    `  ✓ AGP ${versions.agp} · Gradle ${versions.gradle} · ` +
+      `compileSdk ${versions.compileSdk} · targetSdk ${versions.targetSdk}`,
+  )
 
   const modifies = modifiesSelonGit()
   if (modifies && modifies.length > 0) {

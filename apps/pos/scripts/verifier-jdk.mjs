@@ -38,8 +38,12 @@ import { join } from 'node:path'
 
 /**
  * La plage éprouvée. 17 est le minimum d'AGP 8.7 ; 23 est le dernier JDK que
- * Gradle 8.11.1 connaît. Au-delà, il ne sait pas lire le bytecode et échoue
+ * Gradle 8.13 connaît. Au-delà, il ne sait pas lire le bytecode et échoue
  * avant d'avoir rien fait.
+ *
+ * (Le wrapper est passé de 8.11.1 à 8.13 en montant à l'API 36 : le plugin
+ * Android 8.11 l'exige. Le PLAFOND, lui, n'a pas bougé — 8.13 ne lit pas le
+ * JDK 24 non plus.)
  */
 const MINIMUM = 17
 const MAXIMUM = 23
@@ -75,7 +79,7 @@ export function diagnostiquer(majeure) {
       ok: false,
       trop: 'recent',
       message:
-        `JDK ${majeure} détecté — Gradle 8.11.1 ne sait pas le lire.\n\n` +
+        `JDK ${majeure} détecté — Gradle 8.13 ne sait pas le lire.\n\n` +
         `  C'est LUI qui produit « Unsupported class file major version ` +
         `${versionDeClasse(majeure)} », un message qui ne nomme ni Java ni sa version` +
         ' — et dont le mot « BUG! » accuse le projet alors que la cause est ici.\n\n' +
@@ -203,7 +207,7 @@ export function ecrireOverrideGradle(racineJdk, home = homedir()) {
   appendFileSync(
     fichier,
     `\n# Ajouté par « pnpm verifier:jdk --ecrire » (Kaissi).\n` +
-      `# Gradle 8.11 ne lit pas le bytecode des JDK récents ; cette ligne lui\n` +
+      `# Gradle ne lit pas le bytecode des JDK trop récents ; cette ligne lui\n` +
       `# désigne un JDK de la plage éprouvée. Retirez-la pour revenir au JDK\n` +
       `# du PATH. Vaut pour TOUS les projets Gradle de ce poste.\n` +
       `org.gradle.java.home=${chemin}\n`,

@@ -1999,6 +1999,49 @@ Play, l'icône 1024 pour l'App Store, la bannière 1024 × 500, et un aperçu.
 
 ---
 
+### Q quater. Play refuse le bundle : « must target at least API level 36 »
+
+1. `pnpm verifier:gradle`
+
+**Attendu** : `✓ AGP 8.11.1 · Gradle 8.13 · compileSdk 36 · targetSdk 36`.
+
+> **Le message de Play se lit à l'envers la première fois.** Il ne demande pas
+> de DESCENDRE à 35 — il constate qu'on y est et exige de monter à **36**. La
+> phrase nomme les deux nombres dans cet ordre, et c'est le premier qu'on
+> retient.
+>
+> Monter enchaîne trois versions qui ne se choisissent pas séparément : viser
+> 36 oblige à compiler contre 36, compiler contre 36 oblige à un plugin
+> Android qui la connaît, et ce plugin exige un Gradle minimal. Rater un
+> maillon donne une erreur qui ne nomme **jamais** celui qu'il faut bouger.
+> `verifier:gradle` lit les trois et dit lequel est en retard, en une seconde
+> plutôt qu'en quatre minutes de Gradle.
+
+2. Vérifie que le contrôle mord : remets `gradle-8.11.1-all.zip` dans
+   `android/gradle/wrapper/gradle-wrapper.properties`, relance.
+
+**Attendu** : il refuse, nomme Gradle 8.13, et dit **dans quel fichier**
+corriger.
+
+3. `pnpm pos:aab`, puis téléverse le bundle.
+
+**Attendu** : Play l'accepte. Le `versionCode` est passé de **100** à **101**
+— la version npm est passée de `0.1.0` à `0.1.1`.
+
+> **Le `versionCode` est l'erreur qui coûte un aller-retour.** Play refuse un
+> bundle dont le numéro n'est pas strictement supérieur au précédent, et un
+> numéro consommé l'est définitivement. Il se dérive de `apps/pos/package.json`
+> : on incrémente là, jamais dans le fichier Gradle.
+
+> **L'avertissement sur la déobfuscation reste, et c'est voulu.** Il n'y a
+> rien à déobfusquer — `minifyEnabled false`. Activer R8 casserait
+> silencieusement les plugins Capacitor, qui se résolvent par réflexion : R8
+> supprime des classes sans référence statique, et la caisse s'ouvre sur un
+> écran blanc. Le second avertissement, lui, est réglé : les symboles natifs
+> de SQLite partent maintenant dans le bundle.
+
+---
+
 ### R. Ouvrir un deuxième client, et changer une caisse d'établissement
 
 #### R.1 — La caisse suit VRAIMENT le nouvel établissement

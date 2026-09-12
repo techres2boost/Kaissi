@@ -401,7 +401,7 @@ pnpm --filter @kaissi/pos test:parcours
 # pnpm db:test le prépare : base jetable + migrations de production telles quelles.
 pnpm db:test && pnpm --filter @kaissi/sync test && pnpm db:test:stop
 
-# Le JDK du poste est-il dans la plage éprouvée ? (17–23, Gradle 8.11 ne lit
+# Le JDK du poste est-il dans la plage éprouvée ? (17–23, Gradle 8.13 ne lit
 # pas au-delà — « Unsupported class file major version 69 » = JDK 25)
 # `--ecrire` trouve un JDK utilisable et le désigne à Gradle, sans toucher au PATH.
 pnpm verifier:jdk [--ecrire]

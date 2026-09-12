@@ -1,6 +1,6 @@
 {
   "name": "@kaissi/pos",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Terminal de caisse Kaissi — Vite + React empaqueté dans Capacitor. Fonctionne en mode avion.",
   "type": "module",

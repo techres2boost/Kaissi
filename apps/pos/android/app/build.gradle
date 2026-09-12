@@ -79,8 +79,37 @@ android {
             if (signatureDisponible) {
                 signingConfig signingConfigs.release
             }
+            /*
+             * `minifyEnabled false`, et c'est DÉLIBÉRÉ.
+             *
+             * Play avertit qu'aucun fichier de déobfuscation n'accompagne le
+             * bundle. L'avertissement est exact et sans conséquence : il n'y
+             * a rien à déobfusquer, puisque rien n'est obfusqué. Activer R8
+             * réduirait la taille — et casserait silencieusement les plugins
+             * Capacitor, qui se résolvent par RÉFLEXION : leurs classes n'ont
+             * aucune référence statique, R8 les supprime, et la caisse
+             * s'ouvre sur un écran blanc. Cela se règle avec des règles
+             * `-keep`, une par plugin, et cela se VÉRIFIE sur un appareil.
+             * Tant que ce n'est pas fait, un avertissement vaut mieux qu'une
+             * caisse morte en service.
+             */
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+
+            /*
+             * Les SYMBOLES NATIFS, eux, s'ajoutent sans risque — et ils
+             * répondent au second avertissement de Play.
+             *
+             * Le bundle embarque du code natif : la bibliothèque SQLite de
+             * `@capacitor-community/sqlite`. Sans table de symboles, un
+             * plantage dedans remonte en adresses hexadécimales — illisible,
+             * donc introuvable. `SYMBOL_TABLE` suffit à nommer les fonctions
+             * et ne pèse que quelques centaines de kio ; `FULL` embarquerait
+             * aussi les numéros de ligne, pour plusieurs mégaoctets.
+             */
+            ndk {
+                debugSymbolLevel 'SYMBOL_TABLE'
+            }
         }
     }
 }
