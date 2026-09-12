@@ -43,7 +43,8 @@
     "mise-en-service": "pnpm --filter @kaissi/pos test:mise-en-service",
     "verifier:gradle": "pnpm --filter @kaissi/pos verifier:gradle",
     "pos:aab": "pnpm --filter @kaissi/pos aab",
-    "pos:apk": "pnpm --filter @kaissi/pos apk"
+    "pos:apk": "pnpm --filter @kaissi/pos apk",
+    "pos:version": "pnpm --filter @kaissi/pos version:publiee"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

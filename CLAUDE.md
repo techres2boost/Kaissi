@@ -424,6 +424,11 @@ pnpm verifier:gradle
 # ci-dessus, la garde du mode avion, cap sync, puis bundleRelease.
 pnpm pos:aab        # ou pnpm pos:apk pour un APK signé, installable
 
+# Le versionCode vient de apps/pos/package.json (« 1.4.2 » → 10402), et Play
+# le CONSOMME au téléversement : « Discard draft release » ne le libère pas.
+# Un numéro refusé ne se récupère jamais — on monte.
+pnpm pos:version [--monter]
+
 # Le plugin Java d'impression compile — un JDK suffit, aucun SDK Android
 pnpm verifier:natif
 

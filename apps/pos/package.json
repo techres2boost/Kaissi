@@ -1,6 +1,6 @@
 {
   "name": "@kaissi/pos",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Terminal de caisse Kaissi — Vite + React empaqueté dans Capacitor. Fonctionne en mode avion.",
   "type": "module",
@@ -30,7 +30,8 @@
     "test": "vitest run",
     "verifier:gradle": "node scripts/verifier-gradle.mjs",
     "aab": "node scripts/aab.mjs",
-    "apk": "node scripts/aab.mjs --apk"
+    "apk": "node scripts/aab.mjs --apk",
+    "version:publiee": "node scripts/version.mjs"
   },
   "dependencies": {
     "@capacitor-community/sqlite": "^7.0.0",

@@ -259,6 +259,41 @@ Play refuse un envoi dont le `versionCode` n'est pas **strictement supérieur**
 au précédent, et un numéro consommé l'est définitivement. Donc : on incrémente
 la version npm, on ne touche à rien d'autre.
 
+```bash
+pnpm pos:version            # où en suis-je ?
+pnpm pos:version --monter   # 0.1.1 → 0.1.2, soit versionCode 101 → 102
+```
+
+> ### ⚠ « Version code 101 has already been used »
+>
+> **Le numéro est brûlé au TÉLÉVERSEMENT, pas à la publication.** C'est le
+> point contre-intuitif, et il coûte un aller-retour à tout le monde la
+> première fois :
+>
+> **« Discard draft release » annule la version, pas la consommation du
+> numéro.** On croit repartir de zéro, on reprend le même AAB, et Play le
+> refuse. Il n'existe aucun moyen de récupérer un `versionCode` déjà envoyé,
+> ni depuis la console, ni par le support.
+>
+> La seule réponse est de monter :
+>
+> ```bash
+> pnpm pos:version --monter
+> pnpm pos:aab
+> ```
+>
+> Ce n'est pas grave : les numéros ne coûtent rien et personne ne les voit.
+> Ce que voit l'utilisateur, c'est le `versionName` (`0.1.2`) — sauter des
+> `versionCode` au fil des essais est parfaitement normal.
+>
+> `pnpm pos:aab` affiche désormais le numéro **avant** de construire, pour
+> qu'on puisse le comparer à la console Play sans attendre cinq minutes :
+>
+> ```
+>   Version 0.1.2 · versionCode 102
+>   (déjà téléversé sur Play ? → pnpm pos:version --monter)
+> ```
+
 > **Où en est-on.** Le premier envoi portait le code **100** (`0.1.0`). La
 > version est passée à **`0.1.1` → 101** pour l'envoi qui corrige le niveau
 > d'API (§3.3 ter). Le prochain sera `0.1.2` → 102.
@@ -574,6 +609,7 @@ C'est ce fichier qu'on téléverse.
 
 | Message | Cause | Réponse |
 |---|---|---|
+| `Version code N has already been used` | Le numéro est consommé au téléversement ; « Discard draft » ne le rend pas | `pnpm pos:version --monter` puis `pnpm pos:aab` (§3.2) |
 | `Unsupported class file major version 69` | JDK 25, que Gradle ne lit pas | `pnpm verifier:jdk --ecrire` (§3.3 bis) |
 | Le même message **alors que `verifier:jdk` répond ✓** | `JAVA_HOME` désigne un autre Java que le `PATH`. Le script le détecte et nomme la source depuis le correctif ; s'il répond encore ✓, votre dépôt est en retard — `git pull`. | `pnpm verifier:jdk --ecrire` |
 | `… requires Android Gradle plugin 8.x or higher` | le couple AGP/Gradle a divergé | `pnpm verifier:gradle` le dit avant Gradle |

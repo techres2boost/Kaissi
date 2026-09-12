@@ -34,6 +34,7 @@ import { existsSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { platform } from 'node:os'
+import { codeDeVersion, lireVersion } from './version.mjs'
 
 const POS = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ANDROID = join(POS, 'android')
@@ -56,6 +57,24 @@ function etape(titre, commande, arguments_, options = {}) {
 }
 
 const cible = process.argv.includes('--apk') ? 'apk' : 'aab'
+
+/*
+ * Le numéro de version, DIT AVANT de construire.
+ *
+ * PANNE OBSERVÉE au premier envoi : « Version code 101 has already been used ».
+ * Le numéro avait été consommé par un téléversement précédent — et « Discard
+ * draft release », qui semble tout annuler, ne le libère pas. On construit,
+ * on téléverse, et on l'apprend après coup.
+ *
+ * L'afficher ici ne l'empêche pas, rien ne le peut depuis ce poste : Play
+ * seul sait ce qu'il a déjà reçu. Mais on peut le comparer d'un coup d'œil à
+ * la console Play avant de lancer cinq minutes de construction.
+ */
+const version = lireVersion()
+console.log(
+  `\n  Version ${version} · versionCode ${codeDeVersion(version)}\n` +
+    '  (déjà téléversé sur Play ? → pnpm pos:version --monter)',
+)
 
 etape('Le JDK est-il dans la plage éprouvée ?', 'node', ['scripts/verifier-jdk.mjs'])
 etape('Les scripts Gradle sont-ils intacts ?', 'node', ['scripts/verifier-gradle.mjs'])
@@ -95,9 +114,11 @@ console.log(
   `\n✓ Terminé.\n\n    ${produit}\n\n` +
     (cible === 'aab'
       ? "  C'est ce fichier qu'on envoie au Play Store (Production → Créer une\n" +
-        '  version). Le numéro de version vient de apps/pos/package.json : Play\n' +
-        "  refuse un envoi dont le versionCode n'est pas strictement supérieur au\n" +
-        '  précédent, et un numéro consommé l’est définitivement.\n'
+        `  version). Il porte le versionCode ${codeDeVersion(version)}.\n\n` +
+        '  Play refuse un envoi dont le versionCode n’est pas strictement supérieur\n' +
+        '  au précédent, et un numéro est consommé dès le TÉLÉVERSEMENT — «\u00a0Discard\n' +
+        '  draft release\u00a0» ne le rend pas. Si Play le refuse :\n\n' +
+        '      pnpm pos:version --monter && pnpm pos:aab\n'
       : '  APK signé, installable directement — c’est le chemin le plus rapide\n' +
         '  pour un premier client. Le Play Store, lui, veut l’AAB.\n'),
 )
