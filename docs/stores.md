@@ -1272,11 +1272,45 @@ un effet de bord d'un commit.
 3. Groupe **`google_play`** avec `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS`, si
    l'on veut la publication automatique. Sans lui, l'AAB reste disponible en
    artefact.
-4. Après avoir créé la fiche dans App Store Connect, reporter son *Apple ID*
-   à dix chiffres dans `APP_STORE_APPLE_ID` (`codemagic.yaml`). Tant qu'il
-   est vide, le numéro de build retombe sur le compteur de Codemagic — la
-   première construction n'échoue donc pas faute d'une fiche qui n'existe
-   pas encore.
+4. Après avoir créé la fiche dans App Store Connect, ajouter son *Apple ID*
+   à dix chiffres sous le nom **`APP_STORE_APPLE_ID`**, dans les variables
+   d'environnement Codemagic (groupe `ios_signing`). Tant qu'il est absent,
+   le numéro de build retombe sur le compteur de Codemagic — monotone, ce
+   qui est tout ce qu'Apple exige — et la première construction n'échoue
+   donc pas faute d'une fiche qui n'existe pas encore.
+
+> ### ⚠ Pourquoi `APP_STORE_APPLE_ID` n'est PAS dans `codemagic.yaml`
+>
+> Il y était, déclaré à vide, et Codemagic refusait le fichier entier :
+>
+> ```
+> Configuration file error: 4 validation errors in codemagic.yaml:
+> pos-ios -> environment -> vars -> APP_STORE_APPLE_ID
+>   ensure this value has at least 1 characters
+> ```
+>
+> Le schéma interdit une valeur vide. Or ce champ ne **peut pas** être rempli
+> avant la première construction : l'Apple ID à dix chiffres n'existe qu'une
+> fois la fiche créée, et la fiche se crée avec une build. Déclarer la
+> variable dans le dépôt imposait donc un ordre impossible.
+>
+> Elle n'est plus déclarée du tout. Les scripts la lisent en
+> `${APP_STORE_APPLE_ID:-}` : absente, elle vaut la chaîne vide. Le jour où
+> elle existe, on l'ajoute côté Codemagic — **sans toucher au dépôt**, donc
+> sans repasser par une revue de code pour un numéro.
+
+> ### `VERSIONING_SYSTEM = "apple-generic"`, sans quoi `agvtool` ne fait rien
+>
+> `Info.plist` porte `$(CURRENT_PROJECT_VERSION)` et `$(MARKETING_VERSION)` —
+> les vraies valeurs vivent dans le `.xcodeproj`. C'est là qu'`agvtool` va les
+> écrire, **à condition** que le projet déclare le versionnement
+> « apple-generic ». Le gabarit de Capacitor ne le pose pas : sans lui,
+> l'étape « Poser les numéros de version » s'exécute sans erreur et ne change
+> **rien**, et Apple rejette la build suivante pour numéro déjà utilisé.
+>
+> Le réglage est ajouté aux quatre configurations du projet
+> (`apps/pos/ios/App/App.xcodeproj`). Il est versionné : `cap sync ios` ne
+> réécrit pas le `.xcodeproj`, seulement les ressources et les pods.
 
 ---
 
