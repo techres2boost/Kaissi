@@ -1632,9 +1632,38 @@ App Store Connect → **Mes applications** → **+** → *Nouvelle app* :
 | Accès utilisateur | Accès complet | |
 
 Puis, dans *Informations sur l'app*, relevez l'**Apple ID à dix chiffres** de
-la fiche et reportez-le dans `APP_STORE_APPLE_ID`, dans `codemagic.yaml`
-(§4 bis). Tant qu'il est vide, le numéro de build retombe sur le compteur de
-Codemagic.
+la fiche et ajoutez-le en variable d'environnement Codemagic sous le nom
+`APP_STORE_APPLE_ID` (§4 bis). Tant qu'il est absent, le numéro de build
+retombe sur le compteur de Codemagic.
+
+> ### ⚠ Cette étape vient AVANT le premier envoi, pas après
+>
+> C'est l'ordre qui trompe, parce que la chaîne de construction, elle, n'en a
+> pas besoin : un IPA se construit et se **signe** sans qu'aucune fiche
+> n'existe. Tout passe au vert jusqu'à la dernière ligne, puis :
+>
+> ```
+> ERROR: [altool.A6702C600] Cannot determine the Apple ID from Bundle ID
+> 'tn.res2boost.kaissi' and platform 'IOS'. (19)
+> Failed to upload archive at ".../App.ipa"
+> ```
+>
+> Le message ne dit pas ce qui manque, et il nomme le seul élément qui, lui,
+> **existe**. Car il y a DEUX objets distincts, dans deux portails différents :
+>
+> | | Où | Créé par | Ce que c'est |
+> |---|---|---|---|
+> | **Bundle ID** | *Certificates, Identifiers & Profiles* | `fetch-signing-files --create`, tout seul | l'identifiant technique qui autorise la signature |
+> | **La fiche** | *App Store Connect → Mes applications* | **vous, à la main** | le produit : son nom, son prix, ses captures, et son **Apple ID à dix chiffres** |
+>
+> `altool` envoie vers une FICHE. Il part du Bundle ID pour la retrouver, et
+> « cannot determine the Apple ID » veut dire : ce Bundle ID n'est rattaché à
+> aucune fiche. La signature était bonne, le paquet est bon — il n'y a
+> simplement pas de destination.
+>
+> L'IPA n'est pas perdu pour autant : il reste dans les artefacts de la
+> construction. Mais relancer après création de la fiche est plus simple que
+> de l'envoyer à la main, et ne coûte que quelques minutes.
 
 ### Étape 4 — Tarif, disponibilité, et le contrat qui bloque tout
 
@@ -1960,6 +1989,7 @@ mal qu'une absence de vidéo.
 | `Configuration file error: … ensure this value has at least 1 characters` | une variable déclarée à vide dans `codemagic.yaml` | ne pas la déclarer ; la poser dans les variables d'environnement Codemagic (§4 bis) |
 | `Cannot save Signing Certificates without certificate private key` | `CERTIFICATE_PRIVATE_KEY` absente, ou sa valeur ne commence pas par `-----BEGIN` | §4 bis (suite), piège n° 1 |
 | 401 d'Apple sur `fetch-signing-files` | la `.p8` n'est pas une clé d'**API App Store Connect** | §4 bis (suite), piège n° 2 |
+| `altool … Cannot determine the Apple ID from Bundle ID … (19)` | la **fiche** n'existe pas encore dans App Store Connect — le Bundle ID ne suffit pas | créer la fiche (§4 ter, étape 3), puis relancer |
 | `409: You already have a current Distribution certificate or a pending certificate request` | le compte est à son plafond de certificats, et aucun ne correspond à `CERTIFICATE_PRIVATE_KEY` | reprendre le `cert_key` d'un projet déjà signé sur ce compte ; à défaut révoquer un certificat expiré (§4 bis suite) |
 
 > **Le keystore de Codemagic et celui de ton PC doivent être LE MÊME

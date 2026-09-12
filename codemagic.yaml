@@ -243,23 +243,42 @@ workflows:
           cd apps/pos/ios/App
           agvtool new-marketing-version "$VERSION"
 
-          # `:-` : la variable peut être absente de l’environnement, pas
-          # seulement vide. Sans lui, `set -e` ferait échouer le build sur
-          # une variable non définie.
+          # ── Le numéro de build : demandé à Apple, jamais supposé ──────────
+          #
+          # `:-` : la variable peut être ABSENTE de l'environnement, pas
+          # seulement vide. Sans lui, `set -e` ferait échouer le build sur une
+          # variable non définie — et le message ne nommerait pas la variable.
+          DERNIER=""
           if [ -n "${APP_STORE_APPLE_ID:-}" ]; then
+            # `|| true` et `2>/dev/null` : une fiche qui n'a encore AUCUN build
+            # est le cas normal le jour où on renseigne APP_STORE_APPLE_ID. La
+            # commande échoue alors, et un échec ici ferait perdre un IPA déjà
+            # signé pour une question à laquelle on sait répondre autrement.
             DERNIER=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" \
               --issuer-id "$ASC_ISSUER_ID" \
               --key-id "$ASC_KEY_ID" \
-              --private-key "@env:ASC_PRIVATE_KEY")
-            agvtool new-version -all $(($DERNIER + 1))
-          else
-            # Première construction : la fiche n'existe pas encore, donc
-            # aucun build à interroger. Le compteur de Codemagic fait
-            # l'affaire — il est monotone, ce qui est tout ce qu'Apple exige.
-            echo "APP_STORE_APPLE_ID absent — numéro de build = $BUILD_NUMBER."
-            echo "Ajoute-le dans les variables d'environnement Codemagic dès que la fiche existe."
-            agvtool new-version -all "$BUILD_NUMBER"
+              --private-key "@env:ASC_PRIVATE_KEY" 2>/dev/null || true)
           fi
+
+          case "$DERNIER" in
+            ''|*[!0-9]*)
+              # Aucun build chez Apple, ou fiche pas encore créée. Le compteur
+              # de Codemagic fait l'affaire : il est monotone, ce qui est tout
+              # ce qu'Apple exige.
+              NUMERO="$BUILD_NUMBER"
+              echo "Aucun build TestFlight à interroger — numéro = $NUMERO (compteur Codemagic)."
+              ;;
+            *)
+              NUMERO=$((DERNIER + 1))
+              # Le compteur de Codemagic peut avoir dépassé TestFlight : des
+              # builds qui n'ont pas été envoyés l'ont fait monter. On garde le
+              # plus grand des deux — plus grand que TestFlight suffit à Apple,
+              # et redescendre ferait refuser l'envoi.
+              [ "$NUMERO" -lt "$BUILD_NUMBER" ] && NUMERO="$BUILD_NUMBER"
+              echo "Dernier build TestFlight : $DERNIER — numéro = $NUMERO."
+              ;;
+          esac
+          agvtool new-version -all "$NUMERO"
 
       - name: Construire l'IPA
         script: |
