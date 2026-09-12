@@ -129,7 +129,7 @@ pour les suivantes.
 |---|---|---|---|
 | 1 | developer.apple.com | compte Apple Developer, **99 $/an** | oui, **renouvelable** |
 | 2 | App Store Connect | *Utilisateurs et accès → Intégrations → Clés App Store Connect* : créer une clé **App Manager**, télécharger le `.p8` (**une seule fois**), noter *Issuer ID* et *Key ID* | oui |
-| 3 | Codemagic | groupe de variables **`ios_signing`** : `ASC_ISSUER_ID`, `ASC_KEY_ID`, `ASC_PRIVATE_KEY` (le contenu du `.p8`), `CERTIFICATE_PRIVATE_KEY` — **c'est le groupe de Stampi, rien à ressaisir** | oui |
+| 3 | Codemagic | groupe de variables **`ios_signing`** : `ASC_ISSUER_ID`, `ASC_KEY_ID`, `ASC_PRIVATE_KEY` (le contenu du `.p8`), `CERTIFICATE_PRIVATE_KEY` — mêmes valeurs que Stampi, mais à **ressaisir** : un groupe d'application ne se partage pas, et une variable *Secure* ne se relit jamais (§4 bis suite) | oui |
 | 4 | App Store Connect | *Mes applications → +* → nouvelle application, *Bundle ID* **`tn.res2boost.kaissi`** (à enregistrer d'abord dans *Certificates, Identifiers & Profiles* s'il n'existe pas), puis accepter l'accord **« Apps gratuites »** (§4 ter, étape 4) | oui |
 | 5 | ton PC | reporter l'**Apple ID à dix chiffres** de la fiche dans `APP_STORE_APPLE_ID`, dans `codemagic.yaml` | oui |
 | 6 | ton PC | incrémenter `"version"` dans `apps/pos/package.json` | **à chaque envoi** |
@@ -1266,9 +1266,11 @@ un effet de bord d'un commit.
 
 1. *Teams → Code signing identities → Android keystores* : téléverser le
    keystore sous le nom **`kaissi_keystore`**.
-2. Groupe de variables **`ios_signing`** — c'est **le même que Stampi**, avec
-   les mêmes noms (`ASC_ISSUER_ID`, `ASC_KEY_ID`, `ASC_PRIVATE_KEY`,
-   `CERTIFICATE_PRIVATE_KEY`) : il n'y a rien à ressaisir.
+2. Groupe de variables **`ios_signing`**, avec les mêmes noms que Stampi
+   (`ASC_ISSUER_ID`, `ASC_KEY_ID`, `ASC_PRIVATE_KEY`,
+   `CERTIFICATE_PRIVATE_KEY`). ⚠ Mêmes **noms**, pas même **groupe** : un
+   groupe d'application ne se partage pas, et une variable *Secure* ne se
+   relit jamais. Où retrouver chacune des quatre : **§4 bis (suite)**.
 3. Groupe **`google_play`** avec `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS`, si
    l'on veut la publication automatique. Sans lui, l'AAB reste disponible en
    artefact.
@@ -1313,6 +1315,117 @@ un effet de bord d'un commit.
 > réécrit pas le `.xcodeproj`, seulement les ressources et les pods.
 
 ---
+
+### 4 bis (suite). Les quatre variables `ios_signing` — où les retrouver
+
+> ### ⚠ Celles de Stampi ne se relisent PAS
+>
+> Une variable marquée **Secure** dans Codemagic est chiffrée : sa valeur
+> n'est plus jamais affichée, ni dans l'interface, ni dans les journaux de
+> construction. On peut la remplacer, jamais la lire. C'est exactement ce
+> qu'on lui demande.
+>
+> Et **« mêmes noms » ne veut pas dire « même groupe »** : un groupe posé
+> dans les réglages d'une APPLICATION n'est visible que de cette
+> application-là. Seul un groupe de *Teams → Global variables and secrets*
+> se partage entre applications, et c'est une fonction d'**équipe** — sur un
+> compte personnel, elle n'existe pas.
+>
+> Conclusion : les quatre se ressaisissent pour Kaissi. Deux se **relisent**
+> chez Apple, une se **régénère**, une se **fabrique**. Aucune n'est perdue.
+
+Dans Codemagic : l'application **Kaissi** → *Environment variables* → pour
+chacune, nom, valeur, groupe `ios_signing`, case **Secure** cochée.
+
+#### 1 et 2 — `ASC_ISSUER_ID` et `ASC_KEY_ID` : ils sont affichés
+
+Ce ne sont pas des secrets, et ils se relisent autant de fois qu'on veut.
+
+1. [appstoreconnect.apple.com](https://appstoreconnect.apple.com) → **Users
+   and Access** → onglet **Integrations** → **App Store Connect API**.
+2. **`ASC_ISSUER_ID`** est écrit **au-dessus de la liste des clés**, pas dans
+   une clé. Il est le même pour tout le compte — donc **identique à celui de
+   Stampi**. C'est un UUID : `57246542-96fe-1a63-…`.
+3. **`ASC_KEY_ID`** est la colonne *KEY ID* de la ligne de la clé : dix
+   caractères, `2X9R4HXF34`. Chaque clé a le sien.
+
+> Coche qu'il faut avoir : la clé doit avoir le rôle **App Manager** au
+> minimum. Une clé *Developer* télécharge les profils mais ne peut pas
+> envoyer de build, et Apple répond alors un 403 qui ne dit pas pourquoi.
+
+#### 3 — `ASC_PRIVATE_KEY` : le fichier `.p8`, à régénérer s'il est perdu
+
+C'est le **contenu** du fichier `AuthKey_XXXXXXXXXX.p8`, en entier,
+`-----BEGIN PRIVATE KEY-----` et `-----END PRIVATE KEY-----` compris, sauts
+de ligne conservés.
+
+**Apple ne le laisse télécharger qu'UNE fois**, à la création. Il n'y a pas
+de « retélécharger ». Si le fichier de Stampi n'est plus sur ton disque, la
+réponse n'est pas de le retrouver — c'est d'**en créer une autre** :
+
+*Users and Access → Integrations → App Store Connect API →* **+** *→ nom
+« Codemagic Kaissi », accès* **App Manager** *→ Generate → Download.*
+
+Le nouveau `.p8` vaut pour **tout le compte**, donc pour Stampi aussi. Rien
+n'est cassé : l'ancienne clé continue de fonctionner tant qu'elle n'est pas
+révoquée, et Stampi garde la sienne dans ses propres variables.
+
+> Sous Windows, pour coller le contenu sans se tromper d'espaces :
+>
+> ```powershell
+> Get-Content $HOME\Downloads\AuthKey_2X9R4HXF34.p8 -Raw | Set-Clipboard
+> ```
+>
+> Puis `Ctrl+V` dans le champ de valeur. Codemagic accepte les variables
+> multi-lignes.
+
+#### 4 — `CERTIFICATE_PRIVATE_KEY` : elle n'est pas d'Apple, elle est à toi
+
+C'est la seule des quatre qui **ne vient pas d'Apple**. C'est une clé privée
+RSA 2048 que **tu fabriques**, et qu'Apple ne voit jamais.
+
+La raison tient en une phrase : **Apple ne conserve que la partie PUBLIQUE
+d'un certificat de distribution.** La partie privée reste sur la machine qui
+a fait la demande. Sans elle, Codemagic télécharge un certificat avec lequel
+il n'a rien pour signer — et répond *« Cannot save Signing Certificates
+without certificate private key »*.
+
+Dans **Git Bash** (celui qui est déjà installé avec git sous Windows) :
+
+```bash
+ssh-keygen -t rsa -b 2048 -m PEM -f cert_key -q -N ""
+cat cert_key
+```
+
+`-m PEM` n'est pas décoratif : sans lui, `ssh-keygen` écrit au format OpenSSH,
+que les outils de signature ne lisent pas. Colle le contenu de `cert_key` —
+le fichier SANS `.pub` — dans la variable, puis **conserve-le** ailleurs
+qu'ici.
+
+> **Si tu retrouves celle de Stampi, préfère-la.** Un certificat de
+> distribution est lié à une clé privée, et Apple en limite le nombre par
+> compte (deux pour *Apple Distribution*). Réutiliser la clé de Stampi
+> réutilise son certificat ; en fabriquer une nouvelle en fait créer un
+> **second**.
+>
+> Ce n'est un problème que si le compte est déjà au plafond : `fetch-signing-files`
+> répond alors *« Maximum number of certificates generated »*. Le remède est
+> dans *Certificates, Identifiers & Profiles → Certificates* : révoquer un
+> certificat inutilisé. Révoquer un certificat de distribution **ne retire
+> aucune application du magasin** et ne casse aucune build déjà envoyée — il
+> ne sert qu'à signer les prochaines.
+
+#### Le tableau, en une ligne chacune
+
+| Variable | Secret ? | Où | Si elle est perdue |
+|---|---|---|---|
+| `ASC_ISSUER_ID` | non | App Store Connect → Users and Access → Integrations, **au-dessus** de la liste | se relit |
+| `ASC_KEY_ID` | non | même écran, colonne *KEY ID* de la clé | se relit |
+| `ASC_PRIVATE_KEY` | **oui** | contenu du `.p8`, téléchargeable **une seule fois** | créer une nouvelle clé API |
+| `CERTIFICATE_PRIVATE_KEY` | **oui** | fabriquée par `ssh-keygen`, jamais vue par Apple | en refabriquer une (⚠ un second certificat sera créé) |
+
+---
+
 
 ## 4 ter. Publier : le parcours App Store Connect, clic par clic
 

@@ -4,10 +4,17 @@
 #
 # ── Ce qui est repris de Digital_Fidelity, et ce qui ne l'est pas ──────────
 #
-# Repris : Codemagic, Capacitor, le groupe de variables `ios_signing` avec
-# les MÊMES noms (ASC_ISSUER_ID, ASC_KEY_ID, ASC_PRIVATE_KEY,
-# CERTIFICATE_PRIVATE_KEY) — le groupe déjà rempli pour Stampi se réutilise
-# tel quel, il n'y a rien à ressaisir.
+# Repris : Codemagic, Capacitor, et le groupe de variables `ios_signing`
+# avec les MÊMES noms (ASC_ISSUER_ID, ASC_KEY_ID, ASC_PRIVATE_KEY,
+# CERTIFICATE_PRIVATE_KEY).
+#
+# ⚠ Mêmes NOMS ne veut pas dire même GROUPE. Un groupe posé dans les réglages
+#   d'une application n'est visible que de cette application-là ; seul un
+#   groupe de « Global variables and secrets », au niveau d'une ÉQUIPE
+#   Codemagic, se partage entre applications. Sur un compte personnel, il faut
+#   donc les ressaisir ici — et les valeurs de Stampi ne se relisent PAS : une
+#   variable marquée « Secure » est chiffrée et n'est plus jamais affichée.
+#   docs/stores.md §4 bis dit où retrouver chacune des quatre.
 #
 # NON repris : le `server.url` de `native/capacitor.config.js` et la TWA
 # Android de PWABuilder. Ce n'est pas un oubli et ce n'est pas une préférence
@@ -139,8 +146,10 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       groups:
-        # MÊME groupe que Stampi : les identifiants App Store Connect sont
-        # ceux du compte développeur, pas ceux d'une application.
+        # Les identifiants App Store Connect sont ceux du COMPTE développeur,
+        # pas ceux d'une application : les mêmes valeurs que pour Stampi. Mais
+        # un groupe d'application ne se partage pas — sur un compte personnel,
+        # il se ressaisit. Voir docs/stores.md §4 bis.
         - ios_signing
       vars:
         XCODE_WORKSPACE: "apps/pos/ios/App/App.xcworkspace"
@@ -198,7 +207,8 @@ workflows:
           [ -z "$CERTIFICATE_PRIVATE_KEY" ] && manquantes="$manquantes CERTIFICATE_PRIVATE_KEY"
           if [ -n "$manquantes" ]; then
             echo "ERREUR : variables absentes du groupe ios_signing :$manquantes"
-            echo "Elles sont les mêmes que pour Stampi — le groupe se réutilise tel quel."
+            echo "Ce sont les identifiants du COMPTE développeur Apple, pas ceux d'une application."
+            echo "Où les retrouver : docs/stores.md §4 bis."
             exit 1
           fi
           echo "Key ID présenté à Apple : $ASC_KEY_ID"
