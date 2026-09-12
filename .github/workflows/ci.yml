@@ -253,6 +253,30 @@ jobs:
           # désactivée.
           pnpm audit --audit-level=high
 
+      - name: Aucun CORPS de clé privée
+        run: |
+          # Un EN-TÊTE PEM n'est pas un secret : « -----BEGIN … KEY----- » est
+          # une chaîne publique, et une documentation qui apprend à la
+          # reconnaître doit pouvoir l'écrire. C'est pour cela que
+          # `.gitleaks.toml` laisse passer ces en-têtes dans docs/stores.md.
+          #
+          # Ce qui EST un secret, c'est le corps : des lignes entières de
+          # base64. Aucun texte français, aucun code, aucun chemin ne
+          # ressemble à soixante caractères de base64 seuls sur leur ligne —
+          # le contrôle est donc à la fois plus précis et plus large que
+          # celui qu'il complète, et il vaut pour TOUT le dépôt, ce
+          # fichier-ci et docs/stores.md compris.
+          fautes=$(grep -rnE '^[A-Za-z0-9+/]{64,}={0,2}$' \
+            --exclude-dir=node_modules --exclude-dir=.git --exclude-dir=dist \
+            --exclude-dir=.next --exclude-dir=build --exclude-dir=.turbo \
+            . || true)
+          if [ -n "$fautes" ]; then
+            echo "::error::Corps de cle privee (ou binaire base64) dans le depot :"
+            echo "$fautes"
+            exit 1
+          fi
+          echo "OK — aucun corps de clé privée dans le dépôt."
+
       - name: Aucun secret dans l'historique
         uses: gitleaks/gitleaks-action@v2
         env:

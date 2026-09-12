@@ -2005,6 +2005,50 @@ mal qu'une absence de vidéo.
 
 ---
 
+## 4 sexies. Les avertissements d'Apple APRÈS un envoi réussi
+
+Un envoi peut réussir **et** produire un courriel de reproches. Ce ne sont pas
+des refus : la build est bien dans TestFlight. Ce sont des dates limites
+annoncées à l'avance, et les ignorer les transforme en refus le jour venu.
+
+### ITMS-90068 — `MinimumOSVersion too low`
+
+```
+This app has a MinimumOSVersion of 14.0. Starting in Spring 2027, all iOS
+apps must have a MinimumOSVersion of 15.0 or later in order to be uploaded
+to App Store Connect or submitted for distribution.
+```
+
+Le gabarit de Capacitor pose **iOS 14.0**. Le dépôt est passé à **15.0**, en
+deux endroits qui doivent rester d'accord :
+
+| Fichier | Réglage |
+|---|---|
+| `apps/pos/ios/App/App.xcodeproj/project.pbxproj` | `IPHONEOS_DEPLOYMENT_TARGET = 15.0` — **quatre** occurrences : projet et cible, Debug et Release |
+| `apps/pos/ios/App/Podfile` | `platform :ios, '15.0'` |
+
+> **Les deux, pas l'un ou l'autre.** Le `.xcodeproj` décide de ce qu'Apple lit
+> dans l'IPA ; le `Podfile` décide de la cible des dépendances. Les laisser
+> diverger compile quand même, et produit des avertissements CocoaPods à
+> chaque `pod install` — le genre de bruit dans lequel un vrai problème finit
+> par passer inaperçu.
+>
+> `cap sync ios` régénère la liste des pods, **pas** la ligne `platform` :
+> le réglage tient.
+
+**Pourquoi 15.0 et pas plus haut.** Monter la version minimale RETIRE des
+appareils. Une caisse tourne souvent sur un iPad d'occasion : iPadOS 15
+couvre encore l'iPad Air 2 (2014), iPadOS 16 ne le couvre plus. On prend donc
+le minimum qu'Apple exige, et on remontera quand il l'exigera — pas avant.
+
+### Ce qu'il faut faire de l'avertissement
+
+Rien dans l'immédiat : la build **4** reste installable et testable. Le
+réglage part avec la build suivante, quelle qu'elle soit. Inutile d'en
+fabriquer une exprès.
+
+---
+
 ## 5. Dans quel ordre
 
 1. **Maintenant** — l'APK signé, installé à la main. Zéro attente, correction

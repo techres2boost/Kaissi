@@ -1,0 +1,40 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# gitleaks — la configuration du dépôt
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# `useDefault` garde TOUTES les règles livrées par gitleaks. Ce fichier ne
+# retire rien d'autre que ce qui est écrit ci-dessous, et chaque retrait porte
+# sa raison.
+#
+# ── Pourquoi ce fichier existe ────────────────────────────────────────────
+#
+# La CI est passée au rouge sur `docs/stores.md`, à la ligne :
+#
+#     elle commence par `-----BEGIN OPENSSH PRIVATE KEY-----`
+#
+# C'est une phrase de documentation : elle apprend à RECONNAÎTRE un format de
+# clé, elle n'en contient aucune. La règle `private-key` de gitleaks ne
+# cherche pourtant que l'en-tête — un corps de clé ne lui est pas nécessaire —
+# donc toute page qui explique ce format la déclenche.
+#
+# Le vrai risque, c'est de laisser un garde-fou utile finir désactivé parce
+# qu'il crie sur du texte correct. On ne le désactive donc pas : on l'échange
+# contre un contrôle PLUS strict, posé dans la CI juste à côté
+# (« Aucun CORPS de clé privée »). Un en-tête PEM n'est pas un secret ;
+# soixante caractères de base64 en sont un, et celui-là est refusé PARTOUT,
+# y compris dans ce fichier-ci.
+# ═══════════════════════════════════════════════════════════════════════════
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = """
+docs/stores.md cite les en-têtes PEM pour apprendre à distinguer une clé
+OpenSSH d'une clé PEM — c'est la confusion qui a coûté une construction.
+Portée VOLONTAIREMENT réduite à ce seul fichier et à cette seule règle : une
+clé déposée dans n'importe quel autre fichier reste détectée par gitleaks, et
+un corps de clé déposé dans celui-ci reste refusé par la garde de la CI.
+"""
+targetRules = ["private-key"]
+paths = ['''^docs/stores\.md$''']
