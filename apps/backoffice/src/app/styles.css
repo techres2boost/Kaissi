@@ -2,33 +2,85 @@
    Pas de framework : la surface est petite, et un back-office consulté sur
    un ordinateur de bureau dans un restaurant n'a pas besoin de 60 Kio de CSS. */
 
-/* Palette Res2Boost.
-   Le back-office est consulté sur un ordinateur de bureau, souvent en plein
-   jour : le fond reste sombre pour rester dans la marque, mais les surfaces
-   sont plus claires que sur la tablette, où l'écran est vu sous des néons. */
+/* ══════════════════════════════════════════════════════════════════════════
+   CHARTE Res2Boost — le même habillage que Digital Fidelity
+   ══════════════════════════════════════════════════════════════════════════
+
+   Deep Forest #0D2B1F · Emerald Dark #174634 · Signature Mint #7EC694 ·
+   Warm Ivory #F6F3EA · Soft Beige #ECE7DC · Rich Charcoal #1B1F1C ·
+   Olive Gray · Terracotta #C4562B
+
+   ── Pourquoi le back-office est passé du SOMBRE au CLAIR ─────────────────
+
+   Il était vert sombre de bout en bout, comme la caisse. C'était une erreur
+   de raisonnement : la tablette est lue sous des néons, en salle, souvent de
+   biais — un fond sombre y repose l'œil. Un back-office se lit ASSIS, sur un
+   écran de bureau, au milieu de documents blancs et d'un tableur ouvert à
+   côté. Dans ce contexte, le sombre fatigue au lieu de reposer, et les
+   tableaux de chiffres — l'essentiel de ces écrans — se lisent moins bien.
+
+   Digital Fidelity avait déjà tranché ainsi : colonne de gauche vert forêt,
+   contenu clair. On reprend sa charte à l'identique, jeton par jeton, pour
+   que les deux produits de la marque ne se ressemblent pas « à peu près ».
+
+   ── La règle des DEUX contextes ──────────────────────────────────────────
+
+   Les jetons ci-dessous décrivent le contenu, en CLAIR. La colonne de gauche
+   les REDÉFINIT pour elle-même (voir `.laterale`), exactement comme DF pose
+   la classe `dark` sur son `<aside>`. Un composant qui utilise `--texte` ou
+   `--attenue` est donc juste des deux côtés sans rien savoir de l'endroit
+   où il est rendu.
+
+   ── Les contrastes ne sont pas décoratifs ────────────────────────────────
+
+   Chaque couleur de texte de cette palette tient le 4,5:1 du WCAG AA sur les
+   surfaces où elle est réellement posée. Ce n'est pas une intention : c'est
+   vérifié par `src/app/palette.test.ts`, qui LIT ce fichier. Un jeton
+   éclairci « pour faire joli » casse le test au lieu de casser la lecture
+   d'un gérant. Trois valeurs ont d'ailleurs dû être assombries en passant au
+   clair — l'or, le rouge et le vert de la version sombre y étaient
+   illisibles, autour de 2,3:1.
+   ══════════════════════════════════════════════════════════════════════════ */
 :root {
-  --fond: #07150F;          /* Near Black Green */
-  --panneau: #0D2B1F;       /* Deep Forest */
-  --panneau-clair: #174634; /* Emerald Dark */
-  --bordure: #1F5842;
+  --fond: #F6F3EA;          /* Warm Ivory — la base, et les champs de saisie */
+  --panneau: #FFFFFF;       /* les cartes : blanches, comme chez DF */
+  --panneau-clair: #ECE7DC; /* Soft Beige — surfaces secondaires, survols */
+  --bordure: #DED7C7;
 
-  --texte: #F6F3EA;         /* Warm Ivory */
-  --attenue: #8FA79A;       /* Muted Olive, éclairci pour rester lisible
-                               sur le vert profond */
+  --texte: #1B1F1C;         /* Rich Charcoal */
+  --attenue: #586560;       /* Olive Gray, assombri pour tenir le 4,5:1
+                               jusque sur le beige (#ECE7DC) */
 
-  --accent: #7EC694;        /* Signature Mint */
-  --accent-clair: #9BE3AE;  /* Bright Mint */
-  --or: #C9A86B;            /* Soft Gold */
+  /* L'accent d'ACTION — boutons, liens, focus. Émeraude et non menthe : la
+     menthe #7EC694 ne fait que 1,9:1 sur blanc, elle disparaît. */
+  --accent: #174634;        /* Emerald Dark */
+  --accent-clair: #0D2B1F;  /* Deep Forest — survol : plus SOMBRE, pas plus
+                               clair. Sur fond clair, « appuyer » assombrit. */
+  --sur-accent: #F1FAF4;    /* le texte posé SUR l'accent */
+
+  /* L'accent de NAVIGATION — terracotta, celui de DF. Distinct de l'accent
+     d'action : la colonne dit où l'on est, les boutons disent quoi faire.
+     Les confondre ferait de chaque lien actif un appel à cliquer. */
+  --orange: #C4562B;
+  --orange-texte: #B84E24;  /* le même, assombri pour être LU sur du clair */
+  --orange-clair: #E88A5E;  /* dégradés, et l'icône active sur la colonne */
 
   /* États : volontairement hors charte, ils doivent trancher. */
-  --danger: #E4756A;
-  --succes: #8FFFBC;        /* Neon Mint */
+  --or: #8A6A1F;
+  --danger: #B3261E;
+  --succes: #10714A;
+
+  /* Aplats d'état — des lavis clairs, pas les aplats sombres d'avant. */
+  --fond-danger: #FBEAE8;
+  --fond-succes: #E4F4EC;
+  --fond-or: #FAF0DA;
 
   --rayon: 10px;
 
   /* Sora pour les titres, Inter pour le corps — chargées par next/font, donc
      AUTO-HÉBERGÉES au build : aucune requête vers un domaine tiers à
-     l'exécution, et rien à demander au visiteur. */
+     l'exécution, et rien à demander au visiteur. Ce sont les deux polices de
+     Digital Fidelity, aux mêmes rôles. */
   --titre: var(--police-titre), 'Sora', 'Poppins', system-ui, sans-serif;
   --corps: var(--police-corps), 'Inter', system-ui, -apple-system, sans-serif;
 }
@@ -37,11 +89,61 @@
 
 body {
   margin: 0;
-  background: var(--fond);
+  /* La base crème de DF (`.dash-shell`) : elle évite une bande blanche si le
+     contenu est plus court que l'écran. */
+  background: #F2EDDD;
   color: var(--texte);
   font-family: var(--corps);
   line-height: 1.55;
 }
+
+/*
+ * ── Le fond ombré crème / menthe / terracotta ────────────────────────────
+ *
+ * Repris tel quel de Digital Fidelity : halo menthe au coin haut-gauche,
+ * terracotta au coin bas-droit, sur une base crème.
+ *
+ * Il commence à GAUCHE DU CONTENU, pas du viewport — décalé de la largeur de
+ * la colonne. C'est la précision qui fait tout le rendu : centré sur le
+ * viewport, le halo menthe tomberait entièrement DERRIÈRE la colonne, qui
+ * est opaque. On ne verrait que le terracotta, et le dégradé paraîtrait
+ * raté sans qu'on sache pourquoi. DF le contourne en portant le dégradé sur
+ * sa zone de contenu ; ici la colonne est en `fixed`, donc c'est une couche
+ * fixe décalée d'autant.
+ *
+ * `fixed` et non un fond posé sur `<main>`, et c'est une divergence ASSUMÉE
+ * avec DF : leurs pages tiennent dans un écran, les nôtres sont des rapports
+ * de deux mille lignes. Étiré sur une telle hauteur, un `radial-gradient`
+ * devient un aplat délavé — les halos se voient encore, mais plus comme des
+ * coins. Fixe, ils restent où ils doivent être.
+ *
+ * `z-index: -1` : la couche passe derrière tout le contenu en flux, mais
+ * devant le fond du `body`.
+ */
+body::before {
+  content: '';
+  position: fixed;
+  /* Par DÉFAUT, tout l'écran : la connexion et le choix d'établissement n'ont
+     pas de colonne, et le halo menthe doit y partir du bord. */
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(95% 60% at 0% 0%, rgba(126, 198, 148, 0.92), transparent 58%),
+    radial-gradient(98% 66% at 100% 100%, rgba(201, 120, 54, 0.9), transparent 60%),
+    radial-gradient(55% 38% at 97% 100%, rgba(196, 86, 43, 0.32), transparent 55%),
+    linear-gradient(150deg, #f2eddd 0%, #f4efe1 50%, #ece4cf 100%);
+}
+
+/*
+ * … et décalé UNIQUEMENT quand une colonne le cache.
+ *
+ * `:has()` est le seul moyen, depuis `body::before`, de savoir ce que la page
+ * contient. Un navigateur qui ne le connaît pas garde simplement le halo
+ * pleine largeur : le coin menthe passe derrière la colonne opaque, c'est
+ * moins joli et rien d'autre. Une dégradation qu'on peut se permettre.
+ */
+body:has(.laterale)::before { inset: 0 0 0 var(--laterale); }
 
 a { color: var(--accent); }
 
@@ -49,17 +151,53 @@ a { color: var(--accent); }
    Une rangée d'onglets marche à cinq entrées ; à neuf elle passe à la ligne,
    et la page saute d'une hauteur d'onglet selon le rôle de qui regarde. La
    colonne accepte des entrées sans se déformer, et surtout des GROUPES. */
-:root { --laterale: 15rem; }
+/* 16rem — la `w-64` de Digital Fidelity, au pixel près. Les 15rem d'avant
+   suffisaient à des libellés sans icône ; avec elles, « Ventes par mode de
+   paiement » se coupait un mot plus tôt. */
+:root { --laterale: 16rem; }
 
+/*
+ * ── Le décalage suit la COLONNE, il n'est plus inconditionnel ────────────
+ *
+ * DÉFAUT OBSERVÉ, et rendu visible par le passage au clair. `.enveloppe`
+ * portait `margin-left: var(--laterale)` en dur. Or cinq écrans n'ont PAS de
+ * colonne : la connexion, le choix d'établissement, l'administration, la
+ * page introuvable et la page d'erreur. Tous étaient poussés de 15 rem vers
+ * la droite, contre un vide.
+ *
+ * Sur le fond vert uni d'avant, cela passait pour une marge un peu large. Sur
+ * le fond ombré, la bande sans halo à gauche saute aux yeux : on voit
+ * l'emplacement d'une colonne qui n'existe pas.
+ *
+ * `.laterale ~ .enveloppe` : le décalage n'existe que s'il y a réellement une
+ * colonne avant. Un sélecteur de FRÈRE plutôt que `:has()` — il est supporté
+ * partout depuis toujours, et il dit exactement ce qu'on veut dire.
+ */
 .enveloppe {
   max-width: 76rem;
   margin: 0 auto;
   padding: 1.5rem;
-  /* La colonne est en `fixed` : le contenu se décale, il ne passe pas
-     dessous. */
-  margin-left: var(--laterale);
 }
 
+/* La colonne est en `fixed` : le contenu se décale, il ne passe pas dessous. */
+.laterale ~ .enveloppe { margin-left: var(--laterale); }
+/* Après la barre du haut, le contenu reprend une respiration normale. */
+.barre + .enveloppe { padding-top: 1.5rem; }
+
+/*
+ * ── La colonne, et son SECOND jeu de jetons ──────────────────────────────
+ *
+ * Elle reste vert forêt pendant que le contenu passe au clair — c'est le
+ * contraste qui structure toute la page chez Digital Fidelity, et c'est ce
+ * qu'on reprend.
+ *
+ * Les jetons sont REDÉFINIS ici, et c'est tout le mécanisme : `--texte`
+ * redevient ivoire, `--attenue` olive clair, `--bordure` un filet de menthe
+ * transparente. Un composant posé dans la colonne s'habille donc pour le
+ * sombre sans le savoir. C'est exactement ce que fait DF avec sa classe
+ * `dark` sur l'`<aside>` ; ici, en CSS nu, une redéfinition de variables
+ * suffit et ne coûte pas une classe de plus à poser à la main.
+ */
 .laterale {
   position: fixed;
   inset: 0 auto 0 0;
@@ -68,39 +206,171 @@ a { color: var(--accent); }
   flex-direction: column;
   gap: 1rem;
   padding: 1rem 0.75rem;
-  background: var(--panneau);
-  border-right: 1px solid var(--bordure);
+  /* Le dégradé de DF, à l'identique. */
+  background: linear-gradient(180deg, #0b2016 0%, #0f2e1f 55%, #123725 100%);
+  border-right: 1px solid rgba(126, 198, 148, 0.12);
   overflow-y: auto;
   z-index: 20;
+
+  --texte: #F6F3EA;
+  --attenue: #8FA79A;
+  --bordure: rgba(126, 198, 148, 0.12);
+  --panneau-clair: rgba(255, 255, 255, 0.06);
+  color: var(--texte);
+}
+
+/*
+ * ── La barre du haut, pour les écrans SANS colonne ───────────────────────
+ *
+ * `BarreCompte` la pose sur l'administration et le choix d'établissement.
+ * Elle n'avait AUCUN style : ni `.barre`, ni `.marque` n'existaient dans
+ * cette feuille. Le résultat était un « Kaissi » en texte courant, l'e-mail
+ * et le bouton empilés en dessous. Personne ne l'avait signalé parce que la
+ * page restait utilisable — elle n'avait simplement l'air de rien.
+ *
+ * Elle reprend le vert forêt de la colonne : c'est la `dash-bar-top` de
+ * Digital Fidelity, et c'est ce qui fait que ces pages appartiennent
+ * visiblement au même produit que les autres.
+ */
+.barre {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 0.85rem 1.5rem;
+  background: linear-gradient(180deg, #0b2016 0%, #0f2e1f 55%, #123725 100%);
+  border-bottom: 1px solid rgba(126, 198, 148, 0.12);
+
+  /* Les mêmes jetons sombres que la colonne — même raison, même mécanisme. */
+  --texte: #F6F3EA;
+  --attenue: #8FA79A;
+  --bordure: rgba(126, 198, 148, 0.12);
+  --panneau-clair: rgba(255, 255, 255, 0.06);
+  color: var(--texte);
+}
+.barre .droite { display: flex; align-items: center; gap: 0.75rem; margin-left: auto; }
+.barre button { border-color: transparent; color: var(--attenue); }
+.barre button:hover { color: var(--texte); border-color: var(--bordure); }
+
+/* La marque, dans les deux contextes : la menthe est chez elle sur le vert. */
+.marque {
+  font-family: var(--titre); font-weight: 700;
+  color: #7EC694;
+  letter-spacing: -0.02em; font-size: 1.15rem;
 }
 
 .laterale-entete { display: flex; flex-direction: column; gap: 0.15rem; padding: 0 0.5rem; }
-.laterale .marque {
-  font-family: var(--titre); font-weight: 700; color: var(--accent);
-  letter-spacing: -0.02em; font-size: 1.15rem;
-}
 .laterale-etablissement { font-size: 0.85rem; color: var(--attenue); text-decoration: none; }
 .laterale-etablissement:hover { color: var(--texte); }
+/*
+ * « changer » n'est pas la fin du nom du restaurant.
+ *
+ * Rendu de la même couleur et de la même taille que lui, il se lisait
+ * « Snack Lac 1 changer » — un établissement au nom curieux. Il devient plus
+ * petit, en capitales espacées : une ACTION, visiblement distincte du nom
+ * qu'elle suit.
+ */
+.laterale-etablissement .detail {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  opacity: 0.75;
+  border-bottom: 1px solid currentColor;
+}
 
 .laterale nav { display: flex; flex-direction: column; gap: 1rem; }
-.laterale-groupe { display: flex; flex-direction: column; gap: 0.15rem; }
+.laterale-groupe { display: flex; flex-direction: column; gap: 0.25rem; }
 .laterale-titre {
   font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--attenue); padding: 0 0.65rem; margin-bottom: 0.2rem;
 }
 
+/*
+ * ── Le lien de navigation — le système d'interaction de DF ───────────────
+ *
+ * Quatre couches, et chacune répond à une question différente :
+ *
+ *   ::before  une barre terracotta à gauche — OÙ SUIS-JE ? Elle grandit à
+ *             mi-hauteur au survol, à pleine hauteur sur la page courante.
+ *             Une barre est plus lisible qu'un fond plein : elle marque sans
+ *             recouvrir le libellé.
+ *   ::after   un voile terracotta au survol — CE LIEN RÉPOND-IL ? Il donne
+ *             le retour immédiat que le déplacement seul ne donne pas.
+ *   transform un décalage de 3 px vers la droite au survol.
+ *   l'icône   un léger zoom et une bascule ; en actif, elle passe orange.
+ *
+ * La version précédente remplissait le lien actif de menthe pleine avec un
+ * texte sombre dedans. Ça marchait, mais ça pesait : neuf entrées, dont une
+ * en aplat vif, dans une colonne qu'on garde ouverte toute la journée.
+ */
 .laterale nav a {
+  position: relative;
+  overflow: hidden;
   display: flex; align-items: center; gap: 0.6rem;
-  padding: 0.5rem 0.65rem; border-radius: 8px;
+  padding: 0.625rem 0.75rem; border-radius: 8px;
   color: var(--attenue); text-decoration: none; font-size: 0.92rem;
+  font-weight: 500;
+  transition: color 0.25s ease, background-color 0.25s ease,
+    transform 0.25s cubic-bezier(0.22, 0.9, 0.3, 1), box-shadow 0.25s ease;
 }
-.laterale nav a:hover { background: var(--panneau-clair); color: var(--texte); }
+
+.laterale nav a::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 50%;
+  height: 62%; width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: linear-gradient(180deg, var(--orange-clair), var(--orange));
+  transform: translateY(-50%) scaleY(0);
+  transition: transform 0.34s cubic-bezier(0.22, 0.9, 0.3, 1.25);
+  box-shadow: 0 0 12px rgba(196, 86, 43, 0.6);
+}
+.laterale nav a:hover::before { transform: translateY(-50%) scaleY(0.5); }
+.laterale nav a[aria-current='page']::before { transform: translateY(-50%) scaleY(1); }
+
+.laterale nav a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(90deg, rgba(196, 86, 43, 0.18), transparent 72%);
+  transition: opacity 0.3s ease;
+}
+.laterale nav a:hover::after { opacity: 1; }
+
+.laterale nav a:hover { color: var(--texte); transform: translateX(3px); }
+
 .laterale nav a[aria-current='page'] {
-  background: var(--accent); color: var(--fond); font-weight: 650;
+  background: linear-gradient(90deg, rgba(196, 86, 43, 0.2), rgba(196, 86, 43, 0.04) 78%);
+  color: #FFB694;
+  box-shadow: inset 0 0 0 1px rgba(196, 86, 43, 0.22);
+  font-weight: 600;
 }
-/* Largeur FIXE : sans elle, les libellés ne s'alignent pas, parce que les
-   emoji n'ont pas tous la même chasse. */
-.laterale-icone { width: 1.25rem; text-align: center; font-size: 1rem; }
+
+/*
+ * L'icône. Largeur FIXE encore, mais plus pour la même raison : les emoji
+ * n'avaient pas tous la même chasse, les SVG de lucide sont tous carrés.
+ * Elle sert désormais à aligner les libellés sur une grille nette.
+ */
+.laterale-icone {
+  width: 1.05rem; height: 1.05rem; flex: none;
+  display: grid; place-items: center;
+  transition: transform 0.3s cubic-bezier(0.22, 0.9, 0.3, 1.35), color 0.25s ease;
+}
+.laterale-icone svg { width: 100%; height: 100%; display: block; }
+.laterale nav a:hover .laterale-icone { transform: scale(1.15) rotate(-6deg); }
+.laterale nav a[aria-current='page'] .laterale-icone {
+  color: var(--orange-clair);
+  filter: drop-shadow(0 0 7px rgba(196, 86, 43, 0.55));
+}
+
+/* Entrée décalée des liens — celle de DF. Elle donne la lecture de haut en
+   bas au premier affichage, ce qu'une apparition simultanée ne fait pas. */
+@keyframes laterale-entree {
+  from { opacity: 0; transform: translateX(-14px); }
+  to { opacity: 1; transform: none; }
+}
+.laterale nav a { animation: laterale-entree 0.45s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
 
 .laterale-pied {
   margin-top: auto; display: flex; flex-direction: column;
@@ -108,6 +378,17 @@ a { color: var(--accent); }
   padding: 0.75rem 0.65rem 0; border-top: 1px solid var(--bordure);
 }
 .laterale-qui { font-size: 0.85rem; color: var(--texte); }
+/* Dans la colonne, un bouton discret doit rester lisible sur le forêt : il
+   hérite des jetons sombres, mais pas de la bordure par défaut des boutons. */
+.laterale-pied button { border-color: transparent; color: var(--attenue); }
+.laterale-pied button:hover { color: var(--texte); border-color: var(--bordure); }
+
+@media (prefers-reduced-motion: reduce) {
+  .laterale nav a,
+  .laterale nav a::before,
+  .laterale nav a::after,
+  .laterale-icone { animation: none; transition: none; }
+}
 
 .bouton-menu { display: none; }
 .voile { display: none; }
@@ -116,17 +397,34 @@ a { color: var(--accent); }
    Elle se SUPERPOSE au contenu. Un menu qui pousse la page décale ce qu'on
    était en train de lire, et on perd sa place à chaque ouverture. */
 @media (max-width: 60rem) {
-  .enveloppe { margin-left: 0; padding-top: 0.75rem; }
+  .enveloppe { padding-top: 0.75rem; }
 
-  .laterale { transform: translateX(-100%); transition: transform 0.18s ease; }
+  /* La colonne est repliée hors de l'écran : le halo menthe repart du bord.
+     Sans cette ligne, une bande crème de 16 rem resterait plaquée à gauche,
+     sur un téléphone où aucune colonne ne l'explique. */
+  body:has(.laterale)::before { inset: 0; }
+
+  .laterale ~ .enveloppe { margin-left: 0; }
+
+  /* Le tiroir commence SOUS la barre du haut. Elle est `sticky` et passe
+     au-dessus (z-index 25 contre 20) : sans ce dégagement, elle recouvrait
+     la marque et le nom de l'établissement, qu'on ne voyait donc jamais sur
+     un téléphone. C'était déjà vrai avant, mais la barre était de la même
+     couleur que le tiroir — on ne voyait pas qu'il manquait quelque chose. */
+  .laterale { transform: translateX(-100%); transition: transform 0.18s ease;
+              padding-top: 3.4rem; }
   .laterale.ouverte { transform: translateX(0); box-shadow: 0 0 2rem rgb(0 0 0 / 0.35); }
 
+  /* La barre du haut reprend le forêt de la colonne — c'est la `dash-bar-top`
+     de DF. En clair, elle se confondait avec le contenu et on ne voyait plus
+     où finissait la navigation. */
   .bouton-menu {
     display: inline-flex; align-items: center; gap: 0.4rem;
     position: sticky; top: 0; z-index: 25;
     width: 100%; padding: 0.7rem 1rem;
-    background: var(--panneau); border: 0; border-bottom: 1px solid var(--bordure);
-    color: var(--texte); font: inherit; text-align: left; cursor: pointer;
+    background: linear-gradient(180deg, #0b2016 0%, #0f2e1f 55%, #123725 100%);
+    border: 0; border-bottom: 1px solid rgba(126, 198, 148, 0.12);
+    color: #F6F3EA; font: inherit; text-align: left; cursor: pointer;
   }
 
   .voile {
@@ -140,12 +438,24 @@ h1 { font-family: var(--titre); font-weight: 700; font-size: 1.5rem;
 h2 { font-family: var(--titre); font-weight: 600; font-size: 1.05rem; margin: 0 0 0.75rem; }
 .sous-titre { color: var(--attenue); margin: 0 0 1.5rem; font-size: 0.92rem; }
 
+/*
+ * ── L'ÉLÉVATION, qui n'existait pas avant ────────────────────────────────
+ *
+ * Sur le fond vert sombre, un panneau un ton au-dessus se détachait tout
+ * seul. Sur le fond crème, une carte blanche cernée d'un filet beige se
+ * confond avec lui : la page redevient le mur continu que `.bloc` avait
+ * justement été créé pour éviter.
+ *
+ * Une ombre très basse suffit — 10 % de noir, pas de flou spectaculaire. Ce
+ * qu'on cherche est de dire « ceci est posé dessus », pas de faire flotter.
+ */
 .carte, .bloc {
   background: var(--panneau);
   border: 1px solid var(--bordure);
   border-radius: var(--rayon);
   padding: 1.15rem;
   margin-bottom: 1.25rem;
+  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
 }
 /*
  * `.bloc` n'avait AUCUN style : les sections des rapports flottaient sur le
@@ -210,8 +520,9 @@ button, .bouton {
   font: inherit; cursor: pointer; text-decoration: none; display: inline-block;
 }
 button:hover { border-color: var(--accent); }
-button.principal { background: var(--accent); color: var(--fond); border-color: var(--accent);
+button.principal { background: var(--accent); color: var(--sur-accent); border-color: var(--accent);
                    font-weight: 650; }
+button.principal:hover { background: var(--accent-clair); border-color: var(--accent-clair); }
 /* `.bouton` aussi, et pas seulement `button` : l'export est un LIEN — il
    télécharge un fichier, et un « enregistrer sous » doit marcher dessus. Sans
    ce sélecteur, il gardait le fond plein et se lisait comme l'action
@@ -223,16 +534,16 @@ button.danger { color: var(--danger); }
 
 /* ── Messages ──────────────────────────────────────────────────────────── */
 .message { padding: 0.7rem 0.9rem; border-radius: 8px; margin-bottom: 1rem; font-size: 0.92rem; }
-.message.erreur { background: #2A1614; border: 1px solid var(--danger); color: #F3BDB5; }
-.message.succes { background: #0E3324; border: 1px solid var(--succes); color: #BFF3D4; }
-.message.avertissement { background: #2A2416; border: 1px solid var(--or); color: #EBD5A6; }
+.message.erreur { background: var(--fond-danger); border: 1px solid var(--danger); color: var(--danger); }
+.message.succes { background: var(--fond-succes); border: 1px solid var(--succes); color: var(--succes); }
+.message.avertissement { background: var(--fond-or); border: 1px solid var(--or); color: var(--or); }
 
 .etiquette {
   display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px;
   font-size: 0.75rem; background: var(--panneau-clair); color: var(--attenue);
 }
-.etiquette.actif { background: #123526; color: var(--succes); }
-.etiquette.inactif { background: #2C1B19; color: var(--danger); }
+.etiquette.actif { background: var(--fond-succes); color: var(--succes); }
+.etiquette.inactif { background: var(--fond-danger); color: var(--danger); }
 
 .vide { color: var(--attenue); font-style: italic; padding: 1.5rem 0; text-align: center; }
 
@@ -247,7 +558,7 @@ button.danger { color: var(--danger); }
 .cuisine-entete { margin-bottom: 1.2rem; }
 .cuisine-entete h1 { display: flex; align-items: center; gap: 0.6rem; margin: 0 0 0.3rem; }
 .cuisine-entete .compteur {
-  background: var(--accent); color: var(--fond); font-size: 1rem; font-weight: 700;
+  background: var(--accent); color: var(--sur-accent); font-size: 1rem; font-weight: 700;
   border-radius: 999px; padding: 0.05rem 0.7rem; min-width: 2.2rem; text-align: center;
 }
 
@@ -259,10 +570,10 @@ button.danger { color: var(--danger); }
 }
 .onglets-postes a {
   padding: 0.35rem 0.9rem; border-radius: 999px; text-decoration: none;
-  border: 1px solid var(--bordure); color: var(--texte-2); font-weight: 600;
+  border: 1px solid var(--bordure); color: var(--texte); font-weight: 600;
 }
 .onglets-postes a.actif {
-  background: var(--accent); border-color: var(--accent); color: var(--fond);
+  background: var(--accent); border-color: var(--accent); color: var(--sur-accent);
 }
 
 .cuisine-grille {
@@ -275,6 +586,7 @@ button.danger { color: var(--danger); }
   background: var(--panneau); border: 1px solid var(--bordure);
   border-left: 5px solid var(--accent);
   border-radius: var(--rayon); padding: 0.9rem 1rem;
+  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
 }
 /* L'attente est la seule urgence : elle change la couleur du bon entier,
    pas seulement celle d'un chiffre qu'on ne regarde pas. */
@@ -314,12 +626,13 @@ button.danger { color: var(--danger); }
   display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; align-items: center;
   padding: 0.8rem 1rem; margin-bottom: 1.25rem;
   background: var(--panneau); border: 1px solid var(--bordure); border-radius: var(--rayon);
+  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
 }
 .periode[aria-busy='true'] { opacity: 0.6; }
 .periode-raccourcis { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .periode-raccourcis button { padding: 0.35rem 0.7rem; font-size: 0.85rem; }
 .periode-raccourcis button.actif {
-  background: var(--accent); color: var(--fond); border-color: var(--accent); font-weight: 650;
+  background: var(--accent); color: var(--sur-accent); border-color: var(--accent); font-weight: 650;
 }
 .periode-bornes {
   display: flex; gap: 0.75rem; align-items: center; margin-left: auto;
@@ -347,7 +660,7 @@ button.danger { color: var(--danger); }
   position: absolute; z-index: 30; top: calc(100% + 0.4rem); right: 0;
   width: 19rem; padding: 0.75rem;
   background: var(--panneau); border: 1px solid var(--bordure);
-  border-radius: var(--rayon); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  border-radius: var(--rayon); box-shadow: 0 12px 32px rgba(27, 31, 28, 0.14);
 }
 .calendrier-entete {
   display: flex; align-items: center; justify-content: space-between;
@@ -372,9 +685,9 @@ button.danger { color: var(--danger); }
    couperait les semaines en deux, et on perdrait le repère des lundis. */
 .calendrier-case.hors-mois { color: var(--attenue); opacity: 0.45; }
 .calendrier-case:disabled { opacity: 0.2; cursor: default; }
-.calendrier-case.dans-periode { background: #123526; color: var(--texte); opacity: 1; }
+.calendrier-case.dans-periode { background: var(--fond-succes); color: var(--texte); opacity: 1; }
 .calendrier-case.borne {
-  background: var(--accent); color: var(--fond); font-weight: 650; opacity: 1;
+  background: var(--accent); color: var(--sur-accent); font-weight: 650; opacity: 1;
 }
 /* Aujourd'hui reste repérable même hors période : c'est le point d'ancrage
    de toute lecture d'un rapport. */
@@ -389,6 +702,7 @@ button.danger { color: var(--danger); }
   padding: 0.9rem 1rem;
   background: var(--panneau); border: 1px solid var(--bordure);
   border-left: 4px solid var(--bordure); border-radius: var(--rayon);
+  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
 }
 .kpi.fort { border-left-color: var(--accent); }
 .kpi.alerte { border-left-color: var(--danger); }
@@ -418,9 +732,9 @@ button.danger { color: var(--danger); }
 .detail-ticket { border-left: 4px solid var(--accent); }
 
 /* ── Stock ────────────────────────────────────────────────────────────────── */
-.etiquette.etat-rupture { background: #2C1B19; color: var(--danger); }
-.etiquette.etat-faible { background: #2A2416; color: var(--or); }
-.etiquette.etat-ok { background: #123526; color: var(--succes); }
+.etiquette.etat-rupture { background: var(--fond-danger); color: var(--danger); }
+.etiquette.etat-faible { background: var(--fond-or); color: var(--or); }
+.etiquette.etat-ok { background: var(--fond-succes); color: var(--succes); }
 .etiquette.etat-non_suivi { background: var(--panneau-clair); color: var(--attenue); }
 
 /*
@@ -601,6 +915,7 @@ button.danger { color: var(--danger); }
   display: flex; flex-direction: column; gap: 0.15rem;
   background: var(--panneau); border: 1px solid var(--bordure);
   border-radius: var(--rayon); padding: 0.9rem 1rem;
+  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
 }
 .indicateur-libelle {
   font-size: 0.78rem; color: var(--attenue);
@@ -657,7 +972,7 @@ th .tri:hover { color: var(--texte); }
 .recherche-clients { display: flex; gap: 0.4rem; margin-left: auto; }
 .recherche-clients input { width: auto; min-width: 14rem; }
 .discret.actif {
-  background: var(--accent); color: var(--fond); border-color: var(--accent);
+  background: var(--accent); color: var(--sur-accent); border-color: var(--accent);
 }
 /* L'en-tête d'un panneau dépliant : le titre, et sa fermeture au bout. */
 .entete-panneau {

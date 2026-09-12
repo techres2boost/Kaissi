@@ -16,14 +16,27 @@
  *
  * Ici, les séries SONT le sujet : c'est de l'identité, pas de la grandeur.
  * Une seule teinte déclinée en six valeurs se lit très mal en camembert.
- * La palette est celle du validateur, vérifiée contre CE fond sombre
- * (#0D2B1F) :
  *
- *     node scripts/validate_palette.js "#3987e5,#d95926,#199e70,#c98500,
- *       #d4699a,#7a6ff0" --mode dark --surface "#0D2B1F"
- *     → bande de clarté, plancher de chroma, séparation daltonienne
- *       (ΔE 8,4 pire paire), plancher vision normale (18,5), contraste : tout
- *       passe.
+ * ── Elle a SURVÉCU au passage du sombre au clair, et c'est mesuré ────────
+ *
+ * Ces six teintes avaient été validées contre le vert profond (#0D2B1F) du
+ * back-office d'alors. La carte est devenue BLANCHE : le contraste de chaque
+ * part change du tout au tout, et il fallait le vérifier plutôt que le
+ * supposer. Vérification faite, la palette passe des deux côtés — 3,1:1 au
+ * pire sur blanc, 3,9:1 au pire sur le vert.
+ *
+ * Ce n'est pas un coup de chance : ces teintes sont de clarté MOYENNE, donc
+ * elles tranchent aussi bien sur un fond très clair que sur un très sombre.
+ * C'est la propriété qu'on cherche pour une palette qui doit survivre à un
+ * changement de charte.
+ *
+ * La séparation entre deux parts, elle, ne dépendait pas du fond : deux
+ * couleurs s'éloignent l'une de l'autre quoi qu'il y ait derrière. ΔE 30,8 en
+ * vision normale, 8,8 en deutéranopie — la pire paire des quinze.
+ *
+ * Les trois mesures sont refaites par `src/app/palette.test.ts`, qui va
+ * chercher ces teintes DANS CE FICHIER : en changer une sans la valider fait
+ * tomber la CI.
  *
  * Chaque part porte en plus son NOM et son pourcentage : la couleur n'est
  * jamais la seule information.

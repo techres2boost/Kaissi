@@ -12,6 +12,13 @@
  * Il ne dépend d'AUCUNE feuille de style : ses couleurs sont en ligne. Une
  * page de secours qui a besoin du CSS pour s'afficher n'est pas une page de
  * secours — c'est précisément le CSS qui peut manquer.
+ *
+ * ⚑ Corollaire : ces couleurs ne suivent PAS les jetons, donc elles ne
+ *   suivent pas non plus un changement de charte. Elles étaient restées
+ *   sombres alors que tout le back-office était passé au clair — et c'est
+ *   invisible tant que rien ne casse, c'est-à-dire jusqu'au jour où ça
+ *   compte. Elles sont recopiées ici à la main, à l'identique de
+ *   `styles.css`, et `palette.test.ts` vérifie qu'elles n'en divergent pas.
  */
 
 export default function ErreurGlobale({
@@ -25,8 +32,8 @@ export default function ErreurGlobale({
     <html lang="fr">
       <body
         style={{
-          background: '#08120E',
-          color: '#E8F0EA',
+          background: '#F6F3EA',
+          color: '#1B1F1C',
           fontFamily: 'system-ui, -apple-system, sans-serif',
           margin: 0,
           padding: '3rem 1.5rem',
@@ -46,8 +53,8 @@ export default function ErreurGlobale({
             type="button"
             onClick={() => reset()}
             style={{
-              background: '#5FD39B',
-              color: '#08120E',
+              background: '#174634',
+              color: '#F1FAF4',
               border: 0,
               borderRadius: 8,
               padding: '0.6rem 1.1rem',
@@ -58,7 +65,7 @@ export default function ErreurGlobale({
             Réessayer
           </button>
           {error.digest && (
-            <p style={{ color: '#8FA79A', fontSize: '0.85rem', marginTop: '1.5rem' }}>
+            <p style={{ color: '#586560', fontSize: '0.85rem', marginTop: '1.5rem' }}>
               Code à communiquer au support : <code>{error.digest}</code>
             </p>
           )}

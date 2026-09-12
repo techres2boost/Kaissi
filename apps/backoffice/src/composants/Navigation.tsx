@@ -3,6 +3,27 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
+import {
+  BookOpen,
+  Boxes,
+  Building2,
+  CalendarDays,
+  ChefHat,
+  Clock,
+  Contact,
+  CreditCard,
+  FolderTree,
+  LayoutDashboard,
+  Menu,
+  Package,
+  ReceiptText,
+  Tag,
+  Ticket,
+  UserRound,
+  Users,
+  UtensilsCrossed,
+  type LucideIcon,
+} from 'lucide-react'
 import { seDeconnecter } from '../app/connexion/actions.js'
 import type { Etablissement, SessionBackoffice } from '../serveur/session.js'
 
@@ -23,9 +44,34 @@ import type { Etablissement, SessionBackoffice } from '../serveur/session.js'
  * fois. Regroupés, on va droit au bon tiers.
  *
  * Les icônes sont là pour la reconnaissance latérale, pas pour la décoration :
- * une fois qu'on sait que le panier c'est « Ventes », on ne lit plus le mot.
- * Ce sont des emoji plutôt qu'une police d'icônes — une police, c'est un
- * fichier de plus à charger, et sur une liaison tunisienne moyenne ça se voit.
+ * une fois qu'on sait que le reçu c'est « Récapitulatif », on ne lit plus le
+ * mot.
+ *
+ * ── Pourquoi ce ne sont plus des EMOJI ────────────────────────────────────
+ *
+ * Elles l'ont été, et le commentaire d'alors invoquait le poids : « une
+ * police d'icônes, c'est un fichier de plus à charger, et sur une liaison
+ * tunisienne moyenne ça se voit ». L'argument était juste — contre une
+ * POLICE. Il ne vaut pas contre `lucide-react`, qui n'en est pas une : chaque
+ * icône est un composant React rendant un `<svg>` en ligne, et l'élagage du
+ * build ne garde que les dix-sept utilisées ici. Rien à télécharger en plus,
+ * rien à attendre avant le premier rendu.
+ *
+ * MESURÉ, pas supposé — la bibliothèque entière pèse plusieurs centaines de
+ * kio, et c'était bien la question à trancher : les paquets JavaScript du
+ * back-office passent de 880 à 890 Kio, soit **+9 Kio** pour dix-sept
+ * icônes. Sur une liaison tunisienne moyenne, ça ne se voit pas.
+ *
+ * Ce que les emoji coûtaient, en revanche, se voyait : ils sont rendus par la
+ * POLICE DU SYSTÈME. Le même 🗂️ est plat sur Windows, en relief sur macOS,
+ * et absent d'un poste Linux mal doté — où il tombait en carré vide. Ils
+ * n'ont pas tous la même chasse, d'où la largeur fixe qu'il fallait leur
+ * imposer, et surtout ils ne prennent pas la couleur du texte : impossible de
+ * les faire passer en orange sur le lien actif, comme le fait le reste de la
+ * charte. Un trait uniforme, qui hérite de `currentColor`, fait tout cela.
+ *
+ * C'est aussi ce que fait Digital Fidelity, dont ce back-office reprend
+ * l'habillage.
  *
  * ── Ce qui n'est PAS ici ──────────────────────────────────────────────────
  *
@@ -51,9 +97,9 @@ const GROUPES = [
     // premier clic de la journée.
     titre: null,
     onglets: [
-      { chemin: 'tableau-bord', libelle: 'Tableau de bord', icone: '📊', gestionnaire: true },
-      { chemin: 'preparation', libelle: 'Préparation', icone: '🍳', gestionnaire: false },
-      { chemin: 'journee', libelle: 'Journée', icone: '📅', gestionnaire: false },
+      { chemin: 'tableau-bord', libelle: 'Tableau de bord', icone: LayoutDashboard, gestionnaire: true },
+      { chemin: 'preparation', libelle: 'Préparation', icone: ChefHat, gestionnaire: false },
+      { chemin: 'journee', libelle: 'Journée', icone: CalendarDays, gestionnaire: false },
     ],
   },
   {
@@ -67,14 +113,14 @@ const GROUPES = [
      */
     titre: 'Rapports',
     onglets: [
-      { chemin: 'ventes', libelle: 'Récapitulatif des ventes', icone: '🧾', gestionnaire: true },
-      { chemin: 'articles', libelle: 'Ventes par article', icone: '🍽️', gestionnaire: true },
-      { chemin: 'ventes-par-categorie', libelle: 'Ventes par catégorie', icone: '🗂️', gestionnaire: true },
-      { chemin: 'ventes-par-employe', libelle: 'Ventes par employé', icone: '👤', gestionnaire: true },
-      { chemin: 'ventes-par-paiement', libelle: 'Ventes par mode de paiement', icone: '💳', gestionnaire: true },
-      { chemin: 'recus', libelle: 'Reçus', icone: '🎫', gestionnaire: true },
-      { chemin: 'reductions', libelle: 'Réductions', icone: '🏷️', gestionnaire: true },
-      { chemin: 'periodes', libelle: 'Périodes de travail', icone: '🕐', gestionnaire: true },
+      { chemin: 'ventes', libelle: 'Récapitulatif des ventes', icone: ReceiptText, gestionnaire: true },
+      { chemin: 'articles', libelle: 'Ventes par article', icone: UtensilsCrossed, gestionnaire: true },
+      { chemin: 'ventes-par-categorie', libelle: 'Ventes par catégorie', icone: FolderTree, gestionnaire: true },
+      { chemin: 'ventes-par-employe', libelle: 'Ventes par employé', icone: UserRound, gestionnaire: true },
+      { chemin: 'ventes-par-paiement', libelle: 'Ventes par mode de paiement', icone: CreditCard, gestionnaire: true },
+      { chemin: 'recus', libelle: 'Reçus', icone: Ticket, gestionnaire: true },
+      { chemin: 'reductions', libelle: 'Réductions', icone: Tag, gestionnaire: true },
+      { chemin: 'periodes', libelle: 'Périodes de travail', icone: Clock, gestionnaire: true },
     ],
   },
   {
@@ -83,9 +129,9 @@ const GROUPES = [
     // carte et la barre de navigation — deux choses dans un même mot.
     titre: 'Articles',
     onglets: [
-      { chemin: 'catalogue', libelle: 'Liste d’articles', icone: '📖', gestionnaire: true },
-      { chemin: 'categories', libelle: 'Catégories', icone: '🗃️', gestionnaire: true },
-      { chemin: 'stock', libelle: 'Stock', icone: '📦', gestionnaire: true },
+      { chemin: 'catalogue', libelle: 'Liste d’articles', icone: BookOpen, gestionnaire: true },
+      { chemin: 'categories', libelle: 'Catégories', icone: Boxes, gestionnaire: true },
+      { chemin: 'stock', libelle: 'Stock', icone: Package, gestionnaire: true },
       /*
        * Le RÉFÉRENTIEL des réductions, pas leur rapport.
        *
@@ -94,21 +140,32 @@ const GROUPES = [
        * on lit ce que cela a coûté. Un seul écran mélangerait un réglage et
        * une mesure — et on ne consulte pas les deux au même moment.
        */
-      { chemin: 'reductions/gestion', libelle: 'Réductions', icone: '🏷️', gestionnaire: true },
+      { chemin: 'reductions/gestion', libelle: 'Réductions', icone: Tag, gestionnaire: true },
     ],
   },
   {
     titre: 'Configuration',
     onglets: [
-      { chemin: 'employes', libelle: 'Employés', icone: '👥', gestionnaire: true },
+      { chemin: 'employes', libelle: 'Employés', icone: Users, gestionnaire: true },
       // « Clients » juste sous « Employés », comme dans Loyverse : ce sont
       // les deux carnets de personnes, et on les cherche au même endroit.
-      { chemin: 'clients', libelle: 'Clients', icone: '🧑‍🤝‍🧑', gestionnaire: true },
+      { chemin: 'clients', libelle: 'Clients', icone: Contact, gestionnaire: true },
     ],
   },
 ] as const
 
 type Onglet = (typeof GROUPES)[number]['onglets'][number]
+
+/*
+ * Le contrat que chaque entrée doit tenir. `as const` fige les CHEMINS (voir
+ * plus haut, c'est ce qui fait vérifier les routes par TypeScript) ; cette
+ * ligne-ci vérifie l'autre moitié : que `icone` est bien un composant
+ * d'icône, et non une chaîne oubliée depuis les emoji.
+ */
+const _verifieLesIcones: readonly LucideIcon[] = GROUPES.flatMap((g) =>
+  g.onglets.map((o) => o.icone),
+)
+void _verifieLesIcones
 
 export function Navigation({
   session,
@@ -141,7 +198,8 @@ export function Navigation({
         aria-controls="navigation-laterale"
         onClick={() => setOuvert((o) => !o)}
       >
-        ☰ Menu
+        <Menu size={17} strokeWidth={1.75} aria-hidden="true" />
+        Menu
       </button>
 
       <aside
@@ -186,8 +244,18 @@ export function Navigation({
                       aria-current={cheminActuel === href ? 'page' : undefined}
                       onClick={() => setOuvert(false)}
                     >
+                      {/*
+                        `strokeWidth={1.75}` et non le 2 par défaut : à 17 px,
+                        un trait de 2 px empâte les icônes denses (le reçu, le
+                        dossier) au point qu'on ne distingue plus leur forme.
+                        C'est la valeur que retient DF.
+
+                        `aria-hidden` sur l'enveloppe : l'icône REDIT le
+                        libellé qui la suit. Annoncée, un lecteur d'écran
+                        lirait « graphique, Tableau de bord ».
+                      */}
                       <span className="laterale-icone" aria-hidden="true">
-                        {onglet.icone}
+                        <onglet.icone size={17} strokeWidth={1.75} />
                       </span>
                       {onglet.libelle}
                     </Link>
@@ -217,7 +285,7 @@ export function Navigation({
               onClick={() => setOuvert(false)}
             >
               <span className="laterale-icone" aria-hidden="true">
-                🏢
+                <Building2 size={17} strokeWidth={1.75} />
               </span>
               Établissements
             </Link>

@@ -1843,6 +1843,56 @@ aussi en CI, sur le fichier réel du dépôt.
 
 ---
 
+### Q bis. Le back-office a la tête de Digital Fidelity
+
+1. Ouvre n'importe quel écran du back-office.
+
+**Attendu** : une colonne vert forêt à gauche, un contenu **clair** —
+crème, halo menthe en haut à gauche, terracotta en bas à droite — des cartes
+blanches, et des icônes au trait dans le menu. Plus aucun emoji.
+
+2. Passe la souris sur une entrée du menu, puis clique-la.
+
+**Attendu** : au survol, une barre terracotta pousse à mi-hauteur à gauche du
+lien, un voile orange l'éclaire et il glisse de trois pixels ; sur la page
+courante, la barre est à pleine hauteur et l'icône passe orange.
+
+> **Pourquoi le contenu est passé au clair.** Le back-office était vert sombre
+> de bout en bout, comme la caisse — et c'était un raisonnement faux. Une
+> tablette est lue debout, en salle, sous des néons : le sombre y repose
+> l'œil. Un back-office se lit **assis**, sur un écran de bureau, à côté d'un
+> tableur ouvert et de documents blancs. Dans ce contexte le sombre fatigue,
+> et les tableaux de chiffres — l'essentiel de ces écrans — se lisent moins
+> bien. Digital Fidelity avait déjà tranché ainsi ; on reprend sa charte
+> jeton par jeton, pour que les deux produits de la marque ne se ressemblent
+> pas « à peu près ».
+>
+> **Trois couleurs sont devenues illisibles d'un coup, et aucune n'a
+> protesté.** L'or de la version sombre tombait à 2,3:1 sur blanc, le vert de
+> succès à 1,3:1, le rouge à 2,6:1. Elles s'affichaient encore ; elles ne se
+> lisaient plus. C'est la panne de couleur typique — rien ne casse, et on ne
+> s'en aperçoit qu'en regardant l'écran de quelqu'un d'autre.
+> `apps/backoffice/src/app/palette.test.ts` LIT désormais la feuille de
+> styles et refuse tout jeton sous 4,5:1 sur les surfaces où il est
+> réellement posé, colonne sombre comprise. Il vérifie aussi les six teintes
+> du camembert — contraste sur blanc, et séparation en **deutéranopie**.
+>
+> **Deux défauts de mise en page que le fond clair a révélés**, tous deux
+> antérieurs : les cinq écrans sans colonne (connexion, choix
+> d'établissement, administration, page introuvable, page d'erreur) étaient
+> décalés de 16 rem vers la droite contre un vide ; et la barre du haut de
+> l'administration n'avait **aucun style** — ni `.barre`, ni `.marque`
+> n'existaient dans la feuille. Sur fond uni, l'un passait pour une marge
+> large et l'autre pour une sobriété voulue.
+
+3. Réduis la fenêtre sous 960 px.
+
+**Attendu** : la colonne se replie derrière une barre **vert forêt** portant
+« ☰ Menu » ; le halo menthe repart alors du bord de l'écran, et le tiroir
+ouvert laisse voir la marque au lieu de la cacher sous la barre.
+
+---
+
 ### R. Ouvrir un deuxième client, et changer une caisse d'établissement
 
 #### R.1 — La caisse suit VRAIMENT le nouvel établissement
