@@ -2034,6 +2034,7 @@ mal qu'une absence de vidéo.
 | `Cannot save Signing Certificates without certificate private key` | `CERTIFICATE_PRIVATE_KEY` absente, ou sa valeur ne commence pas par `-----BEGIN` | §4 bis (suite), piège n° 1 |
 | 401 d'Apple sur `fetch-signing-files` | la `.p8` n'est pas une clé d'**API App Store Connect** | §4 bis (suite), piège n° 2 |
 | **Aucun build ne démarre** au push | pas de webhook : Codemagic ne surveille pas le dépôt, c'est GitHub qui l'appelle | §4 nonies |
+| `The selected instance type is not available with the current billing plan` | `linux_x2` n'existe pas sur le plan gratuit — seul le Mac mini M2 y est | §4 decies bis |
 | `altool … Cannot determine the Apple ID from Bundle ID … (19)` | la **fiche** n'existe pas encore dans App Store Connect — le Bundle ID ne suffit pas | créer la fiche (§4 ter, étape 3), puis relancer |
 | `409: You already have a current Distribution certificate or a pending certificate request` | le compte est à son plafond de certificats, et aucun ne correspond à `CERTIFICATE_PRIVATE_KEY` | reprendre le `cert_key` d'un projet déjà signé sur ce compte ; à défaut révoquer un certificat expiré (§4 bis suite) |
 
@@ -2264,104 +2265,125 @@ par **l'API Google Play Developer**. Cette API n'accepte qu'une seule forme
 d'identité : un **compte de service**, dont la preuve est un fichier JSON.
 Aucun mot de passe, aucun jeton d'application, aucune autre voie.
 
-C'est exactement le même rôle que la clé `.p8` côté Apple — celle que vous avez
-déjà configurée, et qui explique que les envois vers App Store Connect
-fonctionnent :
+C'est exactement le rôle de la clé `.p8` côté Apple — celle qui est déjà
+configurée, et qui explique que les envois vers App Store Connect fonctionnent
+alors que Play ne reçoit rien :
 
 | | Apple | Google |
 |---|---|---|
 | L'identité machine | clé d'API App Store Connect (`.p8`) | compte de service (JSON) |
-| Où on la crée | App Store Connect → Users and Access → Integrations | Play Console → **API access** |
 | Dans Codemagic | `ASC_PRIVATE_KEY` | `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` |
 
-> **Si un autre produit publie déjà automatiquement sur Play depuis ce même
-> compte développeur, un compte de service EXISTE déjà.** Il a simplement été
-> créé une fois, il y a longtemps, et oublié. Commencez par le chercher : la
-> §4 decies *bis* ci-dessous évite de tout refaire.
+> ### ⚠ Oubliez « Accès à l'API » — Google a déplacé la porte
+>
+> Tous les tutoriels (y compris une version antérieure de cette page)
+> envoient vers *Paramètres → Accès à l'API*. Sur un compte récent, cette
+> entrée **n'existe plus** : l'URL `…/api-access` renvoie sur la liste des
+> applications, et on tourne en rond en cherchant un onglet absent.
+>
+> Le chemin actuel est ailleurs, et il est bien plus simple : **un compte de
+> service s'invite comme un collègue**, dans *Utilisateurs et autorisations*.
+> C'est la même page que pour ajouter un humain — la seule différence est
+> qu'on y colle une adresse en `…iam.gserviceaccount.com`.
 
-### Où est « Accès à l'API » — le lien direct
-
-Ce n'est pas dans *Paramètres*, malgré l'apparence. C'est une page à part, au
-niveau du **compte développeur**, et le plus sûr est d'y aller par l'URL —
-prenez le numéro qui figure déjà dans la vôtre :
+### Vue d'ensemble — trois pièces, deux consoles
 
 ```
-play.google.com/console/u/0/developers/‹VOTRE-NUMÉRO›/api-access
+Google Cloud                              Google Play Console
+─────────────                             ───────────────────
+1. un projet                     ┐
+2. l'API « Android Developer »   ├──→     3. on INVITE l'adresse du compte
+   activée sur ce projet         │           de service, comme un utilisateur
+3. un compte de service          ┘
+   + sa clé JSON  ──────────────────→     Codemagic
 ```
 
-Par la navigation : **Paramètres** → **Accès à l'API** (entrée distincte dans
-la colonne de gauche, sous *Paramètres* ; elle n'apparaît que pour le
-propriétaire du compte).
+Le projet Cloud n'a pas à être « lié » à Play. Ce qui compte : l'API est
+activée **là où vit le compte de service**, et son adresse est invitée dans
+Play Console.
 
-### 4 decies bis — réutiliser un compte de service existant
+**Un seul projet suffit pour toutes vos applications** — et un seul compte de
+service aussi. Si un autre produit publie déjà automatiquement, réutilisez le
+sien : passez directement à l'étape 4.
 
-Un compte de service n'appartient pas à une application : il appartient au
-**compte développeur**, et on lui accorde l'accès application par application.
+### Étape 1 — Le projet Google Cloud
 
-1. Ouvrez *Accès à l'API*. Si la section **Comptes de service** en liste déjà
-   un (par exemple celui d'un autre produit), c'est gagné.
-2. **Gérer les autorisations Play Console** en face de lui → onglet
-   **Applications** → cochez **Kaissi** → *Appliquer* → *Inviter l'utilisateur*.
-3. Si vous avez encore son fichier JSON, collez-le dans Codemagic (étape 5
-   plus bas) et vous avez terminé.
-4. Sinon, créez-lui simplement **une nouvelle clé** — Google Cloud → ce compte
-   de service → *Clés* → *Ajouter une clé* → JSON. Les anciennes clés
-   continuent de fonctionner ; on n'a rien cassé.
+[console.cloud.google.com](https://console.cloud.google.com) → sélecteur de
+projet en haut → **Nouveau projet** → nom `Kaissi` → **Créer**.
 
-Le reste de cette section ne sert que s'il n'existe AUCUN compte de service.
+Puis **sélectionnez-le** : tout ce qui suit doit se faire *dans ce projet*.
+Le nom affiché en haut à gauche, à côté de « Google Cloud », doit être
+`Kaissi`. C'est l'erreur la plus facile à faire — activer l'API sur le projet
+d'un autre produit, puis chercher le compte de service au mauvais endroit.
 
-### Étape 1 — Lier un projet Google Cloud
+### Étape 2 — Activer l'API Google Play Android Developer
 
-Dans *Accès à l'API*, si rien n'est lié : **Créer un projet Google Cloud**.
-Google en fabrique un et le rattache. Rien à configurer dedans — il ne sert
-que de support administratif au compte de service.
+Toujours dans le projet `Kaissi` :
 
-### Étape 2 — Créer le compte de service
+```
+console.cloud.google.com/apis/library/androidpublisher.googleapis.com
+```
 
-Toujours dans *Accès à l'API* → **Créer un compte de service**. Un encadré
-s'ouvre avec un lien vers **Google Cloud Console** : c'est ce lien qu'il faut
-suivre, parce que la création se fait là-bas et la permission ici.
+Vérifiez le nom du projet en haut, puis **Enable** / **Activer**. S'il affiche
+déjà *Manage* / *Gérer*, c'est fait.
 
-Dans Google Cloud → **Créer un compte de service** :
+> Sans cette activation, tout le reste se configure sans erreur — et le
+> premier appel répond *« Google Play Android Developer API has not been used
+> in project … before or it is disabled »*. Le message est explicite, mais il
+> n'arrive qu'à la fin.
 
-| Champ | Valeur |
-|---|---|
-| Nom | `codemagic-publisher` |
-| ID | rempli tout seul |
-| Description | `Publication automatique depuis Codemagic` |
+### Étape 3 — Le compte de service et sa clé
 
-→ **Continuer** → écran « Accorder à ce compte de service l'accès au projet » :
-**ne donnez AUCUN rôle**. Les droits se donnent côté Play, pas côté Cloud —
-un rôle ici n'ouvrirait rien d'utile et élargirait la surface pour rien.
-→ **Terminé**.
+1. Menu ☰ → **IAM et administration** → **Comptes de service** →
+   **Créer un compte de service**.
 
-### Étape 3 — Télécharger la clé JSON
+   | Champ | Valeur |
+   |---|---|
+   | Nom | `codemagic-publisher` |
+   | Description | `Publication automatique depuis Codemagic` |
 
-Cliquez sur `codemagic-publisher` → onglet **Clés** → **Ajouter une clé** →
-**Créer une clé** → **JSON** → **Créer**.
+2. **Continuer** → écran « Accorder à ce compte de service l'accès au
+   projet » : **ne donnez AUCUN rôle**. Les droits se donnent côté Play, pas
+   côté Cloud — un rôle ici n'ouvrirait rien d'utile. → **Terminé**.
 
-Un fichier se télécharge. **C'est la seule fois.** Rangez-le avec vos autres
-clés (§4 septies) : il ouvre la publication de vos applications.
+3. **Copiez son adresse e-mail** — elle ressemble à
+   `codemagic-publisher@kaissi.iam.gserviceaccount.com`. C'est elle qu'on
+   invite à l'étape suivante.
 
-### Étape 4 — Donner les droits, côté Play
+4. Cliquez sur le compte → onglet **Clés** → **Ajouter une clé** → **Créer une
+   clé** → **JSON** → **Créer**.
 
-Retour dans Play Console → *Accès à l'API* → **Actualiser les comptes de
-service**. `codemagic-publisher@…` apparaît → **Gérer les autorisations Play
-Console**.
+   Un fichier se télécharge. **C'est la seule fois.** Rangez-le avec vos
+   autres clés (§4 septies).
 
-- Onglet **Applications** : cochez **Kaissi**.
-- Autorisations :
+### Étape 4 — Inviter le compte de service dans Play Console
 
-| Autorisation | |
-|---|---|
-| **Afficher les informations sur l'application** | ✅ — lire le dernier `versionCode` publié |
-| **Gérer les versions de test** | ✅ — publier sur la piste interne |
-| ~~Gérer les versions de production~~ | ❌ — la production reste un geste humain |
+C'est l'étape que les anciens guides placent au mauvais endroit.
 
-→ **Inviter l'utilisateur**.
+1. [play.google.com/console](https://play.google.com/console) →
+   **Utilisateurs et autorisations** (colonne de gauche — elle y est déjà,
+   vous l'avez sous les yeux depuis le début).
+2. **Inviter de nouveaux utilisateurs**.
+3. **Adresse e-mail** : collez celle du compte de service
+   (`…@….iam.gserviceaccount.com`). Play l'accepte comme n'importe quelle
+   adresse.
+4. Section **Autorisations pour des applications spécifiques** →
+   **Ajouter une application** → **Kaissi**.
+5. Cochez :
 
+   | Autorisation | |
+   |---|---|
+   | **Afficher les informations sur l'application et télécharger les rapports groupés** | ✅ lire le dernier `versionCode` publié |
+   | **Gérer les versions de test** | ✅ publier sur la piste interne |
+   | ~~Gérer les versions de production~~ | ❌ la production reste un geste humain |
+
+6. **Inviter l'utilisateur**.
+
+> Le compte de service apparaît alors dans la liste des utilisateurs, sans
+> jamais accepter d'invitation — il n'a pas de boîte mail. C'est normal.
+>
 > Google prévient que les changements peuvent prendre **jusqu'à 24 heures**.
-> En pratique c'est quelques minutes. Si le premier build échoue sur
+> En pratique, quelques minutes. Si le premier build échoue sur
 > `The caller does not have permission`, c'est cela : attendez, ne refaites
 > pas la configuration.
 
@@ -2382,10 +2404,10 @@ Codemagic → l'application **Kaissi** → **Environment variables** :
 > les retours à la ligne sont encodés `\n` : les « nettoyer » la rend
 > invalide, et l'erreur d'authentification qui suit ne dit pas pourquoi.
 >
-> Dans Git Bash, pour ne rien laisser à la souris :
+> Dans Git Bash :
 >
 > ```bash
-> clip < ~/Downloads/codemagic-publisher-abc123.json
+> clip < ~/Downloads/kaissi-abc123.json
 > ```
 
 ### Étape 6 — Vérifier
@@ -2400,6 +2422,34 @@ Publishing App Bundle to Google Play (track: internal)
 
 « Aucun numéro publié à interroger » signifie que la variable n'est pas visible
 du workflow : vérifiez le groupe `google_play` et l'orthographe exacte du nom.
+
+---
+
+## 4 decies bis. `The selected instance type is not available with the current billing plan`
+
+Le build Android échouait **avant la première ligne**, sur cette phrase qui ne
+nomme ni le fichier ni le réglage fautif.
+
+La cause : `instance_type: linux_x2`. Sur le **plan gratuit** de Codemagic,
+seul le **Mac mini M2** est disponible — les instances Linux et Windows sont
+réservées aux plans payants. C'est contre-intuitif, parce que Linux est
+l'instance la moins chère : on la choisit *pour* économiser, et c'est
+justement celle qu'on n'a pas.
+
+Le workflow Android construit donc sur `mac_mini_m2`, comme iOS. Un Mac
+construit très bien un AAB : son image porte le SDK Android et un JDK.
+
+> **Ce que ça coûte** : les minutes macOS comptent **double**. Un build
+> Android passe donc de ~8 à ~16 minutes décomptées. Sur 500 minutes
+> mensuelles offertes, cela reste confortable pour un ou deux pushes par jour.
+>
+> Le jour d'un plan payant, remettez `linux_x2` sur `pos-android` — et lui
+> seul. `pos-ios` n'a pas le choix : un IPA ne se signe que sur macOS.
+
+**Un build en échec ne se supprime pas, et n'a rien consommé.** C'est un
+journal, pas une version : il s'est arrêté avant de construire, donc avant de
+demander le moindre numéro à Play ou à Apple. Laissez-le — il documente la
+panne.
 
 ---
 
