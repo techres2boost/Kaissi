@@ -2035,6 +2035,7 @@ mal qu'une absence de vidéo.
 | 401 d'Apple sur `fetch-signing-files` | la `.p8` n'est pas une clé d'**API App Store Connect** | §4 bis (suite), piège n° 2 |
 | **Aucun build ne démarre** au push | pas de webhook : Codemagic ne surveille pas le dépôt, c'est GitHub qui l'appelle | §4 nonies |
 | `The selected instance type is not available with the current billing plan` | `linux_x2` n'existe pas sur le plan gratuit — seul le Mac mini M2 y est | §4 decies bis |
+| `Service account key creation is disabled` | règle d'organisation `iam.disableServiceAccountKeyCreation` héritée du rattachement à res2boost.com | §4 decies ter |
 | `altool … Cannot determine the Apple ID from Bundle ID … (19)` | la **fiche** n'existe pas encore dans App Store Connect — le Bundle ID ne suffit pas | créer la fiche (§4 ter, étape 3), puis relancer |
 | `409: You already have a current Distribution certificate or a pending certificate request` | le compte est à son plafond de certificats, et aucun ne correspond à `CERTIFICATE_PRIVATE_KEY` | reprendre le `cert_key` d'un projet déjà signé sur ce compte ; à défaut révoquer un certificat expiré (§4 bis suite) |
 
@@ -2452,6 +2453,102 @@ demander le moindre numéro à Play ou à Apple. Laissez-le — il documente la
 panne.
 
 ---
+
+## 4 decies ter. `Service account key creation is disabled` — la règle d'organisation
+
+```
+An Organization Policy that blocks service accounts key creation has been
+enforced on your organization.
+Enforced Organization Policies IDs: iam.disableServiceAccountKeyCreation
+```
+
+### Ce qui se passe, exactement
+
+Rien à voir avec Play, ni avec le compte de service : il est créé, actif, et
+son adresse est utilisable. C'est la **clé** qui est refusée.
+
+Google applique depuis peu une politique par défaut — *Secure by default* — sur
+les organisations Workspace : **plus aucune clé de compte de service ne peut
+être créée**. Le raisonnement de Google est solide : une clé JSON est un secret
+éternel, qui traîne dans des dépôts et des boîtes mail, et qui ne se révoque
+que si quelqu'un se souvient qu'elle existe.
+
+La politique s'applique à **l'organisation**, et un projet en hérite du seul
+fait d'y être rattaché. Le projet `Kaissi` a été créé avec
+*Organisation : res2boost.com* — c'est ce rattachement, et lui seul, qui bloque.
+
+> **Ce que ça ne bloque PAS** : les clés qui existent DÉJÀ continuent de
+> fonctionner. La politique interdit d'en créer, elle n'invalide rien.
+
+### Trois voies, de la plus rapide à la plus lourde
+
+#### A. Réutiliser une clé existante — aucune autorisation à demander
+
+Si un autre produit du compte publie déjà automatiquement sur Play, **sa clé
+existe** : elle a été créée avant la politique, ou dans un projet hors
+organisation. Un compte de service n'appartient pas à une application — il
+suffit de l'inviter sur Kaissi.
+
+1. Cherchez le JSON là où sont rangées les autres clés (§4 septies) : un
+   fichier `…-abc123.json` contenant `"type": "service_account"`.
+2. Play Console → *Utilisateurs et autorisations* → si son adresse y figure
+   déjà, **Gérer les autorisations** → ajouter **Kaissi**. Sinon, invitez-la
+   (§4 decies, étape 4).
+3. Collez ce JSON dans `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS`.
+
+C'est terminé — et c'est la seule voie qui ne demande ni administrateur ni
+nouveau projet.
+
+#### B. Un projet HORS organisation, avec un compte Google personnel
+
+La politique porte sur l'organisation. Un projet qui n'en a pas n'y est pas
+soumis.
+
+1. Déconnectez-vous, ou ouvrez une fenêtre de navigation privée.
+2. Connectez-vous à [console.cloud.google.com](https://console.cloud.google.com)
+   avec un compte **Gmail personnel** — pas une adresse `@res2boost.com`.
+3. **Nouveau projet** → nom `kaissi-publication`. Le champ *Organisation*
+   affiche **« Aucune organisation »** : c'est exactement ce qu'on veut.
+4. Reprenez §4 decies à partir de l'étape 2 (activer l'API, créer le compte de
+   service, télécharger la clé JSON) — dans CE projet.
+5. Étape 4 de §4 decies : invitez l'adresse du compte de service dans Play
+   Console. Play ne demande pas à quelle organisation elle appartient.
+
+> **Ce compte Gmail ne devient propriétaire de rien d'important** : il héberge
+> un projet qui ne sert qu'à porter une identité machine. L'application, le
+> compte développeur et les revenus restent où ils sont.
+>
+> Notez tout de même quel compte l'a créé — le jour où il faudra régénérer la
+> clé, c'est avec lui qu'il faudra se reconnecter.
+
+#### C. Demander une exception à l'administrateur
+
+C'est la voie propre si `res2boost.com` a un administrateur joignable. Ce qu'il
+faut lui demander, en une phrase :
+
+> « Peux-tu désactiver la contrainte `iam.disableServiceAccountKeyCreation`
+> **pour le seul projet `Kaissi`** ? »
+
+Son chemin : *IAM et administration → Règles d'administration* → chercher
+`iam.disableServiceAccountKeyCreation` → **Gérer la règle** → *Personnaliser* →
+portée **le projet Kaissi** → **Non appliquée** → *Définir la règle*.
+
+Une exception par projet, plutôt qu'une désactivation à l'échelle de
+l'organisation : la protection reste partout ailleurs.
+
+### En attendant, qu'est-ce qui est bloqué ?
+
+| | État |
+|---|---|
+| iOS → TestFlight | ✅ automatique, rien à faire |
+| Android → l'AAB est construit et signé | ✅ disponible en artefact du build |
+| Android → envoi vers Play | ⏸ attend cette clé |
+
+Le build Android **passe** : c'est l'étape de publication qui signale les
+identifiants absents. Ce n'est pas une régression, c'est l'état d'attente.
+
+---
+
 
 ## 4 undecies. Ce que l'automatisation ne peut PAS faire
 
