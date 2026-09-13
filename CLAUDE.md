@@ -505,6 +505,18 @@ pnpm pos:aab        # ou pnpm pos:apk pour un APK signé, installable
 # Le versionCode vient de apps/pos/package.json (« 1.4.2 » → 10402), et Play
 # le CONSOMME au téléversement : « Discard draft release » ne le libère pas.
 # Un numéro refusé ne se récupère jamais — on monte.
+#
+# ⚑ PUBLIER = POSER UN TAG. codemagic.yaml se déclenche sur `v*`, jamais sur
+#   un push : chaque build iOS brûle un numéro chez Apple, chaque envoi
+#   Android un versionCode que Play ne rend pas.
+#
+#     pnpm pos:version --monter
+#     git commit -am "Version 0.1.3" && git tag v0.1.3 && git push --tags
+#
+#   Ne mélange PAS ce chemin avec `pnpm pos:aab` téléversé à la main : les deux
+#   consomment le même compteur, et Play refuse le second avec « Version code
+#   already used ». `pos:apk` reste la voie pour installer chez un client hors
+#   magasin. Détail complet : docs/stores.md §4 octies.
 pnpm pos:version [--monter]
 
 # Le plugin Java d'impression compile — un JDK suffit, aucun SDK Android

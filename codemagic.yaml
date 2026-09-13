@@ -30,13 +30,29 @@
 # deux magasins, et le site web conservé à côté. Kaissi y arrive autrement —
 # son bundle est déjà empaqueté dans le paquet, sur les deux plateformes.
 #
-# ── Pourquoi aucun déclencheur sur `push` ─────────────────────────────────
+# ── Le déclencheur est un TAG, jamais un push ─────────────────────────────
 #
-# Digital_Fidelity construit à chaque push sur `main`. Ici, non : chaque
-# construction iOS brûle un numéro de build chez Apple, et chaque envoi
-# Android brûle un `versionCode` que Play ne rend JAMAIS. Publier est une
-# décision, pas un effet de bord d'un commit. On lance donc à la main :
-# Codemagic → Start new build → workflow.
+# Digital_Fidelity construit à chaque push sur `main`. Ici, non, et ce n'est
+# pas une timidité : chaque construction iOS brûle un numéro de build chez
+# Apple, et chaque envoi Android brûle un `versionCode` que Play ne rend
+# JAMAIS. Sur vingt commits de documentation, c'est vingt numéros perdus —
+# et le jour où l'on veut vraiment publier, `pnpm pos:version --monter` doit
+# sauter par-dessus.
+#
+# Mais « à la main » n'était pas la bonne réponse non plus : on oublie, et
+# la version installée chez le client dérive de `main` sans que personne ne
+# s'en aperçoive.
+#
+# D'où le TAG. Publier redevient un acte délibéré — une commande, une trace
+# dans l'historique, une version nommée — et tout le reste est automatique :
+#
+#     pnpm pos:version --monter        # monte apps/pos/package.json
+#     git commit -am "Version 0.1.3"
+#     git tag v0.1.3 && git push --tags
+#
+# Codemagic construit alors les deux plateformes et publie. Un push ordinaire
+# sur `main` ne déclenche rien : la CI GitHub, elle, tourne à chaque commit et
+# c'est là que les erreurs se voient.
 # ═══════════════════════════════════════════════════════════════════════════
 
 definitions:
@@ -69,6 +85,19 @@ workflows:
     name: Kaissi POS — Android (AAB pour Google Play)
     max_build_duration: 45
     instance_type: linux_x2
+
+    # ── Déclenchement : un TAG « v… », et rien d'autre ────────────────────
+    #
+    # `tag_patterns` filtre côté Codemagic : un tag `essai-imprimante` ne
+    # lance rien. Sans ce filtre, n'importe quel tag de travail brûlerait un
+    # numéro de version.
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'v*'
+          include: true
+
     environment:
       # Groupe à créer dans Codemagic si l'on veut la publication
       # automatique sur la piste interne (GCLOUD_SERVICE_ACCOUNT_CREDENTIALS).
@@ -144,6 +173,19 @@ workflows:
     name: Kaissi POS — iOS (IPA pour l'App Store)
     max_build_duration: 60
     instance_type: mac_mini_m2
+
+    # ── Déclenchement : un TAG « v… », et rien d'autre ────────────────────
+    #
+    # `tag_patterns` filtre côté Codemagic : un tag `essai-imprimante` ne
+    # lance rien. Sans ce filtre, n'importe quel tag de travail brûlerait un
+    # numéro de version.
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'v*'
+          include: true
+
     environment:
       groups:
         # Les identifiants App Store Connect sont ceux du COMPTE développeur,

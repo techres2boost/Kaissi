@@ -2140,6 +2140,99 @@ installés restent sur la dernière version pour toujours.
 ---
 
 
+## 4 octies. Publier en une commande — le tag, et ce qu'il déclenche
+
+### Pourquoi ce n'était pas automatique, et pourquoi ça ne l'est toujours pas « à chaque push »
+
+`codemagic.yaml` n'avait **aucun** déclencheur. Ce n'était pas un oubli :
+
+- chaque construction **iOS** brûle un numéro de build chez Apple ;
+- chaque envoi **Android** brûle un `versionCode` que Play **ne rend jamais**.
+
+Sur vingt commits de documentation, c'est vingt numéros perdus — et le jour où
+l'on veut vraiment publier, `pnpm pos:version --monter` doit sauter par-dessus.
+
+Mais « à la main » n'était pas la bonne réponse non plus : on oublie, et la
+version installée chez le client dérive de `main` sans que personne ne s'en
+aperçoive.
+
+### Le tag
+
+```bash
+pnpm pos:version --monter          # monte apps/pos/package.json
+git commit -am "Version 0.1.3"
+git tag v0.1.3
+git push && git push --tags
+```
+
+Codemagic construit alors **les deux plateformes** et publie. Un push ordinaire
+sur `main` ne déclenche rien — la CI GitHub, elle, tourne à chaque commit, et
+c'est là que les erreurs se voient.
+
+`tag_patterns: 'v*'` filtre côté Codemagic : un tag `essai-imprimante` ne lance
+rien. Sans ce filtre, n'importe quel tag de travail brûlerait un numéro.
+
+> ### ⚠ Ne mélange pas `pnpm pos:aab` et le tag
+>
+> Les deux produisent un AAB, et les deux consomment le **même compteur** —
+> `apps/pos/package.json`. Un AAB construit sur ton PC, téléversé à la main,
+> brûle le `versionCode` que le tag suivant croira libre : Play refuse alors le
+> build de Codemagic avec « Version code N has already been used », et le
+> numéro est perdu des deux côtés.
+>
+> Choisis une voie. `pnpm pos:aab` reste utile pour **installer un APK chez un
+> client** sans passer par le magasin (`pnpm pos:apk`) — pas pour téléverser.
+
+### Et pourquoi rien n'est apparu sur le Play Store
+
+Trois raisons possibles, et il faut les écarter dans cet ordre :
+
+1. **Aucun build n'a été déclenché** — c'est le point ci-dessus, réglé par le
+   tag.
+2. **`GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` est absent.** Sans lui, le bloc
+   `publishing.google_play` échoue et l'AAB reste un simple artefact à
+   télécharger. La section *Publishing* du journal de build le dit.
+3. **La publication ne vise PAS la production**, et c'est voulu :
+
+   ```yaml
+   track: internal
+   submit_as_draft: true
+   ```
+
+   Une caisse s'installe d'abord sur une tablette d'essai. Une mise à jour
+   automatique qui casse l'encaissement se voit en plein service, chez le
+   client, pas ici. Le passage en production reste un clic dans Play Console.
+
+> Rappel qui prime sur tout le reste : un compte développeur **personnel** ne
+> peut pas publier en production avant **12 testeurs pendant 14 jours** en test
+> fermé (§3.5). Tant que ce n'est pas fait, aucun réglage de Codemagic ne
+> rendra l'application installable par un client depuis le Play Store.
+
+### Côté App Store, la même prudence
+
+```yaml
+submit_to_testflight: false
+```
+
+La build monte dans App Store Connect et s'arrête là. TestFlight, puis la
+revue, restent des décisions — pas un effet de bord d'un `git push --tags`.
+
+### Ce qu'il faut poser dans Codemagic pour que le tag suffise
+
+| | Où | Sans lui |
+|---|---|---|
+| Keystore `kaissi_keystore` | *Settings → Code signing identities* | le build Android échoue d'entrée |
+| Groupe `google_play` avec `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` | *Environment variables* | l'AAB est produit mais jamais envoyé |
+| Groupe `ios_signing` (les quatre variables, §4 bis suite) | *Environment variables* | le build iOS échoue à la signature |
+| `APP_STORE_APPLE_ID` | *Environment variables*, après création de la fiche | le numéro de build vient du compteur Codemagic |
+
+Le **webhook** n'est pas à créer à la main : Codemagic l'installe sur le dépôt
+dès qu'un workflow porte un bloc `triggering`. Si les tags ne déclenchent rien,
+c'est là qu'il faut regarder — *Repository settings → Webhooks*.
+
+---
+
+
 ## 5. Dans quel ordre
 
 1. **Maintenant** — l'APK signé, installé à la main. Zéro attente, correction
