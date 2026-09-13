@@ -1787,6 +1787,54 @@ avec sa liste de fuseaux horaires.
 > voyaient — le remplacement a lieu à l'empaquetage, après eux tous. Un test
 > le refuse désormais dans **tout** le dépôt.
 
+#### Q.2 bis — Un terminal neuf dit qu'il n'est relié à rien
+
+4 bis. Sur une caisse fraîchement installée, regarde le bandeau, à droite.
+
+**Attendu** : un badge ROUGE « ⚠ À appairer ». Touche-le : il ouvre l'écran de
+synchronisation, où l'e-mail et le mot de passe du gérant relient le terminal
+au compte.
+
+> **La panne, sur le premier terminal installé chez le gérant.** Il passe une
+> commande sur le téléphone, ouvre le back-office, ne voit rien, et conclut :
+> « la synchronisation ne marche pas, les deux ne sont pas liés ». Le
+> diagnostic était exact, et la cause était à l'écran depuis le début — le
+> badge affichait « ⇅ local ».
+>
+> Mais « local » DÉCRIT un état au lieu de le NOMMER, et ne dit pas quoi
+> faire. Pire, il se lit comme un mode de fonctionnement — « la caisse marche
+> en local, c'est normal » — alors que c'est une installation inachevée :
+> les ventes d'un terminal non appairé restent sur l'appareil et n'arriveront
+> JAMAIS nulle part.
+>
+> Le badge prend donc le rouge des états qui demandent une action, au même
+> titre qu'un rejet de synchronisation. Ce qui ne part pas doit se voir comme
+> ce qui est refusé.
+
+#### Q.2 ter — La caisse tient dans un téléphone
+
+4 ter. Réduis la fenêtre du navigateur à 390 px de large, ou lance
+   `pnpm --filter @kaissi/pos test:largeur`.
+
+**Attendu** : aucune barre de défilement horizontale, sur aucun écran. Le
+bandeau passe à la ligne et sa rangée d'actions glisse ; le bouton
+« À emporter » de la salle reste visible.
+
+> **Ce qui se voyait sur un iPhone et sur rien d'autre.** La page entière
+> faisait 727 px pour 390 px de fenêtre : « l'écran est copié, il faut
+> glisser, et quand tu glisses c'est mal affiché ».
+>
+> Les grilles n'y étaient pour rien — elles avaient leurs points de bascule.
+> C'était le bandeau : une rangée flex sans retour à la ligne. Dans une
+> colonne flex, un enfant trop large ne rétrécit pas, il déborde, et c'est le
+> DOCUMENT qui devient scrollable. Les grilles calculaient ensuite leurs
+> colonnes sur cette largeur-là.
+>
+> Invisible en développement : la fenêtre fait 1280 px. Un débordement
+> horizontal ne casse d'ailleurs aucun test fonctionnel — le parcours de
+> caisse passait en entier. D'où `tests/largeur-telephone.mjs`, qui compare
+> `scrollWidth` à `innerWidth` sur sept écrans et NOMME l'élément qui dépasse.
+
 #### Q.3 — Le build Android dit enfin ce qui ne va pas
 
 5. Avant de construire l'APK : `pnpm verifier:jdk`.

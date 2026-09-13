@@ -356,17 +356,38 @@ function Bandeau({
         {(!sync || resumeSync.enAttente > 0 || resumeSync.rejetes > 0 || resumeSync.etat === 'bloque') && (
           <button
             type="button"
-            className={`badge-sync ${resumeSync.rejetes > 0 || resumeSync.etat === 'bloque' ? 'alerte' : ''}`}
+            className={`badge-sync ${!sync || resumeSync.rejetes > 0 || resumeSync.etat === 'bloque' ? 'alerte' : ''}`}
             onClick={onSync}
             title={
               !sync
-                ? 'Terminal non appairé — la caisse fonctionne en local'
+                ? 'Ce terminal n’est relié à aucun compte : ses ventes restent sur ' +
+                  'l’appareil et n’arriveront JAMAIS au back-office. Touchez ici pour ' +
+                  'l’appairer avec votre e-mail et votre mot de passe.'
                 : resumeSync.rejetes > 0
                   ? `${resumeSync.rejetes} opération(s) refusée(s) — votre attention est requise`
                   : `${resumeSync.enAttente} opération(s) en attente d'envoi`
             }
           >
-            {!sync ? '⇅ local' : resumeSync.rejetes > 0 ? `⚠ ${resumeSync.rejetes}` : `⇅ ${resumeSync.enAttente}`}
+            {/*
+              ── « ⇅ local » ne disait rien à personne ──────────────────────
+              PANNE OBSERVÉE, sur le premier terminal installé chez le gérant.
+              Il passe une commande, ouvre le back-office, ne la voit pas, et
+              conclut : « la synchronisation ne marche pas, les deux ne sont
+              pas liés ». Le diagnostic était exact et la cause était à
+              l'écran — mais le mot « local » la décrivait au lieu de la
+              NOMMER, et sans jamais dire quoi faire.
+
+              Un terminal non appairé n'est pas un mode de fonctionnement :
+              c'est une installation inachevée. Ses ventes n'arriveront jamais
+              nulle part. Le badge le dit donc en toutes lettres, et prend le
+              rouge des états qui demandent une action — au même titre qu'un
+              rejet de synchronisation.
+            */}
+            {!sync
+              ? '⚠ À appairer'
+              : resumeSync.rejetes > 0
+                ? `⚠ ${resumeSync.rejetes}`
+                : `⇅ ${resumeSync.enAttente}`}
           </button>
         )}
 
