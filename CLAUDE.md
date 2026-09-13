@@ -521,7 +521,9 @@ pnpm pos:aab        # ou pnpm pos:apk pour un APK signé, installable
 #   la voie pour installer chez un client hors magasin.
 #
 #   Détail complet, et les étapes du compte de service Google :
-#   docs/stores.md §4 octies à §4 decies.
+#   docs/stores.md §4 octies à §4 undecies. Rien ne se déclenche ? Le WEBHOOK
+#   avant tout le reste (§4 nonies) : Codemagic ne surveille pas le dépôt,
+#   c'est GitHub qui l'appelle.
 pnpm pos:version [--monter]
 
 # Le plugin Java d'impression compile — un JDK suffit, aucun SDK Android

@@ -2033,6 +2033,7 @@ mal qu'une absence de vidéo.
 | `Configuration file error: … ensure this value has at least 1 characters` | une variable déclarée à vide dans `codemagic.yaml` | ne pas la déclarer ; la poser dans les variables d'environnement Codemagic (§4 bis) |
 | `Cannot save Signing Certificates without certificate private key` | `CERTIFICATE_PRIVATE_KEY` absente, ou sa valeur ne commence pas par `-----BEGIN` | §4 bis (suite), piège n° 1 |
 | 401 d'Apple sur `fetch-signing-files` | la `.p8` n'est pas une clé d'**API App Store Connect** | §4 bis (suite), piège n° 2 |
+| **Aucun build ne démarre** au push | pas de webhook : Codemagic ne surveille pas le dépôt, c'est GitHub qui l'appelle | §4 nonies |
 | `altool … Cannot determine the Apple ID from Bundle ID … (19)` | la **fiche** n'existe pas encore dans App Store Connect — le Bundle ID ne suffit pas | créer la fiche (§4 ter, étape 3), puis relancer |
 | `409: You already have a current Distribution certificate or a pending certificate request` | le compte est à son plafond de certificats, et aucun ne correspond à `CERTIFICATE_PRIVATE_KEY` | reprendre le `cert_key` d'un projet déjà signé sur ce compte ; à défaut révoquer un certificat expiré (§4 bis suite) |
 
@@ -2194,83 +2195,188 @@ continu, seulement croissant.
 
 ---
 
-## 4 nonies. `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS`, clic par clic
+## 4 nonies. Rien ne se déclenche ? Le WEBHOOK avant tout le reste
 
-C'est la seule pièce manquante. Sans elle, l'AAB est construit et signé, puis
-reste un fichier à télécharger — la section *Publishing* du journal de build
-le dit en toutes lettres.
+C'est la première chose à vérifier, et de loin la plus fréquente — avant les
+identifiants, avant les droits, avant le fichier de configuration.
 
-Compte **20 minutes**, et jusqu'à **24 heures** avant que les droits soient
-effectifs chez Google.
+### Pourquoi
 
-### Étape 1 — Lier un projet Google Cloud à Play Console
+Codemagic **ne surveille pas** le dépôt. Il ne vient rien chercher : c'est
+GitHub qui l'appelle, à chaque push, par un **webhook**. Sans ce webhook,
+`triggering` peut être parfait dans `codemagic.yaml`, il ne sera jamais lu —
+personne ne prévient Codemagic qu'il y a quelque chose à lire.
 
-1. [play.google.com/console](https://play.google.com/console) → **Paramètres**
-   (roue dentée, tout en bas à gauche) → **Accès à l'API**.
-2. Si aucun projet n'est lié : **Créer un projet Google Cloud**. Google en
-   fabrique un et le lie. Rien à configurer dedans.
+Et c'est exactement le piège du premier jour : le bloc `triggering` a été
+ajouté **après** avoir connecté l'application. Codemagic pose le webhook au
+moment où il en a besoin ; une application connectée sans aucun déclencheur
+n'en a pas reçu.
+
+> **Le symptôme qui ne trompe pas** : dans *Builds*, les seules constructions
+> visibles sont celles lancées avec *Start new build*, et elles portent des
+> commits anciens. Aucune ne porte le commit que vous venez de pousser.
+
+### Vérifier, côté GitHub
+
+`github.com/‹vous›/‹dépôt›` → **Settings** → **Webhooks**.
+
+| Ce que vous voyez | Ce que ça veut dire |
+|---|---|
+| Aucun webhook | Codemagic n'est prévenu de rien. C'est la cause. |
+| Un webhook `api.codemagic.io/hooks/…` avec une pastille **verte** | il fonctionne — le problème est ailleurs (voir plus bas) |
+| Le même avec une pastille **rouge** | les livraisons échouent : ouvrez-le, onglet *Recent Deliveries*, la réponse dit pourquoi |
+
+### Le poser
+
+Codemagic → l'application **Kaissi** → **Repository settings** (en haut à
+droite de l'écran `codemagic.yaml`) → section **Webhooks** → **Add webhook**.
+
+Si le bouton refuse : l'autorisation GitHub de Codemagic ne permet pas de
+créer des webhooks. Reconnectez l'intégration — Codemagic → *Teams / Personal
+Account* → **Integrations** → GitHub → *Reconnect*, en acceptant les droits
+demandés.
+
+### Si le webhook est vert et que rien ne part quand même
+
+Trois causes, dans l'ordre où il faut les écarter :
+
+1. **La branche ne correspond pas.** `branch_patterns` vaut `main`. Un push
+   sur une autre branche ne déclenche rien — c'est voulu.
+2. **Le `codemagic.yaml` du commit poussé ne contient pas `triggering`.**
+   Codemagic lit la configuration **du commit qui arrive**, pas celle de la
+   dernière fois. Le commit qui AJOUTE le déclencheur ne peut donc pas se
+   déclencher lui-même : c'est le suivant qui le fera.
+3. **L'application n'est pas en mode `codemagic.yaml`.** Si l'écran de
+   configuration montre encore l'éditeur de workflows graphique, cliquez
+   *Check for configuration file*.
+
+---
+
+## 4 decies. `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS`, clic par clic
+
+### D'abord : peut-on s'en passer ?
+
+**Non.** Et il vaut mieux savoir pourquoi que chercher un contournement qui
+n'existe pas.
+
+Publier sur Google Play depuis une machine, sans humain devant l'écran, passe
+par **l'API Google Play Developer**. Cette API n'accepte qu'une seule forme
+d'identité : un **compte de service**, dont la preuve est un fichier JSON.
+Aucun mot de passe, aucun jeton d'application, aucune autre voie.
+
+C'est exactement le même rôle que la clé `.p8` côté Apple — celle que vous avez
+déjà configurée, et qui explique que les envois vers App Store Connect
+fonctionnent :
+
+| | Apple | Google |
+|---|---|---|
+| L'identité machine | clé d'API App Store Connect (`.p8`) | compte de service (JSON) |
+| Où on la crée | App Store Connect → Users and Access → Integrations | Play Console → **API access** |
+| Dans Codemagic | `ASC_PRIVATE_KEY` | `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` |
+
+> **Si un autre produit publie déjà automatiquement sur Play depuis ce même
+> compte développeur, un compte de service EXISTE déjà.** Il a simplement été
+> créé une fois, il y a longtemps, et oublié. Commencez par le chercher : la
+> §4 decies *bis* ci-dessous évite de tout refaire.
+
+### Où est « Accès à l'API » — le lien direct
+
+Ce n'est pas dans *Paramètres*, malgré l'apparence. C'est une page à part, au
+niveau du **compte développeur**, et le plus sûr est d'y aller par l'URL —
+prenez le numéro qui figure déjà dans la vôtre :
+
+```
+play.google.com/console/u/0/developers/‹VOTRE-NUMÉRO›/api-access
+```
+
+Par la navigation : **Paramètres** → **Accès à l'API** (entrée distincte dans
+la colonne de gauche, sous *Paramètres* ; elle n'apparaît que pour le
+propriétaire du compte).
+
+### 4 decies bis — réutiliser un compte de service existant
+
+Un compte de service n'appartient pas à une application : il appartient au
+**compte développeur**, et on lui accorde l'accès application par application.
+
+1. Ouvrez *Accès à l'API*. Si la section **Comptes de service** en liste déjà
+   un (par exemple celui d'un autre produit), c'est gagné.
+2. **Gérer les autorisations Play Console** en face de lui → onglet
+   **Applications** → cochez **Kaissi** → *Appliquer* → *Inviter l'utilisateur*.
+3. Si vous avez encore son fichier JSON, collez-le dans Codemagic (étape 5
+   plus bas) et vous avez terminé.
+4. Sinon, créez-lui simplement **une nouvelle clé** — Google Cloud → ce compte
+   de service → *Clés* → *Ajouter une clé* → JSON. Les anciennes clés
+   continuent de fonctionner ; on n'a rien cassé.
+
+Le reste de cette section ne sert que s'il n'existe AUCUN compte de service.
+
+### Étape 1 — Lier un projet Google Cloud
+
+Dans *Accès à l'API*, si rien n'est lié : **Créer un projet Google Cloud**.
+Google en fabrique un et le rattache. Rien à configurer dedans — il ne sert
+que de support administratif au compte de service.
 
 ### Étape 2 — Créer le compte de service
 
-Toujours dans *Accès à l'API* :
+Toujours dans *Accès à l'API* → **Créer un compte de service**. Un encadré
+s'ouvre avec un lien vers **Google Cloud Console** : c'est ce lien qu'il faut
+suivre, parce que la création se fait là-bas et la permission ici.
 
-3. Section **Comptes de service** → **Créer un compte de service**. Un encadré
-   s'ouvre avec un lien vers **Google Cloud Console** : suis-le.
-4. Dans Google Cloud → **Créer un compte de service** :
+Dans Google Cloud → **Créer un compte de service** :
 
-   | Champ | Valeur |
-   |---|---|
-   | Nom | `codemagic-publisher` |
-   | ID | rempli tout seul |
-   | Description | `Publication automatique depuis Codemagic` |
+| Champ | Valeur |
+|---|---|
+| Nom | `codemagic-publisher` |
+| ID | rempli tout seul |
+| Description | `Publication automatique depuis Codemagic` |
 
-5. **Continuer** → l'écran « Accorder à ce compte de service l'accès au
-   projet » : **ne donne AUCUN rôle**. Les droits se donnent côté Play, pas
-   côté Cloud. → **OK** / **Terminé**.
+→ **Continuer** → écran « Accorder à ce compte de service l'accès au projet » :
+**ne donnez AUCUN rôle**. Les droits se donnent côté Play, pas côté Cloud —
+un rôle ici n'ouvrirait rien d'utile et élargirait la surface pour rien.
+→ **Terminé**.
 
 ### Étape 3 — Télécharger la clé JSON
 
-6. Dans la liste des comptes de service, clique sur `codemagic-publisher`.
-7. Onglet **Clés** → **Ajouter une clé** → **Créer une clé** → format
-   **JSON** → **Créer**.
-8. Un fichier se télécharge. **C'est la seule fois.** Range-le avec tes autres
-   clés (§4 septies) — il ouvre la publication de tes applications.
+Cliquez sur `codemagic-publisher` → onglet **Clés** → **Ajouter une clé** →
+**Créer une clé** → **JSON** → **Créer**.
+
+Un fichier se télécharge. **C'est la seule fois.** Rangez-le avec vos autres
+clés (§4 septies) : il ouvre la publication de vos applications.
 
 ### Étape 4 — Donner les droits, côté Play
 
-9. Retourne dans Play Console → *Accès à l'API* → **Actualiser les comptes de
-   service**. `codemagic-publisher@…` apparaît.
-10. **Gérer les autorisations Play Console** en face de lui.
-11. Onglet **Applications** → coche **Kaissi**.
-12. Onglet **Autorisations du compte** — ou *Autorisations de l'application* —
-    coche :
+Retour dans Play Console → *Accès à l'API* → **Actualiser les comptes de
+service**. `codemagic-publisher@…` apparaît → **Gérer les autorisations Play
+Console**.
 
-    | Autorisation | Pourquoi |
-    |---|---|
-    | **Afficher les informations sur l'application** | lire le dernier `versionCode` publié |
-    | **Gérer les versions de test** | publier sur la piste interne |
-    | ~~Gérer les versions de production~~ | **non** — la production reste un geste humain |
+- Onglet **Applications** : cochez **Kaissi**.
+- Autorisations :
 
-13. **Inviter l'utilisateur** → **Envoyer l'invitation**.
+| Autorisation | |
+|---|---|
+| **Afficher les informations sur l'application** | ✅ — lire le dernier `versionCode` publié |
+| **Gérer les versions de test** | ✅ — publier sur la piste interne |
+| ~~Gérer les versions de production~~ | ❌ — la production reste un geste humain |
+
+→ **Inviter l'utilisateur**.
 
 > Google prévient que les changements peuvent prendre **jusqu'à 24 heures**.
-> En pratique c'est quelques minutes, mais si le premier build échoue sur
-> `The caller does not have permission`, c'est cela : attends, ne recommence
+> En pratique c'est quelques minutes. Si le premier build échoue sur
+> `The caller does not have permission`, c'est cela : attendez, ne refaites
 > pas la configuration.
 
 ### Étape 5 — Coller le JSON dans Codemagic
 
-14. Codemagic → l'application **Kaissi** → **Environment variables**.
-15. Trois champs, puis *Add* :
+Codemagic → l'application **Kaissi** → **Environment variables** :
 
-    | | |
-    |---|---|
-    | Variable name | `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` |
-    | Variable value | **tout le contenu du fichier JSON** |
-    | Group | `google_play` |
-    | Secure | **coché** |
+| | |
+|---|---|
+| Variable name | `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` |
+| Variable value | **tout le contenu du fichier JSON** |
+| Group | `google_play` |
+| Secure | **coché** |
 
-> ### ⚠ Colle le fichier ENTIER, sans le retoucher
+> ### ⚠ Collez le fichier ENTIER, sans le retoucher
 >
 > De `{` à `}`, sauts de ligne compris. Le JSON contient une clé privée dont
 > les retours à la ligne sont encodés `\n` : les « nettoyer » la rend
@@ -2284,7 +2390,7 @@ Toujours dans *Accès à l'API* :
 
 ### Étape 6 — Vérifier
 
-Pousse n'importe quoi sur `main`. Dans le journal du build `pos-android` :
+Poussez n'importe quoi sur `main`. Dans le journal du build `pos-android` :
 
 ```
 Dernier versionCode publié : 101 — nouveau : 102.
@@ -2292,14 +2398,12 @@ Dernier versionCode publié : 101 — nouveau : 102.
 Publishing App Bundle to Google Play (track: internal)
 ```
 
-Si tu lis à la place « Aucun numéro publié à interroger », la variable n'est
-pas visible du workflow — vérifie qu'elle est bien dans le groupe
-`google_play`, que `codemagic.yaml` déclare ce groupe, et que le nom est
-exactement celui ci-dessus.
+« Aucun numéro publié à interroger » signifie que la variable n'est pas visible
+du workflow : vérifiez le groupe `google_play` et l'orthographe exacte du nom.
 
 ---
 
-## 4 decies. Ce que l'automatisation ne peut PAS faire
+## 4 undecies. Ce que l'automatisation ne peut PAS faire
 
 | | Automatique | Reste manuel |
 |---|---|---|
