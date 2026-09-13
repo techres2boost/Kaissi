@@ -16,19 +16,23 @@ import { describe, expect, it } from 'vitest'
 import { CHEMINS_PUBLICS, estPublique } from './routes-publiques.js'
 
 describe('les chemins ouverts sans session', () => {
-  it('ouvre la connexion et la politique de confidentialité', () => {
+  it('ouvre la connexion, la confidentialité et l’assistance', () => {
     expect(estPublique('/connexion')).toBe(true)
     expect(estPublique('/confidentialite')).toBe(true)
+    // « Support URL » de la fiche App Store, visitée par le relecteur.
+    expect(estPublique('/support')).toBe(true)
   })
 
-  it('la page de confidentialité EXISTE — sinon l’ouvrir ne sert à rien', async () => {
-    // Une liste qui autorise une page absente rendrait un 404 à Google, ce
-    // qui est exactement aussi rédhibitoire qu'une redirection.
+  it('les pages ouvertes EXISTENT — sinon les ouvrir ne sert à rien', async () => {
+    // Une liste qui autorise une page absente rend un 404 au magasin, ce qui
+    // est exactement aussi rédhibitoire qu'une redirection vers la connexion.
     const { existsSync } = await import('node:fs')
-    expect(
-      existsSync(new URL('../app/confidentialite/page.tsx', import.meta.url)),
-      'src/app/confidentialite/page.tsx',
-    ).toBe(true)
+    for (const page of ['confidentialite', 'support']) {
+      expect(
+        existsSync(new URL(`../app/${page}/page.tsx`, import.meta.url)),
+        `src/app/${page}/page.tsx`,
+      ).toBe(true)
+    }
   })
 
   it('ferme tout le reste', () => {
@@ -51,6 +55,7 @@ describe('les chemins ouverts sans session', () => {
       '/confidentialite-interne',
       '/connexions-des-appareils',
       '/confidentialitehack',
+      '/support-technique-interne',
     ]) {
       expect(estPublique(piege), piege).toBe(false)
     }
@@ -63,8 +68,8 @@ describe('les chemins ouverts sans session', () => {
 
   it('la liste reste COURTE — ouvrir une page est une décision', () => {
     // Si ce test tombe, ce n'est pas qu'il est trop strict : c'est qu'une
-    // troisième page est devenue publique, et cela se relit.
-    expect(CHEMINS_PUBLICS).toHaveLength(2)
+    // page de plus est devenue publique, et cela se relit.
+    expect(CHEMINS_PUBLICS).toHaveLength(3)
   })
 
   it('le middleware utilise bien ce garde, et pas son ancien `startsWith`', async () => {

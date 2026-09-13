@@ -1860,6 +1860,50 @@ Conséquence pratique : la description longue de Play (§3.6) se réutilise
 telle quelle pour être *lue*, mais les mots-clés qu'elle porte n'y servent
 plus à rien. Ils déménagent dans le champ dédié.
 
+### Les deux URL de la fiche — et celle qu'Apple visite vraiment
+
+| Champ App Store Connect | Ce qu'on met | Obligatoire |
+|---|---|---|
+| **Support URL** | `https://‹votre-domaine-vercel›/support` | **oui** |
+| **Privacy Policy URL** | `https://‹votre-domaine-vercel›/confidentialite` | **oui** |
+| Marketing URL | — laisser vide | non |
+
+Les deux sont des pages du back-office
+(`apps/backoffice/src/app/support/` et `.../confidentialite/`), donc déjà
+déployées avec lui : aucun site à créer, aucun hébergement de plus.
+
+> ### ⚠ Ce n'est pas un champ administratif — un humain l'ouvre
+>
+> Apple **visite** la Support URL pendant la revue, et trois façons de s'y
+> faire rejeter reviennent :
+>
+> 1. **l'URL ne répond pas**, ou rend un écran de connexion. Même piège que
+>    la politique de confidentialité côté Play (§3.5 ter), même remède :
+>    `routes-publiques.ts` ouvre `/support` explicitement, et son test
+>    vérifie les deux sens — que la page est publique, et que rien d'autre ne
+>    l'est devenu ;
+> 2. **c'est une page d'accueil commerciale**, sans moyen de contact. Apple
+>    attend une page D'ASSISTANCE : un humain joignable, et de quoi se
+>    débrouiller sans lui ;
+> 3. **le contact est un formulaire qui exige un compte.** Le client qui
+>    écrit est précisément celui qui n'arrive pas à entrer. D'où une adresse
+>    e-mail en clair.
+>
+> Vérifiez-la comme le relecteur le fera — sans être connecté :
+>
+> ```bash
+> curl -s -o /dev/null -w "%{http_code} %{num_redirects}\n" \
+>   -L https://‹votre-domaine›/support
+> ```
+>
+> **`200 0`** est la seule réponse acceptable. Un `200` après une
+> redirection, c'est la page de connexion.
+
+⚠ Deux valeurs restent à compléter dans `apps/backoffice/src/app/support/page.tsx` :
+le **téléphone** et les **horaires**. Elles sont vides à dessein — tant
+qu'aucune ligne n'est réellement tenue, la page affiche « nous répondons sous
+un jour ouvré » plutôt que de promettre une hotline qui ne décroche pas.
+
 ### Les textes
 
 **Nom** — 30 caractères, unique dans tout l'App Store :

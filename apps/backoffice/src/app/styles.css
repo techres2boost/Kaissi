@@ -1074,3 +1074,27 @@ th .tri:hover { color: var(--texte); }
 }
 .top-cinq .nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .top-cinq .valeur { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 650; }
+
+/* ── Questions fréquentes (page d'assistance publique) ──────────────────────
+ *
+ * Une `<dl>` plutôt qu'une suite de titres : la question et sa réponse sont
+ * un COUPLE, et le lecteur d'écran l'annonce comme tel. Les accordéons ont
+ * été écartés — une page que le relecteur de l'App Store parcourt en
+ * diagonale ne doit rien cacher derrière un clic.
+ */
+.faq { margin: 0; }
+.faq > div + div {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--bordure);
+}
+.faq dt {
+  font-weight: 600;
+  color: var(--texte);
+  margin-bottom: 0.35rem;
+}
+.faq dd {
+  margin: 0;
+  color: var(--attenue);
+  line-height: 1.6;
+}

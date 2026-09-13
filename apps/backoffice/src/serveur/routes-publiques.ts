@@ -14,6 +14,9 @@
  * fiche serait rejetée pour « politique injoignable » — un motif de refus
  * fréquent, et particulièrement agaçant parce que la page existe bel et bien.
  *
+ * L'App Store exige EN PLUS une « Support URL », et un relecteur humain la
+ * visite pendant la revue. Même piège, même remède.
+ *
  * ── Pourquoi une LISTE, et pas un test dans le middleware ─────────────────
  *
  * Pour qu'elle soit énumérable. Une condition écrite en ligne dans le
@@ -27,6 +30,8 @@ export const CHEMINS_PUBLICS = [
   '/connexion',
   // Exigée par Google Play et l'App Store, et testée par eux sans session.
   '/confidentialite',
+  // Exigée par l'App Store (« Support URL »), visitée par le relecteur.
+  '/support',
 ] as const
 
 /**
