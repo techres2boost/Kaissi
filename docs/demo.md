@@ -1787,6 +1787,48 @@ avec sa liste de fuseaux horaires.
 > voyaient — le remplacement a lieu à l'empaquetage, après eux tous. Un test
 > le refuse désormais dans **tout** le dépôt.
 
+#### Q.1 bis — Créer un article sans quitter la caisse
+
+3 ter. Prends le poste avec un **gérant**, ouvre une commande, et cherche la
+   tuile **« + Nouvel article »** en fin de grille. Nom, prix, catégorie,
+   TVA — puis *Ajouter à la carte*.
+
+**Attendu** : l'article apparaît dans la carte **tout de suite**, avec un
+badge ambré « en attente », et il se vend immédiatement.
+
+3 quater. Reprends le poste avec un **caissier**.
+
+**Attendu** : la tuile n'est pas là.
+
+> **Et ce n'est PAS ce qui protège.** Un PIN à quatre chiffres trace, il ne
+> protège pas : masquer un bouton évite une erreur, pas une malveillance, et
+> une tablette volée porte un jeton d'appareil valide. La vraie garde est
+> côté serveur, où le rôle est **relu en base** — un caissier dont la tablette
+> enverrait la bonne requête reçoit `droits_insuffisants`, et l'article n'est
+> pas créé. Les deux existent, aucune ne remplace l'autre.
+>
+> `apps/sync/test/catalogue-depuis-la-caisse.test.ts` le prouve contre un vrai
+> PostgreSQL, et vérifie aussi ce que l'exception **n'ouvre pas** : sous le
+> rôle `kaissi_device`, un `UPDATE` sur un article existant est refusé — la
+> politique est `for insert` sans `using`, et le privilège `update` n'a jamais
+> été accordé.
+
+> **Pourquoi la création est ouverte et la modification non.** Deux caisses
+> hors ligne qui créent chacune un plat produisent deux lignes DISTINCTES : au
+> pire deux fois le même nom, que le back-office fusionne. Un désagrément, pas
+> une perte. Deux caisses qui modifieraient le même prix, elles, s'écraseraient
+> — cela demande le dernier-écrivain-gagne arbitré par
+> `(server_seq, device_id)`, et on ne l'ajoute pas « en passant ».
+
+3 quinquies. Sans catégorie, l'écran prévient.
+
+**Attendu** : « Sans catégorie, il n'apparaîtra sur aucun écran de cuisine ni
+de bar. »
+
+> Le poste de préparation vient de la CATÉGORIE (migration 0025). Un article
+> sans catégorie n'apparaît sur AUCUN écran de préparation — et cela ne se
+> voit qu'en plein service, quand le plat n'arrive pas.
+
 #### Q.2 — « Reçus » sur la caisse, sans jamais appeler le serveur
 
 3 bis. Après avoir encaissé, touche **Reçus** dans le bandeau.

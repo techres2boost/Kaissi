@@ -8,7 +8,7 @@
  *     pas le protocole ni le POS.
  */
 
-import type { EvenementCommande } from '@kaissi/domain'
+import type { EvenementCommande, MutationCatalogue } from '@kaissi/domain'
 import type { ChangementCatalogue, ShiftSynchronise } from './protocole.js'
 
 export interface AppareilAuthentifie {
@@ -156,6 +156,37 @@ export interface DepotSync {
     appareil: AppareilAuthentifie,
     shifts: readonly ShiftSynchronise[],
   ): Promise<readonly string[]>
+
+  /**
+   * Le rôle d'un employé DANS CET ÉTABLISSEMENT, relu en base.
+   *
+   * `null` si l'employé n'y a aucune appartenance, ou si elle est révoquée.
+   *
+   * C'est ici que se joue la seule garde qui vaille sur le catalogue :
+   * l'appareil DÉCLARE qui demande, le serveur ne le croit pas. Un PIN à
+   * quatre chiffres trace, il ne protège pas — et une caisse volée porte un
+   * jeton valide.
+   */
+  roleDeLEmploye(restaurantId: string, employeId: string): Promise<string | null>
+
+  /**
+   * Applique un lot de créations d'articles, et rend ceux réellement écrits.
+   *
+   * L'idempotence est celle de `sync_mutations` : la même mutation renvoyée
+   * cinq fois n'insère qu'une fois. Les articles acceptés redescendent ensuite
+   * par `change_log`, comme n'importe quel changement de prix — le déclencheur
+   * `products_change_log` existe depuis la 0005, il n'y a aucune voie nouvelle.
+   */
+  creerProduits(
+    appareil: AppareilAuthentifie,
+    mutations: readonly MutationCatalogue[],
+  ): Promise<readonly string[]>
+
+  /** Consigne des rejets de CATALOGUE dans le registre d'idempotence. */
+  consignerRejetsCatalogue(
+    appareil: AppareilAuthentifie,
+    rejets: readonly { eventId: string; code: string; message: string }[],
+  ): Promise<void>
 
   /** Consigne les rejets, pour qu'ils remontent au gérant. */
   consignerRejets(

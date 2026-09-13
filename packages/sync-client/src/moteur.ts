@@ -15,7 +15,7 @@
  *   • supprimer un événement local — le journal est en insertion seule.
  */
 
-import type { EvenementCommande } from '@kaissi/domain'
+import type { EvenementCommande, MutationCatalogue } from '@kaissi/domain'
 import { delaiRetentative, estReessayable, type PolitiqueRetentative } from './index.js'
 import { ErreurTransport, type ShiftSynchronise, type Transport } from './transport.js'
 
@@ -46,6 +46,14 @@ export interface DepotLocalSync {
   shiftsAPousser?(limite: number): Promise<readonly ShiftSynchronise[]>
   /** FACULTATIF : marque poussés les shifts que le serveur a accusés. */
   accuserShifts?(ids: readonly string[]): Promise<void>
+  /**
+   * FACULTATIF : mutations de CATALOGUE restant à remonter.
+   *
+   * Même file que les ventes, même purge — seul le destinataire diffère.
+   * Facultatif pour la même raison que les shifts : les dépôts de test, dont
+   * le banc à trois appareils, ne la connaissent pas et n'ont pas à changer.
+   */
+  lotCatalogueAPousser?(taille: number): Promise<readonly { eventId: string; payload: string }[]>
   lireCurseur(cle: 'catalogue' | 'evenements'): Promise<number>
   ecrireCurseur(cle: 'catalogue' | 'evenements', valeur: number): Promise<void>
   /** Compteurs du bandeau : opérations en attente et rejets. */
@@ -134,6 +142,7 @@ export class MoteurSync {
     try {
       await this.pousser()
       await this.pousserShifts()
+      await this.pousserCatalogue()
       await this.tirer()
       this.tentatives = 0
       await this.publier({
@@ -210,6 +219,47 @@ export class MoteurSync {
       const reponse = await envoyer.call(this.options.transport, lot)
       if (reponse.enregistres.length > 0) {
         await accuser.call(this.options.depot, reponse.enregistres)
+      }
+    } catch {
+      // Silencieux à dessein — voir le commentaire ci-dessus.
+    }
+  }
+
+  /**
+   * Étape 1 ter — les articles créés sur la caisse.
+   *
+   * En DERNIER des trois poussées, et l'ordre est une décision : si le réseau
+   * ne tient que trois secondes, ce sont les encaissements qui doivent en
+   * profiter, puis les services de caisse, puis seulement le catalogue. Un
+   * plat du jour qui monte une minute plus tard ne coûte rien ; une vente qui
+   * ne monte pas, si.
+   *
+   * Deux différences avec les ventes, et elles comptent toutes les deux :
+   *
+   *  • l'erreur est AVALÉE, comme pour les shifts — un serveur antérieur
+   *    répond 404 sur cette route, et la laisser remonter mettrait le bandeau
+   *    en « bloqué » alors que les ventes, elles, sont parties ;
+   *  • un REJET, lui, est consigné. C'est une règle métier — le mauvais rôle,
+   *    un taux de TVA inconnu — et elle remonte au gérant, jamais avalée.
+   *    L'article reste en base, marqué « rejeté », au lieu de disparaître
+   *    sans explication d'une carte où on venait de le voir.
+   */
+  private async pousserCatalogue(): Promise<void> {
+    const lire = this.options.depot.lotCatalogueAPousser
+    const envoyer = this.options.transport.catalogue
+    if (!lire || !envoyer) return
+
+    try {
+      const lot = await lire.call(this.options.depot, 50)
+      if (lot.length === 0) return
+      const mutations = lot.map((l) => JSON.parse(l.payload) as MutationCatalogue)
+      const reponse = await envoyer.call(this.options.transport, mutations)
+
+      if (reponse.acceptes.length > 0) {
+        await this.options.depot.accuserReception(reponse.acceptes)
+      }
+      for (const rejet of reponse.rejetes) {
+        await this.options.depot.marquerRejet(rejet.eventId, rejet.code, rejet.message)
       }
     } catch {
       // Silencieux à dessein — voir le commentaire ci-dessus.

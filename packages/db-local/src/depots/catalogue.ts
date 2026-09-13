@@ -1,11 +1,21 @@
 /**
- * Dépôt catalogue — LECTURE LOCALE UNIQUEMENT.
+ * Dépôt catalogue — LECTURE LOCALE, et une seule écriture.
  *
  * L'écran de caisse lit ici, et nulle part ailleurs. Aucun appel réseau sur
  * le chemin de la caisse : ajouter un article doit rester sous les 50 ms,
  * et l'application doit fonctionner en mode avion.
+ *
+ * ── La seule écriture, et pourquoi elle ne casse pas la règle ─────────────
+ *
+ * `creerProduitLocal` écrit un article dans la base de la tablette. Le
+ * catalogue reste pourtant descendant : cette écriture est une DEMANDE,
+ * déposée dans l'outbox en même temps que la ligne. Le serveur tranche, puis
+ * la redescend par `change_log` comme n'importe quel changement de prix. La
+ * caisse n'a pas gagné le droit de décider — elle a gagné celui de proposer
+ * sans attendre le réseau.
  */
 
+import type { MutationCatalogue } from '@kaissi/domain'
 import type { AdaptateurSqlite } from '../adaptateur.js'
 
 export interface CategorieLocale {
@@ -37,6 +47,18 @@ export interface ProduitLocal {
    * règle : c'est `disponible` qui décide, et lui seul.
    */
   motifRetrait: 'stock' | 'manuel' | null
+  /**
+   * L'état de l'article CRÉÉ SUR CETTE CAISSE, s'il en vient.
+   *
+   * `null` — article normal, descendu du serveur, ou créé ici et confirmé.
+   * `'en_attente'` — la demande de création n'est pas encore remontée.
+   * `'rejete'` — le serveur l'a refusée : mauvais rôle, ou donnée invalide.
+   *
+   * Il se déduit de l'OUTBOX, jamais d'un drapeau à entretenir : la ligne
+   * d'outbox disparaît à l'accusé de réception, et l'article redevient
+   * ordinaire sans qu'aucun code n'ait à l'éteindre.
+   */
+  etatLocal: 'en_attente' | 'rejete' | null
 }
 
 export interface TauxTaxeLocal {
@@ -145,6 +167,7 @@ export function depotCatalogue(db: AdaptateurSqlite) {
         position: number
         is_available: number
         unavailable_reason: string | null
+        etat_local: string | null
       }>(
         // Le POSTE vient de la CATÉGORIE, le produit ne sert que de repli.
         //
@@ -162,9 +185,14 @@ export function depotCatalogue(db: AdaptateurSqlite) {
                 COALESCE(c.station_id, p.station_id) AS station_id,
                 p.tax_rate_id, p.name, p.description,
                 p.base_price_millimes, p.color, p.position, p.is_available,
-                p.unavailable_reason
+                p.unavailable_reason,
+                -- L'état vient de l'OUTBOX, pas d'une colonne d'état : elle
+                -- s'y vide toute seule à l'accusé de réception (migration
+                -- locale 011).
+                o.status AS etat_local
          FROM products p
          LEFT JOIN categories c ON c.id = p.category_id
+         LEFT JOIN outbox o ON o.event_id = p.local_event_id AND o.kind = 'catalogue'
          WHERE p.archived_at IS NULL ${filtre}
          ORDER BY p.position, p.name`,
         categorieId ? [categorieId] : [],
@@ -184,7 +212,59 @@ export function depotCatalogue(db: AdaptateurSqlite) {
           l.unavailable_reason === 'stock' || l.unavailable_reason === 'manuel'
             ? l.unavailable_reason
             : null,
+        // `en_cours` est un envoi en vol : pour le caissier, c'est encore
+        // « en attente ». Seuls deux états l'intéressent.
+        etatLocal:
+          l.etat_local === 'rejete'
+            ? 'rejete'
+            : l.etat_local === 'en_attente' || l.etat_local === 'en_cours'
+              ? 'en_attente'
+              : null,
       }))
+    },
+
+    /**
+     * Crée un article DEPUIS la caisse, et dépose sa demande de remontée.
+     *
+     * Les deux écritures sont dans UNE transaction, et ce n'est pas un
+     * raffinement : un article visible dans la carte sans entrée d'outbox ne
+     * remonterait JAMAIS, et rien ne le dirait — il se vendrait pendant des
+     * semaines et n'existerait pour personne d'autre. L'inverse (l'outbox
+     * sans l'article) ferait apparaître un plat que le caissier n'a pas vu
+     * naître.
+     *
+     * L'appelant a déjà validé la mutation avec `validerMutationCatalogue` —
+     * la même fonction que le serveur appellera.
+     */
+    async creerProduitLocal(m: MutationCatalogue): Promise<void> {
+      await db.transaction(async () => {
+        await db.executer(
+          `INSERT OR IGNORE INTO products
+             (id, organization_id, restaurant_id, category_id, station_id,
+              tax_rate_id, name, description, base_price_millimes, color,
+              position, is_available, track_stock, local_event_id)
+           VALUES (?, ?, ?, ?, NULL, ?, ?, NULL, ?, NULL, ?, 1, 0, ?)`,
+          [
+            m.produitId,
+            m.organizationId,
+            m.restaurantId,
+            m.categorieId,
+            m.tauxTvaId,
+            m.nom.trim(),
+            m.prixBaseMillimes,
+            // En FIN de catégorie : un article créé en plein service ne doit
+            // pas se glisser devant ceux que le caissier vise sans regarder.
+            9999,
+            m.mutationId,
+          ],
+        )
+        await db.executer(
+          `INSERT OR IGNORE INTO outbox
+             (event_id, restaurant_id, kind, payload, created_at)
+           VALUES (?, ?, 'catalogue', ?, ?)`,
+          [m.mutationId, m.restaurantId, JSON.stringify(m), new Date().toISOString()],
+        )
+      })
     },
 
     async tauxTaxes(): Promise<TauxTaxeLocal[]> {

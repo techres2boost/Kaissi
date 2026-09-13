@@ -671,6 +671,30 @@ export function creerServeur({
   // ── POST /sync/shifts ────────────────────────────────────────────────
   // Route ADDITIVE : un POS plus ancien ne l'appelle pas, un POS plus récent
   // encaisse normalement si elle manque. Les ventes n'en dépendent jamais.
+  // ── POST /sync/catalogue ─────────────────────────────────────────────
+  //
+  // Route ADDITIVE : un serveur antérieur répond 404, et le client avale
+  // l'erreur pour réessayer au cycle suivant. Rien de ce qui n'est pas une
+  // vente ne doit pouvoir mettre le cycle en échec.
+  app.post('/sync/catalogue', async (c) => {
+    const appareil = c.get('appareil')
+    let corps: unknown
+    try {
+      corps = await c.req.json()
+    } catch {
+      const erreur: ReponseErreur = {
+        erreur: 'requete_invalide',
+        message: 'Corps JSON illisible.',
+      }
+      return c.json(erreur, 400)
+    }
+    try {
+      return c.json(await service.catalogue(appareil, corps as never))
+    } catch (erreur) {
+      return reponseErreur(c, erreur)
+    }
+  })
+
   app.post('/sync/shifts', async (c) => {
     const appareil = c.get('appareil')
     let corps: unknown

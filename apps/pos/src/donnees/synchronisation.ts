@@ -26,6 +26,17 @@ export function depotLocalSync(
       return lot.map((l) => ({ eventId: l.eventId, payload: l.payload }))
     },
 
+    /**
+     * Les articles créés sur la caisse — même file, même purge.
+     *
+     * L'accusé de réception passe par `accuserReception` : c'est la MÊME
+     * ligne d'outbox, et elle ne doit connaître qu'un seul chemin de sortie.
+     */
+    async lotCatalogueAPousser(taille) {
+      const lot = await contexte.journal.lotCatalogueAPousser(taille)
+      return lot.map((l) => ({ eventId: l.eventId, payload: l.payload }))
+    },
+
     async accuserReception(eventIds) {
       await contexte.journal.accuserReception(eventIds)
     },

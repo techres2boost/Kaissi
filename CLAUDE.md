@@ -286,6 +286,42 @@ garde** : un export sans garde rendrait ce qu'on vient de retirer de l'écran.
 Le poste tenu vient de `memberships.station_id`, jamais du NOM de la station :
 renommer « Bar » en « Comptoir » viderait l'écran sans rien expliquer.
 
+### Le catalogue descend — sauf la CRÉATION d'un article
+
+`change_log` reste le sens unique du référentiel : serveur → caisse. Une seule
+exception, et elle est étroite (Postgres 0034, migration locale 011) : une
+caisse peut **créer** un article. Pas le modifier, pas l'archiver, pas
+basculer `is_available` — cette dernière reste la décision du serveur, pour la
+raison de toujours : il calcule le stock à l'instant, une tablette hors ligne
+travaille sur un souvenir de trois heures.
+
+Ce qui rend cette exception tenable, c'est que **créer n'est pas écrire sur un
+état partagé**. Deux caisses hors ligne créent deux lignes distinctes, avec
+leurs identifiants propres ; au pire deux fois le même nom, que le back-office
+fusionne. Un désagrément, pas une perte. Une MODIFICATION, elle, exigerait le
+dernier-écrivain-gagne arbitré par `(server_seq, device_id)` — on ne l'ajoute
+pas « en passant ».
+
+La demande voyage dans **l'outbox existante** (`kind = 'catalogue'`), après
+les ventes et après les services de caisse : si le réseau ne tient que trois
+secondes, ce sont les encaissements qui en profitent. Le serveur applique,
+puis l'article **redescend par `change_log`** comme un changement de prix —
+aucune voie de synchronisation nouvelle.
+
+**Deux gardes, et aucune ne remplace l'autre.** Le rôle (`gerant` ou `admin`)
+est relu **en base** par le service : l'appareil déclare qui demande, le
+serveur ne le croit pas — masquer le bouton évite une erreur, pas une
+malveillance. Et l'établissement est tranché par **RLS**
+(`products_creation_caisse`), parce qu'une question de tenance ne doit jamais
+dépendre d'un `where` écrit à la main. Le privilège `update` n'est pas accordé
+à `kaissi_device` : la seconde serrure tient même si la politique était
+réécrite.
+
+Côté caisse, l'article est vendable **immédiatement**, et sa tuile porte
+« en attente » tant qu'il n'est pas remonté, « refusé » s'il l'a été. L'état
+se déduit de l'outbox — jamais d'un drapeau à entretenir, qui dériverait le
+jour où l'on oublie de l'éteindre sur le chemin du rejet.
+
 ### Le poste de préparation appartient à la CATÉGORIE
 
 `categories.station_id` (migration 0025) est la source de vérité ;
@@ -405,6 +441,13 @@ pnpm --filter @kaissi/pos test:largeur
 
 # Tests de synchronisation — exigent un vrai PostgreSQL.
 # pnpm db:test le prépare : base jetable + migrations de production telles quelles.
+#
+# ⚑ Il REFUSE de démarrer sous root, à dessein. Dans un conteneur sans Docker
+#   où l'on est root, la voie de secours est de lancer PostgreSQL sous un
+#   utilisateur non privilégié :
+#     su postgres -c "/usr/lib/postgresql/16/bin/initdb -D <dir> -U postgres --auth=trust"
+#     su postgres -c "/usr/lib/postgresql/16/bin/pg_ctl -D <dir> -o '-p 5433' -l <log> start"
+#   puis appliquer amorce-supabase.sql et les migrations dans l'ordre.
 pnpm db:test && pnpm --filter @kaissi/sync test && pnpm db:test:stop
 
 # Le JDK que GRADLE utilisera est-il dans la plage éprouvée ? (17–23, Gradle
@@ -504,7 +547,10 @@ téléchargé : une migration qui a besoin du réseau ne s'applique pas en mode 
   l'application vient du réseau : sans connexion, elle ne s'ouvre pas. Le
   raisonnement complet est dans [`docs/stores.md`](docs/stores.md).
 - Mettre une Server Action sur le chemin de la caisse.
-- Synchroniser des lignes mutables plutôt que des événements.
+- Synchroniser des lignes mutables plutôt que des événements. La seule
+  exception est la CRÉATION d'un article depuis la caisse (0034), et elle
+  n'en est une qu'en apparence : deux créations concurrentes ne s'écrasent
+  pas. Une modification, si — elle n'est pas ouverte.
 - Utiliser un flottant pour de l'argent, ou supposer deux décimales.
 - Utiliser un timestamp comme curseur de synchronisation.
 - Bloquer une vente sur une donnée de stock périmée.

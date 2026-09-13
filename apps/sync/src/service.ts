@@ -13,7 +13,15 @@
  *   5. consigne les rejets pour que le gérant les voie.
  */
 
-import { estUuid, estFigee, transitionAutorisee, type EvenementCommande } from '@kaissi/domain'
+import {
+  estUuid,
+  estFigee,
+  peutModifierCatalogue,
+  transitionAutorisee,
+  validerMutationCatalogue,
+  type EvenementCommande,
+  type MutationCatalogue,
+} from '@kaissi/domain'
 import type { AppareilAuthentifie, DepotSync } from './depot.js'
 import {
   ErreurSync,
@@ -345,6 +353,123 @@ export class ServiceSync {
    * gérant des shifts corrects du même lot, et l'appareil réessaierait
    * indéfiniment le même mauvais.
    */
+  /**
+   * Les créations d'articles émises par une caisse.
+   *
+   * ── L'ordre des contrôles, et pourquoi il est celui-là ──────────────────
+   *
+   *  1. IDEMPOTENCE (règle 5) — une mutation déjà appliquée est un doublon de
+   *     retentative, pas une demande tardive. La repasser par le contrôle de
+   *     rôle la ferait rejeter le jour où le gérant qui l'a créée quitte
+   *     l'établissement : l'article existerait en base, et la caisse
+   *     renverrait éternellement une mutation refusée. Elle est donc traitée
+   *     dans `creerProduits`, à l'insertion, sans revalidation.
+   *  2. FORME — `validerMutationCatalogue`, LE MÊME code que la caisse a
+   *     exécuté avant d'accepter la saisie. Dupliqué, il divergerait.
+   *  3. DROITS — le rôle, relu EN BASE. L'appareil déclare qui demande ; le
+   *     service ne le croit pas.
+   *
+   * ── Ce qui est refusé l'est DÉFINITIVEMENT ──────────────────────────────
+   *
+   * Un rejet est une règle métier : il remonte au gérant et ne se réessaie
+   * jamais tout seul. L'article reste dans la base de la caisse, marqué
+   * « rejeté », plutôt que de disparaître d'une carte où on venait de le voir.
+   */
+  async catalogue(
+    appareil: AppareilAuthentifie,
+    requete: { protocolVersion?: number; mutations?: unknown },
+  ): Promise<{ acceptes: string[]; rejetes: RejetEvenement[]; protocolVersion: number }> {
+    if (!protocoleSupporte(requete.protocolVersion ?? VERSION_PROTOCOLE)) {
+      throw new ErreurSync(
+        'protocole_non_supporte',
+        `Protocole v${requete.protocolVersion} non supporté. Mettez à jour l'application.`,
+        426,
+      )
+    }
+    const brut = Array.isArray(requete.mutations) ? requete.mutations : []
+    if (brut.length > TAILLE_LOT_MAX) {
+      throw new ErreurSync(
+        'requete_invalide',
+        `Lot de ${brut.length} mutations : le maximum est ${TAILLE_LOT_MAX}.`,
+        413,
+      )
+    }
+    if (brut.length === 0) return { acceptes: [], rejetes: [], protocolVersion: VERSION_PROTOCOLE }
+
+    const rejetes: RejetEvenement[] = []
+    const recevables: MutationCatalogue[] = []
+
+    /*
+     * Le rôle est lu UNE FOIS PAR EMPLOYÉ, pas une fois par article : un lot
+     * de vingt plats du jour saisis hors ligne vient du même gérant, et vingt
+     * allers-retours en base pour la même réponse se paient en heure de
+     * pointe.
+     */
+    const roles = new Map<string, string | null>()
+
+    for (const item of brut) {
+      const m = item as MutationCatalogue
+      if (typeof m !== 'object' || m === null || !estUuid(m.mutationId)) continue
+
+      if (m.type !== 'catalogue.produit.cree') {
+        rejetes.push({
+          eventId: m.mutationId,
+          code: 'type_inconnu',
+          message: `Type de mutation « ${String(m.type)} » inconnu de ce serveur.`,
+        })
+        continue
+      }
+      if (!estUuid(m.produitId) || !estUuid(m.tauxTvaId)) {
+        rejetes.push({
+          eventId: m.mutationId,
+          code: 'requete_invalide',
+          message: 'Identifiant d’article ou de taux de TVA invalide.',
+        })
+        continue
+      }
+
+      const forme = validerMutationCatalogue(m)
+      if (!forme.valide) {
+        rejetes.push({
+          eventId: m.mutationId,
+          code: 'requete_invalide',
+          message: forme.motif ?? 'Mutation invalide.',
+        })
+        continue
+      }
+
+      if (!roles.has(m.parEmployeId)) {
+        roles.set(
+          m.parEmployeId,
+          await this.depot.roleDeLEmploye(appareil.restaurantId, m.parEmployeId),
+        )
+      }
+      const role = roles.get(m.parEmployeId) ?? null
+      if (role === null || !peutModifierCatalogue(role)) {
+        rejetes.push({
+          eventId: m.mutationId,
+          code: 'droits_insuffisants',
+          // Le message est LU PAR LE GÉRANT dans l'écran de synchronisation :
+          // il doit dire quoi faire, pas seulement que c'est refusé.
+          message:
+            role === null
+              ? 'Cet employé n’appartient plus à cet établissement. L’article n’a pas été créé.'
+              : `Seul un gérant ou un administrateur peut créer un article (rôle « ${role} »).`,
+        })
+        continue
+      }
+
+      recevables.push(m)
+    }
+
+    const acceptes =
+      recevables.length === 0 ? [] : await this.depot.creerProduits(appareil, recevables)
+    if (rejetes.length > 0) {
+      await this.depot.consignerRejetsCatalogue(appareil, rejetes)
+    }
+    return { acceptes: [...acceptes], rejetes, protocolVersion: VERSION_PROTOCOLE }
+  }
+
   async shifts(
     appareil: AppareilAuthentifie,
     requete: RequeteShifts,

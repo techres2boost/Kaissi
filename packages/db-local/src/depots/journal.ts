@@ -125,8 +125,55 @@ export function depotJournal(db: AdaptateurSqlite) {
         status: string
         created_at: string
       }>(
+        /*
+         * ── `kind = 'order_event'`, et c'est une CORRECTION ─────────────────
+         *
+         * Cette requête ne filtrait rien : l'outbox ne portait qu'une sorte
+         * de ligne. Depuis qu'elle transporte aussi les mutations de
+         * catalogue, un article créé sur la caisse partait vers
+         * `POST /sync/push` — qui attend des événements de commande et
+         * l'aurait rejeté, définitivement, sans que rien ne le rattrape.
+         *
+         * La colonne `kind` existait depuis la migration 001, avec sa valeur
+         * par défaut. Elle sert enfin.
+         */
         `SELECT event_id, payload, attempts, last_error, reject_code, status, created_at
-         FROM outbox WHERE status = 'en_attente' ORDER BY created_at LIMIT ?`,
+         FROM outbox WHERE status = 'en_attente' AND kind = 'order_event'
+         ORDER BY created_at LIMIT ?`,
+        [taille],
+      )
+      return lignes.map((l) => ({
+        eventId: l.event_id,
+        payload: l.payload,
+        tentatives: l.attempts,
+        derniereErreur: l.last_error,
+        codeRejet: l.reject_code,
+        statut: l.status as EnregistrementOutbox['statut'],
+        creeA: l.created_at,
+      }))
+    },
+
+    /**
+     * Le lot des mutations de CATALOGUE en attente.
+     *
+     * Même file, même garantie de non-perte, même purge sur accusé de
+     * réception — seul le destinataire change. Les séparer en deux tables
+     * aurait dupliqué la mécanique la plus délicate du produit pour la seule
+     * raison que le corps du message diffère.
+     */
+    async lotCatalogueAPousser(taille: number): Promise<EnregistrementOutbox[]> {
+      const lignes = await db.lire<{
+        event_id: string
+        payload: string
+        attempts: number
+        last_error: string | null
+        reject_code: string | null
+        status: string
+        created_at: string
+      }>(
+        `SELECT event_id, payload, attempts, last_error, reject_code, status, created_at
+         FROM outbox WHERE status = 'en_attente' AND kind = 'catalogue'
+         ORDER BY created_at LIMIT ?`,
         [taille],
       )
       return lignes.map((l) => ({

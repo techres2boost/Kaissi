@@ -113,6 +113,16 @@ export const TVA_07 = '01930000-0000-7000-8000-000000000012'
  * qu'une fois le PIN saisi, donc un employé est toujours connu. Passer
  * `null` dans un test décrivait une vente que la caisse ne produit jamais.
  */
+/**
+ * Le GÉRANT de démonstration (migration 0020).
+ *
+ * Le seul des trois qui puisse toucher au catalogue. Les tests de droits ne
+ * valent que s'ils opposent deux personnes réelles du même établissement :
+ * un refus prouvé avec un identifiant inventé ne prouverait que la validation
+ * d'UUID.
+ */
+export const GERANT_DEMO = '01930000-0000-7000-8000-000000000700'
+
 export const EMPLOYE_DEMO = '01930000-0000-7000-8000-000000000701'
 
 /**

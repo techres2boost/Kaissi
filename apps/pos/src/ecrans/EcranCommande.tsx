@@ -15,6 +15,7 @@ import {
   millimes,
   pointsDeBase,
   estModifiable,
+  peutModifierCatalogue,
   type EtatCommande,
   type Millimes,
   type Remise,
@@ -34,6 +35,7 @@ import { RefusOperation } from '../donnees/session.js'
 import { Modale } from '../composants/Modale.js'
 import { DemandePin } from '../composants/DemandePin.js'
 import { TicketEcran } from '../composants/TicketEcran.js'
+import { ModaleNouvelArticle } from '../composants/ModaleNouvelArticle.js'
 import { IMPRESSION_ACTIVE } from '../config.js'
 import type { Employe } from '@kaissi/domain'
 
@@ -64,6 +66,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
     action: (manager: Employe) => Promise<void>
   } | null>(null)
   const [remiseOuverte, setRemiseOuverte] = useState(false)
+  const [nouvelArticle, setNouvelArticle] = useState(false)
   const [clientOuvert, setClientOuvert] = useState(false)
   /**
    * Bons de cuisine qui viennent de partir, affichés tant que l'impression
@@ -245,8 +248,44 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                 ) : (
                   <span className="prix mention-rupture">Rupture</span>
                 )}
+                {/*
+                  L'article créé ICI et pas encore remonté. Le dire sur la
+                  TUILE, et pas seulement dans un écran de synchronisation :
+                  c'est là que le caissier le voit, et c'est là qu'il doit
+                  savoir que le back-office ne le connaît pas encore.
+                */}
+                {p.etatLocal === 'en_attente' && (
+                  <span className="badge attente" title="Pas encore remonté au back-office">
+                    en attente
+                  </span>
+                )}
+                {p.etatLocal === 'rejete' && (
+                  <span
+                    className="badge alerte"
+                    title="Le serveur a refusé cet article — voir l’écran Sync."
+                  >
+                    refusé
+                  </span>
+                )}
               </button>
             ))}
+
+          {/*
+            Une TUILE, en fin de grille, et pas un bouton dans une barre : on
+            ajoute un article à l'endroit précis où l'on vient de ne pas le
+            trouver. Le geste suit le regard.
+          */}
+          {employe && peutModifierCatalogue(employe.role) && (
+            <button
+              type="button"
+              className="carte-produit nouvel-article"
+              disabled={!modifiable}
+              onClick={() => setNouvelArticle(true)}
+            >
+              <span className="nom">+ Nouvel article</span>
+              <span className="prix">Ajouter à la carte</span>
+            </button>
+          )}
         </div>
       </section>
 
@@ -454,6 +493,34 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
               'Ajout d’un article',
             )
             setChoix(null)
+          }}
+        />
+      )}
+
+      {nouvelArticle && employe && (
+        <ModaleNouvelArticle
+          employe={employe}
+          categories={categories}
+          categorieActive={categorieActive}
+          onFerme={() => setNouvelArticle(false)}
+          onCree={async (nom) => {
+            /*
+             * On relit la carte ICI, et seulement ici.
+             *
+             * L'effet de chargement dépend de `catalogue`, pas de `version` :
+             * ajouter `version` rechargerait tout le catalogue à CHAQUE ligne
+             * ajoutée — `rafraichir()` est appelé à chaque geste de caisse, et
+             * ajouter un article doit rester sous les 50 ms. Une relecture par
+             * création coûte une requête, quelques fois par service.
+             */
+            setProduits(await catalogue.produits())
+            /*
+             * PAS de modale de confirmation, et c'est délibéré : l'article
+             * APPARAÎT dans la carte, avec son badge « en attente ». Un
+             * dialogue par-dessus dirait la même chose et demanderait un
+             * geste de plus — en plein service, devant un client.
+             */
+            void nom
           }}
         />
       )}

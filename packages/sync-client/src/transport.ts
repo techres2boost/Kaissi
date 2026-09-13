@@ -6,7 +6,7 @@
  * c'est ce fichier qui disparaît, pas le reste.
  */
 
-import type { EvenementCommande } from '@kaissi/domain'
+import type { EvenementCommande, MutationCatalogue } from '@kaissi/domain'
 
 export const VERSION_PROTOCOLE = 1
 
@@ -57,6 +57,19 @@ export interface ReponseShifts {
   readonly enregistres: readonly string[]
 }
 
+/**
+ * La réponse du serveur à un lot de mutations de catalogue.
+ *
+ * Elle a la MÊME forme que celle des ventes, et ce n'est pas une coquetterie :
+ * l'outbox purge sur `acceptes` et remonte `rejetes` au gérant, pour les deux
+ * sortes de lignes. Une seconde forme aurait demandé un second chemin de
+ * purge — celui-là même qu'il ne faut jamais avoir écrit deux fois.
+ */
+export interface ReponseCatalogue {
+  readonly acceptes: readonly string[]
+  readonly rejetes: readonly { eventId: string; code: string; message: string }[]
+}
+
 export interface Transport {
   push(batchId: string, evenements: readonly EvenementCommande[]): Promise<ReponsePush>
   pull(depuisCatalogue: number, depuisEvenements: number, taillePage?: number): Promise<ReponsePull>
@@ -67,6 +80,14 @@ export interface Transport {
    * l'optionalité. Les ventes ne dépendent jamais de cette route.
    */
   shifts?(shifts: readonly ShiftSynchronise[]): Promise<ReponseShifts>
+  /**
+   * FACULTATIF : les mutations de catalogue émises par la caisse.
+   *
+   * Facultatif pour la même raison que `shifts` — un serveur antérieur ne
+   * connaît pas cette route, et un article qui attend ne doit JAMAIS empêcher
+   * une vente de partir.
+   */
+  catalogue?(mutations: readonly MutationCatalogue[]): Promise<ReponseCatalogue>
 }
 
 /**
@@ -157,6 +178,13 @@ export function transportHttp(options: OptionsTransport): Transport {
         method: 'POST',
         body: JSON.stringify({ protocolVersion: VERSION_PROTOCOLE, shifts }),
       })) as ReponseShifts
+    },
+
+    async catalogue(mutations) {
+      return (await appeler('/sync/catalogue', {
+        method: 'POST',
+        body: JSON.stringify({ protocolVersion: VERSION_PROTOCOLE, mutations }),
+      })) as ReponseCatalogue
     },
 
     async pull(depuisCatalogue, depuisEvenements, taillePage = 500) {

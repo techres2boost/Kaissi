@@ -771,6 +771,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
  */
 .badge.pret { background: var(--ok); color: var(--sur-accent); font-weight: 700; }
 
+/*
+ * « Refusé » — le SEUL rouge de cette famille.
+ *
+ * Réservé à ce qui ne partira jamais tout seul : un rejet est une règle
+ * métier, il remonte au gérant et ne se réessaie pas. « En attente », juste à
+ * côté, est ambré parce qu'il se résout de lui-même au retour du réseau. Les
+ * confondre apprendrait à ignorer le rouge.
+ */
+.badge.alerte {
+  background: var(--fond-alerte); color: var(--alerte);
+  border: 1px solid rgba(179, 38, 30, 0.35); font-weight: 650;
+}
+
 /* ── Bandeau « prêt à servir » ───────────────────────────────────────────── */
 .bandeau-prets {
   display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem;
@@ -1017,6 +1030,40 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: block; margin-top: 0.15rem;
   font-size: 0.8rem; color: var(--texte-2); font-variant-numeric: tabular-nums;
 }
+
+/* ── Nouvel article, créé depuis la caisse ──────────────────────────────── */
+
+/*
+ * La tuile d'ajout se distingue SANS crier : un trait discontinu, pas un
+ * aplat de couleur. Elle vit au milieu de la carte, et un bouton plus voyant
+ * que les plats serait touché par erreur en plein service.
+ */
+.carte-produit.nouvel-article {
+  background: transparent;
+  border: 2px dashed var(--bordure);
+  box-shadow: none;
+  color: var(--texte-2);
+}
+.carte-produit.nouvel-article .nom { color: var(--accent); font-weight: 700; }
+.carte-produit.nouvel-article .prix { font-size: 0.75rem; font-weight: 400; }
+
+/* L'état d'un article qui n'est pas encore remonté, sur sa tuile. */
+.carte-produit .badge { align-self: flex-start; margin-top: 0.2rem; }
+
+.formulaire-article { display: flex; flex-direction: column; gap: 1rem; }
+.formulaire-article label { display: flex; flex-direction: column; gap: 0.35rem; }
+.formulaire-article label > span { font-weight: 600; font-size: 0.85rem; }
+.formulaire-article input,
+.formulaire-article select {
+  font: inherit; color: var(--texte);
+  background: var(--surface); border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  /* 48 px : on tape dessus avec le pouce, debout, en service. */
+  padding: 0.8rem; min-height: 48px;
+}
+.formulaire-article small { color: var(--texte-2); font-size: 0.78rem; }
+.formulaire-article small.avertissement { color: var(--or); }
+.formulaire-article .erreur { color: var(--alerte); margin: 0; }
 
 /* ── Reçus ───────────────────────────────────────────────────────────────── */
 .recus { height: 100%; display: flex; flex-direction: column; overflow: hidden; }

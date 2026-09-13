@@ -67,6 +67,13 @@ export type CodeRejet =
   | 'charge_invalide'
   | 'type_inconnu'
   | 'lot_trop_grand'
+  // ── Rejets de CATALOGUE (0034) ─────────────────────────────────────────
+  // Ils passent par la même liste, et par le même chemin, que ceux d'une
+  // vente : l'écran de synchronisation en compte UN seul genre — « ce qui
+  // demande votre attention » — et le gérant n'a pas à savoir de quelle file
+  // vient la ligne pour comprendre qu'il doit agir.
+  | 'requete_invalide'
+  | 'droits_insuffisants'
 
 export interface RejetEvenement {
   readonly eventId: string

@@ -24,6 +24,7 @@ import {
   type PointsDeBase,
 } from '@kaissi/domain'
 import { estUuid, uuidV7 } from '@kaissi/domain'
+import type { MutationCatalogue } from '@kaissi/domain'
 import type {
   AbonnementPush,
   AppareilAuthentifie,
@@ -478,6 +479,112 @@ export class DepotPostgres implements DepotSync {
    * 3. `on conflict (id) do update` : la tablette renvoie le shift à son
    *    ouverture PUIS à sa clôture. C'est le même shift, enrichi.
    */
+  /**
+   * Le rôle d'un employé dans cet établissement — ou `null`.
+   *
+   * Requête faite avec le rôle PRIVILÉGIÉ du service, hors `sousIdentite` :
+   * c'est une lecture de CONTRÔLE, et la faire passer par RLS sous l'identité
+   * de l'appareil la rendrait circulaire — on demanderait à l'appelant de
+   * valider ses propres droits. Le filtre `restaurant_id` est celui de
+   * l'appareil authentifié, pas un paramètre reçu du réseau.
+   */
+  async roleDeLEmploye(restaurantId: string, employeId: string): Promise<string | null> {
+    if (!estUuid(employeId)) return null
+    const { rows } = await this.pool.query<{ role: string }>(
+      `select role from kaissi.memberships
+       where restaurant_id = $1 and user_id = $2 and revoked_at is null
+       limit 1`,
+      [restaurantId, employeId],
+    )
+    return rows[0]?.role ?? null
+  }
+
+  async creerProduits(
+    appareil: AppareilAuthentifie,
+    mutations: readonly MutationCatalogue[],
+  ): Promise<readonly string[]> {
+    if (mutations.length === 0) return []
+    const acceptes: string[] = []
+
+    /*
+     * SOUS L'IDENTITÉ DE L'APPAREIL, donc sous RLS (politique
+     * `products_creation_caisse`, migration 0034). Le contrôle de rôle est
+     * déjà fait par le service ; celui-ci répond à l'autre question — dans
+     * quel établissement — et ne dépend d'aucun `where` écrit à la main.
+     */
+    await this.sousIdentite(appareil, async (client) => {
+      for (const m of mutations) {
+        /*
+         * Le registre D'ABORD. `on conflict do nothing` + `returning` : la
+         * ligne ne revient que si elle vient d'être écrite. Une mutation déjà
+         * appliquée ne réinsère donc pas l'article — et l'appareil reçoit
+         * quand même son accusé, sans quoi il la renverrait éternellement.
+         */
+        const { rows } = await client.query<{ event_id: string }>(
+          `insert into kaissi.sync_mutations
+             (event_id, organization_id, restaurant_id, device_id, kind, status)
+           values ($1, $2, $3, $4, 'catalogue', 'accepte')
+           on conflict (event_id) do nothing
+           returning event_id`,
+          [m.mutationId, appareil.organizationId, appareil.restaurantId, appareil.deviceId],
+        )
+        if (rows.length === 0) {
+          // Doublon de retentative : déjà appliqué, on l'accuse et on passe.
+          acceptes.push(m.mutationId)
+          continue
+        }
+
+        await client.query(
+          `insert into kaissi.products
+             (id, organization_id, restaurant_id, category_id, tax_rate_id,
+              name, base_price_millimes, position)
+           values ($1, $2, $3, $4, $5, $6, $7,
+                   coalesce((select max(position) + 1 from kaissi.products
+                              where restaurant_id = $3), 0))
+           on conflict (id) do nothing`,
+          [
+            m.produitId,
+            appareil.organizationId,
+            appareil.restaurantId,
+            m.categorieId,
+            m.tauxTvaId,
+            m.nom.trim(),
+            m.prixBaseMillimes,
+          ],
+        )
+        acceptes.push(m.mutationId)
+      }
+    })
+    return acceptes
+  }
+
+  async consignerRejetsCatalogue(
+    appareil: AppareilAuthentifie,
+    rejets: readonly { eventId: string; code: string; message: string }[],
+  ): Promise<void> {
+    if (rejets.length === 0) return
+    await this.sousIdentite(appareil, async (client) => {
+      for (const r of rejets) {
+        if (!estUuid(r.eventId)) continue
+        await client.query(
+          `insert into kaissi.sync_mutations
+             (event_id, organization_id, restaurant_id, device_id, kind,
+              status, reject_code, reject_message)
+           values ($1, $2, $3, $4, 'catalogue', 'rejete', $5, $6)
+           on conflict (event_id) do nothing`,
+          [
+            r.eventId,
+            appareil.organizationId,
+            appareil.restaurantId,
+            appareil.deviceId,
+            r.code,
+            r.message,
+          ],
+        )
+      }
+    })
+  }
+
   async enregistrerShifts(
     appareil: AppareilAuthentifie,
     shifts: readonly ShiftSynchronise[],

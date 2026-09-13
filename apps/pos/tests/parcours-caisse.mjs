@@ -65,6 +65,20 @@ await etape('ouverture d’une commande sur la table 3', async () => {
   await page.waitForSelector('.grille-produits', { timeout: 10000 })
 })
 
+await etape('un CAISSIER ne voit pas « Nouvel article »', async () => {
+  /*
+   * Salma est caissière (graine de démonstration). La tuile d'ajout ne doit
+   * pas être là — et ce n'est PAS ce qui protège : masquer un bouton évite
+   * une erreur, pas une malveillance. Le refus qui compte est côté serveur,
+   * où le rôle est relu en base (apps/sync/test/catalogue-depuis-la-caisse).
+   * Les deux existent, aucune ne remplace l'autre.
+   */
+  if (await page.$('.carte-produit.nouvel-article')) {
+    throw new Error('la tuile « Nouvel article » est visible pour un caissier')
+  }
+  console.log('    tuile absente pour Salma (caissière)')
+})
+
 await etape('ajout d’un Coca (sans option) — 1 clic', async () => {
   await page.click('.categories button:has-text("Boissons")')
   await page.click('.carte-produit:has-text("Coca-Cola 33cl")')
@@ -220,6 +234,54 @@ await etape('la vente apparaît dans « Reçus », sans rien demander au serveur
 await etape('la table 3 est de nouveau libre', async () => {
   const libre = await page.$('.grille-tables .table:has(.numero:text-is("3")).libre')
   if (!libre) throw new Error('la table 3 est restée occupée')
+})
+
+await etape('un GÉRANT crée un article, et il est vendable aussitôt', async () => {
+  /*
+   * Le chemin local de bout en bout, dans un vrai navigateur : transaction
+   * SQLite (l'article ET son entrée d'outbox, ou ni l'un ni l'autre), lecture
+   * de l'état depuis l'outbox, affichage dans la carte.
+   *
+   * Ce POS n'est appairé à AUCUN serveur. C'est le point : l'article doit
+   * exister et se vendre avant d'avoir vu le réseau — sinon la fonction ne
+   * sert à rien le seul jour où l'on en a besoin.
+   */
+  await page.click('.bandeau-actions .employe')
+  await page.waitForSelector('text=Prise de poste', { timeout: 10000 })
+  await page.click('text=Ahmed')
+  await page.waitForSelector('.pave', { timeout: 5000 })
+  for (const c of '1357') await page.click(`.pave button:has-text("${c}")`)
+  await page.click('.pave .valider')
+  await page.waitForSelector('.grille-tables', { timeout: 20000 })
+
+  await page.click('.barre-salle .principal')
+  await page.waitForSelector('.grille-produits', { timeout: 10000 })
+
+  const tuile = await page.$('.carte-produit.nouvel-article')
+  if (!tuile) throw new Error('la tuile « Nouvel article » manque pour un gérant')
+
+  await tuile.click()
+  await page.waitForSelector('.formulaire-article', { timeout: 5000 })
+  await page.fill('.formulaire-article input[type="text"]', 'Ojja du jour')
+  await page.fill('.formulaire-article input[inputmode="decimal"]', '13,500')
+  await page.click('.modale footer .principal')
+
+  // Présent dans la carte, et marqué « en attente » : rien n'est encore parti.
+  await page.waitForSelector('.carte-produit:has-text("Ojja du jour")', { timeout: 10000 })
+  const marque = await page.$('.carte-produit:has-text("Ojja du jour") .badge.attente')
+  if (!marque) {
+    throw new Error(
+      'Un article créé sur une caisse non appairée doit porter « en attente » : ' +
+        'sans ce marqueur, le gérant le croit connu du back-office.',
+    )
+  }
+
+  // Et il SE VEND. C'est la seule preuve qui compte.
+  await page.click('.carte-produit:has-text("Ojja du jour")')
+  await page.waitForSelector('.lignes li:has-text("Ojja du jour")', { timeout: 10000 })
+  const total = await page.textContent('.grand-total span:last-child')
+  console.log(`    « Ojja du jour » ajoutée à la commande — total ${total}`)
+  if (!total.includes('13,500')) throw new Error(`prix inattendu : ${total}`)
 })
 
 await etape('aucune file d’impression : ce build n’imprime pas', async () => {
