@@ -31,6 +31,30 @@ try {
 }
 
 /*
+ * ── Le numéro que la CI impose, quand elle publie ─────────────────────────
+ *
+ * `package.json` reste la source du numéro de VERSION affiché au client
+ * (`versionName`). Mais le `versionCode`, lui, doit être strictement croissant
+ * À CHAQUE ENVOI — et une publication automatique envoie plusieurs fois la
+ * même version : deux corrections poussées le même jour portent toutes deux
+ * « 0.1.3 », donc toutes deux le code 103, et Play refuse la seconde.
+ *
+ * La CI calcule donc le numéro suivant en INTERROGEANT Play, et le passe ici.
+ * C'est la même mécanique que `get-latest-testflight-build-number` côté Apple :
+ * on ne suppose pas le dernier numéro publié, on le demande à celui qui le
+ * connaît.
+ *
+ * Absente — un build local, ou une CI sans identifiants Play — la variable
+ * n'existe pas et l'on retombe sur `package.json`. Aucun poste de
+ * développement ne dépend du réseau pour construire.
+ */
+def imposeParLaCI = System.getenv('KAISSI_VERSION_CODE')
+if (imposeParLaCI?.isInteger()) {
+    codeVersion = imposeParLaCI as int
+    logger.lifecycle("versionCode imposé par la CI : ${codeVersion} (versionName ${versionNpm})")
+}
+
+/*
  * Signature de production.
  *
  * Les identifiants vivent dans `keystore.properties`, HORS du dépôt (voir

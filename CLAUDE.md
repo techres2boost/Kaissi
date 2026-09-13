@@ -506,17 +506,22 @@ pnpm pos:aab        # ou pnpm pos:apk pour un APK signé, installable
 # le CONSOMME au téléversement : « Discard draft release » ne le libère pas.
 # Un numéro refusé ne se récupère jamais — on monte.
 #
-# ⚑ PUBLIER = POSER UN TAG. codemagic.yaml se déclenche sur `v*`, jamais sur
-#   un push : chaque build iOS brûle un numéro chez Apple, chaque envoi
-#   Android un versionCode que Play ne rend pas.
+# ⚑ PUBLIER EST AUTOMATIQUE. Un push sur `main` construit les deux plateformes
+#   et publie — piste INTERNE de Play, TestFlight interne chez Apple. Jamais la
+#   production, jamais la revue : ce sont des testeurs nommés qui reçoivent.
 #
-#     pnpm pos:version --monter
-#     git commit -am "Version 0.1.3" && git tag v0.1.3 && git push --tags
+#   Le versionCode Android est DEMANDÉ à Play par la CI, jamais supposé : deux
+#   corrections poussées le même jour portent la même version, donc le même
+#   code, et Play refuserait la seconde. `KAISSI_VERSION_CODE` (app/build.gradle)
+#   est le point d'entrée ; sans lui, on retombe sur package.json.
 #
-#   Ne mélange PAS ce chemin avec `pnpm pos:aab` téléversé à la main : les deux
-#   consomment le même compteur, et Play refuse le second avec « Version code
-#   already used ». `pos:apk` reste la voie pour installer chez un client hors
-#   magasin. Détail complet : docs/stores.md §4 octies.
+#   `pnpm pos:version --monter` ne sert donc plus qu'au numéro AFFICHÉ au
+#   client, quand on veut le nommer. Et il ne faut plus téléverser un AAB à la
+#   main : il consommerait un numéro que la CI croirait libre. `pos:apk` reste
+#   la voie pour installer chez un client hors magasin.
+#
+#   Détail complet, et les étapes du compte de service Google :
+#   docs/stores.md §4 octies à §4 decies.
 pnpm pos:version [--monter]
 
 # Le plugin Java d'impression compile — un JDK suffit, aucun SDK Android

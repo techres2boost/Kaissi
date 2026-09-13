@@ -2140,98 +2140,182 @@ installés restent sur la dernière version pour toujours.
 ---
 
 
-## 4 octies. Publier en une commande — le tag, et ce qu'il déclenche
+## 4 octies. Tout automatique — de `git push` aux testeurs
 
-### Pourquoi ce n'était pas automatique, et pourquoi ça ne l'est toujours pas « à chaque push »
+### Ce qui se passe désormais quand tu pousses sur `main`
 
-`codemagic.yaml` n'avait **aucun** déclencheur. Ce n'était pas un oubli :
-
-- chaque construction **iOS** brûle un numéro de build chez Apple ;
-- chaque envoi **Android** brûle un `versionCode` que Play **ne rend jamais**.
-
-Sur vingt commits de documentation, c'est vingt numéros perdus — et le jour où
-l'on veut vraiment publier, `pnpm pos:version --monter` doit sauter par-dessus.
-
-Mais « à la main » n'était pas la bonne réponse non plus : on oublie, et la
-version installée chez le client dérive de `main` sans que personne ne s'en
-aperçoive.
-
-### Le tag
-
-```bash
-pnpm pos:version --monter          # monte apps/pos/package.json
-git commit -am "Version 0.1.3"
-git tag v0.1.3
-git push && git push --tags
+```
+git push
+   ↓
+Codemagic construit pos-android ET pos-ios, en parallèle
+   ↓
+Android → piste INTERNE de Play, en ligne pour tes testeurs
+iOS     → TestFlight, groupe interne, sans revue d'Apple
 ```
 
-Codemagic construit alors **les deux plateformes** et publie. Un push ordinaire
-sur `main` ne déclenche rien — la CI GitHub, elle, tourne à chaque commit, et
-c'est là que les erreurs se voient.
+Aucun clic, aucune commande. Les tags `v*` déclenchent aussi — ils servent à
+**nommer** une version quand tu en montes une pour de bon
+(`pnpm pos:version --monter`), pas à déclencher la construction.
 
-`tag_patterns: 'v*'` filtre côté Codemagic : un tag `essai-imprimante` ne lance
-rien. Sans ce filtre, n'importe quel tag de travail brûlerait un numéro.
-
-> ### ⚠ Ne mélange pas `pnpm pos:aab` et le tag
+> ### ⚠ La frontière qui rend cela sûr
 >
-> Les deux produisent un AAB, et les deux consomment le **même compteur** —
-> `apps/pos/package.json`. Un AAB construit sur ton PC, téléversé à la main,
-> brûle le `versionCode` que le tag suivant croira libre : Play refuse alors le
-> build de Codemagic avec « Version code N has already been used », et le
-> numéro est perdu des deux côtés.
+> La destination est **la piste interne** (Play) et **TestFlight** (Apple).
+> Pas la production, pas la revue Apple. Ce sont des testeurs nommés qui
+> reçoivent, jamais un client.
 >
-> Choisis une voie. `pnpm pos:aab` reste utile pour **installer un APK chez un
-> client** sans passer par le magasin (`pnpm pos:apk`) — pas pour téléverser.
+> Deux lignes, et deux seulement, tiennent cette frontière :
+> `track: internal` et l'absence de `submit_to_app_store`. Le jour où de vrais
+> clients seront en production, ce n'est pas elles qui changent — c'est
+> `triggering`, qu'on resserre au tag seul.
 
-### Et pourquoi rien n'est apparu sur le Play Store
+### Le numéro de version : pourquoi il ne te concerne plus
 
-Trois raisons possibles, et il faut les écarter dans cet ordre :
+Le `versionName` (celui que le client voit) vient toujours de
+`apps/pos/package.json`. Tu le montes quand tu veux, ou jamais.
 
-1. **Aucun build n'a été déclenché** — c'est le point ci-dessus, réglé par le
-   tag.
-2. **`GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` est absent.** Sans lui, le bloc
-   `publishing.google_play` échoue et l'AAB reste un simple artefact à
-   télécharger. La section *Publishing* du journal de build le dit.
-3. **La publication ne vise PAS la production**, et c'est voulu :
+Le **`versionCode`**, lui, doit être strictement croissant à chaque envoi — et
+deux corrections poussées le même jour portent la même version « 0.1.3 », donc
+le même code 103. Play refuserait la seconde.
 
-   ```yaml
-   track: internal
-   submit_as_draft: true
-   ```
+La CI **demande donc le dernier numéro publié à Play**, et prend le suivant.
+On ne suppose rien : on interroge celui qui sait. C'est exactement la mécanique
+d'Apple avec `get-latest-testflight-build-number`, et elle vaut mieux qu'un
+compteur local, qui se désynchronise le jour où l'on téléverse une fois à la
+main.
 
-   Une caisse s'installe d'abord sur une tablette d'essai. Une mise à jour
-   automatique qui casse l'encaissement se voit en plein service, chez le
-   client, pas ici. Le passage en production reste un clic dans Play Console.
+Concrètement : **tu ne touches plus au numéro.** Il monte tout seul. Et oui, il
+« saute » des valeurs — c'est sans conséquence, un numéro n'a pas besoin d'être
+continu, seulement croissant.
 
-> Rappel qui prime sur tout le reste : un compte développeur **personnel** ne
-> peut pas publier en production avant **12 testeurs pendant 14 jours** en test
-> fermé (§3.5). Tant que ce n'est pas fait, aucun réglage de Codemagic ne
-> rendra l'application installable par un client depuis le Play Store.
-
-### Côté App Store, la même prudence
-
-```yaml
-submit_to_testflight: false
-```
-
-La build monte dans App Store Connect et s'arrête là. TestFlight, puis la
-revue, restent des décisions — pas un effet de bord d'un `git push --tags`.
-
-### Ce qu'il faut poser dans Codemagic pour que le tag suffise
-
-| | Où | Sans lui |
-|---|---|---|
-| Keystore `kaissi_keystore` | *Settings → Code signing identities* | le build Android échoue d'entrée |
-| Groupe `google_play` avec `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` | *Environment variables* | l'AAB est produit mais jamais envoyé |
-| Groupe `ios_signing` (les quatre variables, §4 bis suite) | *Environment variables* | le build iOS échoue à la signature |
-| `APP_STORE_APPLE_ID` | *Environment variables*, après création de la fiche | le numéro de build vient du compteur Codemagic |
-
-Le **webhook** n'est pas à créer à la main : Codemagic l'installe sur le dépôt
-dès qu'un workflow porte un bloc `triggering`. Si les tags ne déclenchent rien,
-c'est là qu'il faut regarder — *Repository settings → Webhooks*.
+> **La seule chose à ne plus faire** : téléverser un AAB à la main dans Play
+> Console. Il consommerait un numéro que la CI croirait libre. `pnpm pos:apk`
+> reste la voie pour **installer chez un client hors magasin** — ça, ça ne
+> touche à rien.
 
 ---
 
+## 4 nonies. `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS`, clic par clic
+
+C'est la seule pièce manquante. Sans elle, l'AAB est construit et signé, puis
+reste un fichier à télécharger — la section *Publishing* du journal de build
+le dit en toutes lettres.
+
+Compte **20 minutes**, et jusqu'à **24 heures** avant que les droits soient
+effectifs chez Google.
+
+### Étape 1 — Lier un projet Google Cloud à Play Console
+
+1. [play.google.com/console](https://play.google.com/console) → **Paramètres**
+   (roue dentée, tout en bas à gauche) → **Accès à l'API**.
+2. Si aucun projet n'est lié : **Créer un projet Google Cloud**. Google en
+   fabrique un et le lie. Rien à configurer dedans.
+
+### Étape 2 — Créer le compte de service
+
+Toujours dans *Accès à l'API* :
+
+3. Section **Comptes de service** → **Créer un compte de service**. Un encadré
+   s'ouvre avec un lien vers **Google Cloud Console** : suis-le.
+4. Dans Google Cloud → **Créer un compte de service** :
+
+   | Champ | Valeur |
+   |---|---|
+   | Nom | `codemagic-publisher` |
+   | ID | rempli tout seul |
+   | Description | `Publication automatique depuis Codemagic` |
+
+5. **Continuer** → l'écran « Accorder à ce compte de service l'accès au
+   projet » : **ne donne AUCUN rôle**. Les droits se donnent côté Play, pas
+   côté Cloud. → **OK** / **Terminé**.
+
+### Étape 3 — Télécharger la clé JSON
+
+6. Dans la liste des comptes de service, clique sur `codemagic-publisher`.
+7. Onglet **Clés** → **Ajouter une clé** → **Créer une clé** → format
+   **JSON** → **Créer**.
+8. Un fichier se télécharge. **C'est la seule fois.** Range-le avec tes autres
+   clés (§4 septies) — il ouvre la publication de tes applications.
+
+### Étape 4 — Donner les droits, côté Play
+
+9. Retourne dans Play Console → *Accès à l'API* → **Actualiser les comptes de
+   service**. `codemagic-publisher@…` apparaît.
+10. **Gérer les autorisations Play Console** en face de lui.
+11. Onglet **Applications** → coche **Kaissi**.
+12. Onglet **Autorisations du compte** — ou *Autorisations de l'application* —
+    coche :
+
+    | Autorisation | Pourquoi |
+    |---|---|
+    | **Afficher les informations sur l'application** | lire le dernier `versionCode` publié |
+    | **Gérer les versions de test** | publier sur la piste interne |
+    | ~~Gérer les versions de production~~ | **non** — la production reste un geste humain |
+
+13. **Inviter l'utilisateur** → **Envoyer l'invitation**.
+
+> Google prévient que les changements peuvent prendre **jusqu'à 24 heures**.
+> En pratique c'est quelques minutes, mais si le premier build échoue sur
+> `The caller does not have permission`, c'est cela : attends, ne recommence
+> pas la configuration.
+
+### Étape 5 — Coller le JSON dans Codemagic
+
+14. Codemagic → l'application **Kaissi** → **Environment variables**.
+15. Trois champs, puis *Add* :
+
+    | | |
+    |---|---|
+    | Variable name | `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` |
+    | Variable value | **tout le contenu du fichier JSON** |
+    | Group | `google_play` |
+    | Secure | **coché** |
+
+> ### ⚠ Colle le fichier ENTIER, sans le retoucher
+>
+> De `{` à `}`, sauts de ligne compris. Le JSON contient une clé privée dont
+> les retours à la ligne sont encodés `\n` : les « nettoyer » la rend
+> invalide, et l'erreur d'authentification qui suit ne dit pas pourquoi.
+>
+> Dans Git Bash, pour ne rien laisser à la souris :
+>
+> ```bash
+> clip < ~/Downloads/codemagic-publisher-abc123.json
+> ```
+
+### Étape 6 — Vérifier
+
+Pousse n'importe quoi sur `main`. Dans le journal du build `pos-android` :
+
+```
+Dernier versionCode publié : 101 — nouveau : 102.
+...
+Publishing App Bundle to Google Play (track: internal)
+```
+
+Si tu lis à la place « Aucun numéro publié à interroger », la variable n'est
+pas visible du workflow — vérifie qu'elle est bien dans le groupe
+`google_play`, que `codemagic.yaml` déclare ce groupe, et que le nom est
+exactement celui ci-dessus.
+
+---
+
+## 4 decies. Ce que l'automatisation ne peut PAS faire
+
+| | Automatique | Reste manuel |
+|---|---|---|
+| **Play — piste interne** | ✅ à chaque push | — |
+| **Play — production** | ❌ | **12 testeurs × 14 jours** d'abord (§3.5), puis un clic |
+| **App Store — TestFlight interne** | ✅ à chaque push | — |
+| **App Store — TestFlight externe** | ❌ | revue d'Apple, quelques heures |
+| **App Store — public** | ❌ | soumission + revue, plusieurs jours |
+| Captures, textes, confidentialité | ❌ | fiche du magasin |
+
+> Le blocage réel n'est pas technique. Un compte développeur **personnel** ne
+> peut pas publier en production sur Play avant **12 testeurs opt-in pendant
+> 14 jours consécutifs** en test fermé. Aucun réglage de Codemagic n'y change
+> rien : c'est cette contrainte qui fixe ta date de mise en ligne.
+
+---
 
 ## 5. Dans quel ordre
 
