@@ -135,7 +135,7 @@ jobs:
         run: pnpm --filter @kaissi/backoffice build
 
   parcours-caisse:
-    name: Parcours de caisse de bout en bout
+    name: Parcours de caisse de bout en bout (et largeur téléphone)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -152,6 +152,11 @@ jobs:
           pnpm --filter @kaissi/pos exec vite --port 5173 --host 127.0.0.1 &
           npx wait-on -t 60000 http://127.0.0.1:5173/
           node apps/pos/tests/parcours-caisse.mjs
+          # Le même parcours, à 390 et 320 px de large. Un débordement
+          # horizontal ne casse aucun test fonctionnel — il rend l'écran
+          # inutilisable sans que rien n'échoue. Il a fallu un vrai iPhone
+          # pour le voir ; il ne faudra plus.
+          node apps/pos/tests/largeur-telephone.mjs
 
   synchronisation:
     name: Synchronisation — contre un vrai PostgreSQL

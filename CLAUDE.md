@@ -397,6 +397,12 @@ pnpm backoffice:dev             # back-office Next.js (exige .env.local)
 # commande, envoi cuisine, remise escaladée, encaissement, clôture.
 pnpm --filter @kaissi/pos test:parcours
 
+# Le même parcours à 390 et 320 px de large. Un débordement horizontal ne
+# casse AUCUN test fonctionnel — il rend l'écran inutilisable sans que rien
+# n'échoue. Il a fallu un vrai iPhone pour voir que le bandeau débordait ;
+# ce test le dit maintenant, et NOMME l'élément qui dépasse.
+pnpm --filter @kaissi/pos test:largeur
+
 # Tests de synchronisation — exigent un vrai PostgreSQL.
 # pnpm db:test le prépare : base jetable + migrations de production telles quelles.
 pnpm db:test && pnpm --filter @kaissi/sync test && pnpm db:test:stop

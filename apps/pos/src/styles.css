@@ -1017,3 +1017,108 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: block; margin-top: 0.15rem;
   font-size: 0.8rem; color: var(--texte-2); font-variant-numeric: tabular-nums;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * TÉLÉPHONE — la caisse tient dans 390 points de large
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * PANNE OBSERVÉE, sur un iPhone via TestFlight : « l'écran est copié, il faut
+ * glisser, et quand tu glisses c'est mal affiché ». Ce n'était pas un défaut
+ * d'affichage — c'était la PAGE ENTIÈRE qui était plus large que l'écran.
+ *
+ * ── La cause, et pourquoi elle était invisible en développement ───────────
+ *
+ * Les grilles avaient bien leurs points de bascule (`.caisse` à 820 px,
+ * `.commande` et `.paiement` à 900 px) : à 390 px elles s'empilaient
+ * correctement. Le coupable était AILLEURS — le bandeau.
+ *
+ * `.bandeau` est une rangée flex sans retour à la ligne : marque, état du
+ * réseau, quatre liens de navigation, l'employé, « En ligne ». Environ mille
+ * pixels, et rien pour les contenir. Dans une colonne flex, un enfant trop
+ * large ne rétrécit pas : il DÉBORDE, et c'est le document qui devient
+ * scrollable horizontalement. Tout le reste suit — les grilles calculent
+ * alors leurs colonnes sur mille pixels, et le corps de l'écran part à droite.
+ *
+ * On ne le voit pas sur un poste de développement : la fenêtre du navigateur
+ * fait 1280 px, et `.contenu { overflow: hidden }` masque le symptôme partout
+ * ailleurs. Il fallait un vrai téléphone — ou le test qui va avec,
+ * `tests/largeur-telephone.mjs`, qui vérifie que `scrollWidth` ne dépasse
+ * jamais la largeur de la fenêtre.
+ *
+ * ── Le principe de la correction ──────────────────────────────────────────
+ *
+ * Un débordement se contient LÀ OÙ IL NAÎT, jamais sur la page. Masquer
+ * `overflow-x` sur `<body>` aurait fait disparaître le glissement ET les
+ * boutons du bandeau, sans rien dire. Chaque barre de contrôles devient donc
+ * scrollable pour elle-même : la page reste à la largeur de l'écran, et rien
+ * n'est perdu.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 720px) {
+  .bandeau {
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  /* `min-width: 0` sur un enfant flex : sans lui, le nom de l'établissement
+     impose sa largeur intrinsèque et l'ellipse ne se déclenche jamais. */
+  .bandeau-marque { min-width: 0; flex: 1 1 auto; }
+  .etablissement { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /*
+   * Les actions passent à la ligne, et défilent POUR ELLES-MÊMES.
+   *
+   * Les empiler verticalement mangerait un tiers de l'écran sur un téléphone,
+   * au détriment de la grille de produits — qui est la raison d'être de
+   * l'écran. Une barre qui glisse garde la hauteur d'une seule rangée.
+   */
+  .bandeau-actions {
+    margin-left: 0;
+    width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .bandeau-actions::-webkit-scrollbar { display: none; }
+  /* Sans cela, les chips se compriment jusqu'à l'illisible au lieu de
+     déborder dans la zone qui défile. */
+  .bandeau-actions > * { flex: 0 0 auto; }
+  /* Le liseré de l'écran courant était posé à `bottom: -1px`, donc juste
+     hors de la boîte : `overflow-x: auto` le rognait. */
+  .bandeau-actions .lien[data-actif='true']::after { bottom: 0; }
+
+  /* Même traitement pour la barre de la salle : ses onglets plus le bouton
+     « À emporter » dépassent aussi, et ce bouton est le plus utilisé de
+     l'écran — le voir coupé n'est pas une option. */
+  .barre-salle {
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .barre-salle::-webkit-scrollbar { display: none; }
+  .barre-salle > * { flex: 0 0 auto; }
+  /* `margin-left: auto` pousse le bouton au bout d'une piste qui défile : il
+     serait hors champ à l'arrivée sur l'écran. Il reprend sa place dans le
+     flux, juste après les onglets. */
+  .barre-salle .principal { margin-left: 0; }
+
+  /* Les paddings d'une tablette coûtent 2 rem de largeur utile sur 390. */
+  .categories { padding: 0.6rem 0.75rem; }
+  .grille-produits { padding: 0 0.75rem 0.75rem; gap: 0.5rem; }
+  .grille-tables { padding: 0.75rem; gap: 0.5rem; }
+  .liste-commandes { padding: 0.75rem; }
+}
+
+/*
+ * Sous 400 px — l'iPhone SE et les Android d'entrée de gamme, qui sont
+ * exactement les appareils qu'un petit snack met en salle.
+ */
+@media (max-width: 400px) {
+  /* Deux colonnes de 9,5 rem ne tiennent plus : `auto-fill` en ferait une
+     seule, très haute, et la carte deviendrait une liste à faire défiler.
+     8 rem en garde deux. */
+  .grille-produits { grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); }
+  .grille-tables { grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); }
+}
