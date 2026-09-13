@@ -126,9 +126,16 @@ workflows:
       cancel_previous_builds: true
 
     environment:
-      # Groupe à créer dans Codemagic si l'on veut la publication
-      # automatique sur la piste interne (GCLOUD_SERVICE_ACCOUNT_CREDENTIALS).
-      # Absent, le build produit quand même l'AAB en artefact.
+      # Groupe à créer dans Codemagic — il porte
+      # GCLOUD_SERVICE_ACCOUNT_CREDENTIALS, qui publie sur la piste interne.
+      #
+      # ⚠ Un groupe Codemagic n'est pas un objet qu'on crée : il EXISTE dès
+      #   qu'une variable lui est assignée, et disparaît avec la dernière.
+      #   Assigner la variable au mauvais groupe (`ios_signing`, par
+      #   exemple) ne la rend donc pas simplement invisible ici : le fichier
+      #   est REFUSÉ à la validation, « references to unknown variable
+      #   group(s): google_play », et AUCUNE étape ne tourne — pas même la
+      #   construction de l'AAB. Vu en production.
       groups:
         - google_play
       android_signing:
@@ -226,9 +233,11 @@ workflows:
         # publier à la main. Un brouillon qui attend un clic n'est pas une
         # publication automatique — c'est une notification de plus à traiter.
         submit_as_draft: false
-        # Bloque la promotion automatique vers une piste plus large. Sans
-        # cette borne, une règle de sortie configurée dans Play Console
-        # pourrait faire remonter la build jusqu'en production.
+        # `false` : l'édition Play est envoyée telle quelle, sans rester en
+        # attente d'un « Send for review » à cliquer dans la console. Sur la
+        # piste interne il n'y a de toute façon pas de revue Google — ce
+        # drapeau ne compte que si la même configuration servait un jour une
+        # piste plus large.
         changes_not_sent_for_review: false
 
   # ─────────────────────────────────────────────────────────────────────────

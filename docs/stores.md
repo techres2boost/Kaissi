@@ -2036,6 +2036,7 @@ mal qu'une absence de vidéo.
 | **Aucun build ne démarre** au push | pas de webhook : Codemagic ne surveille pas le dépôt, c'est GitHub qui l'appelle | §4 nonies |
 | `The selected instance type is not available with the current billing plan` | `linux_x2` n'existe pas sur le plan gratuit — seul le Mac mini M2 y est | §4 decies bis |
 | `Service account key creation is disabled` | règle d'organisation `iam.disableServiceAccountKeyCreation` héritée du rattachement à res2boost.com | §4 decies ter |
+| `Codemagic.yaml references to unknown variable group(s): google_play` | la variable `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` existe, mais elle a été assignée à un AUTRE groupe (`ios_signing`) — un groupe Codemagic n'existe que par ses variables | §4 decies quater |
 | `altool … Cannot determine the Apple ID from Bundle ID … (19)` | la **fiche** n'existe pas encore dans App Store Connect — le Bundle ID ne suffit pas | créer la fiche (§4 ter, étape 3), puis relancer |
 | `409: You already have a current Distribution certificate or a pending certificate request` | le compte est à son plafond de certificats, et aucun ne correspond à `CERTIFICATE_PRIVATE_KEY` | reprendre le `cert_key` d'un projet déjà signé sur ce compte ; à défaut révoquer un certificat expiré (§4 bis suite) |
 
@@ -2423,6 +2424,93 @@ Publishing App Bundle to Google Play (track: internal)
 
 « Aucun numéro publié à interroger » signifie que la variable n'est pas visible
 du workflow : vérifiez le groupe `google_play` et l'orthographe exacte du nom.
+
+Et la nouvelle version s'affiche sous **Internal testing**, jamais sous la piste
+`alpha` d'un téléversement manuel antérieur. Les deux pièges, en détail :
+**§4 decies quater**.
+
+---
+
+## 4 decies quater. Les deux pièges d'après — le GROUPE, et la PISTE
+
+Ce sont les deux qui se sont réellement produits, l'un après l'autre, une fois
+la clé du compte de service enfin obtenue. Aucun des deux n'est une erreur de
+configuration du dépôt : `codemagic.yaml` était juste les deux fois.
+
+### Piège n° 1 — la variable est dans le mauvais groupe
+
+Le build s'arrête avant sa première étape :
+
+```
+Codemagic.yaml references to unknown variable group(s): google_play
+```
+
+Le message se lit de travers. Il ne dit pas « la variable manque » — il dit que
+le **groupe** n'existe pas. Et c'est exact, parce qu'un groupe Codemagic n'est
+pas un objet qu'on crée puis qu'on remplit : **il existe tant qu'au moins une
+variable lui est assignée, et pas une seconde de plus.** Assigner
+`GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` à `ios_signing` — le groupe déjà présent
+dans la liste déroulante, donc celui qu'on choisit sans y penser — laisse
+`google_play` vide, donc inexistant, donc inconnu.
+
+La conséquence n'est pas seulement que la publication Play est sautée : le
+fichier entier est refusé à la validation, et **rien** ne tourne. Pas de build,
+pas d'AAB, pas même les étapes qui n'ont aucun besoin de Play.
+
+Le remède, dans *Codemagic → l'application Kaissi → Environment variables* :
+
+1. supprimer la ligne `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` mal rangée — la
+   valeur d'une variable **Secure** ne se relit ni ne se déplace, il faut
+   donc avoir gardé le fichier JSON sous la main ;
+2. la ressaisir avec **Group = `google_play`** ;
+3. **cocher `Secure`**. Sans cette case, Codemagic imprime la valeur dans le
+   journal du build à chaque exécution — ici, la clé privée du compte de
+   service en entier. Une clé qui est passée dans un journal est une clé
+   compromise : elle se révoque dans *IAM → Comptes de service → Clés*, elle
+   ne se « nettoie » pas.
+
+### Piège n° 2 — la nouvelle version n'est pas où on la cherche
+
+Rien n'échoue, et pourtant Play Console montre toujours l'ancien paquet. C'est
+presque toujours qu'on regarde la mauvaise **piste**.
+
+`codemagic.yaml` publie sur `track: internal`. Un AAB téléversé à la main avant
+la mise en place de l'automatisation, lui, a pu partir sur `alpha` (*Closed
+testing*) — c'est la piste que Play Console propose en premier. Les deux
+coexistent, avec chacune sa propre liste de versions :
+
+| Ce qu'on regarde | Ce qu'on y voit |
+|---|---|
+| *Test and release → Closed testing → alpha* | le dernier téléversement **manuel** — figé, il ne bougera plus |
+| *Test and release → Internal testing* | ce que la CI publie à chaque push sur `main` |
+
+Le tableau de bord et la liste *App bundles* (*Release → App bundle explorer*)
+montrent bien les deux, mais l'écran de piste, non.
+
+### Les trois signaux qui disent que ça a marché
+
+Dans le journal du build `pos-android`, en clair, et dans cet ordre :
+
+```
+Dernier versionCode publié : 102 — nouveau : 103.
+...
+Publishing App Bundle to Google Play (track: internal)
+```
+
+Puis, dans Play Console, *Internal testing* porte la nouvelle version.
+
+Deux lectures utiles de la première ligne :
+
+- « Dernier versionCode publié : 102 » **inclut** les téléversements manuels.
+  C'est tout l'intérêt de demander le numéro plutôt que de le supposer : un
+  `102` déjà consommé par une montée à la main ne fera jamais échouer le build
+  suivant.
+- « Aucun numéro publié à interroger » à la place signifie que la variable
+  n'est pas visible du workflow. Le groupe, ou l'orthographe du nom.
+
+> Un `versionCode` consommé ne se libère jamais — « Discard draft release » ne
+> le rend pas. On monte, on ne récupère pas. C'est sans conséquence : il n'y a
+> aucune raison de vouloir redescendre.
 
 ---
 
