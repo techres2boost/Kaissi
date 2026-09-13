@@ -1018,6 +1018,62 @@ button { font: inherit; color: inherit; cursor: pointer; }
   font-size: 0.8rem; color: var(--texte-2); font-variant-numeric: tabular-nums;
 }
 
+/* ── Reçus ───────────────────────────────────────────────────────────────── */
+.recus { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.recus .barre-salle strong { font-size: 1rem; }
+
+.indication-vide { padding: 2rem 1rem; color: var(--texte-2); text-align: center; }
+
+.liste-recus {
+  flex: 1; min-height: 0; overflow-y: auto;
+  list-style: none; margin: 0; padding: 1rem;
+  display: flex; flex-direction: column; gap: 0.5rem;
+}
+.liste-recus li {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 0.75rem; align-items: center;
+  background: var(--surface); border: 1px solid var(--bordure);
+  border-radius: var(--rayon); padding: 0.8rem 1rem; min-height: 60px;
+  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
+}
+.liste-recus .ref { display: flex; flex-direction: column; min-width: 0; }
+.liste-recus .ref small { color: var(--texte-2); font-size: 0.72rem; }
+.liste-recus .detail {
+  display: flex; flex-direction: column; align-items: flex-end;
+  color: var(--texte-2); font-size: 0.75rem;
+}
+.liste-recus .cote { display: flex; flex-direction: column; align-items: flex-end; gap: 0.2rem; }
+.liste-recus .montant { font-variant-numeric: tabular-nums; font-weight: 700; }
+/*
+ * Une vente annulée reste LISIBLE, juste atténuée.
+ *
+ * La barrer ou la masquer donnerait l'impression qu'elle a disparu des
+ * comptes. Elle n'a pas disparu : une annulation ajoute un événement, elle
+ * n'en retire aucun — et c'est ce ticket-là qu'on vient chercher quand un
+ * écart de caisse est en discussion.
+ */
+.liste-recus li.annulee { opacity: 0.7; }
+.liste-recus li.annulee .montant { text-decoration: line-through; }
+
+/*
+ * « En attente » est AMBRÉ, pas rouge.
+ *
+ * Ce n'est pas une erreur : la vente est encaissée, enregistrée, et elle
+ * remontera. Le rouge est réservé à ce qui demande une action — un rejet de
+ * synchronisation, un terminal non appairé. Confondre les deux apprend au
+ * gérant à ignorer le rouge.
+ */
+.badge.attente {
+  background: var(--fond-or); color: var(--or);
+  border: 1px solid rgba(138, 106, 31, 0.4);
+  white-space: nowrap;
+}
+
+.charger-plus {
+  margin: 0 1rem 1rem; padding: 0.8rem; min-height: 48px;
+  background: var(--surface); border: 1px solid var(--bordure);
+  border-radius: var(--rayon); color: var(--texte-2);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
  * TÉLÉPHONE — la caisse tient dans 390 points de large
  * ═══════════════════════════════════════════════════════════════════════════
@@ -1103,6 +1159,20 @@ button { font: inherit; color: inherit; cursor: pointer; }
      serait hors champ à l'arrivée sur l'écran. Il reprend sa place dans le
      flux, juste après les onglets. */
   .barre-salle .principal { margin-left: 0; }
+
+  /*
+   * Le reçu passe à deux colonnes : la référence et le montant. Le détail
+   * (nombre d'articles, mode de paiement) rejoint la seconde ligne de la
+   * référence — à trois colonnes, le montant, qui est la raison d'ouvrir cet
+   * écran, se retrouvait compressé à l'illisible.
+   */
+  .liste-recus { padding: 0.75rem; }
+  .liste-recus li { grid-template-columns: 1fr auto; gap: 0.5rem; }
+  .liste-recus .detail {
+    grid-column: 1; grid-row: 2;
+    flex-direction: row; gap: 0.5rem; align-items: baseline;
+  }
+  .charger-plus { margin: 0 0.75rem 0.75rem; }
 
   /* Les paddings d'une tablette coûtent 2 rem de largeur utile sur 390. */
   .categories { padding: 0.6rem 0.75rem; }

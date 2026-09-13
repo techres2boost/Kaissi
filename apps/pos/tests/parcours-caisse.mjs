@@ -187,6 +187,36 @@ await etape('clôture de la commande — le ticket client s’affiche', async ()
   await page.waitForSelector('.grille-tables', { timeout: 15000 })
 })
 
+await etape('la vente apparaît dans « Reçus », sans rien demander au serveur', async () => {
+  /*
+   * Ce que ce pas prouve, et que rien d'autre ne prouve : l'historique de la
+   * caisse se lit DANS LA BASE LOCALE. Le POS de ce test n'est appairé à
+   * aucun serveur — s'il fallait une requête réseau pour remplir cet écran,
+   * il serait vide ici, et le serait aussi chez un client hors ligne.
+   */
+  await page.click('.bandeau-actions .lien:has-text("Reçus")')
+  await page.waitForSelector('.liste-recus li', { timeout: 10000 })
+  const premier = await page.textContent('.liste-recus li')
+  console.log(`    premier reçu : ${premier.replace(/\s+/g, ' ').trim()}`)
+
+  /*
+   * Et le marqueur « en attente ». C'est le seul écart qu'un système hors
+   * ligne d'abord ne peut pas supprimer — il le NOMME. Sur une caisse non
+   * appairée, aucun événement n'a de `server_seq` : tout est en attente.
+   */
+  const attente = await page.$('.liste-recus .badge.attente')
+  if (!attente) {
+    throw new Error(
+      'Une vente jamais remontée doit porter « en attente » : sans ce marqueur, ' +
+        'le gérant compare la caisse au back-office et cherche une panne.',
+    )
+  }
+  console.log('    marquée « en attente » — l’écart avec le back-office est dit')
+
+  await page.click('.recus .barre-salle .lien:has-text("Salle")')
+  await page.waitForSelector('.grille-tables', { timeout: 10000 })
+})
+
 await etape('la table 3 est de nouveau libre', async () => {
   const libre = await page.$('.grille-tables .table:has(.numero:text-is("3")).libre')
   if (!libre) throw new Error('la table 3 est restée occupée')

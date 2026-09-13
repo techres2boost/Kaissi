@@ -1787,6 +1787,38 @@ avec sa liste de fuseaux horaires.
 > voyaient — le remplacement a lieu à l'empaquetage, après eux tous. Un test
 > le refuse désormais dans **tout** le dépôt.
 
+#### Q.2 — « Reçus » sur la caisse, sans jamais appeler le serveur
+
+3 bis. Après avoir encaissé, touche **Reçus** dans le bandeau.
+
+**Attendu** : la vente y est, avec son numéro de ticket, l'heure, la table,
+l'employé, le mode de paiement et le montant. Et un badge ambré
+**« en attente »**.
+
+> **La question posée était « on interroge le serveur, et on met en cache ? ».**
+> La réponse est non, et ce n'est pas un raccourci : le cycle de
+> synchronisation TIRE déjà les événements de tous les terminaux
+> (`/sync/pull`, curseur `evenements`, depuis 0 à l'appairage) et les rejoue
+> en local. La base de cette tablette contient donc les ventes des AUTRES
+> caisses, projetées par le même code du domaine.
+>
+> Une requête serveur ajouterait une seconde vérité, une route, un cache à
+> invalider — et un écran qui se vide quand le réseau tombe, sur le produit
+> dont la règle est que la caisse ne s'arrête jamais. Le parcours de caisse
+> le prouve : le POS du test n'est appairé à AUCUN serveur, et l'écran est
+> rempli.
+>
+> **Sur « pas de décalage entre les systèmes ».** Au sens strict, c'est
+> impossible : une vente encaissée hors ligne existe sur la tablette et pas au
+> back-office tant qu'elle n'est pas remontée. C'est la définition du hors
+> ligne d'abord, pas un défaut.
+>
+> Ce qui est atteignable, et qui vaut mieux : que l'écart soit NOMMÉ. D'où
+> « en attente », posé **à côté du montant** — c'est le montant qu'on compare
+> au back-office, donc c'est là que l'explication doit être. Ambré et non
+> rouge : la vente est enregistrée et remontera ; le rouge reste à ce qui
+> demande une action.
+
 #### Q.2 bis — Un terminal neuf dit qu'il n'est relié à rien
 
 4 bis. Sur une caisse fraîchement installée, regarde le bandeau, à droite.

@@ -19,6 +19,7 @@ import { EcranCommande } from './ecrans/EcranCommande.js'
 import { EcranPaiement } from './ecrans/EcranPaiement.js'
 import { EcranClotureShift, EcranOuvertureShift } from './ecrans/EcranShift.js'
 import { EcranDiagnostic } from './ecrans/EcranDiagnostic.js'
+import { EcranRecus } from './ecrans/EcranRecus.js'
 import { EcranSync } from './ecrans/EcranSync.js'
 
 export function Application() {
@@ -74,6 +75,7 @@ type Vue =
   | { nom: 'cloture' }
   | { nom: 'diagnostic' }
   | { nom: 'sync' }
+  | { nom: 'recus' }
 
 function Terminal({ contexte }: { contexte: ContexteApplication }) {
   const app = useApp()
@@ -144,6 +146,7 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
           onDiagnostic={() => setVue({ nom: 'diagnostic' })}
           onCloturer={() => setVue({ nom: 'cloture' })}
           onSync={() => setVue({ nom: 'sync' })}
+          onRecus={() => setVue({ nom: 'recus' })}
           impression={etatImpression}
         />
         <main className="contenu">
@@ -167,6 +170,9 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
         onCloturer={() => setVue({ nom: 'cloture' })}
         onSync={() =>
           setVue((v) => (v.nom === 'sync' ? { nom: 'salle' } : { nom: 'sync' }))
+        }
+        onRecus={() =>
+          setVue((v) => (v.nom === 'recus' ? { nom: 'salle' } : { nom: 'recus' }))
         }
         impression={etatImpression}
       />
@@ -230,6 +236,8 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
         )}
 
         {vue.nom === 'sync' && <EcranSync />}
+
+        {vue.nom === 'recus' && <EcranRecus onRetour={() => setVue({ nom: 'salle' })} />}
       </main>
     </div>
   )
@@ -277,6 +285,7 @@ function Bandeau({
   onDiagnostic,
   onCloturer,
   onSync,
+  onRecus,
   impression,
 }: {
   reseau: { connecte: boolean; type: string }
@@ -287,6 +296,7 @@ function Bandeau({
   onDiagnostic: () => void
   onCloturer: () => void
   onSync: () => void
+  onRecus: () => void
   impression: { enAttente: number; echecs: number }
 }) {
   const { employe, etablissement, resumeSync, sync, app } = useApp()
@@ -417,6 +427,21 @@ function Bandeau({
           trait terracotta sous l'onglet courant, exactement comme la colonne
           du back-office pose une barre à gauche du sien.
         */}
+        {/*
+          « Reçus » est posé AVANT « Sync » et « Diagnostic » : c'est le seul
+          des trois qu'un caissier ouvre en service — retrouver un ticket
+          pour un client qui réclame. Les deux autres sont des écrans de
+          dépannage, consultés une fois par semaine.
+        */}
+        <button
+          type="button"
+          className="lien"
+          data-actif={vue === 'recus'}
+          onClick={onRecus}
+        >
+          Reçus
+        </button>
+
         <button
           type="button"
           className="lien"

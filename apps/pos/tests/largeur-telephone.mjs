@@ -156,6 +156,13 @@ for (const appareil of APPAREILS) {
   await page.waitForSelector('.paiement', { timeout: 10000 })
   await mesurer('encaissement')
 
+  // « Reçus » est la ligne la plus dense de l'application : référence, heure,
+  // table, employé, articles, mode de paiement, montant, badges. C'est celle
+  // qui déborde en premier quand on ajoute une colonne.
+  await page.click('.bandeau-actions .lien:has-text("Reçus")')
+  await page.waitForSelector('.recus', { timeout: 10000 })
+  await mesurer('reçus')
+
   await page.close()
 }
 

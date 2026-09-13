@@ -13,6 +13,52 @@ import type {
 } from '@kaissi/domain'
 import type { AdaptateurSqlite } from '../adaptateur.js'
 
+/**
+ * Une vente terminée, telle qu'elle apparaît dans « Reçus ».
+ *
+ * ── Pourquoi cet écran ne DEMANDE rien au serveur ─────────────────────────
+ *
+ * C'était la question posée, et la réponse est déjà dans l'architecture : le
+ * cycle de synchronisation TIRE les événements de tous les terminaux
+ * (`/sync/pull`, curseur `evenements`, depuis 0 à l'appairage) et les rejoue
+ * en local. La base de cette tablette contient donc déjà les ventes des
+ * AUTRES caisses, projetées par le même code.
+ *
+ * Interroger le serveur ajouterait une seconde vérité, une route, un cache à
+ * invalider — et un écran qui se vide quand le réseau tombe. Or le décalage
+ * qu'on cherche à supprimer ne vient pas de là : il vient de ce qui n'est pas
+ * encore REMONTÉ. C'est `enAttente` qui le dit, et c'est le seul écart qu'un
+ * système hors ligne d'abord ne peut pas faire disparaître — seulement rendre
+ * visible.
+ */
+export interface Recu {
+  id: string
+  numeroTicket: string | null
+  type: string
+  tableLabel: string | null
+  statut: string
+  totalMillimes: number
+  nombreArticles: number
+  /** Clôture, ou annulation. C'est la date que le gérant cherche. */
+  termineeA: string
+  /** Qui a encaissé — jamais qui a ouvert : voir `shifts.closed_by`. */
+  employe: string | null
+  /** « Espèces », « Carte »… séparés par une virgule si la note est partagée. */
+  paiements: string
+  /**
+   * Cette vente attend-elle encore d'être envoyée ?
+   *
+   * `order_events.server_seq IS NULL` : le serveur n'a pas encore attribué de
+   * numéro à au moins un de ses événements. C'est exactement la définition,
+   * et il existe déjà un index partiel pour elle.
+   *
+   * Le dire À CÔTÉ du montant est le point : sinon le gérant compare la
+   * caisse au back-office, trouve un écart, et cherche une panne là où il n'y
+   * a qu'une tablette qui n'a pas fini de parler.
+   */
+  enAttente: boolean
+}
+
 export interface CommandeOuverte {
   id: string
   tableId: string | null
@@ -330,6 +376,61 @@ export function depotCaisse(db: AdaptateurSqlite) {
         ouverteA: l.opened_at,
         envoyeeA: l.sent_at,
         preteA: l.ready_at,
+      }))
+    },
+
+    /**
+     * Les ventes terminées, la plus récente d'abord.
+     *
+     * BORNÉE, et ce n'est pas une précaution de style : un restaurant fait
+     * quelques centaines de tickets par semaine, et le `SELECT` sans limite
+     * qui « marche en démo » finit par charger l'année entière dans la
+     * mémoire d'une tablette d'entrée de gamme, en plein service.
+     */
+    async recus(limite = 100): Promise<Recu[]> {
+      const lignes = await db.lire<{
+        id: string
+        ticket_number: string | null
+        type: string
+        table_label: string | null
+        status: string
+        total_millimes: number
+        articles: number | null
+        terminee_a: string
+        employe: string | null
+        paiements: string | null
+        en_attente: number
+      }>(
+        `SELECT o.id, o.ticket_number, o.type, t.label AS table_label, o.status,
+                o.total_millimes,
+                (SELECT SUM(qty) FROM order_items i
+                  WHERE i.order_id = o.id AND i.voided_at IS NULL) AS articles,
+                COALESCE(o.closed_at, o.cancelled_at) AS terminee_a,
+                e.full_name AS employe,
+                (SELECT GROUP_CONCAT(DISTINCT p.type) FROM payments p
+                  WHERE p.order_id = o.id AND p.voided_at IS NULL) AS paiements,
+                EXISTS (SELECT 1 FROM order_events ev
+                         WHERE ev.order_id = o.id AND ev.server_seq IS NULL) AS en_attente
+         FROM orders o
+         LEFT JOIN tables t ON t.id = o.table_id
+         LEFT JOIN employees e ON e.id = o.opened_by
+         WHERE o.status IN ('close','annulee')
+         ORDER BY COALESCE(o.closed_at, o.cancelled_at) DESC
+         LIMIT ?`,
+        [limite],
+      )
+      return lignes.map((l) => ({
+        id: l.id,
+        numeroTicket: l.ticket_number,
+        type: l.type,
+        tableLabel: l.table_label,
+        statut: l.status,
+        totalMillimes: l.total_millimes,
+        nombreArticles: l.articles ?? 0,
+        termineeA: l.terminee_a,
+        employe: l.employe,
+        paiements: l.paiements ?? '',
+        enAttente: l.en_attente === 1,
       }))
     },
 

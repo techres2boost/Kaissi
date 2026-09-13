@@ -36,6 +36,34 @@ export type TypeEvenement =
 export type TypeCommande = 'dine_in' | 'takeaway' | 'delivery'
 export type ModePaiement = 'cash' | 'card' | 'online' | 'other'
 
+/**
+ * Le mode de paiement, en français.
+ *
+ * Les valeurs stockées restent en anglais — c'est la convention des colonnes
+ * SQL, et les changer casserait les lignes déjà écrites sur les tablettes.
+ * Mais un reçu affiché à un caissier tunisien dit « Espèces », jamais
+ * « cash ». La traduction vit donc ICI, avec le type qu'elle traduit : posée
+ * dans un écran, elle serait réécrite différemment dans le suivant.
+ *
+ * Une valeur inconnue est rendue telle quelle plutôt que masquée : un mode
+ * ajouté côté serveur doit s'afficher, même moche, plutôt que disparaître
+ * d'un ticket.
+ */
+export function libelleModePaiement(mode: string): string {
+  switch (mode) {
+    case 'cash':
+      return 'Espèces'
+    case 'card':
+      return 'Carte'
+    case 'online':
+      return 'En ligne'
+    case 'other':
+      return 'Autre'
+    default:
+      return mode
+  }
+}
+
 /** Charges utiles typées, une par type d'événement. */
 export interface ChargesUtiles {
   'order.opened': {
