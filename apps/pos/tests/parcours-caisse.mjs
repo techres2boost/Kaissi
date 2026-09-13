@@ -236,6 +236,35 @@ await etape('la table 3 est de nouveau libre', async () => {
   if (!libre) throw new Error('la table 3 est restée occupée')
 })
 
+await etape('« Périodes » montre le service en cours, puis le service clos', async () => {
+  /*
+   * L'écran lit `shifts` en local. Il doit dire sa PORTÉE — les services de
+   * cette caisse seulement — parce qu'un total de caisse pris pour un total
+   * d'établissement est un chiffre faux, et c'est le chiffre que le patron
+   * regarde.
+   */
+  await page.click('.bandeau-actions .lien:has-text("Périodes")')
+  await page.waitForSelector('.liste-periodes li', { timeout: 10000 })
+
+  const portee = await page.textContent('.portee-caisse')
+  if (!portee.includes('cette caisse')) {
+    throw new Error('l’écran ne dit pas qu’il ne montre qu’une seule caisse')
+  }
+
+  const premier = await page.textContent('.liste-periodes li')
+  console.log(`    première période : ${premier.replace(/\s+/g, ' ').trim().slice(0, 120)}`)
+  if (!premier.includes('en cours')) {
+    throw new Error('le service ouvert doit être marqué « en cours »')
+  }
+  // Un service jamais remonté : le POS du test n'est appairé à personne.
+  if (!premier.includes('Ahmed') && !premier.includes('Salma')) {
+    throw new Error('le nom de qui a ouvert le service manque')
+  }
+
+  await page.click('.periodes .barre-salle .lien:has-text("Salle")')
+  await page.waitForSelector('.grille-tables', { timeout: 10000 })
+})
+
 await etape('un GÉRANT crée un article, et il est vendable aussitôt', async () => {
   /*
    * Le chemin local de bout en bout, dans un vrai navigateur : transaction

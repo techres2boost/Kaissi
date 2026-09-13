@@ -37,6 +37,26 @@ export const CIBLE_WEB = import.meta.env.VITE_CIBLE === 'web'
 export const URL_SYNC_PAR_DEFAUT = import.meta.env.VITE_URL_SYNC ?? ''
 
 /**
+ * Adresse du BACK-OFFICE — pour le bouton du bandeau, et rien d'autre.
+ *
+ * ── La nuance qui sépare ce bouton d'une TWA ──────────────────────────────
+ *
+ * Il ouvre le NAVIGATEUR DU SYSTÈME sur cette page. Rien de ce qui s'affiche
+ * alors n'est l'application Kaissi : la caisse continue de tourner derrière,
+ * avec son code empaqueté, et elle s'ouvrira demain sans réseau exactement
+ * comme aujourd'hui.
+ *
+ * Une TWA ferait venir le CODE DE L'APPLICATION depuis cette adresse. C'est
+ * cela qui est disqualifiant — pas le fait qu'une URL figure dans le bundle.
+ * La garde du mode avion applique la même distinction : elle admet l'hôte
+ * DÉCLARÉ ici, et refuse tous les autres.
+ *
+ * Vide = pas de bouton. Un bouton qui ouvre une page blanche est pire que
+ * pas de bouton.
+ */
+export const URL_BACKOFFICE = import.meta.env.VITE_URL_BACKOFFICE ?? ''
+
+/**
  * Empreinte du build en cours d'exécution.
  *
  * Affichée dans l'écran Diagnostic. Sans elle, « ma correction est-elle en

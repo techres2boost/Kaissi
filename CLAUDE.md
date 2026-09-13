@@ -322,6 +322,35 @@ Côté caisse, l'article est vendable **immédiatement**, et sa tuile porte
 se déduit de l'outbox — jamais d'un drapeau à entretenir, qui dériverait le
 jour où l'on oublie de l'éteindre sur le chemin du rejet.
 
+### Le bouton « Back-office » n'est pas un `server.url`
+
+Il ouvre le **navigateur du système** sur `urlBackOffice`
+(`apps/pos/deploiement.json`). Rien de ce qui s'affiche alors n'est
+l'application Kaissi : la caisse continue de tourner derrière, avec son code
+empaqueté, et elle s'ouvrira demain sans réseau exactement comme aujourd'hui.
+
+Une TWA, elle, ferait venir le **code de l'application** depuis cette adresse.
+C'est cela qui est disqualifiant — pas le fait qu'une URL figure dans le
+bundle. La garde du mode avion applique la même distinction : elle admet
+l'hôte **déclaré**, et refuse tous les autres. Vider `urlBackOffice` fait donc
+échouer le build si l'hôte apparaît quand même.
+
+Hors ligne, le bouton **ne tente rien** : il explique, et rappelle que la
+caisse continue. Ouvrir une page blanche ferait conclure que le back-office
+est en panne.
+
+### « Périodes de travail » ne montre QUE cette caisse
+
+Les reçus couvrent tout l'établissement parce que les événements de commande
+**redescendent** par `/sync/pull`. Les services de caisse, eux, sont poussés
+(`POST /sync/shifts`) et **jamais retirés** : une tablette ne connaît que ses
+propres services.
+
+L'écran le dit en toutes lettres, une fois, en haut. Afficher un total présenté
+comme celui du restaurant alors qu'il ne couvre qu'une caisse serait un chiffre
+**faux** — et l'écart de caisse est le chiffre que le patron regarde. La vue
+multi-caisses existe déjà au back-office, qui les reçoit tous.
+
 ### Le poste de préparation appartient à la CATÉGORIE
 
 `categories.station_id` (migration 0025) est la source de vérité ;

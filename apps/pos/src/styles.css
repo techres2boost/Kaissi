@@ -1031,6 +1031,58 @@ button { font: inherit; color: inherit; cursor: pointer; }
   font-size: 0.8rem; color: var(--texte-2); font-variant-numeric: tabular-nums;
 }
 
+/* ── Périodes de travail ─────────────────────────────────────────────────── */
+.periodes { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.periodes .barre-salle strong { font-size: 1rem; }
+
+/*
+ * La portée est dite UNE FOIS, en haut, et pas répétée sur chaque ligne :
+ * un avertissement qu'on lit vingt fois cesse d'être lu. Mais il est là,
+ * parce qu'un total de caisse pris pour un total d'établissement est un
+ * chiffre faux — et c'est le chiffre que le patron regarde.
+ */
+.portee-caisse {
+  margin: 0; padding: 0.7rem 1rem;
+  background: var(--fond-accent); color: var(--texte-2);
+  border-bottom: 1px solid var(--bordure);
+  font-size: 0.82rem;
+}
+
+.liste-periodes {
+  flex: 1; min-height: 0; overflow-y: auto;
+  list-style: none; margin: 0; padding: 1rem;
+  display: flex; flex-direction: column; gap: 0.6rem;
+}
+.liste-periodes li {
+  background: var(--surface); border: 1px solid var(--bordure);
+  border-radius: var(--rayon); padding: 0.9rem 1rem;
+  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
+}
+.liste-periodes li.en-cours { border-color: var(--accent); background: var(--fond-accent); }
+.liste-periodes .entete {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+
+.liste-periodes .chiffres {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.5rem 1rem; margin: 0;
+}
+.liste-periodes .chiffres > div { display: flex; flex-direction: column; }
+.liste-periodes dt { color: var(--texte-2); font-size: 0.7rem; }
+.liste-periodes dd {
+  margin: 0; font-variant-numeric: tabular-nums; font-weight: 650;
+}
+
+/*
+ * L'écart a DEUX niveaux, et c'est une règle du domaine
+ * (`ecartSignificatif`), pas une préférence d'affichage. Peindre en rouge un
+ * manque de cinquante millimes apprendrait à ignorer la couleur — et elle
+ * doit rester lisible le jour où il manque vingt dinars.
+ */
+.liste-periodes .ecart-faible dd { color: var(--or); }
+.liste-periodes .ecart-fort dd { color: var(--alerte); font-weight: 800; }
+
 /* ── Nouvel article, créé depuis la caisse ──────────────────────────────── */
 
 /*
@@ -1213,6 +1265,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
    * référence — à trois colonnes, le montant, qui est la raison d'ouvrir cet
    * écran, se retrouvait compressé à l'illisible.
    */
+  .liste-periodes { padding: 0.75rem; }
+  .liste-periodes .chiffres { grid-template-columns: 1fr 1fr; }
+  .portee-caisse { padding: 0.6rem 0.75rem; }
+
   .liste-recus { padding: 0.75rem; }
   .liste-recus li { grid-template-columns: 1fr auto; gap: 0.5rem; }
   .liste-recus .detail {

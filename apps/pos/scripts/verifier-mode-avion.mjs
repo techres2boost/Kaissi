@@ -135,29 +135,45 @@ const HOTES_AUTORISES = [
  * On n'autorise QUE l'hôte réellement déclaré, jamais une plage : une
  * URL distante arrivée par accident reste refusée.
  */
-function urlSyncDeclaree() {
-  const posee = (process.env['VITE_URL_SYNC'] ?? '').trim()
-  if (posee) return { source: 'la variable VITE_URL_SYNC', valeur: posee }
+function urlDeclaree(cle, variable) {
+  const posee = (process.env[variable] ?? '').trim()
+  if (posee) return { source: `la variable ${variable}`, valeur: posee }
   try {
     const brut = readFileSync(join(racine, 'deploiement.json'), 'utf8')
-    const valeur = JSON.parse(brut).urlSync
+    const valeur = JSON.parse(brut)[cle]
     return typeof valeur === 'string' && valeur.trim()
-      ? { source: 'apps/pos/deploiement.json', valeur: valeur.trim() }
+      ? { source: `apps/pos/deploiement.json (${cle})`, valeur: valeur.trim() }
       : null
   } catch {
     return null
   }
 }
 
-const declaree = urlSyncDeclaree()
-if (declaree) {
+/*
+ * L'adresse du BACK-OFFICE est admise pour la MÊME raison, et la nuance est
+ * celle qui sépare ce projet d'une TWA.
+ *
+ * Le bouton « Back-office » ouvre le NAVIGATEUR DU SYSTÈME sur cette page.
+ * Rien de ce qui s'affiche alors n'est l'application Kaissi : la caisse
+ * continue de tourner derrière, avec son code empaqueté, et elle s'ouvrira
+ * demain sans réseau. Une TWA, elle, ferait venir le code de l'application
+ * elle-même depuis cette adresse — c'est cela qui est disqualifiant, pas le
+ * fait qu'une URL figure dans le bundle.
+ *
+ * Comme pour la synchronisation : seul l'hôte RÉELLEMENT déclaré passe.
+ */
+for (const [cle, variable, exemple] of [
+  ['urlSync', 'VITE_URL_SYNC', 'https://mon-serveur-de-sync.example'],
+  ['urlBackOffice', 'VITE_URL_BACKOFFICE', 'https://mon-back-office.example'],
+]) {
+  const declaree = urlDeclaree(cle, variable)
+  if (!declaree) continue
   try {
     HOTES_AUTORISES.push(new URL(declaree.valeur).hostname.toLowerCase())
   } catch {
     console.error(
-      `\n✗ L'adresse de synchronisation déclarée dans ${declaree.source} n'est ` +
-        `pas une URL valide : « ${declaree.valeur} »\n` +
-        '  Attendu : https://mon-serveur-de-sync.example\n',
+      `\n✗ L'adresse déclarée dans ${declaree.source} n'est pas une URL ` +
+        `valide : « ${declaree.valeur} »\n  Attendu : ${exemple}\n`,
     )
     process.exit(1)
   }

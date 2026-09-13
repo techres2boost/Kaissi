@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react'
 import { Printer, TriangleAlert } from 'lucide-react'
 import type { Shift } from '@kaissi/domain'
-import { IMPRESSION_ACTIVE } from './config.js'
+import { IMPRESSION_ACTIVE, URL_BACKOFFICE } from './config.js'
 import { demarrer, type ContexteApplication } from './donnees/demarrage.js'
 import { useEtatReseau } from './donnees/reseau.js'
 import { FournisseurApp, useApp } from './etat/contexte.js'
@@ -19,6 +19,8 @@ import { EcranCommande } from './ecrans/EcranCommande.js'
 import { EcranPaiement } from './ecrans/EcranPaiement.js'
 import { EcranClotureShift, EcranOuvertureShift } from './ecrans/EcranShift.js'
 import { EcranDiagnostic } from './ecrans/EcranDiagnostic.js'
+import { Modale } from './composants/Modale.js'
+import { EcranPeriodes } from './ecrans/EcranPeriodes.js'
 import { EcranRecus } from './ecrans/EcranRecus.js'
 import { EcranSync } from './ecrans/EcranSync.js'
 
@@ -76,6 +78,7 @@ type Vue =
   | { nom: 'diagnostic' }
   | { nom: 'sync' }
   | { nom: 'recus' }
+  | { nom: 'periodes' }
 
 function Terminal({ contexte }: { contexte: ContexteApplication }) {
   const app = useApp()
@@ -84,6 +87,32 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
 
   const [shift, setShift] = useState<Shift | null | undefined>(undefined)
   const [vue, setVue] = useState<Vue>({ nom: 'salle' })
+  /**
+   * Le back-office a été demandé SANS réseau.
+   *
+   * Ouvrir quand même donnerait une page blanche dans le navigateur, et la
+   * personne conclurait que le back-office est en panne. On préfère le dire
+   * — et rappeler que la caisse, elle, continue.
+   */
+  const [backOfficeHorsLigne, setBackOfficeHorsLigne] = useState(false)
+
+  /**
+   * Ouvre le back-office dans le NAVIGATEUR DU SYSTÈME.
+   *
+   * `window.open(..., '_blank')` : dans une WebView Capacitor, une cible
+   * externe est confiée au navigateur de l'appareil. Le code de la caisse
+   * reste dans le paquet — ce n'est en rien un `server.url`.
+   *
+   * `noopener` : la page ouverte ne doit pas pouvoir manipuler celle de la
+   * caisse par `window.opener`.
+   */
+  const ouvrirBackOffice = () => {
+    if (!reseau.connecte) {
+      setBackOfficeHorsLigne(true)
+      return
+    }
+    window.open(URL_BACKOFFICE, '_blank', 'noopener,noreferrer')
+  }
 
   useEffect(() => {
     let vivant = true
@@ -147,6 +176,8 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
           onCloturer={() => setVue({ nom: 'cloture' })}
           onSync={() => setVue({ nom: 'sync' })}
           onRecus={() => setVue({ nom: 'recus' })}
+          onPeriodes={() => setVue({ nom: 'periodes' })}
+          onBackOffice={ouvrirBackOffice}
           impression={etatImpression}
         />
         <main className="contenu">
@@ -174,6 +205,10 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
         onRecus={() =>
           setVue((v) => (v.nom === 'recus' ? { nom: 'salle' } : { nom: 'recus' }))
         }
+        onPeriodes={() =>
+          setVue((v) => (v.nom === 'periodes' ? { nom: 'salle' } : { nom: 'periodes' }))
+        }
+        onBackOffice={ouvrirBackOffice}
         impression={etatImpression}
       />
 
@@ -238,7 +273,34 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
         {vue.nom === 'sync' && <EcranSync />}
 
         {vue.nom === 'recus' && <EcranRecus onRetour={() => setVue({ nom: 'salle' })} />}
+
+        {vue.nom === 'periodes' && (
+          <EcranPeriodes onRetour={() => setVue({ nom: 'salle' })} />
+        )}
       </main>
+
+      {backOfficeHorsLigne && (
+        <Modale
+          titre="Le back-office a besoin d’une connexion"
+          onFermer={() => setBackOfficeHorsLigne(false)}
+          pied={
+            <button type="button" className="principal" onClick={() => setBackOfficeHorsLigne(false)}>
+              Revenir à la caisse
+            </button>
+          }
+        >
+          <p>
+            Cette tablette est hors ligne. Le back-office est un site web : il
+            ne s’ouvrira pas tant que la connexion n’est pas revenue.
+          </p>
+          <p className="indication">
+            La caisse, elle, continue de fonctionner normalement — encaissements
+            compris. Ce qui attend d’être envoyé partira tout seul au retour du
+            réseau.
+          </p>
+        </Modale>
+      )}
+
     </div>
   )
 }
@@ -286,6 +348,8 @@ function Bandeau({
   onCloturer,
   onSync,
   onRecus,
+  onPeriodes,
+  onBackOffice,
   impression,
 }: {
   reseau: { connecte: boolean; type: string }
@@ -297,6 +361,8 @@ function Bandeau({
   onCloturer: () => void
   onSync: () => void
   onRecus: () => void
+  onPeriodes: () => void
+  onBackOffice: () => void
   impression: { enAttente: number; echecs: number }
 }) {
   const { employe, etablissement, resumeSync, sync, app } = useApp()
@@ -445,6 +511,15 @@ function Bandeau({
         <button
           type="button"
           className="lien"
+          data-actif={vue === 'periodes'}
+          onClick={onPeriodes}
+        >
+          Périodes
+        </button>
+
+        <button
+          type="button"
+          className="lien"
           data-actif={vue === 'sync'}
           onClick={onSync}
         >
@@ -469,6 +544,21 @@ function Bandeau({
             Clôturer
           </button>
         )}
+        {/*
+          Le seul bouton qui SORT de l'application — d'où sa place, en
+          dernier, et son libellé explicite. Il ouvre le navigateur du
+          système : rien de ce qui s'affiche alors n'est Kaissi, et la caisse
+          continue de tourner derrière avec son code empaqueté.
+
+          Absent si aucune adresse n'est déclarée pour ce déploiement : un
+          bouton qui ouvre une page blanche est pire que pas de bouton.
+        */}
+        {URL_BACKOFFICE && (
+          <button type="button" className="lien" onClick={onBackOffice}>
+            Back-office ↗
+          </button>
+        )}
+
         <button type="button" className="employe" onClick={onVerrouiller}>
           {employe?.nom ?? '—'}
           <small>verrouiller</small>

@@ -18,10 +18,27 @@ import react from '@vitejs/plugin-react'
 function urlSyncDuDeploiement(): string {
   const posee = (process.env['VITE_URL_SYNC'] ?? '').trim()
   if (posee) return posee
+  return champDuDeploiement('urlSync')
+}
+
+/**
+ * L'adresse du BACK-OFFICE, pour le bouton du bandeau.
+ *
+ * Vide = pas de bouton. Un bouton qui ouvre une page blanche est pire que pas
+ * de bouton — et la caisse doit rester utilisable sur un déploiement qui n'a
+ * pas encore de back-office en ligne.
+ */
+function urlBackOfficeDuDeploiement(): string {
+  const posee = (process.env['VITE_URL_BACKOFFICE'] ?? '').trim()
+  if (posee) return posee
+  return champDuDeploiement('urlBackOffice')
+}
+
+function champDuDeploiement(cle: 'urlSync' | 'urlBackOffice'): string {
   try {
     const fichier = new URL('./deploiement.json', import.meta.url)
-    const { urlSync } = JSON.parse(readFileSync(fichier, 'utf8')) as { urlSync?: unknown }
-    return typeof urlSync === 'string' ? urlSync.trim() : ''
+    const valeur = (JSON.parse(readFileSync(fichier, 'utf8')) as Record<string, unknown>)[cle]
+    return typeof valeur === 'string' ? valeur.trim() : ''
   } catch {
     // Fichier absent ou illisible : le POS demandera l'adresse à l'écran.
     // Ce n'est jamais une raison d'empêcher un build de sortir.
@@ -173,6 +190,7 @@ export default defineConfig(({ command, mode }) => {
       // Pré-remplit l'adresse du serveur de synchronisation. Voir
       // `deploiement.json` : c'est une DONNÉE, pas un `server.url`.
       'import.meta.env.VITE_URL_SYNC': JSON.stringify(urlSyncDuDeploiement()),
+      'import.meta.env.VITE_URL_BACKOFFICE': JSON.stringify(urlBackOfficeDuDeploiement()),
     },
     // Chemins RELATIFS : indispensable pour un chargement depuis le schéma
     // interne de Capacitor.

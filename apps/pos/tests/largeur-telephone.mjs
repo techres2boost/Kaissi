@@ -163,6 +163,12 @@ for (const appareil of APPAREILS) {
   await page.waitForSelector('.recus', { timeout: 10000 })
   await mesurer('reçus')
 
+  // Les périodes affichent huit chiffres côte à côte : c'est la grille la
+  // plus serrée de l'application, celle qui déborde en premier.
+  await page.click('.bandeau-actions .lien:has-text("Périodes")')
+  await page.waitForSelector('.periodes', { timeout: 10000 })
+  await mesurer('périodes de travail')
+
   await page.close()
 }
 

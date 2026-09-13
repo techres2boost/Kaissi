@@ -29,5 +29,21 @@
     "La variable d'environnement VITE_URL_SYNC, si elle est posée, l'emporte",
     "— pour construire un bundle de recette sans toucher au dépôt."
   ],
-  "urlSync": "https://kaissi-production.up.railway.app"
+  "urlSync": "https://kaissi-production.up.railway.app",
+
+  "$commentaireBackOffice": [
+    "Adresse du BACK-OFFICE, pour le bouton « Back-office » du bandeau.",
+    "",
+    "Ce n'est pas davantage un `server.url` que la précédente, et la nuance",
+    "vaut d'être posée parce qu'elle en a l'air : le bouton ouvre le",
+    "NAVIGATEUR DU SYSTÈME sur cette page. Rien de ce qui s'affiche alors",
+    "n'est l'application Kaissi — la caisse continue de tourner derrière,",
+    "avec son code empaqueté, et elle s'ouvrira demain sans réseau comme",
+    "aujourd'hui. Une TWA, elle, ferait venir le code de l'application",
+    "elle-même depuis cette adresse : c'est CELA qui est disqualifiant.",
+    "",
+    "Laissée vide, le bouton n'apparaît pas. Un bouton qui ouvre une page",
+    "blanche est pire que pas de bouton."
+  ],
+  "urlBackOffice": "https://kaissi-backoffice.vercel.app"
 }

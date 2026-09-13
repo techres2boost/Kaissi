@@ -25,6 +25,15 @@ interface ImportMetaEnv {
    * n'imprime pas, il affiche. Voir `config.ts`.
    */
   readonly VITE_IMPRESSION?: string
+  /** Adresse du serveur de synchronisation, pré-remplie à l'appairage. */
+  readonly VITE_URL_SYNC?: string
+  /**
+   * Adresse du BACK-OFFICE, pour le bouton du bandeau.
+   *
+   * Vide = pas de bouton. Ce n'est pas un `server.url` : le bouton ouvre le
+   * NAVIGATEUR DU SYSTÈME, et le code de la caisse reste dans le paquet.
+   */
+  readonly VITE_URL_BACKOFFICE?: string
 }
 
 interface ImportMeta {

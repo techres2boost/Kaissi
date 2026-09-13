@@ -1861,6 +1861,48 @@ l'employé, le mode de paiement et le montant. Et un badge ambré
 > rouge : la vente est enregistrée et remontera ; le rouge reste à ce qui
 > demande une action.
 
+#### Q.2 ter — « Périodes » et « Back-office », comme Loyverse
+
+3 sexies. Touche **Périodes** dans le bandeau.
+
+**Attendu** : le service en cours, marqué « en cours », avec qui l'a ouvert,
+le nombre de ventes, l'encaissé, le fond de caisse. Les services clos y
+ajoutent attendu / compté / **écart**.
+
+> **La portée est dite en haut, et c'est le point.** Cet écran ne montre que
+> les services de CETTE caisse. Les reçus, eux, couvrent tout l'établissement —
+> parce que les événements de commande REDESCENDENT par `/sync/pull`. Les
+> services de caisse sont poussés et jamais retirés : une tablette ne connaît
+> que les siens.
+>
+> Afficher un total présenté comme celui du restaurant alors qu'il ne couvre
+> qu'une caisse serait un chiffre FAUX — et l'écart de caisse est le chiffre
+> que le patron regarde. La vue multi-caisses est au back-office, qui les
+> reçoit tous.
+
+> **L'écart a deux niveaux**, et c'est une règle du domaine
+> (`ecartSignificatif`), pas une préférence d'affichage : ambré en dessous du
+> seuil, rouge au-dessus. Peindre en rouge un manque de cinquante millimes
+> apprendrait à ignorer la couleur — elle doit rester lisible le jour où il
+> manque vingt dinars. Et un écart **négatif** s'affiche tel quel : le borner
+> effacerait la seule information utile de l'écran.
+
+3 septies. Touche **Back-office ↗**, réseau coupé.
+
+**Attendu** : une explication — « le back-office est un site web, il ne
+s'ouvrira pas tant que la connexion n'est pas revenue » — et le rappel que la
+caisse, elle, continue.
+
+> **Ce bouton n'est pas un `server.url`.** Il ouvre le NAVIGATEUR DU SYSTÈME.
+> Rien de ce qui s'affiche alors n'est Kaissi : la caisse tourne derrière avec
+> son code empaqueté. Une TWA ferait venir le CODE de l'application depuis
+> cette adresse — c'est cela qui est disqualifiant, pas la présence d'une URL
+> dans le bundle.
+>
+> La garde du mode avion applique la même distinction : elle admet l'hôte
+> **déclaré** dans `deploiement.json`, et refuse tous les autres. Vérifié dans
+> les deux sens — vider `urlBackOffice` fait échouer le build.
+
 #### Q.2 bis — Un terminal neuf dit qu'il n'est relié à rien
 
 4 bis. Sur une caisse fraîchement installée, regarde le bandeau, à droite.

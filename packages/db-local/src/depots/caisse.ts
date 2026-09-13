@@ -59,6 +59,39 @@ export interface Recu {
   enAttente: boolean
 }
 
+/**
+ * Une période de travail terminée, telle qu'elle apparaît dans l'historique.
+ *
+ * ── Ce que cette liste peut montrer, et ce qu'elle ne peut pas ────────────
+ *
+ * UNIQUEMENT les services de CETTE caisse. Contrairement aux reçus — dont les
+ * événements redescendent par `/sync/pull` — les services de caisse sont
+ * POUSSÉS et jamais retirés : le protocole ne les fait pas redescendre. Une
+ * tablette ne connaît donc que ses propres services.
+ *
+ * Ce n'est pas une omission à corriger en douce : la vue multi-caisses existe
+ * déjà au back-office, qui les reçoit tous. Prétendre ici à un total de
+ * l'établissement afficherait un chiffre FAUX sur la caisse — et c'est le
+ * chiffre que le patron regarde. L'écran le dit donc en toutes lettres.
+ */
+export interface PeriodeTravail {
+  id: string
+  ouverteA: string
+  fermeeA: string | null
+  ouvertePar: string | null
+  /** Qui a COMPTÉ la caisse — pas forcément qui l'a ouverte (migration 0027). */
+  fermeePar: string | null
+  fondDeCaisseMillimes: number
+  compteMillimes: number | null
+  attenduMillimes: number | null
+  /** Peut être négatif : c'est tout son intérêt. */
+  ecartMillimes: number | null
+  nombreVentes: number
+  chiffreAffairesMillimes: number
+  /** Le service n'a pas encore été remonté au back-office (`pushed_at` nul). */
+  enAttente: boolean
+}
+
 export interface CommandeOuverte {
   id: string
   tableId: string | null
@@ -376,6 +409,70 @@ export function depotCaisse(db: AdaptateurSqlite) {
         ouverteA: l.opened_at,
         envoyeeA: l.sent_at,
         preteA: l.ready_at,
+      }))
+    },
+
+    /**
+     * Les périodes de travail de CETTE caisse, la plus récente d'abord.
+     *
+     * Le service en cours est inclus s'il y en a un : c'est celui qu'on
+     * consulte le plus, et l'exclure obligerait à deux écrans pour une même
+     * question.
+     *
+     * Bornée, pour la même raison que les reçus : un an de services ne tient
+     * pas dans la mémoire d'une tablette d'entrée de gamme.
+     */
+    async periodes(limite = 60): Promise<PeriodeTravail[]> {
+      const lignes = await db.lire<{
+        id: string
+        opened_at: string
+        closed_at: string | null
+        ouvert_par: string | null
+        ferme_par: string | null
+        opening_float_millimes: number
+        counted_millimes: number | null
+        expected_millimes: number | null
+        variance_millimes: number | null
+        ventes: number | null
+        ca: number | null
+        pushed_at: string | null
+      }>(
+        /*
+         * Les ventes sont rattachées au service par leurs PAIEMENTS
+         * (`payments.shift_id`), pas par une plage d'horaires. Une commande
+         * ouverte avant la clôture et encaissée après appartient au service
+         * qui l'a ENCAISSÉE — c'est l'argent qui est dans le tiroir qui
+         * compte, pas le moment où le client s'est assis.
+         */
+        `SELECT s.id, s.opened_at, s.closed_at,
+                eo.full_name AS ouvert_par,
+                ef.full_name AS ferme_par,
+                s.opening_float_millimes, s.counted_millimes,
+                s.expected_millimes, s.variance_millimes, s.pushed_at,
+                (SELECT COUNT(DISTINCT p.order_id) FROM payments p
+                  WHERE p.shift_id = s.id AND p.voided_at IS NULL) AS ventes,
+                (SELECT SUM(p.amount_millimes) FROM payments p
+                  WHERE p.shift_id = s.id AND p.voided_at IS NULL) AS ca
+         FROM shifts s
+         LEFT JOIN employees eo ON eo.id = COALESCE(s.opened_by, s.employee_id)
+         LEFT JOIN employees ef ON ef.id = s.closed_by
+         ORDER BY s.opened_at DESC
+         LIMIT ?`,
+        [limite],
+      )
+      return lignes.map((l) => ({
+        id: l.id,
+        ouverteA: l.opened_at,
+        fermeeA: l.closed_at,
+        ouvertePar: l.ouvert_par,
+        fermeePar: l.ferme_par,
+        fondDeCaisseMillimes: l.opening_float_millimes,
+        compteMillimes: l.counted_millimes,
+        attenduMillimes: l.expected_millimes,
+        ecartMillimes: l.variance_millimes,
+        nombreVentes: l.ventes ?? 0,
+        chiffreAffairesMillimes: l.ca ?? 0,
+        enAttente: l.pushed_at === null,
       }))
     },
 
