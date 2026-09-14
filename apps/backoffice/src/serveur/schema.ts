@@ -470,6 +470,16 @@ export type MethodePaiement = {
   name: string
   /** `cash` | `card` | `online` | `other`. */
   type: string
+  /**
+   * Le tiroir-caisse s'ouvre à la validation de ce paiement.
+   *
+   * Déclaré ici depuis que l'écran « Modes de paiement » le modifie : ce
+   * fichier dit noir sur blanc de quelles colonnes le back-office dépend, et
+   * une colonne renommée doit casser la compilation plutôt que la production.
+   */
+  opens_drawer: boolean
+  /** Ordre d'affichage à l'encaissement. Déduit, jamais saisi. */
+  position: number
   is_active: boolean
   archived_at: Horodatage | null
 }

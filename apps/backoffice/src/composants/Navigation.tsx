@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   Menu,
   Package,
+  Percent,
   ReceiptText,
   Tag,
   Ticket,
@@ -144,12 +145,25 @@ const GROUPES = [
     ],
   },
   {
-    titre: 'Configuration',
+    /*
+     * « Paramètres » et non « Configuration » — pour la raison déjà donnée
+     * plus haut sur les rapports : c'est le mot que le marché connaît, et un
+     * restaurateur qui vient de Loyverse le cherche sous ce nom.
+     */
+    titre: 'Paramètres',
     onglets: [
       { chemin: 'employes', libelle: 'Employés', icone: Users, gestionnaire: true },
       // « Clients » juste sous « Employés », comme dans Loyverse : ce sont
       // les deux carnets de personnes, et on les cherche au même endroit.
       { chemin: 'clients', libelle: 'Clients', icone: Contact, gestionnaire: true },
+      /*
+       * Taxes AVANT modes de paiement, et ce n'est pas alphabétique : un
+       * restaurant ouvert depuis la caisse reçoit un taux à ZÉRO, exprès —
+       * Kaissi refuse d'inventer une règle fiscale. C'est donc le tout
+       * premier réglage à corriger, et il doit se trouver sans chercher.
+       */
+      { chemin: 'taxes', libelle: 'Taxes', icone: Percent, gestionnaire: true },
+      { chemin: 'paiements', libelle: 'Modes de paiement', icone: CreditCard, gestionnaire: true },
     ],
   },
 ] as const

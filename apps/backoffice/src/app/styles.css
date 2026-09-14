@@ -1133,3 +1133,64 @@ th .tri:hover { color: var(--texte); }
   color: var(--attenue);
   line-height: 1.6;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Paramètres — Taxes et modes de paiement
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.liste-taux { list-style: none; margin: 0 0 1.5rem; padding: 0; display: grid; gap: 0.6rem; }
+.liste-taux > li {
+  background: var(--panneau); border: 1px solid var(--bordure);
+  border-radius: var(--rayon); padding: 0.75rem 1rem;
+  display: grid; gap: 0.5rem;
+}
+/*
+ * Une ligne archivée reste LISIBLE, elle n'est pas effacée à moitié.
+ * `opacity: 0.4` sur du texte de réglage tombe sous le seuil de contraste et
+ * rend illisible ce qu'on vient précisément chercher : lequel avait été
+ * retiré, et sous quel nom.
+ */
+.liste-taux > li.archive { background: var(--panneau-clair); }
+.liste-taux > li.archive .ligne-taux input,
+.liste-taux > li.archive .ligne-paiement input { text-decoration: line-through; }
+
+.ligne-taux, .ligne-paiement {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
+}
+.ligne-taux input[name='nom'],
+.ligne-paiement input[name='nom'] { flex: 1 1 12rem; min-width: 0; }
+.champ-taux { display: inline-flex; align-items: center; gap: 0.3rem; }
+.champ-taux input { width: 5rem; text-align: right; }
+
+/*
+ * Le `<select>` du type de paiement, ramené à sa largeur utile.
+ *
+ * La feuille pose `width: 100%` sur les champs de formulaire — ce qui est
+ * juste dans une colonne, et faux dans une RANGÉE : le select prenait la
+ * ligne entière, repoussait le nom sur la suivante, et l'écran se dépliait
+ * en quatre lignes par mode de paiement. La liste des taxes y échappait
+ * seulement parce qu'elle n'a pas de select.
+ */
+.ligne-paiement select { flex: 0 0 auto; width: auto; min-width: 9rem; }
+
+.case { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; }
+.case input { width: auto; min-height: 0; }
+
+.actions-taux { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+
+.formulaire-taux { display: grid; gap: 0.35rem; max-width: 34rem; }
+.formulaire-taux h2 { margin: 0 0 0.5rem; font-size: 1.05rem; }
+.formulaire-taux label:not(.case) { font-size: 0.85rem; color: var(--attenue); }
+.formulaire-taux .principal { margin-top: 0.75rem; justify-self: start; }
+
+@media (max-width: 720px) {
+  /* Les champs passent en colonne : trois côte à côte sur 390 px font des
+     boîtes de 6 caractères, où l'on ne relit pas ce qu'on vient de taper. */
+  .ligne-taux, .ligne-paiement { flex-direction: column; align-items: stretch; }
+  .ligne-taux input[name='nom'],
+  .ligne-paiement input[name='nom'] { flex: 1 1 auto; }
+  .champ-taux input { width: 100%; }
+  /* En colonne, le select reprend toute la largeur : c'est la disposition
+     où `width: 100%` est juste. */
+  .ligne-paiement select { width: 100%; }
+}
