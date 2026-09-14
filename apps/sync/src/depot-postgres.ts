@@ -868,7 +868,12 @@ export class DepotPostgres implements DepotSync {
             etat.numeroTicket,
             etat.deviceProprietaireId,
           )
-          const exceptions = collision ? [...etat.exceptions, collision] : etat.exceptions
+          const client_ = await clientConnu(client, etat.restaurantId, etat.clientId)
+          const exceptions = [
+            ...etat.exceptions,
+            ...(collision ? [collision] : []),
+            ...(client_.anomalie ? [client_.anomalie] : []),
+          ]
 
           await client.query(
             `insert into kaissi.orders (
@@ -938,7 +943,13 @@ export class DepotPostgres implements DepotSync {
                * pour la même raison que le libellé de la réduction — un reçu
                * ne se réécrit pas quand on corrige une fiche.
                */
-              etat.clientId ?? null,
+              /*
+               * L'identifiant ARBITRÉ, jamais celui de l'événement tel quel :
+               * un client que ce restaurant ne connaît pas ferait échouer la
+               * projection, donc le push, donc TOUT ce qui suit. Le nom, lui,
+               * passe intact — c'est lui qui figure sur le ticket.
+               */
+              client_.clientId,
               etat.clientNom ?? null,
             ],
           )
@@ -1716,6 +1727,64 @@ async function prochainPrefixeLibre(
  * fait foi, et la collision est enregistrée dans `orders.exceptions` — que le
  * back-office indexe déjà (`orders_exceptions_idx`).
  */
+/**
+ * Le client rattaché existe-t-il VRAIMENT côté serveur ?
+ *
+ * ── PANNE OBSERVÉE EN PRODUCTION, et elle gelait toute la caisse ─────────
+ *
+ * `orders.customer_id` porte une clé étrangère vers `kaissi.customers`
+ * (migration 0031). La graine de démonstration, elle, écrit ses clients
+ * UNIQUEMENT dans la base locale du POS — la table `customers` n'existait pas
+ * encore quand la migration 0007 a posé les données de démonstration.
+ * Rattacher l'un d'eux produit donc un identifiant que le serveur ne connaît
+ * pas, la projection viole la contrainte, et le push répond 500.
+ *
+ * Les événements, eux, sont bien arrivés — ils s'insèrent dans leur propre
+ * transaction. Rien n'est perdu. Mais la projection échoue à chaque
+ * tentative, sur le même événement, POUR TOUJOURS : la caisse réessaie comme
+ * elle doit, et le mur est identique à chaque cycle. Une seule commande
+ * fautive gèle la file de toutes les suivantes. Vu en clientèle : dix-huit
+ * opérations en attente, cinq tentatives échouées, réseau parfait.
+ *
+ * ── Le même arbitrage que pour un numéro de ticket déjà pris ─────────────
+ *
+ * On écarte l'identifiant, on GARDE le nom — `customer_name` est une colonne
+ * à part, et c'est elle que le ticket et les rapports utilisent. La commande
+ * entre dans la projection, la file se vide, et l'anomalie est inscrite dans
+ * `orders.exceptions` plutôt que de disparaître.
+ *
+ * Perdre une vente coûte infiniment plus cher qu'un rattachement client.
+ *
+ * ⚑ On ne se contente pas de vérifier l'existence : le client doit être de CE
+ *   restaurant. Sans ce filtre, un identifiant valide ailleurs rattacherait
+ *   une vente au client d'un autre établissement — une fuite de tenance, dans
+ *   le sens le plus littéral.
+ */
+async function clientConnu(
+  client: PoolClient,
+  restaurantId: string,
+  clientId: string | null | undefined,
+): Promise<{ clientId: string | null; anomalie: Record<string, unknown> | null }> {
+  if (!clientId) return { clientId: null, anomalie: null }
+
+  const { rows } = await client.query<{ id: string }>(
+    'select id from kaissi.customers where id = $1 and restaurant_id = $2 limit 1',
+    [clientId, restaurantId],
+  )
+  if (rows.length > 0) return { clientId, anomalie: null }
+
+  return {
+    clientId: null,
+    anomalie: {
+      type: 'client_inconnu',
+      clientId,
+      message:
+        "Le client rattaché à cette vente n'existe pas dans cet établissement. " +
+        'Son nom est conservé ; le rattachement, non.',
+    },
+  }
+}
+
 async function numeroTicketLibre(
   client: PoolClient,
   restaurantId: string,
