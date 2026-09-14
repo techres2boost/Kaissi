@@ -94,12 +94,45 @@
 
 * { box-sizing: border-box; }
 
-html, body, #racine {
+/*
+ * ── La FENÊTRE elle-même ne défile jamais ────────────────────────────────
+ *
+ * PANNE OBSERVÉE sur un iPhone, à la saisie du mot de passe de mise en
+ * service : le bandeau glissait SOUS la barre d'état, l'horloge par-dessus le
+ * badge « À appairer ».
+ *
+ * La cause n'est pas la marge de zone sûre, qui était bien posée. C'est que
+ * WKWebView fait défiler la FENÊTRE pour révéler le champ quand le clavier
+ * s'ouvre : la marge, posée sur `body`, sort alors par le haut de l'écran, et
+ * le bandeau vient prendre sa place. Rajouter de la marge n'y aurait rien
+ * fait — elle aurait défilé aussi.
+ *
+ * `position: fixed` + `overflow: hidden` retirent au document tout défilement
+ * à offrir : il n'y a plus rien à faire glisser, donc le clavier ne peut plus
+ * déplacer le chrome. Ce qui défile reste ce qui doit défiler — la grille de
+ * produits, la liste des reçus, chacune dans sa propre boîte.
+ *
+ * Cela ne change rien à la caisse sur Android ni au navigateur : la coque
+ * occupait déjà exactement la hauteur de l'écran, et n'avait donc jamais eu
+ * de défilement de page à perdre.
+ *
+ * ⚑ `position: fixed` sur `body` ne piège PAS le tiroir : un élément en
+ *   `position: fixed` se cale sur la fenêtre, pas sur un ancêtre fixe — seuls
+ *   `transform`, `filter` et `perspective` créent un tel bloc conteneur.
+ */
+html, #racine {
   height: 100%;
   margin: 0;
+  overflow: hidden;
 }
 
 body {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  overflow: hidden;
+  /* Le rebond élastique d'iOS révélerait la même bande, en moins durable. */
+  overscroll-behavior: none;
   /* La base crème de Digital Fidelity (`.dash-shell`) : elle évite une bande
      blanche si un écran est plus court que la tablette. */
   background: #F2EDDD;

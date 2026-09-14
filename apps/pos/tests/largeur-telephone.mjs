@@ -151,6 +151,55 @@ for (const appareil of APPAREILS) {
   // Caisse neuve : l'accueil d'abord (voir parcours-caisse.mjs).
   await page.waitForSelector('.bienvenue', { timeout: 20000 })
   await mesurer('accueil — caisse jamais mise en service')
+
+  /*
+   * ── La FENÊTRE ne doit offrir aucun défilement ────────────────────────
+   *
+   * PANNE OBSERVÉE sur un iPhone, à la saisie du mot de passe de mise en
+   * service : le bandeau glissait SOUS la barre d'état, l'horloge par-dessus
+   * le badge « À appairer ». WKWebView fait défiler la FENÊTRE pour révéler
+   * le champ quand le clavier s'ouvre ; la marge de zone sûre, posée sur
+   * `body`, sortait alors par le haut. Le remède est de retirer au document
+   * tout défilement à offrir — `position: fixed` et `overflow: hidden`.
+   *
+   * ⚠ CE QUE CE CONTRÔLE PROUVE, ET CE QU'IL NE PROUVE PAS.
+   *
+   *   Il ne reproduit PAS la panne. Aucun clavier iOS ne s'ouvre ici, et
+   *   Chromium rend exactement la même géométrie avec ou sans le remède —
+   *   vérifié en le retirant : le contrôle restait vert. Mesurer `scrollY`
+   *   aurait donc été un garde-fou qui dit ✓ à un écran cassé, ce qui est
+   *   pire que pas de garde-fou.
+   *
+   *   Ce qu'il fait est plus modeste et honnête : il VERROUILLE le remède. Ces
+   *   trois déclarations n'ont aucun effet visible sur un navigateur de
+   *   bureau ; quelqu'un les retirera un jour en les prenant pour un reste, et
+   *   la panne reviendra sur un iPhone, six semaines plus tard, chez un
+   *   client. Le contrôle dit alors pourquoi elles sont là.
+   *
+   *   La vérification réelle reste manuelle, sur un vrai iPhone : ouvrir la
+   *   mise en service, toucher le champ mot de passe, et regarder l'horloge.
+   */
+  const fige = await page.evaluate(() => {
+    const corps = getComputedStyle(document.body)
+    const racine = getComputedStyle(document.documentElement)
+    return { position: corps.position, corpsOverflow: corps.overflowY, racineOverflow: racine.overflowY }
+  })
+  if (
+    fige.position !== 'fixed' ||
+    fige.corpsOverflow !== 'hidden' ||
+    fige.racineOverflow !== 'hidden'
+  ) {
+    echecs++
+    console.log(
+      "  ✗ le document peut de nouveau défiler : sur iPhone, le clavier fera\n" +
+        "      passer le bandeau sous la barre d'état. Attendu body{position:fixed;\n" +
+        `      overflow:hidden} et html{overflow:hidden} — trouvé position ` +
+        `« ${fige.position} », overflow « ${fige.corpsOverflow} » / « ${fige.racineOverflow} ».`,
+    )
+  } else {
+    console.log('  ✓ le document est figé — le clavier iOS ne peut pas déplacer le bandeau')
+  }
+
   await page.click('.lien-discret')
   await page.waitForSelector('text=Prise de poste', { timeout: 20000 })
   await mesurer('prise de poste')
