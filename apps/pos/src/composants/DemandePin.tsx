@@ -104,6 +104,28 @@ export function DemandePin({
   const [erreur, setErreur] = useState<string | null>(null)
   const [tentatives, setTentatives] = useState<EtatTentatives>(TENTATIVES_VIERGES)
   const [verification, setVerification] = useState(false)
+  /*
+   * Ce terminal est-il rattaché à un établissement, et depuis quand a-t-il
+   * reçu la carte ? Les deux servent au MÊME message : expliquer un « Code
+   * incorrect » qui n'a rien d'incorrect.
+   */
+  const [contexteCode, setContexteCode] = useState<{
+    appaire: boolean
+    catalogueRecuLe: string | null
+  } | null>(null)
+
+  useEffect(() => {
+    let vivant = true
+    void Promise.all([
+      app.etat.lire('jeton_appareil'),
+      app.etat.lire('catalogue_applique_a'),
+    ]).then(([jeton, recu]) => {
+      if (vivant) setContexteCode({ appaire: !!jeton, catalogueRecuLe: recu })
+    })
+    return () => {
+      vivant = false
+    }
+  }, [app])
 
   const bloque = estBloque(tentatives)
 
@@ -136,10 +158,33 @@ export function DemandePin({
       const suivant = apresEchec(tentatives)
       setTentatives(suivant)
       setPin('')
+      /*
+       * ── « Code incorrect » ne l'est pas toujours ──────────────────────
+       *
+       * PANNE OBSERVÉE, et elle a coûté une demi-journée. Le même employé
+       * ouvre la caisse sur un terminal et se voit refusé sur l'autre : sur
+       * celui qui n'est rattaché à rien, son PIN est celui de la GRAINE DE
+       * DÉMONSTRATION ; sur celui qui l'est, c'est celui du back-office, où
+       * il a été changé. Les deux se comportent correctement, et l'écran
+       * disait la même chose dans les deux cas.
+       *
+       * On ne peut pas savoir lequel des deux vient d'arriver — un hachage
+       * ne se compare qu'à lui-même. On peut en revanche nommer ce qui
+       * distingue ce terminal-ci, et c'est tout ce qu'il faut pour arrêter de
+       * chercher du côté du logiciel.
+       */
       setErreur(
         estBloque(suivant)
           ? `Trop de tentatives. Réessayez dans ${secondesRestantes(suivant)} secondes.`
-          : 'Code incorrect.',
+          : contexteCode?.appaire === false
+            ? 'Code incorrect. Cette caisse n’est rattachée à aucun ' +
+              'établissement : les employés et leurs codes sont ceux de la ' +
+              'DÉMONSTRATION, pas ceux du back-office.'
+            : contexteCode?.catalogueRecuLe
+              ? 'Code incorrect. Si le code a été changé au back-office, ' +
+                `vérifiez que la caisse l’a reçu — dernière mise à jour de la ` +
+                `carte le ${new Date(contexteCode.catalogueRecuLe).toLocaleString('fr-FR')}.`
+              : 'Code incorrect.',
       )
     } finally {
       setVerification(false)
@@ -150,6 +195,22 @@ export function DemandePin({
     <Modale titre={titre} sousTitre={sousTitre} onFermer={onAnnuler}>
       {!choisi ? (
         <div className="liste-employes">
+          {/*
+            Dit AVANT la saisie ce que l'échec dirait après. Sur une caisse
+            rattachée à rien, ces noms sont ceux de la graine — mêmes
+            personnes que le back-office, codes différents. Le taire faisait
+            taper le code de démonstration sur un terminal réel, et
+            réciproquement.
+
+            Sur la prise de poste seulement : une escalade affiche la même
+            liste, mais le manager qui autorise une remise n'a pas besoin
+            qu'on lui rappelle le mode de la caisse à ce moment-là.
+          */}
+          {proposerLHabitue && contexteCode?.appaire === false && (
+            <p className="aide avertissement-demo">
+              Caisse non rattachée : employés et codes de DÉMONSTRATION.
+            </p>
+          )}
           {liste.map((e) => (
             <button key={e.id} type="button" onClick={() => setChoisi(e)}>
               <span className="nom">{e.nom}</span>

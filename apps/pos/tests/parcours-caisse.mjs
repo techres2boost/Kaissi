@@ -70,6 +70,35 @@ await etape('une caisse NEUVE ouvre sur l’accueil, pas sur la prise de poste',
   console.log('    accueil affiché, « Découvrir sans compte » mène à la prise de poste')
 })
 
+await etape('une caisse NON RATTACHÉE annonce ses employés de démonstration', async () => {
+  /*
+   * PANNE OBSERVÉE, et elle a coûté une demi-journée de recherche.
+   *
+   * Le même employé — Salma — ouvre la caisse sur un terminal et se voit
+   * refusé sur l'autre. Sur celui qui n'est rattaché à rien, son code est
+   * celui de la GRAINE DE DÉMONSTRATION ; sur l'iPhone appairé, c'est celui
+   * du back-office, où il avait été changé. Les deux terminaux se
+   * comportaient correctement — et l'écran disait « Code incorrect » dans les
+   * deux cas, donc la recherche est partie du côté de la synchronisation.
+   *
+   * Un hachage ne se compare qu'à lui-même : impossible de savoir lequel des
+   * deux codes vient d'être tapé. Ce qu'on PEUT nommer, c'est ce qui
+   * distingue ce terminal-ci — et cela suffit à ne plus chercher dans le
+   * logiciel.
+   */
+  const avert = await page.$('.avertissement-demo')
+  if (!avert) {
+    throw new Error(
+      'aucun avertissement : rien ne dit que ces employés sont ceux de la démonstration',
+    )
+  }
+  const texte = (await avert.textContent())?.trim() ?? ''
+  if (!/DÉMONSTRATION/.test(texte)) {
+    throw new Error(`l’avertissement ne nomme pas la démonstration : « ${texte} »`)
+  }
+  console.log(`    « ${texte} »`)
+})
+
 await etape('choix de l’employé', async () => {
   await page.click('text=Salma Trabelsi')
   await page.waitForSelector('.pave', { timeout: 5000 })
