@@ -79,6 +79,68 @@ await etape('un CAISSIER ne voit pas « Nouvel article »', async () => {
   console.log('    tuile absente pour Salma (caissière)')
 })
 
+await etape('le tiroir marque « Ventes » DEPUIS une commande en cours', async () => {
+  /*
+   * Ce pas est posé ICI, et l'endroit est tout son intérêt : une commande est
+   * ouverte. Sa première version l'ouvrait depuis la salle — elle passait
+   * donc même quand le tiroir ne marquait que l'écran `salle`, c'est-à-dire
+   * exactement le défaut qu'elle prétendait couvrir. Un test dont le
+   * commentaire promet plus que son code est pire qu'une absence de test.
+   *
+   * Ce qui est en jeu : le tiroir marque une SECTION, pas un écran. « Ventes »
+   * couvre la salle, la commande et l'encaissement. Sans cela, ouvrir le menu
+   * en plein service n'allume rien, et un menu où rien n'est marqué laisse
+   * croire qu'on est nulle part.
+   */
+  const actif = () =>
+    page.$eval('.tiroir-lien[data-actif="true"]', (e) => e.textContent.trim()).catch(() => null)
+
+  await page.click('.ouvrir-tiroir')
+  await page.waitForSelector('.tiroir', { timeout: 5000 })
+  const marque = await actif()
+  if (marque !== 'Ventes') {
+    throw new Error(
+      `commande en cours : le tiroir marque « ${marque} » au lieu de « Ventes »`,
+    )
+  }
+
+  /*
+   * Trois sorties, et aucune n'est un confort. Le VOILE, parce que viser une
+   * croix de 24 px pouce en l'air au-dessus d'un client qui attend ne marche
+   * pas. ÉCHAP, parce qu'un tiroir qui ne se ferme qu'au doigt est un piège
+   * au clavier sur le poste du gérant. La CROIX, pour qui la cherche.
+   *
+   * Aucune des trois ne navigue : la commande doit être intacte à la sortie,
+   * sinon c'est le parcours entier qui le dirait.
+   */
+  await page.click('.tiroir-voile', { position: { x: 900, y: 400 } })
+  await page.waitForSelector('.tiroir', { state: 'detached', timeout: 5000 })
+
+  await page.click('.ouvrir-tiroir')
+  await page.waitForSelector('.tiroir', { timeout: 5000 })
+  await page.keyboard.press('Escape')
+  await page.waitForSelector('.tiroir', { state: 'detached', timeout: 5000 })
+
+  await page.click('.ouvrir-tiroir')
+  await page.waitForSelector('.tiroir', { timeout: 5000 })
+  await page.click('.tiroir-fermer')
+  await page.waitForSelector('.tiroir', { state: 'detached', timeout: 5000 })
+
+  /*
+   * Le badge de synchronisation, lui, N'ENTRE PAS dans le tiroir. Un état
+   * rangé derrière un bouton n'est plus un état : « ⚠ À appairer » invisible
+   * est exactement la panne qui a fait conclure, chez le premier gérant, que
+   * « la synchronisation ne marche pas ».
+   */
+  if (!(await page.$('.bandeau-etats .badge-sync'))) {
+    throw new Error('le badge de synchronisation a quitté le bandeau')
+  }
+  if (!(await page.$('.grille-produits'))) {
+    throw new Error('la commande a été quittée en refermant le tiroir')
+  }
+  console.log('    « Ventes » marqué, trois sorties, commande intacte, badge resté au bandeau')
+})
+
 await etape('ajout d’un Coca (sans option) — 1 clic', async () => {
   await page.click('.categories button:has-text("Boissons")')
   await page.click('.carte-produit:has-text("Coca-Cola 33cl")')
@@ -208,7 +270,11 @@ await etape('la vente apparaît dans « Reçus », sans rien demander au serveur
    * aucun serveur — s'il fallait une requête réseau pour remplir cet écran,
    * il serait vide ici, et le serait aussi chez un client hors ligne.
    */
-  await page.click('.bandeau-actions .lien:has-text("Reçus")')
+  await page.click('.ouvrir-tiroir')
+  await page.click('.tiroir-lien:has-text("Reçus")')
+  /* Choisir un écran REFERME le tiroir : le laisser ouvert par-dessus l'écran
+     demandé ferait retomber le geste suivant sur le voile. */
+  await page.waitForSelector('.tiroir', { state: 'detached', timeout: 5000 })
   await page.waitForSelector('.liste-recus li', { timeout: 10000 })
   const premier = await page.textContent('.liste-recus li')
   console.log(`    premier reçu : ${premier.replace(/\s+/g, ' ').trim()}`)
@@ -243,7 +309,8 @@ await etape('« Périodes » montre le service en cours, puis le service clos', 
    * d'établissement est un chiffre faux, et c'est le chiffre que le patron
    * regarde.
    */
-  await page.click('.bandeau-actions .lien:has-text("Périodes")')
+  await page.click('.ouvrir-tiroir')
+  await page.click('.tiroir-lien:has-text("Périodes de travail")')
   await page.waitForSelector('.liste-periodes li', { timeout: 10000 })
 
   const portee = await page.textContent('.portee-caisse')
@@ -275,7 +342,7 @@ await etape('un GÉRANT crée un article, et il est vendable aussitôt', async (
    * exister et se vendre avant d'avoir vu le réseau — sinon la fonction ne
    * sert à rien le seul jour où l'on en a besoin.
    */
-  await page.click('.bandeau-actions .employe')
+  await page.click('.bandeau-etats .employe')
   await page.waitForSelector('text=Prise de poste', { timeout: 10000 })
   await page.click('text=Ahmed')
   await page.waitForSelector('.pave', { timeout: 5000 })

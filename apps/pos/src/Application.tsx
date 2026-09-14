@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Printer, TriangleAlert } from 'lucide-react'
+import { Menu, Printer, TriangleAlert } from 'lucide-react'
 import type { Shift } from '@kaissi/domain'
 import { IMPRESSION_ACTIVE, URL_BACKOFFICE } from './config.js'
 import { demarrer, type ContexteApplication } from './donnees/demarrage.js'
@@ -23,6 +23,8 @@ import { Modale } from './composants/Modale.js'
 import { EcranPeriodes } from './ecrans/EcranPeriodes.js'
 import { EcranRecus } from './ecrans/EcranRecus.js'
 import { EcranSync } from './ecrans/EcranSync.js'
+import { ICONES_TIROIR, TiroirNavigation, type EntreeTiroir } from './composants/TiroirNavigation.js'
+import type { Vue } from './navigation.js'
 
 export function Application() {
   const [contexte, setContexte] = useState<ContexteApplication | null>(null)
@@ -70,16 +72,6 @@ export function Application() {
   )
 }
 
-type Vue =
-  | { nom: 'salle' }
-  | { nom: 'commande'; orderId: string }
-  | { nom: 'paiement'; orderId: string }
-  | { nom: 'cloture' }
-  | { nom: 'diagnostic' }
-  | { nom: 'sync' }
-  | { nom: 'recus' }
-  | { nom: 'periodes' }
-
 function Terminal({ contexte }: { contexte: ContexteApplication }) {
   const app = useApp()
   const { employe, definirEmploye, etatImpression, version } = app
@@ -95,6 +87,7 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
    * — et rappeler que la caisse, elle, continue.
    */
   const [backOfficeHorsLigne, setBackOfficeHorsLigne] = useState(false)
+  const [tiroirOuvert, setTiroirOuvert] = useState(false)
 
   /**
    * Ouvre le back-office dans le NAVIGATEUR DU SYSTÈME.
@@ -127,6 +120,99 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
       vivant = false
     }
   }, [app, version])
+
+  /**
+   * Les écrans du tiroir, dans l'ordre où on les ouvre en vrai.
+   *
+   * « Ventes » d'abord — c'est le retour à la salle, et de loin le lien le
+   * plus pressé : un caissier égaré dans Diagnostic avec un client devant lui
+   * cherche la sortie, pas une fonction. « Reçus » ensuite, le seul des
+   * suivants qu'on ouvre EN SERVICE, pour retrouver un ticket qu'un client
+   * réclame. Synchronisation et Diagnostic sont des écrans de dépannage,
+   * consultés une fois par semaine ; ils passent après.
+   *
+   * Un écran déjà ouvert renvoie à la salle plutôt que de ne rien faire :
+   * toucher « Reçus » depuis Reçus doit produire quelque chose.
+   */
+  const bascule = (nom: Vue['nom']) => () =>
+    setVue((v) => (v.nom === nom ? { nom: 'salle' } : ({ nom } as Vue)))
+
+  const entreesTiroir: EntreeTiroir[] = [
+    {
+      cle: 'salle',
+      vues: ['salle', 'commande', 'paiement'],
+      libelle: 'Ventes',
+      icone: ICONES_TIROIR.salle,
+      action: () => setVue({ nom: 'salle' }),
+    },
+    {
+      cle: 'recus',
+      vues: ['recus'],
+      libelle: 'Reçus',
+      icone: ICONES_TIROIR.recus,
+      action: bascule('recus'),
+    },
+    {
+      cle: 'periodes',
+      vues: ['periodes'],
+      libelle: 'Périodes de travail',
+      icone: ICONES_TIROIR.periodes,
+      action: bascule('periodes'),
+    },
+    {
+      cle: 'sync',
+      vues: ['sync'],
+      libelle: 'Synchronisation',
+      icone: ICONES_TIROIR.sync,
+      action: bascule('sync'),
+    },
+    {
+      cle: 'diagnostic',
+      vues: ['diagnostic'],
+      libelle: 'Diagnostic',
+      icone: ICONES_TIROIR.diagnostic,
+      action: bascule('diagnostic'),
+    },
+    ...(shift
+      ? [
+          {
+            cle: 'cloture',
+            vues: ['cloture' as const],
+            libelle: 'Clôturer la caisse',
+            icone: ICONES_TIROIR.cloture,
+            action: () => setVue({ nom: 'cloture' }),
+          },
+        ]
+      : []),
+    /*
+      Le seul lien qui SORT de l'application, donc mis à part sous un filet.
+      Absent si aucune adresse n'est déclarée pour ce déploiement : un bouton
+      qui ouvre une page blanche est pire que pas de bouton.
+    */
+    ...(URL_BACKOFFICE
+      ? [
+          {
+            cle: 'back-office',
+            libelle: 'Back-office',
+            icone: ICONES_TIROIR.backOffice,
+            action: ouvrirBackOffice,
+            sortante: true,
+          },
+        ]
+      : []),
+  ]
+
+  const tiroir = (
+    <TiroirNavigation
+      ouvert={tiroirOuvert}
+      vue={vue.nom}
+      entrees={entreesTiroir}
+      employe={employe?.nom ?? null}
+      etablissement={app.etablissement.nom}
+      onFermer={() => setTiroirOuvert(false)}
+      onVerrouiller={() => definirEmploye(null)}
+    />
+  )
 
   // ── Terminal verrouillé ────────────────────────────────────────────────
   if (!employe) {
@@ -168,18 +254,12 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
       <div className="application">
         <Bandeau
           reseau={reseau}
-          shift={null}
-          vue={vue.nom}
-          onSalle={() => setVue({ nom: 'salle' })}
+          onOuvrirTiroir={() => setTiroirOuvert(true)}
           onVerrouiller={() => definirEmploye(null)}
-          onDiagnostic={() => setVue({ nom: 'diagnostic' })}
-          onCloturer={() => setVue({ nom: 'cloture' })}
           onSync={() => setVue({ nom: 'sync' })}
-          onRecus={() => setVue({ nom: 'recus' })}
-          onPeriodes={() => setVue({ nom: 'periodes' })}
-          onBackOffice={ouvrirBackOffice}
           impression={etatImpression}
         />
+        {tiroir}
         <main className="contenu">
           <EcranOuvertureShift onOuvert={() => setVue({ nom: 'salle' })} />
         </main>
@@ -191,26 +271,12 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
     <div className="application">
       <Bandeau
         reseau={reseau}
-        shift={shift}
-        vue={vue.nom}
-        onSalle={() => setVue({ nom: 'salle' })}
+        onOuvrirTiroir={() => setTiroirOuvert(true)}
         onVerrouiller={() => definirEmploye(null)}
-        onDiagnostic={() =>
-          setVue((v) => (v.nom === 'diagnostic' ? { nom: 'salle' } : { nom: 'diagnostic' }))
-        }
-        onCloturer={() => setVue({ nom: 'cloture' })}
-        onSync={() =>
-          setVue((v) => (v.nom === 'sync' ? { nom: 'salle' } : { nom: 'sync' }))
-        }
-        onRecus={() =>
-          setVue((v) => (v.nom === 'recus' ? { nom: 'salle' } : { nom: 'recus' }))
-        }
-        onPeriodes={() =>
-          setVue((v) => (v.nom === 'periodes' ? { nom: 'salle' } : { nom: 'periodes' }))
-        }
-        onBackOffice={ouvrirBackOffice}
+        onSync={bascule('sync')}
         impression={etatImpression}
       />
+      {tiroir}
 
       <main className="contenu">
         {vue.nom === 'salle' && (
@@ -340,34 +406,33 @@ function BandeauSimple({ reseau }: { reseau: { connecte: boolean; type: string }
 
 function Bandeau({
   reseau,
-  shift,
-  vue,
-  onSalle,
+  onOuvrirTiroir,
   onVerrouiller,
-  onDiagnostic,
-  onCloturer,
   onSync,
-  onRecus,
-  onPeriodes,
-  onBackOffice,
   impression,
 }: {
   reseau: { connecte: boolean; type: string }
-  shift: Shift | null
-  vue: Vue['nom']
-  onSalle: () => void
+  onOuvrirTiroir: () => void
   onVerrouiller: () => void
-  onDiagnostic: () => void
-  onCloturer: () => void
   onSync: () => void
-  onRecus: () => void
-  onPeriodes: () => void
-  onBackOffice: () => void
   impression: { enAttente: number; echecs: number }
 }) {
   const { employe, etablissement, resumeSync, sync, app } = useApp()
   return (
     <header className="bandeau">
+      {/*
+        Le bouton du tiroir en PREMIER, à gauche, avant la marque : c'est là
+        que le pouce le cherche, et c'est là qu'il est au back-office.
+      */}
+      <button
+        type="button"
+        className="ouvrir-tiroir"
+        onClick={onOuvrirTiroir}
+        aria-label="Ouvrir le menu"
+      >
+        <Menu size={22} strokeWidth={2} aria-hidden="true" />
+      </button>
+
       <div className="bandeau-marque">
         <span className="logo">Kaissi</span>
         <span className="etablissement">{etablissement.nom}</span>
@@ -384,7 +449,7 @@ function Bandeau({
             title={
               'Base SQLite en mémoire : tout disparaît au rechargement, et le ' +
               'catalogue vient de la graine locale — les modifications faites au ' +
-              'back-office n’arrivent pas ici. Seule l’application Android ' +
+              'back-office n\u2019arrivent pas ici. Seule l\u2019application Android ' +
               'installée se synchronise réellement.'
             }
           >
@@ -393,7 +458,15 @@ function Bandeau({
         )}
       </div>
 
-      <div className="bandeau-actions">
+      {/*
+        ── Ce qui reste ici est un ÉTAT, jamais une destination ─────────────
+        Les écrans sont passés dans le tiroir ; ces trois-là n'y vont pas, et
+        ce n'est pas une exception mais la règle qui décide : un état rangé
+        derrière un bouton n'est plus un état. « ⚠ À appairer » enfermé dans
+        un tiroir ne serait jamais vu — et c'est justement le message qui
+        explique pourquoi les ventes n'arrivent pas au back-office.
+      */}
+      <div className="bandeau-etats">
         {/*
           Le badge « tickets non imprimés » est visible en permanence : un KOT
           resté en file, c'est un plat qui n'arrivera jamais en salle.
@@ -428,6 +501,10 @@ function Bandeau({
           Badge de synchronisation. Il ne s'affiche que s'il y a quelque
           chose à dire : un badge permanent devient invisible au bout d'une
           journée, et c'est justement celui-là qu'on veut voir.
+
+          Il reste CLIQUABLE et mène à l'écran de synchronisation. Depuis que
+          les liens sont dans le tiroir, c'est aussi le raccourci : on touche
+          le problème qu'on voit, on ne le cherche pas dans un menu.
         */}
         {(!sync || resumeSync.enAttente > 0 || resumeSync.rejetes > 0 || resumeSync.etat === 'bloque') && (
           <button
@@ -436,9 +513,9 @@ function Bandeau({
             onClick={onSync}
             title={
               !sync
-                ? 'Ce terminal n’est relié à aucun compte : ses ventes restent sur ' +
-                  'l’appareil et n’arriveront JAMAIS au back-office. Touchez ici pour ' +
-                  'l’appairer avec votre e-mail et votre mot de passe.'
+                ? 'Ce terminal n\u2019est relié à aucun compte : ses ventes restent sur ' +
+                  'l\u2019appareil et n\u2019arriveront JAMAIS au back-office. Touchez ici pour ' +
+                  'l\u2019appairer avec votre e-mail et votre mot de passe.'
                 : resumeSync.rejetes > 0
                   ? `${resumeSync.rejetes} opération(s) refusée(s) — votre attention est requise`
                   : `${resumeSync.enAttente} opération(s) en attente d'envoi`
@@ -464,98 +541,6 @@ function Bandeau({
               : resumeSync.rejetes > 0
                 ? `⚠ ${resumeSync.rejetes}`
                 : `⇅ ${resumeSync.enAttente}`}
-          </button>
-        )}
-
-        {/*
-          Retour à la salle, toujours à la même place. Depuis Diagnostic ou
-          l'écran de synchronisation, il n'y avait aucun chemin de retour
-          évident : le caissier rechargeait la page.
-        */}
-        {vue !== 'salle' && (
-          <button type="button" className="lien" onClick={onSalle}>
-            Salle
-          </button>
-        )}
-
-        {/*
-          Accès PERMANENT à l'écran de synchronisation. Le badge ci-dessus ne
-          s'affiche que s'il a quelque chose à dire — donc, terminal appairé
-          et outbox vide, il disparaît, et avec lui le seul chemin vers cet
-          écran. C'est exactement quand tout va bien qu'on cherche à vérifier
-          que tout va bien.
-        */}
-        {/*
-          `data-actif` marque l'écran COURANT.
-          Les quatre liens se ressemblaient trait pour trait, quel que soit
-          l'endroit où l'on se trouvait : depuis Diagnostic, rien ne disait
-          qu'on y était — sinon le contenu, qu'il faut lire. La charte pose un
-          trait terracotta sous l'onglet courant, exactement comme la colonne
-          du back-office pose une barre à gauche du sien.
-        */}
-        {/*
-          « Reçus » est posé AVANT « Sync » et « Diagnostic » : c'est le seul
-          des trois qu'un caissier ouvre en service — retrouver un ticket
-          pour un client qui réclame. Les deux autres sont des écrans de
-          dépannage, consultés une fois par semaine.
-        */}
-        <button
-          type="button"
-          className="lien"
-          data-actif={vue === 'recus'}
-          onClick={onRecus}
-        >
-          Reçus
-        </button>
-
-        <button
-          type="button"
-          className="lien"
-          data-actif={vue === 'periodes'}
-          onClick={onPeriodes}
-        >
-          Périodes
-        </button>
-
-        <button
-          type="button"
-          className="lien"
-          data-actif={vue === 'sync'}
-          onClick={onSync}
-        >
-          Sync
-        </button>
-
-        <button
-          type="button"
-          className="lien"
-          data-actif={vue === 'diagnostic'}
-          onClick={onDiagnostic}
-        >
-          Diagnostic
-        </button>
-        {shift && (
-          <button
-            type="button"
-            className="lien"
-            data-actif={vue === 'cloture'}
-            onClick={onCloturer}
-          >
-            Clôturer
-          </button>
-        )}
-        {/*
-          Le seul bouton qui SORT de l'application — d'où sa place, en
-          dernier, et son libellé explicite. Il ouvre le navigateur du
-          système : rien de ce qui s'affiche alors n'est Kaissi, et la caisse
-          continue de tourner derrière avec son code empaqueté.
-
-          Absent si aucune adresse n'est déclarée pour ce déploiement : un
-          bouton qui ouvre une page blanche est pire que pas de bouton.
-        */}
-        {URL_BACKOFFICE && (
-          <button type="button" className="lien" onClick={onBackOffice}>
-            Back-office ↗
           </button>
         )}
 

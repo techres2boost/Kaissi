@@ -195,13 +195,15 @@ for (const appareil of APPAREILS) {
   // « Reçus » est la ligne la plus dense de l'application : référence, heure,
   // table, employé, articles, mode de paiement, montant, badges. C'est celle
   // qui déborde en premier quand on ajoute une colonne.
-  await page.click('.bandeau-actions .lien:has-text("Reçus")')
+  await page.click('.ouvrir-tiroir')
+  await page.click('.tiroir-lien:has-text("Reçus")')
   await page.waitForSelector('.recus', { timeout: 10000 })
   await mesurer('reçus')
 
   // Les périodes affichent huit chiffres côte à côte : c'est la grille la
   // plus serrée de l'application, celle qui déborde en premier.
-  await page.click('.bandeau-actions .lien:has-text("Périodes")')
+  await page.click('.ouvrir-tiroir')
+  await page.click('.tiroir-lien:has-text("Périodes de travail")')
   await page.waitForSelector('.periodes', { timeout: 10000 })
   await mesurer('périodes de travail')
 
