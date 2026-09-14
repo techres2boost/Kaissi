@@ -14,7 +14,7 @@
  * du client ne désigne quoi que ce soit de déjà là.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { Client } from 'pg'
 import { uuidV7 } from '@kaissi/domain'
 import { DepotPostgres } from '../src/depot-postgres.js'
@@ -66,13 +66,17 @@ let compteur = 0
 /** Une adresse neuve à chaque appel : la limite par compte est par adresse. */
 const adresseNeuve = () => `gerant${(compteur += 1)}-${Date.now()}@exemple.tn`
 
-async function inscrire(corps: Record<string, unknown>, application = app) {
+async function inscrire(demande: Record<string, unknown>, application = app) {
   const reponse = await application.request('http://test/inscription', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(corps),
+    body: JSON.stringify(demande),
   })
-  return { statut: reponse.status, corps: (await reponse.json()) as Record<string, unknown> }
+  const corps = (await reponse.json()) as Record<string, unknown>
+  // Retenue dès qu'elle existe : c'est la seule trace qui permette de rendre
+  // la base telle qu'on l'a trouvée.
+  if (typeof corps['organizationId'] === 'string') creees.push(corps['organizationId'])
+  return { statut: reponse.status, corps }
 }
 
 const valide = () => ({
@@ -81,8 +85,38 @@ const valide = () => ({
   nomRestaurant: 'Chez Fatma',
 })
 
+/*
+ * ── Ce test CRÉE des organisations, et doit donc les reprendre ───────────
+ *
+ * Chaque inscription réussie pose une organisation, un restaurant, un employé
+ * et un appareil. La base de test est PARTAGÉE entre les fichiers : sans
+ * nettoyage, quinze « chez-fatma » s'accumulent, et c'est un AUTRE test —
+ * celui qui vérifie que le slug « snack-lac-2 » n'est pas désambiguïsé — qui
+ * finit par échouer, sur un message qui ne nomme pas ce fichier-ci.
+ *
+ * Vu ici même : la suite complète a échoué deux fois avant qu'on remonte
+ * jusqu'à la cause.
+ */
+const creees: string[] = []
+
 beforeEach(() => {
   dejaInscrites.clear()
+})
+
+afterAll(async () => {
+  for (const orgId of creees) {
+    // Dans cet ordre : les appareils et les appartenances pointent le
+    // restaurant, le restaurant pointe l'organisation.
+    await client.query('delete from kaissi.devices where organization_id = $1', [orgId])
+    await client.query('delete from kaissi.memberships where organization_id = $1', [orgId])
+    await client.query('delete from kaissi.tax_rates where organization_id = $1', [orgId])
+    await client.query('delete from kaissi.payment_methods where organization_id = $1', [orgId])
+    await client.query('delete from kaissi.stations where organization_id = $1', [orgId])
+    await client.query('delete from kaissi.change_log where organization_id = $1', [orgId])
+    await client.query('delete from kaissi.restaurants where organization_id = $1', [orgId])
+    await client.query('delete from kaissi.users where organization_id = $1', [orgId])
+    await client.query('delete from kaissi.organizations where id = $1', [orgId])
+  }
 })
 
 describe('POST /inscription', () => {

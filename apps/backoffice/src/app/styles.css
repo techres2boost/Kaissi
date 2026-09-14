@@ -1194,3 +1194,30 @@ th .tri:hover { color: var(--texte); }
      où `width: 100%` est juste. */
   .ligne-paiement select { width: 100%; }
 }
+
+/* ── Paramètres → Reçu ──────────────────────────────────────────────────── */
+.reglages-recu { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 24rem); gap: 1rem; align-items: start; }
+@media (max-width: 900px) { .reglages-recu { grid-template-columns: 1fr; } }
+.reglages-recu textarea {
+  width: 100%; font: inherit; padding: 0.55rem 0.7rem;
+  background: var(--panneau-clair); border: 1px solid var(--bordure);
+  border-radius: var(--rayon); color: var(--texte); resize: vertical;
+}
+/*
+ * L'aperçu est MONOSPACÉ et borné à 42 caractères : un ticket de 80 mm n'en
+ * tient pas davantage. Le rendre dans la police de l'interface donnerait une
+ * fausse idée de ce qui rentre, et l'écart ne se verrait qu'avec un rouleau
+ * entre les mains.
+ */
+.apercu-ticket {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem; line-height: 1.5;
+  background: #fff; color: #1B1F1C;
+  border: 1px solid var(--bordure); border-radius: var(--rayon);
+  padding: 0.9rem; overflow-x: auto; white-space: pre;
+}
+.apercu-ticket .apercu-separateur { color: var(--attenue); }
+.apercu-ticket .apercu-corps, .apercu-ticket .apercu-defaut { color: var(--attenue); font-style: italic; }
+/* Une ligne trop longue est SIGNALÉE, pas coupée : elle repartira à la ligne
+   à l'impression, et c'est cela qu'il faut voir avant d'imprimer. */
+.apercu-ticket .trop-long { background: var(--fond-or); color: var(--or); }

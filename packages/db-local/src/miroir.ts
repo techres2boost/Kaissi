@@ -41,6 +41,25 @@ export const TABLES_MIROIR: Record<
   string,
   { nom: string; colonnes: string[]; /** Clé primaire, `id` par défaut. */ cle?: string }
 > = {
+  /*
+   * L'ÉTABLISSEMENT lui-même — son en-tête et le pied de son reçu.
+   *
+   * Sa clé n'est pas un `restaurant_id` : son propre `id` EST le restaurant,
+   * et c'est pour cela que la migration Postgres 0035 lui donne un
+   * déclencheur dédié plutôt que celui du référentiel.
+   *
+   * Les colonnes énumérées sont celles que le TICKET utilise, et rien de
+   * plus. `service_rate_bp`, `service_taxable` et `stamp_duty_millimes`
+   * existent des deux côtés mais aucun calcul ne les lit — les faire
+   * descendre laisserait croire qu'elles s'appliquent.
+   */
+  restaurants: {
+    nom: 'restaurants',
+    colonnes: [
+      'id', 'organization_id', 'name', 'timezone',
+      'address', 'phone', 'fiscal_id', 'receipt_footer',
+    ],
+  },
   tax_rates: {
     nom: 'tax_rates',
     colonnes: ['id', 'organization_id', 'restaurant_id', 'name', 'rate_bp',

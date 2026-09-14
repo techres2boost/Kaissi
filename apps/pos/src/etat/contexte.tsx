@@ -44,6 +44,8 @@ export interface ValeurContexte {
   readonly identite: IdentiteTerminal
   readonly config: ConfigCalcul
   readonly etablissement: EnteteEtablissement
+  /** Pied de page du ticket, une entrée par ligne. Vide = celui du domaine. */
+  readonly piedDePage: readonly string[]
   readonly stations: ReadonlyMap<string, StationImprimante>
   readonly tables: readonly TableLocale[]
   readonly methodesPaiement: readonly MethodePaiementLocale[]
@@ -75,10 +77,20 @@ interface Props {
   children: ReactNode
 }
 
+/** Ce que la table `restaurants` locale porte, côté reçu (migration 012). */
+interface LigneEtablissement {
+  name: string
+  address: string | null
+  phone: string | null
+  fiscal_id: string | null
+  receipt_footer: string | null
+}
+
 interface DonneesChargees {
   identite: IdentiteTerminal
   config: ConfigCalcul
   etablissement: EnteteEtablissement
+  piedDePage: string[]
   stations: Map<string, StationImprimante>
   tables: TableLocale[]
   methodesPaiement: MethodePaiementLocale[]
@@ -209,9 +221,30 @@ export function FournisseurApp({ app, children }: Props) {
         printer_port: number
       }>('SELECT id, name, printer_host, printer_port FROM stations WHERE archived_at IS NULL')
 
-      const etab = await app.base.adaptateur.lireUne<{ name: string }>(
-        'SELECT name FROM restaurants LIMIT 1',
-      )
+      /*
+       * ── L'établissement se lit PAR SON IDENTIFIANT, pas « LIMIT 1 » ─────
+       *
+       * Depuis que `restaurants` descend par le catalogue (migration Postgres
+       * 0035, locale 012), la table peut contenir DEUX lignes : celle de la
+       * graine de démonstration, et celle que le serveur envoie. `LIMIT 1`
+       * sans `ORDER BY` rendait alors l'une ou l'autre au gré de SQLite — un
+       * ticket au nom du restaurant de démonstration, une fois sur deux, sans
+       * que rien n'échoue.
+       *
+       * Le repli sur `LIMIT 1` reste pour une caisse jamais appairée, qui n'a
+       * pas encore de `restaurant_id` : elle n'a alors qu'une ligne, celle de
+       * la démonstration, et c'est bien celle-là qu'il faut.
+       */
+      const etab = resto
+        ? await app.base.adaptateur.lireUne<LigneEtablissement>(
+            `SELECT name, address, phone, fiscal_id, receipt_footer
+               FROM restaurants WHERE id = ?`,
+            [resto],
+          )
+        : await app.base.adaptateur.lireUne<LigneEtablissement>(
+            `SELECT name, address, phone, fiscal_id, receipt_footer
+               FROM restaurants LIMIT 1`,
+          )
 
       if (!vivant) return
       setDonnees({
@@ -223,10 +256,19 @@ export function FournisseurApp({ app, children }: Props) {
         config: SessionCaisse.tauxDepuisCatalogue(taxes),
         etablissement: {
           nom: etab?.name ?? 'Kaissi',
-          adresse: null,
-          telephone: null,
-          identifiantFiscal: null,
+          adresse: etab?.address ?? null,
+          telephone: etab?.phone ?? null,
+          identifiantFiscal: etab?.fiscal_id ?? null,
         },
+        /*
+         * Le pied de page du ticket, découpé par retours à la ligne. Vide ou
+         * absent, le domaine remet « Merci de votre visite ! » — un ticket
+         * qui se termine brutalement sur un total a l'air inachevé.
+         */
+        piedDePage: (etab?.receipt_footer ?? '')
+          .split('\n')
+          .map((l) => l.trim())
+          .filter((l) => l !== ''),
         stations: new Map(
           lignesStations.map((s) => [
             s.id,
@@ -356,6 +398,7 @@ export function FournisseurApp({ app, children }: Props) {
             donnees.config,
             donnees.etablissement,
             impression,
+            donnees.piedDePage,
           )
         : null,
     [app, donnees, impression],
@@ -380,6 +423,7 @@ export function FournisseurApp({ app, children }: Props) {
             identite: donnees.identite,
             config: donnees.config,
             etablissement: donnees.etablissement,
+            piedDePage: donnees.piedDePage,
             stations: donnees.stations,
             tables: donnees.tables,
             methodesPaiement: donnees.methodesPaiement,

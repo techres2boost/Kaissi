@@ -66,6 +66,16 @@ export class SessionCaisse {
     private readonly config: ConfigCalcul,
     private readonly etablissement: EnteteEtablissement,
     private readonly impression: ServiceImpression,
+    /**
+     * Le pied du ticket, réglé au back-office et descendu par le catalogue
+     * (migrations Postgres 0035, locale 012).
+     *
+     * Vide = le domaine remet « Merci de votre visite ! ». Un ticket qui se
+     * termine brutalement sur un total a l'air inachevé, et le repli n'est
+     * pas une opinion sur ce que le restaurateur veut écrire — c'est ce
+     * qu'on met tant qu'il n'a rien écrit.
+     */
+    private readonly piedDePage: readonly string[] = [],
   ) {}
 
   // ── Fabrique d'événements ─────────────────────────────────────────────
@@ -507,6 +517,10 @@ export class SessionCaisse {
       libelleTable: options.libelleTable,
       numeroFiscal: null,
       libellesPaiement: options.libellesPaiement,
+      // Absent plutôt que vide : `construireTicketClient` distingue les deux,
+      // et un tableau vide EFFACERAIT le repli du domaine au lieu de le
+      // laisser jouer.
+      ...(this.piedDePage.length > 0 ? { piedDePage: this.piedDePage } : {}),
     })
 
     if (options.imprimer && IMPRESSION_ACTIVE) {

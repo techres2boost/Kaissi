@@ -164,6 +164,12 @@ const GROUPES = [
        */
       { chemin: 'taxes', libelle: 'Taxes', icone: Percent, gestionnaire: true },
       { chemin: 'paiements', libelle: 'Modes de paiement', icone: CreditCard, gestionnaire: true },
+      /*
+       * « Reçu » au singulier : c'est le RÉGLAGE du ticket, pas la liste des
+       * reçus émis — celle-là vit dans « Rapports → Reçus », au pluriel. Les
+       * deux mots se ressemblent assez pour qu'on les distingue exprès.
+       */
+      { chemin: 'recu', libelle: 'Reçu', icone: Ticket, gestionnaire: true },
     ],
   },
 ] as const

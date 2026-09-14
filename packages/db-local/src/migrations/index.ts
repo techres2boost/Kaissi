@@ -28,6 +28,7 @@ import { SQL_008 } from './008_reductions.js'
 import { SQL_009 } from './009_clients.js'
 import { SQL_010 } from './010_purge_etablissement.js'
 import { SQL_011 } from './011_article_cree_sur_la_caisse.js'
+import { SQL_012 } from './012_reglages_du_recu.js'
 
 export interface MigrationLocale {
   readonly version: number
@@ -47,6 +48,7 @@ export const MIGRATIONS: readonly MigrationLocale[] = [
   { version: 9, nom: 'clients', sql: SQL_009 },
   { version: 10, nom: 'purge_etablissement', sql: SQL_010 },
   { version: 11, nom: 'article_cree_sur_la_caisse', sql: SQL_011 },
+  { version: 12, nom: 'reglages_du_recu', sql: SQL_012 },
 ]
 
 /** Version cible : celle de la dernière migration connue de ce binaire. */

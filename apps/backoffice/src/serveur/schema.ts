@@ -63,6 +63,21 @@ export type Restaurant = {
   service_rate_bp: number
   stamp_duty_millimes: Millimes
   status: string
+  /*
+   * ── L'en-tête et le pied du REÇU ────────────────────────────────────────
+   *
+   * Déclarés ici depuis que l'écran « Paramètres → Reçu » les modifie. Les
+   * trois premiers existaient en base depuis la 0002 ; `receipt_footer` vient
+   * de la 0035, qui pose aussi le déclencheur `change_log` sans lequel rien
+   * de tout cela n'atteignait la caisse.
+   *
+   * ⚠ `fiscal_id` : le champ existe, son format et son obligation ne sont
+   *   affirmés nulle part dans ce dépôt.
+   */
+  address: string | null
+  phone: string | null
+  fiscal_id: string | null
+  receipt_footer: string | null
 }
 
 export type Utilisateur = {
