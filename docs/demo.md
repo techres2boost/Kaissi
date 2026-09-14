@@ -1230,7 +1230,7 @@ le marché connaît : un restaurateur qui vient de Loyverse cherche
 |---|---|
 | **Rapports** | Récapitulatif des ventes · Ventes par article · par catégorie · par employé · par mode de paiement · Reçus · Réductions · Périodes de travail |
 | **Articles** | Liste d'articles · Catégories · Stock · Réductions |
-| **Configuration** | Employés · Clients |
+| **Paramètres** | Employés · Clients · Taxes · Modes de paiement · Reçu · Imprimantes cuisine |
 
 > **« Tickets » s'appelle « Reçus ».** L'ancienne adresse `/‹resto›/tickets`
 > redirige : un favori ou un lien envoyé par message continue de marcher.
@@ -2412,6 +2412,105 @@ reste tout seul.
 > donnez (`--tva`, en points de base — 1900, jamais 0.19), soit vous les
 > reprenez d'un client existant (`--modele`), soit il vous dit en toutes
 > lettres que la caisse refusera la première vente.
+
+
+---
+
+### S. Paramètres — taxes, paiements, reçu et imprimantes
+
+La rubrique **Configuration** s'appelle désormais **Paramètres**, comme chez
+Loyverse, et elle contient enfin ce qu'un restaurateur y cherche. Quatre
+écrans nouveaux, tous réservés au gérant par `ecranReserve()` — c'est-à-dire
+côté serveur, pas en masquant un lien.
+
+#### S.1 — Taxes : le premier réglage à corriger
+
+1. **Paramètres → Taxes.**
+
+**Attendu** : un restaurant ouvert depuis la caisse (`POST /inscription`)
+porte un taux à **0 %**, nommé « À régler ». C'est voulu : Kaissi refuse
+d'écrire « TVA 19 % » dans son code, ce serait affirmer une règle fiscale
+tunisienne. Jusqu'ici il n'existait **aucun endroit pour le corriger** — le
+gérant se retrouvait avec une caisse qui facture sans taxe.
+
+> Le taux se saisit en clair (« 19 », « 13,5 ») et devient des **points de
+> base entiers** : 1900, jamais 0.19. Trois décimales sont refusées plutôt
+> que tronquées en silence.
+>
+> Un taux encore utilisé par des articles **ne s'archive pas** : l'écran dit
+> combien. Sans ce refus, la caisse recevrait un catalogue dont des produits
+> pointent un taux qu'elle n'a plus — et cela ne se verrait qu'à la vente
+> suivante.
+
+#### S.2 — Modes de paiement
+
+2. **Paramètres → Modes de paiement.** Ajoutez « Flouci », type
+   *En ligne*.
+
+**Attendu** : le **nom** sert au caissier et au ticket, le **type** sert au
+rapport, qui regroupe — « Flouci » et « D17 » sont deux noms pour un même
+type. Le dernier mode actif **refuse** d'être archivé : sans aucun mode, la
+caisse ne pourrait plus rien encaisser, et le gérant chercherait la panne
+partout sauf ici.
+
+#### S.3 — Reçu : l'en-tête et le pied du ticket
+
+3. **Paramètres → Reçu.** Saisissez l'adresse, le téléphone, l'identifiant
+   fiscal et un pied de page libre.
+
+**Attendu** : l'aperçu à droite est **monospacé et borné à 42 caractères**,
+la largeur réelle d'un rouleau de 80 mm. Le rendre dans la police de
+l'interface donnerait une fausse idée de ce qui rentre, et l'écart ne se
+verrait qu'avec un vrai ticket en main.
+
+> **Ce que la migration 0035 a dû ajouter.** `kaissi.restaurants` portait
+> l'adresse depuis la 0002, mais cette table n'avait **jamais** eu de
+> déclencheur `change_log` : le back-office pouvait écrire une adresse que la
+> caisse n'aurait jamais vue. Personne ne l'avait signalé — un réglage qu'on
+> ne peut pas modifier ne peut pas paraître cassé.
+
+#### S.4 — Imprimantes cuisine
+
+4. **Paramètres → Imprimantes cuisine.**
+
+**Attendu, et c'est la première chose que dit l'écran** : *dans la version
+actuelle des caisses, rien ne s'imprime*. Le bon de cuisine et le ticket
+client s'affichent à l'écran de la tablette, et la cuisine lit ses commandes
+dans **Préparation**. Les adresses saisies ici sont conservées et descendent
+déjà aux caisses ; elles serviront telles quelles le jour où l'impression
+sera allumée.
+
+> Annoncer un réglage qui ne fait rien **sans le dire** est exactement ce
+> qu'on refuse : un gérant qui saisit une adresse et n'entend jamais son
+> imprimante chercherait la panne dans son réseau, son imprimante et son
+> câble — partout sauf ici.
+
+Chaque ligne dit aussi ce qui la rendrait inutile :
+
+| Ce que la ligne montre | Ce que cela veut dire |
+|---|---|
+| « N rattachement(s) » | combien de catégories (et de produits en repli) préparent à ce poste |
+| « Aucune catégorie ne prépare ici » | ce poste ne recevra **jamais** rien, avec ou sans imprimante — le rattachement se fait dans **Catégories** |
+| « aucune imprimante » | les bons de ce poste se lisent à l'écran, et c'est un état légitime |
+
+> **Le ticket CLIENT n'a pas de poste à lui.** La caisse l'envoie au
+> **premier poste qui porte une adresse**, dans l'ordre affiché — l'écran
+> nomme lequel c'est aujourd'hui. Sans cette note, un gérant qui règle
+> d'abord la cuisine voit ses tickets clients sortir en cuisine et cherche un
+> réglage qui n'existe pas.
+>
+> Au passage : la caisse lisait ses postes **sans `ORDER BY`**. Ce
+> « premier » était donc celui que SQLite rendait en tête, potentiellement un
+> autre après chaque synchronisation — le ticket sortait au bar un jour, en
+> cuisine le lendemain, sans que rien n'ait changé dans les réglages.
+
+L'écran **refuse** les trois formes qu'on tape par réflexe, en disant chaque
+fois laquelle corriger : `http://192.168.1.50` (une imprimante n'est pas une
+page web), `192.168.1.50:9100` (le port est le champ d'à côté), et tout ce
+qui contient un espace ou un `/`. Le schéma ne contraint que le **port** —
+sans ce contrôle, les deux premières s'enregistreraient sans broncher, et le
+bon ne partirait jamais le jour où l'impression est allumée, en plein
+service.
 
 
 ---

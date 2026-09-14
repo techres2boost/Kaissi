@@ -81,14 +81,38 @@ async function mesurer(html: string, largeur: number, hauteur: number) {
        <style>${STYLES}</style></head><body>${html}</body></html>`,
       { waitUntil: 'load' },
     )
-    return await page.evaluate((tolerance) => {
+    return await page.evaluate(([tolerance, demandee]) => {
       const nommer = (el: Element) =>
         el.tagName.toLowerCase() +
         (typeof el.className === 'string' && el.className.trim()
           ? '.' + el.className.trim().split(/\s+/).join('.')
           : '')
 
-      const fenetre = window.innerWidth
+      /*
+       * La largeur DEMANDÉE, et non `window.innerWidth`.
+       *
+       * ⛑ C'est le trou qu'avait ce garde-fou, et il le rendait incapable
+       *   d'échouer. Avec `isMobile: true` et `width=device-width`, la fenêtre
+       *   de mise en page s'ÉLARGIT pour absorber ce qui dépasse : un élément
+       *   large de 384 px sur un écran de 320 faisait répondre 434 à
+       *   `innerWidth`. Comparer le contenu à cette valeur-là, c'était comparer
+       *   le débordement à lui-même : `r.right > fenetre` ne pouvait plus être
+       *   vrai, et `documentElement.scrollWidth` grandissait d'autant.
+       *
+       *   VÉRIFIÉ PAR SABOTAGE, dans `Parametres.largeur.test.tsx` : un
+       *   `min-width: 24rem` posé sur une rangée de réglage passait les seize
+       *   tests au vert. Avec la largeur demandée, il en fait échouer quatre,
+       *   et les NOMME.
+       *
+       *   Sur un vrai téléphone, cet élargissement n'est pas une tolérance :
+       *   c'est le moment où Safari dézoome la page entière, ou la laisse
+       *   glisser latéralement. C'est exactement le symptôme qu'on traque.
+       */
+      const fenetre = demandee
+      // Ce que la fenêtre a fait, elle, de la largeur demandée. Au-dessus,
+      // quelque chose l'a poussée — et c'est un débordement, même si plus
+      // aucun élément ne « dépasse » d'une fenêtre qui a cédé.
+      const fenetreReelle = window.innerWidth
       const depassent: string[] = []
       for (const el of document.querySelectorAll('body *')) {
         const r = el.getBoundingClientRect()
@@ -145,6 +169,7 @@ async function mesurer(html: string, largeur: number, hauteur: number) {
       const rb = bouton?.getBoundingClientRect() ?? null
       return {
         fenetre,
+        fenetreReelle,
         page: document.documentElement.scrollWidth,
         depassent,
         rognes,
@@ -152,7 +177,7 @@ async function mesurer(html: string, largeur: number, hauteur: number) {
           ? { gauche: Math.round(rb.left), droite: Math.round(rb.right), lignes, coupe: boutonCoupe }
           : null,
       }
-    }, tolerance())
+    }, [tolerance(), largeur] as const)
   } finally {
     await page.close()
   }
@@ -191,6 +216,12 @@ describe('la barre du compte, en largeur téléphone', () => {
     it(`ne déborde pas sur ${appareil.nom} (${appareil.width} px)`, async () => {
       const m = await mesurer(html(), appareil.width, appareil.height)
       expect(m.depassent, `éléments hors champ : ${m.depassent.join(' · ')}`).toEqual([])
+      // Et la fenêtre elle-même n'a pas cédé. Après `depassent`, qui NOMME
+      // l'élément fautif : cette ligne-ci ne dit que le symptôme.
+      expect(
+        m.fenetreReelle,
+        `la fenêtre a cédé : demandée à ${m.fenetre} px, élargie à ${m.fenetreReelle}`,
+      ).toBeLessThanOrEqual(m.fenetre + TOLERANCE)
       expect(m.rognes, `contenu rogné : ${m.rognes.join(' · ')}`).toEqual([])
       expect(m.page).toBeLessThanOrEqual(m.fenetre + TOLERANCE)
     })

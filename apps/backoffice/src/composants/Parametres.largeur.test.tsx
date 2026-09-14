@@ -1,5 +1,5 @@
 /**
- * Taxes et modes de paiement tiennent-ils dans un téléphone ?
+ * Taxes, modes de paiement et imprimantes tiennent-ils dans un téléphone ?
  *
  * ── Pourquoi ces deux écrans-là, et pas seulement « ça compile » ──────────
  *
@@ -33,8 +33,19 @@ vi.mock('../app/[restaurant]/paiements/actions.js', () => ({
   archiverModePaiement: () => undefined,
 }))
 
+/*
+ * Seule l'ACTION est remplacée. `PORT_PAR_DEFAUT` vit dans `port.ts`, un
+ * module ordinaire qui ne tire ni `next/cache` ni Supabase : le simuler
+ * aussi masquerait une divergence entre la valeur du test et celle que la
+ * production affiche.
+ */
+vi.mock('../app/[restaurant]/imprimantes/actions.js', () => ({
+  definirImprimante: () => undefined,
+}))
+
 const { GestionTaxes } = await import('./GestionTaxes.js')
 const { GestionModesPaiement } = await import('./GestionModesPaiement.js')
+const { GestionImprimantes } = await import('./GestionImprimantes.js')
 
 const STYLES = readFileSync(new URL('../app/styles.css', import.meta.url), 'utf8')
 
@@ -72,14 +83,37 @@ async function mesurer(html: string, largeur: number, hauteur: number) {
        <style>body{padding:1rem}</style></head><body>${html}</body></html>`,
       { waitUntil: 'load' },
     )
-    return await page.evaluate((tolerance) => {
+    return await page.evaluate(([tolerance, demandee]) => {
       const nommer = (el: Element) =>
         el.tagName.toLowerCase() +
         (typeof el.className === 'string' && el.className.trim()
           ? '.' + el.className.trim().split(/\s+/).join('.')
           : '')
 
-      const fenetre = window.innerWidth
+      /*
+       * La largeur DEMANDée, et non `window.innerWidth`.
+       *
+       * ⛑ C'est le trou qu'avait ce garde-fou, et il le rendait incapable
+       *   d'échouer. Avec `isMobile: true` et `width=device-width`, la fenêtre
+       *   de mise en page s'ÉLARGIT pour absorber ce qui dépasse : un élément
+       *   large de 384 px sur un écran de 320 faisait répondre 434 à
+       *   `innerWidth`. Comparer le contenu à cette valeur-là, c'était comparer
+       *   le débordement à lui-même : `r.right > fenetre` ne pouvait plus être
+       *   vrai, et `documentElement.scrollWidth` grandissait d'autant.
+       *
+       *   VÉRIFIÉ PAR SABOTAGE : un `min-width: 24rem` posé sur le nom du
+       *   poste passait les seize tests au vert. Avec la largeur demandée, il
+       *   en fait échouer quatre, et les NOMME.
+       *
+       *   Sur un vrai téléphone, cet élargissement n'est pas une tolérance :
+       *   c'est le moment où Safari dézoome la page entière, ou la laisse
+       *   glisser latéralement. C'est exactement le symptôme qu'on traque.
+       */
+      const fenetre = demandee
+      // Ce que la fenêtre a fait, elle, de la largeur demandée. Au-dessus,
+      // quelque chose l'a poussée — et c'est un débordement, même si plus
+      // aucun élément ne « dépasse » d'une fenêtre qui a cédé.
+      const fenetreReelle = window.innerWidth
       const depassent: string[] = []
       for (const el of document.querySelectorAll('body *')) {
         const r = el.getBoundingClientRect()
@@ -119,12 +153,13 @@ async function mesurer(html: string, largeur: number, hauteur: number) {
 
       return {
         fenetre,
+        fenetreReelle,
         page: document.documentElement.scrollWidth,
         depassent,
         rognes,
         etroits,
       }
-    }, TOLERANCE)
+    }, [TOLERANCE, largeur] as const)
   } finally {
     await page.close()
   }
@@ -148,6 +183,32 @@ const MODES = [
   { id: 'm3', nom: 'Flouci', type: 'online', ouvreTiroir: false, archive: true },
 ]
 
+/*
+ * Les trois états de l'écran des imprimantes, dans un seul jeu — et pas un
+ * jeu « propre » :
+ *
+ *  • un poste à nom long AVEC adresse, qui porte en plus la phrase du ticket
+ *    client, la plus longue de l'écran ;
+ *  • un poste sans imprimante, dont l'indication contient un lien ;
+ *  • un poste sans rattachement, dont l'avertissement est le plus long des
+ *    trois.
+ *
+ * Mesurer avec un seul poste bien réglé aurait laissé passer exactement ce
+ * qu'on cherche : une rangée de quatre éléments comprimée sur 320 px.
+ */
+const POSTES = [
+  { id: 'p1', nom: 'Cuisine chaude', hote: '192.168.1.50', port: 9100, rattachements: 7, ticketClient: true },
+  { id: 'p2', nom: 'Bar', hote: null, port: 9100, rattachements: 3, ticketClient: false },
+  { id: 'p3', nom: 'Pâtisserie', hote: '192.168.1.51', port: 9100, rattachements: 0, ticketClient: false },
+  /*
+   * Un nom LONG et d'un seul tenant. `texteObligatoire` en accepte 60, et un
+   * restaurateur qui nomme ses postes d'après sa carte en écrit de ceux-là.
+   * Le nom du poste ne rétrécit pas — c'est voulu, il distingue les rangées —
+   * et sans coupure de mot il pousserait la rangée hors de l'écran.
+   */
+  { id: 'p4', nom: 'Pâtisserie-Boulangerie-Viennoiserie', hote: null, port: 9100, rattachements: 2, ticketClient: false },
+]
+
 describe('les écrans de Paramètres, en largeur téléphone', () => {
   const cas = [
     {
@@ -164,6 +225,13 @@ describe('les écrans de Paramètres, en largeur téléphone', () => {
           <GestionModesPaiement restaurantId="r1" modifiable modes={MODES} />,
         ),
     },
+    {
+      nom: 'Imprimantes cuisine',
+      html: () =>
+        renderToStaticMarkup(
+          <GestionImprimantes restaurantId="r1" modifiable postes={POSTES} />,
+        ),
+    },
   ]
 
   for (const appareil of APPAREILS) {
@@ -171,6 +239,12 @@ describe('les écrans de Paramètres, en largeur téléphone', () => {
       it(`${c.nom} ne déborde pas sur ${appareil.nom} (${appareil.width} px)`, async () => {
         const m = await mesurer(c.html(), appareil.width, appareil.height)
         expect(m.depassent, `hors champ : ${m.depassent.join(' · ')}`).toEqual([])
+        // Et la fenêtre elle-même n'a pas cédé. Après `depassent`, qui NOMME
+        // l'élément fautif : cette ligne-ci ne dit que le symptôme.
+        expect(
+          m.fenetreReelle,
+          `la fenêtre a cédé : demandée à ${m.fenetre} px, élargie à ${m.fenetreReelle}`,
+        ).toBeLessThanOrEqual(m.fenetre + TOLERANCE)
         expect(m.rognes, `rogné : ${m.rognes.join(' · ')}`).toEqual([])
         expect(m.page).toBeLessThanOrEqual(m.fenetre + TOLERANCE)
       })

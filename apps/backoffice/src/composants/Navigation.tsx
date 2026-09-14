@@ -17,6 +17,7 @@ import {
   Menu,
   Package,
   Percent,
+  Printer,
   ReceiptText,
   Tag,
   Ticket,
@@ -55,13 +56,16 @@ import type { Etablissement, SessionBackoffice } from '../serveur/session.js'
  * tunisienne moyenne ça se voit ». L'argument était juste — contre une
  * POLICE. Il ne vaut pas contre `lucide-react`, qui n'en est pas une : chaque
  * icône est un composant React rendant un `<svg>` en ligne, et l'élagage du
- * build ne garde que les dix-sept utilisées ici. Rien à télécharger en plus,
+ * build ne garde que celles utilisées ici. Rien à télécharger en plus,
  * rien à attendre avant le premier rendu.
  *
  * MESURÉ, pas supposé — la bibliothèque entière pèse plusieurs centaines de
  * kio, et c'était bien la question à trancher : les paquets JavaScript du
  * back-office passent de 880 à 890 Kio, soit **+9 Kio** pour dix-sept
- * icônes. Sur une liaison tunisienne moyenne, ça ne se voit pas.
+ * icônes. Sur une liaison tunisienne moyenne, ça ne se voit pas. Le chiffre
+ * reste celui de CE relevé-là, et non de la liste du jour — elle s'allonge à
+ * chaque écran, d'un demi-Kio à chaque fois ; y accrocher un compte qui
+ * dérive rendrait la mesure fausse sans que personne ne la remesure.
  *
  * Ce que les emoji coûtaient, en revanche, se voyait : ils sont rendus par la
  * POLICE DU SYSTÈME. Le même 🗂️ est plat sur Windows, en relief sur macOS,
@@ -170,6 +174,13 @@ const GROUPES = [
        * deux mots se ressemblent assez pour qu'on les distingue exprès.
        */
       { chemin: 'recu', libelle: 'Reçu', icone: Ticket, gestionnaire: true },
+      /*
+       * Les imprimantes APRÈS le reçu : c'est le même objet vu deux fois — ce
+       * que le ticket dit, puis où il sort. Et c'est le réglage qu'on ouvre le
+       * moins souvent des cinq, parce que dans la version actuelle des
+       * caisses rien ne s'imprime encore : l'écran le dit en toutes lettres.
+       */
+      { chemin: 'imprimantes', libelle: 'Imprimantes cuisine', icone: Printer, gestionnaire: true },
     ],
   },
 ] as const

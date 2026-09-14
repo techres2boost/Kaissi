@@ -136,6 +136,16 @@ export type Station = {
   organization_id: Uuid
   restaurant_id: Uuid
   name: string
+  /**
+   * L'imprimante du poste — adresse IP ou nom d'hôte, et port TCP.
+   *
+   * Déclarées ici depuis que l'écran « Imprimantes cuisine » les modifie.
+   * `printer_host` à `null` est un état légitime : le poste existe pour
+   * l'écran de préparation, et n'imprime rien. `printer_port` est NOT NULL en
+   * base avec 9100 par défaut (0003), d'où l'absence de `| null`.
+   */
+  printer_host: string | null
+  printer_port: number
   position: number
   updated_at: Horodatage
   archived_at: Horodatage | null

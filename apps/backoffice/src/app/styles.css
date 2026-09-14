@@ -596,6 +596,17 @@ button.danger { color: var(--danger); }
 .message.erreur { background: var(--fond-danger); border: 1px solid var(--danger); color: var(--danger); }
 .message.succes { background: var(--fond-succes); border: 1px solid var(--succes); color: var(--succes); }
 .message.avertissement { background: var(--fond-or); border: 1px solid var(--or); color: var(--or); }
+/*
+ * `.info` n'a PAS de couleur d'alerte, et c'est le sujet.
+ *
+ * Elle porte la mention « rien ne s'imprime encore » de l'écran Imprimantes :
+ * un fait, pas un incident. En or, elle se lirait comme une panne à réparer,
+ * et le gérant appellerait le support pour un comportement voulu. En rouge,
+ * pire. Le panneau neutre dit « lis ceci » sans dire « quelque chose ne va pas ».
+ */
+.message.info {
+  background: var(--panneau-clair); border: 1px solid var(--bordure); color: var(--texte);
+}
 
 .etiquette {
   display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px;
@@ -1154,11 +1165,12 @@ th .tri:hover { color: var(--texte); }
 .liste-taux > li.archive .ligne-taux input,
 .liste-taux > li.archive .ligne-paiement input { text-decoration: line-through; }
 
-.ligne-taux, .ligne-paiement {
+.ligne-taux, .ligne-paiement, .ligne-imprimante {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
 }
 .ligne-taux input[name='nom'],
-.ligne-paiement input[name='nom'] { flex: 1 1 12rem; min-width: 0; }
+.ligne-paiement input[name='nom'],
+.ligne-imprimante input[name='hote'] { flex: 1 1 12rem; min-width: 0; }
 .champ-taux { display: inline-flex; align-items: center; gap: 0.3rem; }
 .champ-taux input { width: 5rem; text-align: right; }
 
@@ -1183,12 +1195,49 @@ th .tri:hover { color: var(--texte); }
 .formulaire-taux label:not(.case) { font-size: 0.85rem; color: var(--attenue); }
 .formulaire-taux .principal { margin-top: 0.75rem; justify-self: start; }
 
+/* ── Paramètres → Imprimantes cuisine ──────────────────────── */
+/*
+ * ⛑ CE BLOC DOIT RESTER AVANT `@media (max-width: 720px)`.
+ *
+ * À spécificité égale, c'est l'ordre du fichier qui tranche — y compris contre
+ * une règle ÉCRITE DANS une requête média. Posé après, le `flex: 0 0 11rem`
+ * ci-dessous écrasait le `flex: 1 1 auto` du téléphone ; et en
+ * `flex-direction: column`, ce « 11rem » n'est plus une largeur mais une
+ * HAUTEUR : chaque nom de poste s'ouvrait alors sur 176 px de vide.
+ *
+ * Vu sur une capture à 390 px, pas dans un test — aucun garde-fou ici ne mesure
+ * la hauteur d'un blanc, et les seize tests de largeur étaient au vert.
+ */
+.ligne-imprimante .poste-nom {
+  /*
+   * Largeur FIXE, et non `auto` : on lit cet écran en descendant la colonne
+   * des adresses IP, qui ne diffèrent souvent que par le dernier chiffre. Avec
+   * `auto`, chaque nom de poste décalait le début du champ d'à côté — vu sur
+   * la capture, « Bar » et « Cuisine chaude » ne commençaient pas au même x,
+   * et la comparaison devenait un exercice.
+   *
+   * Un nom long y revient à la ligne DANS sa colonne : la rangée grandit vers
+   * le bas, jamais vers la droite.
+   */
+  flex: 0 0 11rem; display: inline-flex; align-items: center; gap: 0.4rem;
+  font-weight: 620; overflow-wrap: anywhere;
+}
+.ligne-imprimante .champ-taux .detail { font-size: 0.8rem; color: var(--attenue); }
+.note-imprimantes { max-width: 46rem; }
+.note-imprimantes h2 { margin: 0 0 0.5rem; font-size: 1.05rem; }
+.note-imprimantes p { margin: 0 0 0.6rem; font-size: 0.92rem; }
+.note-imprimantes p:last-child { margin-bottom: 0; }
+
 @media (max-width: 720px) {
   /* Les champs passent en colonne : trois côte à côte sur 390 px font des
      boîtes de 6 caractères, où l'on ne relit pas ce qu'on vient de taper. */
-  .ligne-taux, .ligne-paiement { flex-direction: column; align-items: stretch; }
+  .ligne-taux, .ligne-paiement, .ligne-imprimante { flex-direction: column; align-items: stretch; }
   .ligne-taux input[name='nom'],
-  .ligne-paiement input[name='nom'] { flex: 1 1 auto; }
+  .ligne-paiement input[name='nom'],
+  .ligne-imprimante input[name='hote'] { flex: 1 1 auto; }
+  /* Le nom du poste redevient un titre de ligne, sur sa propre ligne. */
+  .ligne-imprimante .poste-nom { flex: 1 1 auto; }
+  .ligne-imprimante .champ-taux { justify-content: space-between; }
   .champ-taux input { width: 100%; }
   /* En colonne, le select reprend toute la largeur : c'est la disposition
      où `width: 100%` est juste. */

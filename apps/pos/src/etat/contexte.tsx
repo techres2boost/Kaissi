@@ -219,7 +219,28 @@ export function FournisseurApp({ app, children }: Props) {
         name: string
         printer_host: string | null
         printer_port: number
-      }>('SELECT id, name, printer_host, printer_port FROM stations WHERE archived_at IS NULL')
+      }>(
+        /*
+         * `ORDER BY position, name` — et ce tri n'est PAS cosmétique.
+         *
+         * Le ticket CLIENT n'a pas de poste à lui : `EcranPaiement.tsx`
+         * l'envoie au PREMIER poste qui porte une adresse d'imprimante. Sans
+         * `ORDER BY`, ce « premier » était celui que SQLite rendait en tête,
+         * donc potentiellement un autre après chaque synchronisation : le
+         * ticket sortait au bar un jour, en cuisine le lendemain, sans que
+         * rien n'ait changé dans les réglages.
+         *
+         * C'est déjà l'ordre qu'appliquent `depotStations.toutes()` et le
+         * repli « caisse » de la file d'impression — et c'est celui que
+         * l'écran « Imprimantes cuisine » du back-office affiche, en nommant
+         * le poste qui sortira le ticket. Trois endroits qui devaient déjà
+         * s'accorder, dont celui-ci ne s'accordait pas.
+         */
+        `SELECT id, name, printer_host, printer_port
+           FROM stations
+          WHERE archived_at IS NULL
+          ORDER BY position, name`,
+      )
 
       /*
        * ── L'établissement se lit PAR SON IDENTIFIANT, pas « LIMIT 1 » ─────

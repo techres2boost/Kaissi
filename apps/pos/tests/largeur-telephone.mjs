@@ -15,10 +15,14 @@
  *
  * ── Pourquoi un test de bout en bout, et pas un test de CSS ───────────────
  *
- * Parce que la mesure qui compte n'existe que dans un navigateur : c'est
- * `document.documentElement.scrollWidth` comparé à `window.innerWidth`. Aucune
+ * Parce que la mesure qui compte n'existe que dans un navigateur : c'est la
+ * largeur réelle du contenu, comparée à celle de l'écran DEMANDÉ. Aucune
  * lecture de feuille de style ne l'aurait donnée — le débordement naissait de
  * la SOMME des enfants d'une barre, pas d'une règle fautive isolée.
+ *
+ * ⛑ « Demandé », et non `window.innerWidth` : voir la note dans `mesurer()`.
+ *   Sur un téléphone simulé, la fenêtre s'élargit pour absorber ce qui
+ *   dépasse, et se comparer à elle-même ne peut jamais échouer.
  *
  * Et il faut visiter les écrans : la caisse, la salle, une commande ouverte et
  * l'encaissement ne partagent ni leur barre de contrôles ni leur grille.
@@ -73,15 +77,36 @@ for (const appareil of APPAREILS) {
    * le plus large dont le bord droit dépasse la fenêtre.
    */
   const mesurer = (etiquette) =>
-    page.evaluate((tolerance) => {
+    page.evaluate(([tolerance, demandee]) => {
       const nommer = (el) =>
         el.tagName.toLowerCase() +
         (el.className && typeof el.className === 'string'
           ? '.' + el.className.trim().split(/\s+/).join('.')
           : '')
 
-      const fenetre = window.innerWidth
-      const page = document.documentElement.scrollWidth
+      /*
+       * La largeur DEMANDÉE, et non `window.innerWidth`.
+       *
+       * ⛑ Avec `isMobile: true` et `width=device-width`, la fenêtre de mise en
+       *   page s'ÉLARGIT pour absorber ce qui dépasse : un élément large de
+       *   384 px sur un écran de 320 fait répondre 434 à `innerWidth`, et
+       *   `document.documentElement.scrollWidth` grandit d'autant. Comparer
+       *   l'un à l'autre, c'est comparer le débordement à lui-même : la
+       *   condition ne peut plus être vraie.
+       *
+       *   Ici, le débordement du bandeau avait été pris malgré tout — par la
+       *   mesure du ROGNÉ plus bas, pas par celle-ci. C'est dire à quel point
+       *   cette ligne-là ne prouvait rien.
+       *
+       *   Le même trou existait dans les deux garde-fous du back-office ; il y
+       *   est corrigé de la même façon, et vérifié par sabotage
+       *   (`Parametres.largeur.test.tsx`).
+       */
+      const fenetre = demandee
+      // Ce que la fenêtre a fait, elle, de la largeur demandée. Au-dessus,
+      // quelque chose l'a poussée — et c'est un débordement.
+      const fenetreReelle = window.innerWidth
+      const page = Math.max(document.documentElement.scrollWidth, fenetreReelle)
       const coupables = []
       if (page > fenetre + tolerance) {
         for (const el of document.querySelectorAll('body *')) {
@@ -121,8 +146,14 @@ for (const appareil of APPAREILS) {
         })
       }
 
-      return { fenetre, page, coupables: coupables.slice(0, 6), rognes: rognes.slice(0, 6) }
-    }, TOLERANCE).then((m) => {
+      return {
+        fenetre,
+        fenetreReelle,
+        page,
+        coupables: coupables.slice(0, 6),
+        rognes: rognes.slice(0, 6),
+      }
+    }, [TOLERANCE, appareil.width]).then((m) => {
       const deborde = m.page > m.fenetre + TOLERANCE
       if (!deborde && m.rognes.length === 0) {
         console.log(`  ✓ ${etiquette} — ${m.page} px pour ${m.fenetre} px de fenêtre`)
