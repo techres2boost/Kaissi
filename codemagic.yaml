@@ -125,6 +125,37 @@ workflows:
           include: true
       cancel_previous_builds: true
 
+    # ── Ne construire que si le PAQUET a changé ───────────────────────────
+    #
+    # Un magasin ne sert qu'à livrer du CODE EMPAQUETÉ. Kaissi n'a aucune
+    # mise à jour par le réseau — c'est la règle `server.url`, et elle vaut
+    # aussi pour « juste un petit changement » : le moindre pixel du POS
+    # exige un nouveau binaire. L'inverse est vrai aussi, et c'est ce que
+    # `changeset` exploite : un push qui ne touche QUE le back-office, la
+    # documentation, le service de synchronisation ou les migrations n'a
+    # strictement rien à livrer à un magasin. Le construire brûlerait des
+    # minutes de build et un numéro de version pour un binaire identique au
+    # précédent.
+    #
+    # Le back-office, lui, se met bien à jour tout seul : il est sur Vercel,
+    # et son déploiement ne passe par aucun magasin.
+    #
+    # ⚑ `includes` liste tout ce qui FINIT dans le paquet — le POS, les
+    #   paquets partagés qu'il importe en source, le lockfile, et ce fichier.
+    #   Un chemin oublié ici produirait le pire des cas : un correctif poussé
+    #   qui n'arrive jamais sur les tablettes, sans que rien n'échoue.
+    when:
+      changeset:
+        includes:
+          - 'apps/pos'
+          - 'packages'
+          - 'package.json'
+          - 'pnpm-lock.yaml'
+          - 'pnpm-workspace.yaml'
+          - 'codemagic.yaml'
+        excludes:
+          - '**/*.md'
+
     environment:
       # Groupe à créer dans Codemagic — il porte
       # GCLOUD_SERVICE_ACCOUNT_CREDENTIALS, qui publie sur la piste interne.
@@ -270,6 +301,37 @@ workflows:
         - pattern: 'v*'
           include: true
       cancel_previous_builds: true
+
+    # ── Ne construire que si le PAQUET a changé ───────────────────────────
+    #
+    # Un magasin ne sert qu'à livrer du CODE EMPAQUETÉ. Kaissi n'a aucune
+    # mise à jour par le réseau — c'est la règle `server.url`, et elle vaut
+    # aussi pour « juste un petit changement » : le moindre pixel du POS
+    # exige un nouveau binaire. L'inverse est vrai aussi, et c'est ce que
+    # `changeset` exploite : un push qui ne touche QUE le back-office, la
+    # documentation, le service de synchronisation ou les migrations n'a
+    # strictement rien à livrer à un magasin. Le construire brûlerait des
+    # minutes de build et un numéro de version pour un binaire identique au
+    # précédent.
+    #
+    # Le back-office, lui, se met bien à jour tout seul : il est sur Vercel,
+    # et son déploiement ne passe par aucun magasin.
+    #
+    # ⚑ `includes` liste tout ce qui FINIT dans le paquet — le POS, les
+    #   paquets partagés qu'il importe en source, le lockfile, et ce fichier.
+    #   Un chemin oublié ici produirait le pire des cas : un correctif poussé
+    #   qui n'arrive jamais sur les tablettes, sans que rien n'échoue.
+    when:
+      changeset:
+        includes:
+          - 'apps/pos'
+          - 'packages'
+          - 'package.json'
+          - 'pnpm-lock.yaml'
+          - 'pnpm-workspace.yaml'
+          - 'codemagic.yaml'
+        excludes:
+          - '**/*.md'
 
     environment:
       groups:

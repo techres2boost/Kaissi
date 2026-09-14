@@ -74,6 +74,12 @@ for (const appareil of APPAREILS) {
    */
   const mesurer = (etiquette) =>
     page.evaluate((tolerance) => {
+      const nommer = (el) =>
+        el.tagName.toLowerCase() +
+        (el.className && typeof el.className === 'string'
+          ? '.' + el.className.trim().split(/\s+/).join('.')
+          : '')
+
       const fenetre = window.innerWidth
       const page = document.documentElement.scrollWidth
       const coupables = []
@@ -82,31 +88,61 @@ for (const appareil of APPAREILS) {
           const r = el.getBoundingClientRect()
           if (r.width === 0 && r.height === 0) continue
           if (r.right > fenetre + tolerance) {
-            coupables.push({
-              selecteur:
-                el.tagName.toLowerCase() +
-                (el.className && typeof el.className === 'string'
-                  ? '.' + el.className.trim().split(/\s+/).join('.')
-                  : ''),
-              droite: Math.round(r.right),
-            })
+            coupables.push({ selecteur: nommer(el), droite: Math.round(r.right) })
           }
         }
       }
-      return { fenetre, page, coupables: coupables.slice(0, 6) }
+
+      /*
+       * ── Le débordement ROGNÉ, celui que `scrollWidth` ne dit pas ─────────
+       *
+       * Un conteneur en `overflow-x: hidden` dont le contenu est plus large
+       * découpe la différence : elle n'est ni visible, ni atteignable, et la
+       * PAGE, elle, ne déborde pas. La première version de ce test ne
+       * mesurait que `document.documentElement.scrollWidth` — elle répondait
+       * donc ✓ sur un écran de commande où la troisième colonne de produits,
+       * le nom du client et le bord du bouton « Encaisser » étaient coupés.
+       * C'est exactement le cas qu'il a fallu un vrai iPhone pour voir.
+       *
+       * `auto` et `scroll` sont légitimes : l'utilisateur peut faire glisser.
+       * `hidden` et `clip`, non : ils perdent le contenu en silence.
+       */
+      const rognes = []
+      for (const el of document.querySelectorAll('body *')) {
+        const cs = getComputedStyle(el)
+        if (cs.overflowX !== 'hidden' && cs.overflowX !== 'clip') continue
+        if (el.scrollWidth <= el.clientWidth + tolerance) continue
+        // Une ellipse de texte rogne à dessein — ce n'est pas du contenu perdu.
+        if (cs.textOverflow === 'ellipsis') continue
+        rognes.push({
+          selecteur: nommer(el),
+          visible: el.clientWidth,
+          reel: el.scrollWidth,
+        })
+      }
+
+      return { fenetre, page, coupables: coupables.slice(0, 6), rognes: rognes.slice(0, 6) }
     }, TOLERANCE).then((m) => {
       const deborde = m.page > m.fenetre + TOLERANCE
-      if (!deborde) {
+      if (!deborde && m.rognes.length === 0) {
         console.log(`  ✓ ${etiquette} — ${m.page} px pour ${m.fenetre} px de fenêtre`)
         return
       }
       echecs++
-      console.log(
-        `  ✗ ${etiquette} — la page fait ${m.page} px pour ${m.fenetre} px de fenêtre ` +
-          `(${m.page - m.fenetre} px de trop)`,
-      )
-      for (const c of m.coupables) {
-        console.log(`      dépasse jusqu'à ${c.droite} px : ${c.selecteur}`)
+      if (deborde) {
+        console.log(
+          `  ✗ ${etiquette} — la page fait ${m.page} px pour ${m.fenetre} px de fenêtre ` +
+            `(${m.page - m.fenetre} px de trop)`,
+        )
+        for (const c of m.coupables) {
+          console.log(`      dépasse jusqu'à ${c.droite} px : ${c.selecteur}`)
+        }
+      }
+      for (const r of m.rognes) {
+        console.log(
+          `  ✗ ${etiquette} — contenu ROGNÉ, donc inatteignable : ${r.selecteur} ` +
+            `montre ${r.visible} px sur ${r.reel} (${r.reel - r.visible} px perdus)`,
+        )
       }
     })
 

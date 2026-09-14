@@ -273,7 +273,28 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .caisse { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
 }
 
-.menu { display: flex; flex-direction: column; min-height: 0; }
+/*
+ * ── `min-width: 0`, et pourquoi c'est la ligne qui rend la carte utilisable
+ *
+ * `.menu` est un ÉLÉMENT DE GRILLE (`.caisse`, `.commande`). Sa taille
+ * minimale automatique vaut donc sa largeur min-content — et `.categories`,
+ * dont les onglets sont en `white-space: nowrap`, la porte à 450 px dès
+ * qu'un restaurant a quatre catégories. Son `overflow-x: auto` ne la dissout
+ * PAS : il rend la barre défilante, il n'autorise pas son parent à être plus
+ * étroit qu'elle.
+ *
+ * Résultat sur un écran de 390 px : la piste `1fr` était forcée à 450, tout
+ * le contenu était calculé à 450, et `.contenu { overflow: hidden }`
+ * découpait les 60 px de trop. La troisième colonne de produits, le nom du
+ * client et le bord du bouton « Encaisser » disparaissaient — SANS barre de
+ * défilement, donc sans aucun moyen de les atteindre. Vu sur un vrai iPhone.
+ *
+ * Le pire de l'affaire n'est pas le rognage : c'est que la page, elle, ne
+ * débordait pas — `scrollWidth` valait bien 390. Le garde-fou de largeur
+ * répondait ✓ sur un écran inutilisable. Il mesure désormais AUSSI l'intérieur
+ * des conteneurs qui rognent (`tests/largeur-telephone.mjs`).
+ */
+.menu { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 
 .categories {
   display: flex; gap: 0.5rem;
@@ -363,6 +384,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ── Ticket ─────────────────────────────────────────────────────────────── */
 .ticket {
+  /* Même raison que `.menu` ci-dessus : élément de grille, donc taille
+     minimale automatique = min-content. `.actions-commande` et le nom du
+     client y imposaient 449 px sur un écran de 390. */
+  min-width: 0;
   background: var(--surface);
   border-left: 1px solid var(--bordure);
   /* Un panneau collé au bord, pas une carte posée : une ombre portée vers la
