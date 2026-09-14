@@ -178,6 +178,7 @@ export class DepotPostgres implements DepotSync {
       organization_id: string
       nom: string
       role: string
+      employe_id: string
     }>(
       // On entre par `auth_user_id`, JAMAIS par `users.id`.
       //
@@ -186,7 +187,8 @@ export class DepotPostgres implements DepotSync {
       // compte Supabase ne désigne donc l'employé que par `auth_user_id`.
       // Comparer avec `memberships.user_id` ne rendrait aucune ligne — et
       // l'appairage refuserait un gérant parfaitement légitime.
-      `select m.restaurant_id, m.organization_id, r.name as nom, m.role
+      `select m.restaurant_id, m.organization_id, r.name as nom, m.role,
+              u.id as employe_id
          from kaissi.users u
          join kaissi.memberships m on m.user_id = u.id
          join kaissi.restaurants r on r.id = m.restaurant_id
@@ -202,6 +204,7 @@ export class DepotPostgres implements DepotSync {
       organizationId: l.organization_id,
       nom: l.nom,
       role: l.role,
+      employeId: l.employe_id,
     }))
   }
 

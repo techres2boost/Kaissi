@@ -62,6 +62,30 @@ export type CleEtat =
    * appairé, elle n'est plus consultée.
    */
   | 'accueil_demo_accepte'
+  /*
+   * ── Qui proposer d'emblée à la prise de poste ─────────────────────────
+   *
+   * L'écran listait toute l'équipe, à chaque prise de poste : cuisine, bar,
+   * caissiers, gérant. Or sur un terminal donné c'est presque toujours la
+   * MÊME personne qui reprend — celle qui a fermé, ou celle qui a mis la
+   * caisse en service le premier jour.
+   *
+   * `dernier_employe` est la dernière personne dont le PIN a été accepté ICI.
+   * À la différence de `employe_courant`, elle SURVIT au verrouillage : c'est
+   * tout son intérêt, puisque c'est justement après un verrouillage qu'on
+   * repose la question.
+   *
+   * `employe_appaireur` est le repli du premier jour, quand personne n'a
+   * encore pris de poste : la personne dont le compte a mis ce terminal en
+   * service, désignée par le serveur à l'appairage.
+   *
+   * Ni l'une ni l'autre n'accorde quoi que ce soit. Le PIN reste exigé et
+   * vérifié hors ligne ; se tromper de proposition coûte un appui sur
+   * « changer ». Le PIN TRACE, il ne protège pas — ce qui garde l'argent est
+   * ailleurs.
+   */
+  | 'dernier_employe'
+  | 'employe_appaireur'
 
 export function depotEtat(db: AdaptateurSqlite) {
   return {

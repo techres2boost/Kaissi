@@ -33,6 +33,16 @@ export interface EtablissementEnrolable {
   readonly organizationId: string
   readonly nom: string
   readonly role: string
+  /**
+   * L'employé — `kaissi.users.id`, donc l'identifiant que la caisse connaît —
+   * derrière le compte qui vient de s'authentifier.
+   *
+   * ⚠ Ce n'est PAS l'identifiant Supabase Auth : depuis la 0017 les deux
+   *   identités sont distinctes (un serveur en salle a une ligne `users` sans
+   *   compte de connexion). Renvoyer l'un pour l'autre ferait chercher à la
+   *   caisse un employé qui n'existe pas chez elle.
+   */
+  readonly employeId: string
 }
 
 export interface DemandeEnrolement {

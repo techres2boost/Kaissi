@@ -371,6 +371,26 @@ await etape('un GÉRANT crée un article, et il est vendable aussitôt', async (
    */
   await page.click('.bandeau-etats .employe')
   await page.waitForSelector('text=Prise de poste', { timeout: 10000 })
+
+  /*
+   * ── La prise de poste PROPOSE l'habitué, elle ne liste plus l'équipe ───
+   *
+   * Salma vient de tenir la caisse : c'est elle qu'on retrouve, pavé PIN
+   * ouvert. Sur un terminal donné, c'est presque toujours la même personne
+   * qui reprend — lister cuisine, bar, caissiers et gérant à chaque
+   * verrouillage coûtait un appui à tout le monde pour n'en servir aucun.
+   *
+   * Ici, c'est justement le cas contraire : Ahmed prend le relais. Le pas
+   * vérifie donc les DEUX moitiés — que Salma est bien proposée, et que
+   * « changer » rend la liste complète. Sans la seconde, une proposition
+   * fausse serait un cul-de-sac.
+   */
+  const propose = await page.textContent('.employe-choisi')
+  if (!propose?.includes('Salma')) {
+    throw new Error(`la prise de poste propose « ${propose?.trim()} » au lieu de Salma`)
+  }
+  await page.click('.employe-choisi')
+  await page.waitForSelector('.liste-employes', { timeout: 5000 })
   await page.click('text=Ahmed')
   await page.waitForSelector('.pave', { timeout: 5000 })
   for (const c of '1357') await page.click(`.pave button:has-text("${c}")`)

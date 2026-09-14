@@ -291,6 +291,16 @@ export function creerServeur({
         nomEtablissement: enrole.nomEtablissement,
         prefixe: enrole.prefixe,
         reprise: enrole.reprise,
+        /*
+         * QUI a mis ce terminal en service.
+         *
+         * La caisse s'en sert pour proposer d'emblée le pavé PIN de cette
+         * personne, au lieu de la liste de toute l'équipe. C'est un CONFORT
+         * de saisie et rien d'autre : le PIN reste exigé, et il est vérifié
+         * hors ligne contre le hachage synchronisé. Le serveur ne dit ici que
+         * ce que la caisse sait déjà par le catalogue des employés.
+         */
+        employeId: choisi.employeId,
       })
     } catch (erreur) {
       if (erreur instanceof ErreurAuth) {

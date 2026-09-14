@@ -123,6 +123,26 @@ describe('POST /appairage', () => {
     ])
     expect(rows[0].token_hash).toBe(empreinteDe(corps.jeton))
     expect(rows[0].token_hash).not.toContain(corps.jeton)
+
+    /*
+     * ── `employeId` désigne l'EMPLOYÉ, pas le compte Supabase ────────────
+     *
+     * La caisse s'en sert pour proposer d'emblée le pavé PIN de la personne
+     * qui vient de mettre le terminal en service, au lieu de lister toute
+     * l'équipe.
+     *
+     * Le piège est là : depuis la 0017 les deux identités sont DISTINCTES —
+     * `kaissi.users.id` d'un côté, `auth.users.id` de l'autre. Renvoyer le
+     * second ferait chercher à la caisse un employé qui n'existe pas chez
+     * elle, et la proposition retomberait silencieusement sur la liste. Rien
+     * n'échouerait ; la fonction ne marcherait simplement jamais.
+     */
+    const { rows: employes } = await sql(
+      'select id, auth_user_id from kaissi.users where auth_user_id is not null',
+    )
+    const attendu = employes.find((u: { id: string }) => u.id === corps.employeId)
+    expect(attendu, `employeId « ${corps.employeId} » ne désigne aucun kaissi.users`).toBeTruthy()
+    expect(corps.employeId).not.toBe(attendu.auth_user_id)
   })
 
   it('attribue un préfixe libre, sans jamais réutiliser celui d’un révoqué', async () => {

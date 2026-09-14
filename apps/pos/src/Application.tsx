@@ -277,6 +277,7 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
         <DemandePin
           titre="Prise de poste"
           sousTitre="Qui utilise la caisse ?"
+          proposerLHabitue
           onValide={definirEmploye}
         />
       </div>

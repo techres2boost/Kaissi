@@ -500,6 +500,7 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
         organizationId?: string
         nomEtablissement?: string
         prefixe?: string
+        employeId?: string
         choix?: { restaurantId: string; nom: string }[]
         message?: string
       } | null
@@ -595,6 +596,15 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
       // appareils hors ligne ne doivent pas pouvoir produire le même numéro.
       // Encore fallait-il l'appliquer.
       if (corps.prefixe) await app.etat.ecrire('ticket_prefix', corps.prefixe)
+      /*
+       * QUI vient de mettre ce terminal en service — pour lui proposer son
+       * pavé PIN d'emblée, plutôt que la liste de toute l'équipe.
+       *
+       * Facultatif : un serveur antérieur ne renvoie pas ce champ, et la
+       * prise de poste retombe alors sur la liste. Rien de ce qui n'est pas
+       * une vente ne doit pouvoir faire échouer un appairage.
+       */
+      if (corps.employeId) await app.etat.ecrire('employe_appaireur', corps.employeId)
 
       // Le device_id est lu UNE fois au montage du contexte, puis figé dans la
       // session de caisse. S'il vient de changer, un simple rafraîchir ne

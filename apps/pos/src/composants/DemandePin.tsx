@@ -10,7 +10,7 @@
  * c'est tout l'intérêt de la traçabilité.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   apresEchec,
   apresSucces,
@@ -30,6 +30,15 @@ interface Props {
   readonly sousTitre?: string
   /** Restreint la liste aux employés habilités (managers, typiquement). */
   readonly candidats?: readonly EmployeLocal[]
+  /**
+   * Propose d'emblée le pavé PIN de la personne attendue, au lieu de la liste.
+   *
+   * Vrai à la PRISE DE POSTE seulement. Sur une escalade — un manager
+   * autorise une remise au-delà du plafond — c'est tout l'inverse : celui qui
+   * tient la caisse n'est PAS celui dont on attend le PIN, et pré-remplir son
+   * nom l'inviterait à taper le sien.
+   */
+  readonly proposerLHabitue?: boolean
   readonly onValide: (employe: Employe) => void
   readonly onAnnuler?: () => void
 }
@@ -38,6 +47,7 @@ export function DemandePin({
   titre = 'Prise de poste',
   sousTitre,
   candidats,
+  proposerLHabitue = false,
   onValide,
   onAnnuler,
 }: Props) {
@@ -46,6 +56,50 @@ export function DemandePin({
   const [choisi, setChoisi] = useState<EmployeLocal | null>(
     liste.length === 1 ? liste[0]! : null,
   )
+
+  /*
+   * ── Qui proposer, et dans quel ordre ──────────────────────────────────
+   *
+   * L'écran listait toute l'équipe à chaque prise de poste — cuisine, bar,
+   * caissiers, gérant — alors que sur un terminal donné c'est presque
+   * toujours la même personne qui reprend.
+   *
+   * L'ordre est celui de la probabilité, pas de la hiérarchie :
+   *   1. la dernière personne dont le PIN a été accepté ICI ;
+   *   2. à défaut — premier jour, aucun poste encore pris — celle dont le
+   *      compte a mis ce terminal en service.
+   *
+   * Ce n'est qu'un CONFORT de saisie. Le PIN reste exigé et vérifié hors
+   * ligne contre le hachage synchronisé ; se tromper de proposition coûte un
+   * appui sur « changer ». Le PIN trace, il ne protège pas.
+   *
+   * Un employé archivé ou suspendu a disparu de `liste` : la recherche ne le
+   * retrouve pas, et l'écran retombe sur la liste complète. C'est le bon
+   * comportement — proposer quelqu'un qui ne peut plus ouvrir la caisse
+   * ferait taper un PIN qui sera refusé sans qu'on dise pourquoi.
+   */
+  useEffect(() => {
+    if (!proposerLHabitue) return
+    let vivant = true
+    void (async () => {
+      const [dernier, appaireur] = await Promise.all([
+        app.etat.lire('dernier_employe'),
+        app.etat.lire('employe_appaireur'),
+      ])
+      if (!vivant) return
+      const habituel =
+        liste.find((e) => e.id === dernier) ?? liste.find((e) => e.id === appaireur)
+      // `setChoisi` seulement si on a trouvé : ne JAMAIS remettre à null, on
+      // écraserait un choix que la personne vient de faire à la main.
+      if (habituel) setChoisi((actuel) => actuel ?? habituel)
+    })()
+    return () => {
+      vivant = false
+    }
+    // `liste` est recalculée à chaque rendu : la dépendre ferait tourner cet
+    // effet en boucle. Sa longueur suffit à repérer un vrai changement.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app, proposerLHabitue, liste.length])
   const [pin, setPin] = useState('')
   const [erreur, setErreur] = useState<string | null>(null)
   const [tentatives, setTentatives] = useState<EtatTentatives>(TENTATIVES_VIERGES)
@@ -64,6 +118,18 @@ export function DemandePin({
       if (employe) {
         setTentatives(apresSucces())
         setPin('')
+        /*
+         * On retient qui vient de PRENDRE LE POSTE — et rien d'autre.
+         *
+         * La première version écrivait aussi sur une escalade, au motif qu'un
+         * manager qui débloque une remise est quelqu'un qui se sert de ce
+         * terminal. C'est faux, et le parcours l'a dit tout seul : Ahmed
+         * autorise une remise par-dessus l'épaule de Salma, repart, et c'est
+         * LUI qu'on proposait au verrouillage suivant — alors que Salma n'a
+         * pas quitté la caisse. Le même drapeau qui décide d'afficher la
+         * proposition décide donc de l'écrire.
+         */
+        if (proposerLHabitue) void app.etat.ecrire('dernier_employe', employe.id)
         onValide(employe)
         return
       }
