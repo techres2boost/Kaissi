@@ -2038,6 +2038,7 @@ mal qu'une absence de vidéo.
 | `Service account key creation is disabled` | règle d'organisation `iam.disableServiceAccountKeyCreation` héritée du rattachement à res2boost.com | §4 decies ter |
 | `Codemagic.yaml references to unknown variable group(s): google_play` | la variable `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` existe, mais elle a été assignée à un AUTRE groupe (`ios_signing`) — un groupe Codemagic n'existe que par ses variables | §4 decies quater |
 | `error: invalid source release: 21` sur `:capacitor-android:compileReleaseJavaWithJavac` | la machine de build tourne sous un JDK 17 — `@capacitor/android` 7 compile en source 21 | `java: 21` dans le workflow `pos-android` (plancher remonté aussi dans `pnpm verifier:jdk`) |
+| `Setting release for Google Play track internal failed. The caller does not have permission` — APRÈS un `Uploaded App Bundle` réussi | le compte de service peut lire et déposer, mais pas créer une version : Play sépare les deux droits | §4 decies quater, piège n° 3 |
 | `altool … Cannot determine the Apple ID from Bundle ID … (19)` | la **fiche** n'existe pas encore dans App Store Connect — le Bundle ID ne suffit pas | créer la fiche (§4 ter, étape 3), puis relancer |
 | `409: You already have a current Distribution certificate or a pending certificate request` | le compte est à son plafond de certificats, et aucun ne correspond à `CERTIFICATE_PRIVATE_KEY` | reprendre le `cert_key` d'un projet déjà signé sur ce compte ; à défaut révoquer un certificat expiré (§4 bis suite) |
 
@@ -2372,23 +2373,37 @@ C'est l'étape que les anciens guides placent au mauvais endroit.
    adresse.
 4. Section **Autorisations pour des applications spécifiques** →
    **Ajouter une application** → **Kaissi**.
-5. Cochez :
+5. Cochez, sous *Versions* :
 
    | Autorisation | |
    |---|---|
    | **Afficher les informations sur l'application et télécharger les rapports groupés** | ✅ lire le dernier `versionCode` publié |
-   | **Gérer les versions de test** | ✅ publier sur la piste interne |
-   | ~~Gérer les versions de production~~ | ❌ la production reste un geste humain |
+   | **Diffuser des applications sur les versions de test** *(Release apps to testing tracks)* | ✅ **créer la version** sur la piste interne |
+   | **Gérer les versions de test** *(Manage testing tracks and edit tester lists)* | ✅ gérer les pistes et la liste des testeurs |
+   | ~~Diffuser en production~~ | ❌ la production reste un geste humain |
 
 6. **Inviter l'utilisateur**.
+
+> ### ⚠ Les deux premières ne suffisent PAS l'une sans l'autre
+>
+> Play sépare **déposer un binaire** de **créer une version**, et les deux
+> lignes se ressemblent assez pour qu'on n'en coche qu'une. Sans « Diffuser sur
+> les versions de test », le build va jusqu'au bout, téléverse l'AAB, **brûle
+> le `versionCode`**, et échoue à la dernière ligne. Voir §4 decies quater,
+> piège n° 3.
 
 > Le compte de service apparaît alors dans la liste des utilisateurs, sans
 > jamais accepter d'invitation — il n'a pas de boîte mail. C'est normal.
 >
 > Google prévient que les changements peuvent prendre **jusqu'à 24 heures**.
-> En pratique, quelques minutes. Si le premier build échoue sur
-> `The caller does not have permission`, c'est cela : attendez, ne refaites
-> pas la configuration.
+> En pratique, quelques minutes.
+>
+> ⚑ Devant `The caller does not have permission`, **ne concluez pas à la
+> propagation sans lire le log au-dessus.** Le partage est net : si les lignes
+> précédentes montrent `Uploaded App Bundle`, le compte de service a déjà lu
+> ET écrit — il ne s'agit pas d'un délai, mais de l'autorisation manquante
+> ci-dessus, et attendre ne la fera jamais apparaître. Si en revanche RIEN
+> n'a abouti, pas même la lecture du dernier numéro, alors attendez.
 
 ### Étape 5 — Coller le JSON dans Codemagic
 
@@ -2432,11 +2447,13 @@ Et la nouvelle version s'affiche sous **Internal testing**, jamais sous la piste
 
 ---
 
-## 4 decies quater. Les deux pièges d'après — le GROUPE, et la PISTE
+## 4 decies quater. Les trois pièges d'après — le GROUPE, la PISTE, le DROIT
 
-Ce sont les deux qui se sont réellement produits, l'un après l'autre, une fois
-la clé du compte de service enfin obtenue. Aucun des deux n'est une erreur de
-configuration du dépôt : `codemagic.yaml` était juste les deux fois.
+Ce sont les trois qui se sont réellement produits, l'un après l'autre, une fois
+la clé du compte de service enfin obtenue. Aucun des trois n'est une erreur de
+configuration du dépôt : `codemagic.yaml` était juste les trois fois. Ils se
+règlent tous dans une console — Codemagic pour le premier, Play Console pour
+les deux autres.
 
 ### Piège n° 1 — la variable est dans le mauvais groupe
 
@@ -2487,6 +2504,52 @@ coexistent, avec chacune sa propre liste de versions :
 
 Le tableau de bord et la liste *App bundles* (*Release → App bundle explorer*)
 montrent bien les deux, mais l'écran de piste, non.
+
+### Piège n° 3 — `The caller does not have permission`, APRÈS un téléversement réussi
+
+C'est le plus trompeur des trois, parce que l'échec arrive à la toute dernière
+ligne, après trois minutes de travail qui a marché :
+
+```
+Uploaded App Bundle ... to Google Play
+-- Bundle --
+Version code: 103
+Set new release for application "tn.res2boost.kaissi" Google Play track internal
+Setting release for Google Play track internal failed.
+The caller does not have permission
+```
+
+**Ne cherche pas du côté du compte Google.** Le premier réflexe est de se
+demander si le compte de service, créé dans un projet Cloud appartenant à une
+adresse personnelle, « n'est pas le bon » face à une application Play détenue
+par l'adresse de l'entreprise. Le log répond déjà non :
+
+| Ce que la CI a réussi | Ce que ça prouve |
+|---|---|
+| `get-latest-build-number` a rendu 102 | le compte de service **lit** la bonne application |
+| `Uploaded App Bundle … Version code: 103` | il **écrit** dedans, et l'AAB porte le bon certificat `Res2boost` |
+| `Setting release … failed` | il ne peut pas **publier sur une piste** |
+
+Un compte de service est une identité Google **Cloud** ; ses droits Play ne
+viennent que de l'invitation dans Play Console, jamais du compte qui l'a créé.
+Le projet Cloud peut donc parfaitement être sous une autre adresse que celle
+qui détient l'application.
+
+Ce qui manque est un droit de plus, et Play les découpe finement : **déposer un
+binaire** et **créer une version** sont deux permissions distinctes. Play
+Console → **Users and permissions** → la ligne du compte de service → onglet
+**App permissions** → l'application Kaissi, sous *Releases* :
+
+- ☑ **Release apps to testing tracks** — celle qui manque ;
+- ☑ **Manage testing tracks and edit tester lists** — pour gérer la liste des
+  testeurs depuis la console.
+
+Puis relancer le build : il n'y a rien à changer dans le dépôt.
+
+> Le `versionCode` 103 est **consommé** par ce téléversement, même si la
+> version n'a pas été publiée. Le build suivant demandera le numéro à Play et
+> prendra 104. C'est le comportement voulu, et c'est pour cela qu'on le demande
+> plutôt que de le supposer.
 
 ### Les trois signaux qui disent que ça a marché
 
