@@ -26,18 +26,12 @@
  */
 
 import { useState } from 'react'
-import { LogIn, Store, TriangleAlert } from 'lucide-react'
+import { LogIn, Store } from 'lucide-react'
 import { useApp } from '../etat/contexte.js'
-import { URL_BACKOFFICE } from '../config.js'
 import { FormulaireAppairage } from './EcranSync.js'
+import { FormulaireInscription } from '../composants/FormulaireInscription.js'
 
-export function EcranBienvenue({
-  onDemonstration,
-  reseau,
-}: {
-  onDemonstration: () => void
-  reseau: { connecte: boolean }
-}) {
+export function EcranBienvenue({ onDemonstration }: { onDemonstration: () => void }) {
   const { app, rafraichir } = useApp()
   const [voie, setVoie] = useState<'choix' | 'connexion' | 'creation'>('choix')
 
@@ -65,39 +59,10 @@ export function EcranBienvenue({
         <button type="button" className="retour-accueil" onClick={() => setVoie('choix')}>
           ‹ Retour
         </button>
-        <section className="carte-action">
-          <h1>Créer un compte</h1>
-          {/*
-            Dire la vérité plutôt que d'ouvrir un formulaire qui n'aboutit
-            pas. Aucune route d'inscription n'existe encore : tout compte est
-            créé depuis le back-office par un administrateur. Un formulaire
-            qui échoue après la saisie coûte plus cher que cette phrase.
-          */}
-          <p>
-            L'ouverture d'un restaurant se fait pour l'instant depuis le
-            back-office, par un administrateur. Il crée l'établissement et vos
-            identifiants ; vous revenez ensuite ici et vous vous connectez —
-            ce terminal se rattachera tout seul.
-          </p>
-          {URL_BACKOFFICE && (
-            <button
-              type="button"
-              className="principal"
-              disabled={!reseau.connecte}
-              onClick={() => window.open(URL_BACKOFFICE, '_blank', 'noopener,noreferrer')}
-            >
-              Ouvrir le back-office ↗
-            </button>
-          )}
-          {!reseau.connecte && (
-            <p className="aide">
-              <TriangleAlert size={15} strokeWidth={2} aria-hidden="true" /> Sans
-              réseau, le back-office ne peut pas s'ouvrir. La caisse, elle,
-              fonctionne : vous pouvez commencer en démonstration et vous
-              connecter plus tard.
-            </p>
-          )}
-        </section>
+        <FormulaireInscription
+          onInscrit={onDemonstration}
+          onDejaUnCompte={() => setVoie('connexion')}
+        />
       </div>
     )
   }

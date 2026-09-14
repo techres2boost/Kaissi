@@ -263,7 +263,7 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
       <div className="application">
         <BandeauSimple reseau={reseau} etablissement={false} />
         <main className="contenu">
-          <EcranBienvenue reseau={reseau} onDemonstration={() => setDemoAcceptee(true)} />
+          <EcranBienvenue onDemonstration={() => setDemoAcceptee(true)} />
         </main>
       </div>
     )

@@ -294,6 +294,24 @@ export interface DepotSync {
     authUserId: string
   }): Promise<{ restaurantId: string; reglagesCopies: number }>
 
+  /**
+   * Ouvre une organisation ENTIÈRE pour un compte qui n'a encore rien.
+   *
+   * Distinct de `creerEtablissement`, qui suppose une organisation, un
+   * établissement modèle et une ligne `kaissi.users` déjà là. Ici, rien
+   * n'existe : c'est le premier geste d'un restaurateur qui installe la
+   * caisse et crée son compte depuis la tablette.
+   */
+  creerInscription(demande: {
+    /** L'identité Supabase Auth, créée juste avant par GoTrue. */
+    authUserId: string
+    email: string
+    nomGerant: string
+    nomRestaurant: string
+    timezone: string
+    bascule: string
+  }): Promise<{ organizationId: string; restaurantId: string; employeId: string }>
+
   /** Compte d'authentification portant cette adresse, s'il existe. */
   compteParEmail(email: string): Promise<{ id: string; email: string } | null>
 

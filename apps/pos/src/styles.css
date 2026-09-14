@@ -790,6 +790,41 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* `.carte-action` porte déjà la carte centrée de l'ouverture de caisse : on
    la réutilise telle quelle plutôt que d'en écrire une jumelle qui dériverait. */
 .bienvenue .carte-action { width: min(30rem, 100%); }
+/*
+ * Les champs du formulaire d'inscription.
+ *
+ * `.carte-action` ne portait aucun style de champ : ses seuls occupants
+ * étaient des pavés numériques et des boutons. Libellés et champs se
+ * retrouvaient donc côte à côte, en ligne, l'un par-dessus l'autre. Un
+ * `display: block` et une largeur pleine suffisent — mais il fallait les
+ * écrire.
+ */
+.bienvenue .carte-action label {
+  display: block;
+  margin: 0.85rem 0 0.25rem;
+  font-size: 0.85rem;
+  color: var(--texte-2);
+}
+.bienvenue .carte-action input {
+  display: block; width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--bordure);
+  border-radius: var(--rayon);
+  /* 16 px au moins : en dessous, iOS ZOOME sur le champ à la mise au point,
+     et la page reste ensuite décalée. */
+  font: inherit; font-size: 16px;
+  padding: 0.7rem 0.8rem;
+  min-height: 48px;
+  color: var(--texte);
+}
+.bienvenue .carte-action input:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+.bienvenue .carte-action .erreur {
+  color: var(--alerte); font-size: 0.85rem; margin-top: 0.6rem;
+}
+.bienvenue .carte-action .lien-discret { border: 0; margin-top: 0.4rem; }
+
 .bienvenue .carte-action button {
   width: 100%; min-height: 52px; margin-top: 0.6rem;
   display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;

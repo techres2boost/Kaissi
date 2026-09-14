@@ -1150,6 +1150,151 @@ export class DepotPostgres implements DepotSync {
     }))
   }
 
+  /**
+   * Ouvre une organisation ENTIÈRE — le premier geste d'un restaurateur.
+   *
+   * ── Pourquoi une méthode de plus, et pas `creerEtablissement` ───────────
+   *
+   * Celle-là suppose tout ce qui manque ici : une organisation, un
+   * établissement MODÈLE d'où recopier les réglages, et une ligne
+   * `kaissi.users` déjà rattachée. À l'inscription, rien n'existe. Tordre
+   * l'autre pour accepter des nuls partout l'aurait rendue illisible et
+   * aurait fait porter à la création d'un second restaurant le risque de la
+   * création du premier.
+   *
+   * ⚠ LE TAUX DE TAXE, ET CE QUE CE CODE REFUSE D'AFFIRMER.
+   *
+   *   Sans aucun taux, la caisse ne peut RIEN encaisser : elle refuserait la
+   *   première vente sans dire pourquoi. Il en faut donc un.
+   *
+   *   Mais écrire ici « TVA 19 % » serait affirmer une règle fiscale
+   *   tunisienne depuis du code, ce que ce dépôt s'interdit (CLAUDE.md, les
+   *   points à valider avec un expert-comptable). On pose donc un taux à
+   *   ZÉRO, nommé pour ce qu'il est : un réglage à faire. La caisse
+   *   fonctionne, et personne ne peut confondre ce placeholder avec une
+   *   affirmation. La réponse de la route le répète au gérant.
+   *
+   *   Les modes de paiement et le poste de préparation, eux, ne relèvent
+   *   d'aucune réglementation : on les pose pour de bon.
+   */
+  async creerInscription(demande: {
+    authUserId: string
+    email: string
+    nomGerant: string
+    nomRestaurant: string
+    timezone: string
+    bascule: string
+  }): Promise<{ organizationId: string; restaurantId: string; employeId: string }> {
+    const client = await this.pool.connect()
+    try {
+      await client.query('begin')
+
+      // RÈGLE 2 : les identifiants viennent du code, jamais d'un « serial ».
+      const organizationId = uuidV7()
+      const restaurantId = uuidV7()
+      const employeId = uuidV7()
+
+      const slug = (texte: string, repli: string) =>
+        texte
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 50) || repli
+
+      /*
+       * Le slug d'organisation est unique GLOBALEMENT : deux restaurateurs
+       * qui ouvrent « Chez Ali » le même jour ne doivent pas se marcher
+       * dessus. On désambiguïse plutôt que de refuser — c'est la même
+       * décision que pour un numéro de ticket en collision.
+       */
+      const baseOrg = slug(demande.nomRestaurant, 'organisation')
+      let slugOrg = baseOrg
+      for (let n = 2; n < 1000; n += 1) {
+        const { rows } = await client.query(
+          'select 1 from kaissi.organizations where slug = $1',
+          [slugOrg],
+        )
+        if (rows.length === 0) break
+        slugOrg = `${baseOrg}-${n}`
+      }
+
+      await client.query(
+        'insert into kaissi.organizations (id, name, slug) values ($1, $2, $3)',
+        [organizationId, demande.nomRestaurant, slugOrg],
+      )
+
+      await client.query(
+        `insert into kaissi.restaurants
+           (id, organization_id, name, slug, timezone, business_day_start)
+         values ($1, $2, $3, $4, $5, $6)`,
+        [
+          restaurantId,
+          organizationId,
+          demande.nomRestaurant,
+          slug(demande.nomRestaurant, 'etablissement'),
+          demande.timezone,
+          demande.bascule,
+        ],
+      )
+
+      /*
+       * L'employé, puis son appartenance ADMIN.
+       *
+       * Dans cet ordre et dans la même transaction : un établissement sans
+       * appartenance est invisible de tout le monde sous RLS, y compris de
+       * son auteur, et devient irrattrapable depuis l'interface.
+       */
+      await client.query(
+        `insert into kaissi.users
+           (id, organization_id, auth_user_id, full_name, email, status)
+         values ($1, $2, $3, $4, $5, 'actif')`,
+        [employeId, organizationId, demande.authUserId, demande.nomGerant, demande.email],
+      )
+
+      await client.query(
+        `insert into kaissi.memberships (organization_id, user_id, restaurant_id, role)
+         values ($1, $2, $3, 'admin')`,
+        [organizationId, employeId, restaurantId],
+      )
+
+      // ⚠ Zéro, et nommé pour ce qu'il est — voir l'entête de la méthode.
+      await client.query(
+        `insert into kaissi.tax_rates
+           (id, organization_id, restaurant_id, name, rate_bp, is_included, is_default)
+         values (kaissi.uuid_v7(), $1, $2, $3, 0, true, true)`,
+        [organizationId, restaurantId, 'À régler — taux non défini'],
+      )
+
+      for (const [nom, type, tiroir, position] of [
+        ['Espèces', 'cash', true, 0],
+        ['Carte bancaire', 'card', false, 1],
+      ] as const) {
+        await client.query(
+          `insert into kaissi.payment_methods
+             (id, organization_id, restaurant_id, name, type, opens_drawer, position, is_active)
+           values (kaissi.uuid_v7(), $1, $2, $3, $4, $5, $6, true)`,
+          [organizationId, restaurantId, nom, type, tiroir, position],
+        )
+      }
+
+      await client.query(
+        `insert into kaissi.stations (id, organization_id, restaurant_id, name, position)
+         values (kaissi.uuid_v7(), $1, $2, 'Cuisine', 0)`,
+        [organizationId, restaurantId],
+      )
+
+      await client.query('commit')
+      return { organizationId, restaurantId, employeId }
+    } catch (erreur) {
+      await client.query('rollback')
+      throw erreur
+    } finally {
+      client.release()
+    }
+  }
+
   async creerEtablissement(demande: {
     organizationId: string
     nom: string

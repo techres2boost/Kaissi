@@ -207,6 +207,21 @@ export type CodeErreur =
   | 'administration_indisponible'
   /** Jeton de session absent, expiré, ou rôle insuffisant. */
   | 'acces_refuse'
+  // ── Ouverture de compte depuis la caisse (/inscription) ─────────────────
+  /** Le serveur n'a pas SUPABASE_SERVICE_ROLE_KEY : créer un compte Auth
+   *  passe par GoTrue, jamais par du SQL. */
+  | 'inscription_indisponible'
+  /** Formulaire refusé — nom trop court, mot de passe trop faible, fuseau. */
+  | 'inscription_refusee'
+  /**
+   * L'adresse a DÉJÀ un compte Kaissi.
+   *
+   * Distinct d'un refus de formulaire, parce que la suite ne l'est pas : la
+   * bonne porte est « Se connecter », qui vérifie le mot de passe. Rattacher
+   * un restaurant neuf à un compte existant sans cette vérification
+   * l'ouvrirait à quiconque connaît une adresse.
+   */
+  | 'adresse_deja_utilisee'
 
 export interface ReponseErreur {
   readonly erreur: CodeErreur

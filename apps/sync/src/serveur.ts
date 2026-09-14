@@ -311,6 +311,166 @@ export function creerServeur({
     }
   })
 
+  // ── POST /inscription ────────────────────────────────────────────────
+  //
+  // Ouvrir un restaurant depuis la tablette, sans compte préalable. C'est la
+  // PREMIÈRE surface publique de ce service : tout le reste exige déjà soit
+  // un jeton d'appareil, soit une session Supabase.
+  //
+  // ── Ce qui la rend tenable ──────────────────────────────────────────────
+  //
+  //   • la MÊME limitation de débit que l'appairage, par IP et par adresse.
+  //     Sans elle, la route crée des organisations à la vitesse du réseau ;
+  //   • elle ne touche RIEN d'existant. Elle ne crée qu'une organisation
+  //     neuve, avec son restaurant et son unique membre. Aucun identifiant
+  //     venu du client ne désigne quoi que ce soit de déjà là — il n'y a donc
+  //     pas de « chez le voisin » à atteindre ;
+  //   • une adresse DÉJÀ prise est refusée, sans créer d'organisation
+  //     orpheline et sans dire si le compte existait : on renvoie vers la
+  //     connexion, qui est la bonne porte.
+  //
+  // ⚠ Elle exige `SUPABASE_SERVICE_ROLE_KEY`, comme les routes d'administration
+  //   — créer un compte Auth passe par GoTrue, jamais par du SQL : une colonne
+  //   de jeton à NULL rend la connexion impossible en disant « e-mail ou mot
+  //   de passe incorrect ». Vu en production.
+  app.post('/inscription', async (c) => {
+    const verdictIp = parIp.verifier(adresseClient(c.req.raw.headers))
+    if (!verdictIp.autorise) {
+      return tropDeTentatives(c, verdictIp.attendreSecondes, "d'inscription depuis cette connexion")
+    }
+
+    if (!auth || !cleService) {
+      const absentes = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY'].filter(
+        (nom) => !(process.env[nom] ?? '').trim(),
+      )
+      const corps: ReponseErreur = {
+        erreur: 'inscription_indisponible',
+        message:
+          "L'ouverture de compte n'est pas configurée sur ce serveur. " +
+          `Variable(s) absente(s) : ${absentes.join(', ')}.`,
+      }
+      return c.json(corps, 501)
+    }
+
+    let brut: unknown
+    try {
+      brut = await c.req.json()
+    } catch {
+      const corps: ReponseErreur = { erreur: 'requete_invalide', message: 'Corps JSON illisible.' }
+      return c.json(corps, 400)
+    }
+    const donnees = (brut ?? {}) as Record<string, unknown>
+
+    try {
+      const email = verifierEmail(donnees['email'])
+      const motDePasse = verifierMotDePasse(donnees['motDePasse'])
+
+      const nomRestaurant = String(donnees['nomRestaurant'] ?? '').trim()
+      if (nomRestaurant.length < 2 || nomRestaurant.length > 200) {
+        throw new ErreurAuth('Le nom du restaurant doit faire entre 2 et 200 caractères.', 401)
+      }
+      const nomGerant = String(donnees['nomGerant'] ?? '').trim() || email.split('@')[0]!
+
+      // Le fuseau par défaut est celui du PRODUIT, pas celui du serveur : un
+      // conteneur en Europe ne décide pas de la journée commerciale d'un
+      // restaurant tunisien.
+      const timezone = String(donnees['timezone'] ?? '').trim() || 'Africa/Tunis'
+      const bascule = String(donnees['bascule'] ?? '').trim() || '04:00'
+      if (!/^\d{2}:\d{2}(:\d{2})?$/.test(bascule)) {
+        throw new ErreurAuth('L\u2019heure de bascule doit s\u2019écrire « 04:00 ».', 401)
+      }
+
+      const installationId = donnees['installationId']
+      if (installationId !== undefined && !UUID.test(String(installationId))) {
+        throw new ErreurAuth("L'identifiant d'installation doit être un UUID.", 401)
+      }
+
+      const cleCompte = `inscription:${email}`
+      const verdictCompte = parCompte.verifier(cleCompte)
+      if (!verdictCompte.autorise) {
+        return tropDeTentatives(c, verdictCompte.attendreSecondes, 'pour cette adresse')
+      }
+
+      /*
+       * Le compte Auth D'ABORD, et c'est l'ordre qui compte.
+       *
+       * Si GoTrue refuse — adresse déjà prise, mot de passe trop faible —
+       * aucune organisation n'a été écrite, donc rien à nettoyer. L'inverse
+       * laisserait un restaurant sans personne pour l'ouvrir, invisible sous
+       * RLS et irrattrapable depuis l'interface.
+       */
+      const cree = await creerCompteSupabase(auth, cleService, email, motDePasse, fetchAuth)
+      if (!cree.nouveau || !cree.authUserId) {
+        /*
+         * L'adresse a déjà un compte. On NE crée rien, et on renvoie vers la
+         * connexion — qui est la bonne porte, et la seule qui vérifie le mot
+         * de passe. Rattacher un restaurant neuf à un compte existant sans
+         * cette vérification ouvrirait la porte à quiconque connaît une
+         * adresse.
+         */
+        const corps: ReponseErreur = {
+          erreur: 'adresse_deja_utilisee',
+          message:
+            'Cette adresse a déjà un compte Kaissi. Revenez en arrière et ' +
+            'utilisez « Se connecter » — cette caisse se rattachera toute seule.',
+        }
+        return c.json(corps, 409)
+      }
+
+      const { organizationId, restaurantId, employeId } = await depot.creerInscription({
+        authUserId: cree.authUserId,
+        email,
+        nomGerant,
+        nomRestaurant,
+        timezone,
+        bascule,
+      })
+
+      /*
+       * Et l'appairage dans la FOULÉE : c'est tout l'intérêt de la route.
+       * Obliger à ressaisir ses identifiants juste après les avoir choisis
+       * serait exactement l'étape en trop qu'on vient de supprimer.
+       */
+      const enrole = await depot.enrolerAppareil({
+        restaurantId,
+        libelle:
+          typeof donnees['libelle'] === 'string' && donnees['libelle'].trim()
+            ? donnees['libelle'].trim()
+            : 'Terminal',
+        ...(typeof installationId === 'string' ? { installationId } : {}),
+      })
+
+      return c.json({
+        jeton: enrole.jeton,
+        deviceId: enrole.deviceId,
+        restaurantId: enrole.restaurantId,
+        organizationId,
+        nomEtablissement: nomRestaurant,
+        prefixe: enrole.prefixe,
+        reprise: enrole.reprise,
+        employeId,
+        /*
+         * ⚠ Le taux de taxe posé est à ZÉRO, et le gérant doit le savoir tout
+         *   de suite. Écrire un taux « standard » dans le code serait
+         *   affirmer une règle fiscale tunisienne, ce que ce dépôt s'interdit
+         *   — mais un taux nul silencieux ferait facturer sans taxe pendant
+         *   des semaines sans que rien ne le dise.
+         */
+        aRegler: ['taux_de_taxe'],
+        message:
+          `Restaurant « ${nomRestaurant} » ouvert, et cette caisse y est rattachée. ` +
+          'Le taux de taxe est posé à 0 % — réglez-le au back-office avant ' +
+          'd’encaisser, il n’est pas deviné.',
+      })
+    } catch (erreur) {
+      if (erreur instanceof ErreurAuth) {
+        const corps: ReponseErreur = { erreur: 'inscription_refusee', message: erreur.message }
+        return c.json(corps, erreur.statut)
+      }
+      return reponseErreur(c, erreur)
+    }
+  })
+
   // ── Authentification par jeton d'appareil ────────────────────────────
   app.use('/sync/*', async (c, next) => {
     const jeton = jetonDepuisEntete(c.req.header('authorization'))
