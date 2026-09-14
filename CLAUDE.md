@@ -479,7 +479,7 @@ pnpm --filter @kaissi/pos test:largeur
 #   puis appliquer amorce-supabase.sql et les migrations dans l'ordre.
 pnpm db:test && pnpm --filter @kaissi/sync test && pnpm db:test:stop
 
-# Le JDK que GRADLE utilisera est-il dans la plage éprouvée ? (17–23, Gradle
+# Le JDK que GRADLE utilisera est-il dans la plage éprouvée ? (21–23, Gradle
 # 8.13 ne lit pas au-delà — « Unsupported class file major version 69 » = JDK 25)
 #
 # ⚑ Il interroge le JVM DE GRADLE, dans l'ordre de Gradle : org.gradle.java.home

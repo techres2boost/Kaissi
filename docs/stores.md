@@ -320,7 +320,7 @@ avant Gradle plutôt qu'après :
 `pnpm pos:apk` fait la même chose en produisant un **APK signé**, installable
 directement : c'est le chemin le plus rapide pour un premier client.
 
-Prérequis : **JDK 17 à 23** — 21 de préférence, c'est celui de la CI — et le
+Prérequis : **JDK 21 à 23** — 21 de préférence, c'est celui de la CI — et le
 SDK Android (Android Studio installe les deux).
 
 La séquence à la main reste valable, si l'on veut voir chaque étape :
@@ -398,7 +398,7 @@ cd apps/pos/android && ./gradlew bundleRelease
 > retenue** :
 >
 > ```
-> ✓ JDK 21 — dans la plage éprouvée (17–23).
+> ✓ JDK 21 — dans la plage éprouvée (21–23).
 >   Source retenue par Gradle : JAVA_HOME.
 > ```
 >
@@ -2037,6 +2037,7 @@ mal qu'une absence de vidéo.
 | `The selected instance type is not available with the current billing plan` | `linux_x2` n'existe pas sur le plan gratuit — seul le Mac mini M2 y est | §4 decies bis |
 | `Service account key creation is disabled` | règle d'organisation `iam.disableServiceAccountKeyCreation` héritée du rattachement à res2boost.com | §4 decies ter |
 | `Codemagic.yaml references to unknown variable group(s): google_play` | la variable `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` existe, mais elle a été assignée à un AUTRE groupe (`ios_signing`) — un groupe Codemagic n'existe que par ses variables | §4 decies quater |
+| `error: invalid source release: 21` sur `:capacitor-android:compileReleaseJavaWithJavac` | la machine de build tourne sous un JDK 17 — `@capacitor/android` 7 compile en source 21 | `java: 21` dans le workflow `pos-android` (plancher remonté aussi dans `pnpm verifier:jdk`) |
 | `altool … Cannot determine the Apple ID from Bundle ID … (19)` | la **fiche** n'existe pas encore dans App Store Connect — le Bundle ID ne suffit pas | créer la fiche (§4 ter, étape 3), puis relancer |
 | `409: You already have a current Distribution certificate or a pending certificate request` | le compte est à son plafond de certificats, et aucun ne correspond à `CERTIFICATE_PRIVATE_KEY` | reprendre le `cert_key` d'un projet déjà signé sur ce compte ; à défaut révoquer un certificat expiré (§4 bis suite) |
 

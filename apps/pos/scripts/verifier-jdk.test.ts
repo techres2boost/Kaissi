@@ -70,9 +70,24 @@ describe('traduire le numéro de version de classe', () => {
 
 describe('le diagnostic', () => {
   it('accepte la plage éprouvée', () => {
-    for (const v of [17, 21, 23]) {
+    for (const v of [21, 22, 23]) {
       expect(diagnostiquer(v).ok, `JDK ${v} doit passer`).toBe(true)
     }
+  })
+
+  it('refuse le JDK 17 — Capacitor 7 compile en source 21', () => {
+    /*
+     * Le plancher n'est plus celui d'AGP (17), c'est celui de Capacitor.
+     * Tant qu'il était à 17, ce script répondait « ✓ JDK 17 — dans la plage
+     * éprouvée » à une machine qui échouait une minute plus tard sur
+     * `:capacitor-android:compileReleaseJavaWithJavac`. Un garde-fou qui dit
+     * ✓ à un poste qui va échouer est pire que pas de garde-fou.
+     */
+    const bilan = diagnostiquer(17)
+    expect(bilan.ok).toBe(false)
+    expect(bilan.trop).toBe('ancien')
+    // Comme pour le JDK 25 : le lien avec ce que la personne a SOUS LES YEUX.
+    expect(bilan.message).toContain('invalid source release: 21')
   })
 
   it('refuse le JDK 25 — et nomme le message que Gradle affiche', () => {
@@ -89,7 +104,7 @@ describe('le diagnostic', () => {
     const bilan = diagnostiquer(11)
     expect(bilan.ok).toBe(false)
     expect(bilan.trop).toBe('ancien')
-    expect(bilan.message).toContain('au moins 17')
+    expect(bilan.message).toContain('source 21')
   })
 
   it("ne mélange pas le DIAGNOSTIC et le REMÈDE", () => {

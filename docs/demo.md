@@ -1955,7 +1955,7 @@ bandeau passe à la ligne et sa rangée d'actions glisse ; le bouton
 
 5. Avant de construire l'APK : `pnpm verifier:jdk`.
 
-**Attendu** : « JDK 21 — dans la plage éprouvée (17–23) », ou un message qui
+**Attendu** : « JDK 21 — dans la plage éprouvée (21–23) », ou un message qui
 nomme ton JDK et donne la commande exacte pour en changer.
 
 > **Ce qu'on voyait avant** : `BUG! exception in phase 'semantic analysis' …
@@ -2018,7 +2018,7 @@ retenue n'est PAS le PATH, le script le dit en toutes lettres.
 > lisait donc, dans la même sortie :
 >
 > ```
-> ✓ JDK 21 — dans la plage éprouvée (17–23).
+> ✓ JDK 21 — dans la plage éprouvée (21–23).
 > …
 > BUG! … Unsupported class file major version 69
 > ```

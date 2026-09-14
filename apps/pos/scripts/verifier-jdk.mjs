@@ -69,15 +69,27 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 /**
- * La plage éprouvée. 17 est le minimum d'AGP 8.7 ; 23 est le dernier JDK que
- * Gradle 8.13 connaît. Au-delà, il ne sait pas lire le bytecode et échoue
- * avant d'avoir rien fait.
+ * La plage éprouvée. 23 est le dernier JDK que Gradle 8.13 connaît : au-delà,
+ * il ne sait pas lire le bytecode et échoue avant d'avoir rien fait.
  *
  * (Le wrapper est passé de 8.11.1 à 8.13 en montant à l'API 36 : le plugin
  * Android 8.11 l'exige. Le PLAFOND, lui, n'a pas bougé — 8.13 ne lit pas le
  * JDK 24 non plus.)
+ *
+ * ⚑ Le PLANCHER est 21, et ce n'est plus celui d'AGP (qui se contente de 17).
+ *   C'est celui de Capacitor 7 : `@capacitor/android/capacitor/build.gradle`
+ *   pose `sourceCompatibility JavaVersion.VERSION_21`, et un javac de JDK 17
+ *   refuse de compiler en source 21 :
+ *
+ *     > Task :capacitor-android:compileReleaseJavaWithJavac FAILED
+ *     > error: invalid source release: 21
+ *
+ *   Le message ne nomme ni Capacitor, ni le JDK du poste, ni ce qu'il faut
+ *   faire. Tant que ce plancher était à 17, `verifier:jdk` répondait « ✓ JDK
+ *   17 — dans la plage éprouvée » à un poste qui allait échouer une minute
+ *   plus tard. Vu sur la CI, build #6.
  */
-const MINIMUM = 17
+const MINIMUM = 21
 const MAXIMUM = 23
 /** Celui des trois que la documentation recommande, et que la CI utilise. */
 const RECOMMANDE = 21
@@ -122,7 +134,11 @@ export function diagnostiquer(majeure) {
     return {
       ok: false,
       trop: 'ancien',
-      message: `JDK ${majeure} détecté — le plugin Android en exige au moins ${MINIMUM}.`,
+      message:
+        `JDK ${majeure} détecté — Capacitor 7 compile en source ${MINIMUM}.\n\n` +
+        `  C'est LUI qui produit « error: invalid source release: ${MINIMUM} » sur\n` +
+        '  la tâche `:capacitor-android:compileReleaseJavaWithJavac` — un message qui\n' +
+        "  ne nomme ni Java, ni le JDK de ce poste, ni ce qu'il faut faire.",
     }
   }
   return {

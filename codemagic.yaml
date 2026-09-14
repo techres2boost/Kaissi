@@ -147,7 +147,13 @@ workflows:
         #   Google ne le régénère pas. Sauvegarde-le ailleurs qu'ici.
         - kaissi_keystore
       node: 20.11.0
-      java: 17
+      # ⚠ 21, et pas 17. `@capacitor/android` 7 compile en
+      #   `sourceCompatibility JavaVersion.VERSION_21` : un javac de JDK 17
+      #   refuse, « error: invalid source release: 21 », sur la tâche
+      #   `:capacitor-android:compileReleaseJavaWithJavac`. Le message ne
+      #   nomme ni Capacitor, ni le JDK de la machine de build. Vu ici.
+      #   Le plafond reste 23 : Gradle 8.13 ne lit pas au-delà.
+      java: 21
 
     scripts:
       - *installer
