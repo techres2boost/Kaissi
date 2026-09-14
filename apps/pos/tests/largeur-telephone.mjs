@@ -148,6 +148,10 @@ for (const appareil of APPAREILS) {
 
   await page.goto(URL_POS, { waitUntil: 'networkidle' })
 
+  // Caisse neuve : l'accueil d'abord (voir parcours-caisse.mjs).
+  await page.waitForSelector('.bienvenue', { timeout: 20000 })
+  await mesurer('accueil — caisse jamais mise en service')
+  await page.click('.lien-discret')
   await page.waitForSelector('text=Prise de poste', { timeout: 20000 })
   await mesurer('prise de poste')
 

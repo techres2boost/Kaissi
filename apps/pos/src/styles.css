@@ -731,6 +731,53 @@ button { font: inherit; color: inherit; cursor: pointer; }
   padding: 0.5rem 0; min-height: 44px; text-align: left;
 }
 
+/* ── Écran d'accueil d'une caisse neuve ──────────────────────────────────── */
+.bienvenue {
+  height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1.25rem;
+  /* Le padding LATÉRAL ne descend jamais sous 16 px : c'est la seule marge
+     qui garde le formulaire lisible sur un téléphone tenu d'une main. */
+  padding: 2rem 1rem;
+  overflow-y: auto;
+}
+.bienvenue-marque { display: flex; flex-direction: column; align-items: center; gap: 0.2rem; }
+.bienvenue-marque .logo { font-size: 1.9rem; font-weight: 700; color: var(--accent); }
+.bienvenue-marque .signature { color: var(--texte-2); font-size: 0.9rem; }
+
+/* `.carte-action` porte déjà la carte centrée de l'ouverture de caisse : on
+   la réutilise telle quelle plutôt que d'en écrire une jumelle qui dériverait. */
+.bienvenue .carte-action { width: min(30rem, 100%); }
+.bienvenue .carte-action button {
+  width: 100%; min-height: 52px; margin-top: 0.6rem;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  background: var(--surface); border: 1px solid var(--bordure);
+  border-radius: var(--rayon); color: var(--texte);
+}
+.bienvenue .carte-action button.principal {
+  background: var(--accent); border-color: var(--accent); color: var(--sur-accent);
+  font-weight: 650;
+}
+.bienvenue .carte-action button:disabled { opacity: 0.5; }
+.bienvenue .carte-action .aide {
+  display: flex; align-items: flex-start; gap: 0.4rem;
+  color: var(--texte-2); font-size: 0.85rem; margin-top: 0.75rem;
+}
+
+/* Discret, mais pas caché — et libellé pour ce qu'il est. */
+.lien-discret {
+  background: transparent; border: 0;
+  color: var(--texte-2); font-size: 0.85rem;
+  text-decoration: underline; text-underline-offset: 3px;
+  padding: 0.6rem; min-height: 44px;
+  max-width: 100%;
+}
+.retour-accueil {
+  align-self: flex-start;
+  background: transparent; border: 0; color: var(--texte-2);
+  padding: 0.5rem 0.25rem; min-height: 44px;
+}
+
 /* ── Écran centré (ouverture de caisse) ──────────────────────────────────── */
 .ecran-centre {
   height: 100%; display: flex; align-items: center; justify-content: center; padding: 1rem;

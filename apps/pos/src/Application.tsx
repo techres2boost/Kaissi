@@ -23,6 +23,7 @@ import { Modale } from './composants/Modale.js'
 import { EcranPeriodes } from './ecrans/EcranPeriodes.js'
 import { EcranRecus } from './ecrans/EcranRecus.js'
 import { EcranSync } from './ecrans/EcranSync.js'
+import { EcranBienvenue } from './ecrans/EcranBienvenue.js'
 import { ICONES_TIROIR, TiroirNavigation, type EntreeTiroir } from './composants/TiroirNavigation.js'
 import type { Vue } from './navigation.js'
 
@@ -88,6 +89,24 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
    */
   const [backOfficeHorsLigne, setBackOfficeHorsLigne] = useState(false)
   const [tiroirOuvert, setTiroirOuvert] = useState(false)
+  /*
+   * Le choix fait sur l'écran d'accueil, relu au démarrage.
+   *
+   * `undefined` = on ne sait pas encore, et on n'affiche donc RIEN : montrer
+   * l'accueil puis le retirer d'un coup ferait clignoter l'écran de toute
+   * caisse déjà en démonstration, à chaque lancement.
+   */
+  const [demoAcceptee, setDemoAcceptee] = useState<boolean | undefined>(undefined)
+
+  useEffect(() => {
+    let vivant = true
+    void app.app.etat.lire('accueil_demo_accepte').then((v) => {
+      if (vivant) setDemoAcceptee(v === '1')
+    })
+    return () => {
+      vivant = false
+    }
+  }, [app, version])
 
   /**
    * Ouvre le back-office dans le NAVIGATEUR DU SYSTÈME.
@@ -213,6 +232,42 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
       onVerrouiller={() => definirEmploye(null)}
     />
   )
+
+  /*
+   * ── Caisse jamais mise en service ──────────────────────────────────────
+   *
+   * AVANT la prise de poste, et c'est tout le changement. Une installation
+   * fraîche allait droit au clavier PIN, sur les employés de la graine de
+   * démonstration : rien ne disait que ce terminal n'était rattaché à aucun
+   * établissement, et la mise en service était un écran de plus, caché
+   * derrière « Sync ». Le gérant encaissait de vraies ventes sur une caisse
+   * qui ne remonterait jamais rien, et il le découvrait en ouvrant un
+   * back-office vide.
+   *
+   * Se connecter APPAIRE : il n'y a plus de « configuration de
+   * synchronisation » à faire ensuite, c'est le même geste.
+   *
+   * `demoAcceptee === undefined` : on ne sait pas encore. On n'affiche rien
+   * plutôt que l'accueil, sinon toute caisse en démonstration le verrait
+   * clignoter à chaque lancement.
+   */
+  if (demoAcceptee === undefined) {
+    return (
+      <div className="ecran-bloquant">
+        <div className="pastille-chargement" aria-hidden="true" />
+      </div>
+    )
+  }
+  if (!app.sync && !demoAcceptee) {
+    return (
+      <div className="application">
+        <BandeauSimple reseau={reseau} etablissement={false} />
+        <main className="contenu">
+          <EcranBienvenue reseau={reseau} onDemonstration={() => setDemoAcceptee(true)} />
+        </main>
+      </div>
+    )
+  }
 
   // ── Terminal verrouillé ────────────────────────────────────────────────
   if (!employe) {
@@ -389,13 +444,27 @@ function IndicateurReseau({ reseau }: { reseau: { connecte: boolean; type: strin
   )
 }
 
-function BandeauSimple({ reseau }: { reseau: { connecte: boolean; type: string } }) {
+function BandeauSimple({
+  reseau,
+  etablissement: montrerEtablissement = true,
+}: {
+  reseau: { connecte: boolean; type: string }
+  /**
+   * Faux sur l'écran d'accueil, et ce n'est pas cosmétique.
+   *
+   * Le nom affiché vient de la graine de DÉMONSTRATION tant que la caisse
+   * n'est appairée à rien. Le bandeau annonçait donc « Snack Lac 1 » au-dessus
+   * d'un écran qui demande à quel restaurant ce terminal appartient — soit
+   * exactement la réponse à la question posée, et elle était fausse.
+   */
+  etablissement?: boolean
+}) {
   const { etablissement } = useApp()
   return (
     <header className="bandeau">
       <div className="bandeau-marque">
         <span className="logo">Kaissi</span>
-        <span className="etablissement">{etablissement.nom}</span>
+        {montrerEtablissement && <span className="etablissement">{etablissement.nom}</span>}
       </div>
       <div style={{ marginLeft: 'auto' }}>
         <IndicateurReseau reseau={reseau} />

@@ -360,7 +360,7 @@ export function EcranSync() {
  * local. C'est un repli valide si le serveur est indisponible le jour de
  * l'installation.
  */
-function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
+export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
   const { app } = useApp()
   const [url, setUrl] = useState(URL_SYNC_PAR_DEFAUT)
   const [email, setEmail] = useState('')

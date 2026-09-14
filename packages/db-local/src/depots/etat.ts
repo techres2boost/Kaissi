@@ -44,6 +44,24 @@ export type CleEtat =
    * puissent vérifier qu'il ne reste JAMAIS posé après coup.
    */
   | 'purge_etablissement'
+  /*
+   * « J'ai vu l'écran d'accueil et j'ai choisi d'essayer sans compte. »
+   *
+   * Une caisse jamais mise en service ouvre désormais sur « Se connecter /
+   * Créer un compte » au lieu d'aller droit à la prise de poste sur les
+   * employés de démonstration. C'est le parcours réel : on installe, et on
+   * rattache le terminal à son établissement.
+   *
+   * Mais la démonstration reste un vrai usage — on montre le POS au
+   * restaurateur AVANT de le mettre en service, et c'est aussi ce que rejoue
+   * `test:parcours`. Cette clé est ce choix, rendu EXPLICITE : sans elle, il
+   * aurait fallu deviner l'intention (base en mémoire ? variable de build ?)
+   * et l'écran d'accueil ne serait jamais passé sous aucun test.
+   *
+   * Elle ne donne aucun droit et ne survit à rien : dès que le terminal est
+   * appairé, elle n'est plus consultée.
+   */
+  | 'accueil_demo_accepte'
 
 export function depotEtat(db: AdaptateurSqlite) {
   return {

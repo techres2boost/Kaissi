@@ -39,8 +39,35 @@ const etape = async (nom, fn) => {
 
 await page.goto(URL_POS, { waitUntil: 'networkidle' })
 
-await etape('démarrage → écran de prise de poste', async () => {
+await etape('une caisse NEUVE ouvre sur l’accueil, pas sur la prise de poste', async () => {
+  /*
+   * PANNE QUE CE PAS EMPÊCHE DE REVENIR.
+   *
+   * Une installation fraîche allait droit au clavier PIN, sur les employés de
+   * la graine de démonstration. Rien ne disait que ce terminal n'était
+   * rattaché à AUCUN établissement, et la mise en service était un écran de
+   * plus, caché derrière « Sync ». Le gérant encaissait de vraies ventes sur
+   * une caisse qui ne remonterait jamais rien — et il le découvrait en
+   * ouvrant un back-office vide.
+   */
+  await page.waitForSelector('.bienvenue', { timeout: 20000 })
+  if (await page.$('.pave')) {
+    throw new Error('une caisse neuve est allée droit au clavier PIN')
+  }
+  if (!(await page.$('.bienvenue .principal'))) {
+    throw new Error('l’accueil ne propose pas « Se connecter »')
+  }
+
+  /*
+   * « Découvrir sans compte » est le parcours commercial réel — on montre le
+   * POS au restaurateur, puis on le met en service. Le rendre EXPLICITE
+   * plutôt que de le déduire d'un indice (base en mémoire, variable de
+   * build) a deux vertus : la personne sait ce qu'elle choisit, et l'écran
+   * d'accueil passe sous ce test au lieu d'être contourné par lui.
+   */
+  await page.click('.lien-discret')
   await page.waitForSelector('text=Prise de poste', { timeout: 20000 })
+  console.log('    accueil affiché, « Découvrir sans compte » mène à la prise de poste')
 })
 
 await etape('choix de l’employé', async () => {
