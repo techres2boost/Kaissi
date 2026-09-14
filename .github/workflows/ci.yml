@@ -158,6 +158,14 @@ jobs:
           # pour le voir ; il ne faudra plus.
           node apps/pos/tests/largeur-telephone.mjs
 
+      # Le back-office n'avait AUCUN test de largeur : le même défaut s'y est
+      # produit, découvert sur le même iPhone — « Se déconnecter » passait à
+      # la ligne, à cheval sur l'adresse e-mail. Il rend les VRAIS composants
+      # contre la VRAIE feuille de style, sans session Supabase : pas
+      # d'identifiants en CI, donc pas d'excuse pour ne pas l'exécuter.
+      - name: Le back-office tient-il dans un téléphone ?
+        run: pnpm --filter @kaissi/backoffice test:largeur
+
   synchronisation:
     name: Synchronisation — contre un vrai PostgreSQL
     runs-on: ubuntu-latest
