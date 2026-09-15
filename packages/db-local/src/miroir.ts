@@ -42,22 +42,32 @@ export const TABLES_MIROIR: Record<
   { nom: string; colonnes: string[]; /** Clé primaire, `id` par défaut. */ cle?: string }
 > = {
   /*
-   * L'ÉTABLISSEMENT lui-même — son en-tête et le pied de son reçu.
+   * L'ÉTABLISSEMENT lui-même — l'en-tête et le pied de son reçu, et ce qui
+   * s'ajoute au TOTAL.
    *
    * Sa clé n'est pas un `restaurant_id` : son propre `id` EST le restaurant,
    * et c'est pour cela que la migration Postgres 0035 lui donne un
    * déclencheur dédié plutôt que celui du référentiel.
    *
-   * Les colonnes énumérées sont celles que le TICKET utilise, et rien de
-   * plus. `service_rate_bp`, `service_taxable` et `stamp_duty_millimes`
-   * existent des deux côtés mais aucun calcul ne les lit — les faire
-   * descendre laisserait croire qu'elles s'appliquent.
+   * ── Les quatre colonnes de restauration, et pourquoi elles sont LÀ ─────
+   *
+   * Elles n'y étaient pas, et le commentaire d'alors disait pourquoi : « aucun
+   * calcul ne les lit — les faire descendre laisserait croire qu'elles
+   * s'appliquent ». L'argument était juste, et il ne l'est plus : la migration
+   * Postgres 0036 a fait l'autre moitié du chemin, et `chargerConfig()` côté
+   * serveur comme le contexte de la caisse les lisent désormais tous les deux.
+   *
+   * L'ordre importe : elles doivent descendre AVANT de servir, sinon la caisse
+   * appliquerait un service que le serveur ignore — ou l'inverse — et le
+   * ticket du client ne vaudrait plus le total du back-office.
    */
   restaurants: {
     nom: 'restaurants',
     colonnes: [
       'id', 'organization_id', 'name', 'timezone',
       'address', 'phone', 'fiscal_id', 'receipt_footer',
+      'service_rate_bp', 'service_taxable', 'service_tax_rate_id',
+      'stamp_duty_millimes',
     ],
   },
   tax_rates: {

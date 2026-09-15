@@ -18,32 +18,59 @@ export interface CommandeComplete {
 }
 
 /**
+ * La configuration RÉELLEMENT appliquée à une commande.
+ *
+ * Le service porté par la commande (`service.set`) prime sur celui de
+ * l'établissement : un serveur peut le retirer sur une commande à emporter.
+ * Absent, c'est le réglage de l'établissement qui s'applique — celui que
+ * « Paramètres → Options de restauration » pose, et que `change_log` fait
+ * descendre.
+ *
+ * ── Pourquoi cette fonction est EXPORTÉE ──────────────────────────────────
+ *
+ * Parce que trois endroits reconstruisent une commande : l'écran de caisse,
+ * le projecteur local (`@kaissi/db-local`) et la reprojection serveur
+ * (`apps/sync`). Les trois recopiaient ces huit lignes — et le serveur, lui,
+ * ne les recopiait PAS : il passait `config` tel quel.
+ *
+ * Conséquence, si une commande portait un `service.set` : la tablette
+ * imprimait un ticket AVEC service, le serveur reprojetait la même vente
+ * SANS, et le back-office affichait un total inférieur à celui que le client
+ * avait payé. Aucune erreur nulle part — juste deux chiffres qui ne se
+ * rejoignent jamais, et c'est exactement l'écart de caisse que la RÈGLE 7
+ * interdit. Une seule copie, donc, et les trois appellent celle-ci.
+ */
+export function configEffective(
+  config: ConfigCalcul,
+  etat: Pick<EtatCommande, 'service'>,
+): ConfigCalcul {
+  if (!etat.service) return config
+  return {
+    ...config,
+    service: {
+      tauxBp: pointsDeBase(etat.service.tauxBp),
+      taxable: etat.service.taxable,
+      tauxTaxeId: etat.service.tauxTaxeId ?? undefined,
+    },
+  }
+}
+
+/**
  * Reconstruit une commande complète depuis son journal.
  *
- * La configuration de service portée par la commande (`service.set`) prime
- * sur la configuration par défaut de l'établissement : un serveur peut
- * retirer le service sur une commande à emporter.
+ * C'est l'entrée unique : état, totaux et encaissement en un appel, avec la
+ * configuration effective déjà résolue.
  */
 export function reconstruireCommande(
   evenements: readonly EvenementCommande[],
   config: ConfigCalcul,
 ): CommandeComplete {
   const etat = reduireEvenements(evenements)
-  const configEffective: ConfigCalcul = etat.service
-    ? {
-        ...config,
-        service: {
-          tauxBp: pointsDeBase(etat.service.tauxBp),
-          taxable: etat.service.taxable,
-          tauxTaxeId: etat.service.tauxTaxeId ?? undefined,
-        },
-      }
-    : config
 
   const totaux = calculerTotaux({
     lignes: etat.lignes,
     remiseGlobale: etat.remiseGlobale ?? undefined,
-    config: configEffective,
+    config: configEffective(config, etat),
   })
 
   return {

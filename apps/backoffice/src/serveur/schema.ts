@@ -60,7 +60,23 @@ export type Restaurant = {
   timezone: string
   /** Heure locale de bascule de la journée commerciale, « 04:00:00 ». */
   business_day_start: string
+  /*
+   * ── Les options de RESTAURATION ─────────────────────────────────────────
+   *
+   * Présentes depuis la 0002, et lues par AUCUN calcul jusqu'à la 0036 :
+   * `packages/domain` savait les appliquer (étapes 7 et 8 de `totaux.ts`),
+   * mais ni la caisse ni le serveur ne les lui passaient.
+   *
+   * `service_tax_rate_id` vient de la 0036 : sans lui, `service_taxable` à
+   * vrai ne taxait rien du tout — le domaine ne calcule la taxe du service
+   * que s'il connaît le taux.
+   *
+   * ⚠ Aucune valeur par défaut ici n'est une règle fiscale. Le timbre et le
+   *   caractère taxable du service restent à valider par un expert-comptable.
+   */
   service_rate_bp: number
+  service_taxable: boolean
+  service_tax_rate_id: Uuid | null
   stamp_duty_millimes: Millimes
   status: string
   /*

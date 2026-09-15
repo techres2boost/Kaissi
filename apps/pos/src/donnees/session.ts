@@ -16,6 +16,7 @@ import {
   autoriser,
   autoriserRemise,
   construireTicketClient,
+  configEtablissement,
   construireTicketCuisine,
   pointsDeBase,
   reduireEvenements,
@@ -29,6 +30,7 @@ import {
   type EvenementCommande,
   type Millimes,
   type ModePaiement,
+  type OptionsRestauration,
   type Permission,
   type Remise,
   type TypeCommande,
@@ -567,16 +569,21 @@ export class SessionCaisse {
     return this.config
   }
 
+  /**
+   * La configuration de calcul de l'établissement : ses taux, son service,
+   * son timbre.
+   *
+   * Simple ADAPTATEUR : la traduction elle-même vit dans
+   * `configEtablissement` de `@kaissi/domain`, que le serveur appelle aussi.
+   * C'est volontairement une seule ligne de logique ici — la version
+   * précédente de ce méthode recopiait les trois décisions (service à zéro,
+   * case taxable sans taux, valeurs manquantes), et c'est exactement ce genre
+   * de recopie qui avait déjà fait diverger la reprojection serveur.
+   */
   static tauxDepuisCatalogue(
     taxes: readonly { id: string; nom: string; tauxBp: number; incluse: boolean }[],
+    options: OptionsRestauration = {},
   ): ConfigCalcul {
-    return {
-      tauxTaxes: Object.fromEntries(
-        taxes.map((t) => [
-          t.id,
-          { id: t.id, nom: t.nom, tauxBp: pointsDeBase(t.tauxBp), incluse: t.incluse },
-        ]),
-      ),
-    }
+    return configEtablissement(taxes, options)
   }
 }

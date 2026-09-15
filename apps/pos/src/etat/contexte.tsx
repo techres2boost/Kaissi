@@ -84,6 +84,22 @@ interface LigneEtablissement {
   phone: string | null
   fiscal_id: string | null
   receipt_footer: string | null
+  /*
+   * ── Les options de restauration (migrations Postgres 0036, locale 013) ──
+   *
+   * Elles s'ajoutent au TOTAL, après les taxes. Le serveur lit exactement les
+   * mêmes colonnes dans `chargerConfig()` : c'est ce qui garantit que le
+   * ticket remis au client et la vente affichée au back-office portent le même
+   * chiffre. Deux lectures différentes donneraient deux totaux, sans qu'aucune
+   * erreur ne soit levée nulle part.
+   *
+   * SQLite n'a pas de booléen : `service_taxable` arrive en 0/1 — c'est
+   * `normaliser()` du miroir qui convertit.
+   */
+  service_rate_bp: number | null
+  service_taxable: number | null
+  service_tax_rate_id: string | null
+  stamp_duty_millimes: number | null
 }
 
 interface DonneesChargees {
@@ -258,12 +274,16 @@ export function FournisseurApp({ app, children }: Props) {
        */
       const etab = resto
         ? await app.base.adaptateur.lireUne<LigneEtablissement>(
-            `SELECT name, address, phone, fiscal_id, receipt_footer
+            `SELECT name, address, phone, fiscal_id, receipt_footer,
+                    service_rate_bp, service_taxable, service_tax_rate_id,
+                    stamp_duty_millimes
                FROM restaurants WHERE id = ?`,
             [resto],
           )
         : await app.base.adaptateur.lireUne<LigneEtablissement>(
-            `SELECT name, address, phone, fiscal_id, receipt_footer
+            `SELECT name, address, phone, fiscal_id, receipt_footer,
+                    service_rate_bp, service_taxable, service_tax_rate_id,
+                    stamp_duty_millimes
                FROM restaurants LIMIT 1`,
           )
 
@@ -274,7 +294,19 @@ export function FournisseurApp({ app, children }: Props) {
           restaurantId: resto ?? '',
           deviceId: device ?? '',
         },
-        config: SessionCaisse.tauxDepuisCatalogue(taxes),
+        /*
+         * Les taux, ET ce qui s'ajoute au total : service et timbre. Ils
+         * viennent de `restaurants`, descendus par le catalogue — jamais
+         * d'une constante. Le serveur lit les mêmes colonnes, et
+         * `apps/sync/test/options-de-restauration.test.ts` exige que les deux
+         * chemins donnent le même total au millime.
+         */
+        config: SessionCaisse.tauxDepuisCatalogue(taxes, {
+          tauxServiceBp: etab?.service_rate_bp ?? 0,
+          serviceTaxable: Boolean(etab?.service_taxable),
+          serviceTauxTaxeId: etab?.service_tax_rate_id ?? null,
+          timbreMillimes: etab?.stamp_duty_millimes ?? 0,
+        }),
         etablissement: {
           nom: etab?.name ?? 'Kaissi',
           adresse: etab?.address ?? null,

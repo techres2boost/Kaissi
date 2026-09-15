@@ -1244,6 +1244,37 @@ th .tri:hover { color: var(--texte); }
   .ligne-paiement select { width: 100%; }
 }
 
+/* ── Paramètres → Options de restauration ────────────────── */
+/*
+ * L'aperçu réutilise la grille de « Reçu » (`.reglages-recu`) : formulaire à
+ * gauche, résultat à droite, une seule colonne sous 900 px. C'est la même
+ * question posée au lecteur — « qu'est-ce que ça donne » — et deux
+ * dispositions différentes pour la même question coûteraient une relecture.
+ */
+.apercu-restauration h2 { margin: 0 0 0.75rem; font-size: 1.05rem; }
+.tableau-apercu { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+.tableau-apercu td { padding: 0.35rem 0; }
+.tableau-apercu td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+/*
+ * Le TOTAL se détache : c'est le chiffre que le gérant compare à celui qu'il
+ * avait avant de toucher au réglage. Noyé dans la liste, il oblige à relire
+ * quatre lignes pour trouver la seule qui compte.
+ */
+/*
+ * Une ligne « dont » n'est PAS un terme de l'addition : elle détaille la ligne
+ * du dessus. En retrait et atténuée, on ne l'additionne pas par réflexe — ce
+ * qui était exactement le défaut : la colonne ne tombait pas sur le total.
+ */
+.tableau-apercu .apercu-dont td {
+  color: var(--attenue); font-size: 0.85rem; padding-top: 0;
+}
+.tableau-apercu .apercu-dont td:first-child { padding-left: 1rem; }
+
+.tableau-apercu .apercu-total td {
+  border-top: 1px solid var(--bordure); padding-top: 0.5rem;
+  font-weight: 700; font-size: 1.05rem;
+}
+
 /* ── Paramètres → Reçu ──────────────────────────────────────────────────── */
 .reglages-recu { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 24rem); gap: 1rem; align-items: start; }
 @media (max-width: 900px) { .reglages-recu { grid-template-columns: 1fr; } }

@@ -17,10 +17,13 @@
 import { Pool, type PoolClient } from 'pg'
 import {
   calculerTotaux,
+  configEffective,
+  configEtablissement,
   reduireEvenements,
   totalVerse,
   type ConfigCalcul,
   type EvenementCommande,
+  type Millimes,
   type PointsDeBase,
 } from '@kaissi/domain'
 import { estUuid, uuidV7 } from '@kaissi/domain'
@@ -844,7 +847,22 @@ export class DepotPostgres implements DepotSync {
         const totaux = calculerTotaux({
           lignes: etat.lignes,
           remiseGlobale: etat.remiseGlobale ?? undefined,
-          config,
+          /*
+           * ⚑ Ici passait `config` TEL QUEL — et c'était un écart de caisse
+           *   en attente.
+           *
+           *   Une commande peut porter son propre service (`service.set`) :
+           *   un serveur retire le service sur une commande à emporter, ou
+           *   l'ajoute sur une table. Le projecteur LOCAL l'appliquait ; la
+           *   reprojection serveur, non. La tablette imprimait donc un ticket
+           *   avec service, le back-office affichait la même vente sans, et
+           *   rien n'échouait nulle part — juste deux chiffres qui ne se
+           *   rejoignaient jamais.
+           *
+           *   `configEffective` est la SEULE copie de cette résolution
+           *   (RÈGLE 7), et les deux projecteurs l'appellent.
+           */
+          config: configEffective(config, etat),
         })
 
         await client.query('begin')
@@ -1741,30 +1759,79 @@ export class DepotPostgres implements DepotSync {
   }
 }
 
+/**
+ * La configuration de calcul d'un établissement : ses taux, son service, son
+ * timbre.
+ *
+ * ── Elle doit être identique à celle de la caisse ────────────────────────
+ *
+ * C'est la contrainte entière de cette fonction. Le POS construit la sienne
+ * dans `apps/pos/src/etat/contexte.tsx`, à partir des MÊMES colonnes
+ * descendues par `change_log` (miroir `restaurants`, migration locale 013).
+ * Si les deux divergent, la tablette imprime un total et le back-office en
+ * affiche un autre pour la même vente — sans qu'aucune erreur ne soit levée
+ * nulle part. `apps/sync/test/options-de-restauration.test.ts` fait tourner
+ * les deux chemins sur le même jeu et exige l'égalité au millime.
+ *
+ * ⚠ Le service et le timbre viennent de la BASE, jamais d'une constante : ce
+ *   sont des paramètres réglementaires, et ce dépôt n'en affirme aucun.
+ */
 async function chargerConfig(client: PoolClient, restaurantId: string): Promise<ConfigCalcul> {
-  const { rows } = await client.query<{
-    id: string
-    name: string
-    rate_bp: number
-    is_included: boolean
-  }>(
-    `select id, name, rate_bp, is_included from kaissi.tax_rates
-     where restaurant_id = $1 and archived_at is null`,
-    [restaurantId],
-  )
-  return {
-    tauxTaxes: Object.fromEntries(
-      rows.map((r) => [
-        r.id,
-        {
-          id: r.id,
-          nom: r.name,
-          tauxBp: r.rate_bp as PointsDeBase,
-          incluse: r.is_included,
-        },
-      ]),
+  const [taux, etablissement] = await Promise.all([
+    client.query<{
+      id: string
+      name: string
+      rate_bp: number
+      is_included: boolean
+    }>(
+      `select id, name, rate_bp, is_included from kaissi.tax_rates
+       where restaurant_id = $1 and archived_at is null`,
+      [restaurantId],
     ),
-  }
+    client.query<{
+      service_rate_bp: number
+      service_taxable: boolean
+      service_tax_rate_id: string | null
+      stamp_duty_millimes: string | number
+    }>(
+      `select service_rate_bp, service_taxable, service_tax_rate_id,
+              stamp_duty_millimes
+         from kaissi.restaurants where id = $1`,
+      [restaurantId],
+    ),
+  ])
+
+  const options = etablissement.rows[0]
+
+  /*
+   * `configEtablissement` et non une construction locale : c'est la MÊME
+   * fonction que la caisse appelle, et les trois décisions qu'elle porte (un
+   * service à zéro est absent, une case taxable sans taux ne taxe rien, une
+   * valeur manquante vaut zéro) n'existent donc qu'à un exemplaire.
+   *
+   * Pas d'établissement : aucune option, et surtout rien de deviné. Le cas ne
+   * se produit que si la ligne a été supprimée sous la commande.
+   *
+   * ⚑ `pg` rend les `bigint` en CHAÎNE. `configEtablissement` passe donc par
+   *   `Number()` — sans quoi le timbre s'additionnerait par concaténation, et
+   *   600 millimes de timbre sur un total de 10100 donneraient « 10100600 ».
+   */
+  return configEtablissement(
+    taux.rows.map((r) => ({
+      id: r.id,
+      nom: r.name,
+      tauxBp: r.rate_bp,
+      incluse: r.is_included,
+    })),
+    options
+      ? {
+          tauxServiceBp: Number(options.service_rate_bp),
+          serviceTaxable: options.service_taxable,
+          serviceTauxTaxeId: options.service_tax_rate_id,
+          timbreMillimes: Number(options.stamp_duty_millimes),
+        }
+      : {},
+  )
 }
 
 /**

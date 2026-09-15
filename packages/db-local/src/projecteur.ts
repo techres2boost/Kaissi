@@ -16,6 +16,7 @@
 
 import {
   calculerTotaux,
+  configEffective,
   reduireEvenements,
   totalVerse,
   type ConfigCalcul,
@@ -44,16 +45,10 @@ export async function projeterCommande(
   const totaux = calculerTotaux({
     lignes: etat.lignes,
     remiseGlobale: etat.remiseGlobale ?? undefined,
-    config: etat.service
-      ? {
-          ...config,
-          service: {
-            tauxBp: etat.service.tauxBp as never,
-            taxable: etat.service.taxable,
-            tauxTaxeId: etat.service.tauxTaxeId ?? undefined,
-          },
-        }
-      : config,
+    // `configEffective` et non une copie locale : le serveur reprojette la
+    // MÊME commande, et deux copies de ces huit lignes finissent par diverger
+    // — elles l'avaient déjà fait, celle du serveur manquant tout simplement.
+    config: configEffective(config, etat),
   })
   const verse = totalVerse(etat)
   const maintenant = new Date().toISOString()

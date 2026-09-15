@@ -43,9 +43,14 @@ vi.mock('../app/[restaurant]/imprimantes/actions.js', () => ({
   definirImprimante: () => undefined,
 }))
 
+vi.mock('../app/[restaurant]/restauration/actions.js', () => ({
+  enregistrerOptions: () => undefined,
+}))
+
 const { GestionTaxes } = await import('./GestionTaxes.js')
 const { GestionModesPaiement } = await import('./GestionModesPaiement.js')
 const { GestionImprimantes } = await import('./GestionImprimantes.js')
+const { OptionsRestauration } = await import('./OptionsRestauration.js')
 
 const STYLES = readFileSync(new URL('../app/styles.css', import.meta.url), 'utf8')
 
@@ -230,6 +235,34 @@ describe('les écrans de Paramètres, en largeur téléphone', () => {
       html: () =>
         renderToStaticMarkup(
           <GestionImprimantes restaurantId="r1" modifiable postes={POSTES} />,
+        ),
+    },
+    {
+      /*
+       * Avec le service TAXABLE : c'est l'état le plus chargé de l'écran — il
+       * déplie une liste déroulante ET la phrase la plus longue, celle qui
+       * prévient qu'une case sans taux ne taxe rien. Mesurer l'état replié
+       * aurait laissé passer exactement ce qui déborde.
+       */
+      nom: 'Options de restauration',
+      html: () =>
+        renderToStaticMarkup(
+          <OptionsRestauration
+            restaurantId="r1"
+            modifiable
+            valeurs={{
+              tauxServiceBp: 1000,
+              serviceTaxable: true,
+              serviceTauxTaxeId: 't1',
+              timbreMillimes: 600,
+            }}
+            taux={TAUX.filter((t) => !t.archive).map((t) => ({
+              id: t.id,
+              nom: t.nom,
+              tauxBp: t.tauxBp,
+              incluse: t.incluse,
+            }))}
+          />,
         ),
     },
   ]

@@ -17,6 +17,7 @@ import {
   Menu,
   Package,
   Percent,
+  HandPlatter,
   Printer,
   ReceiptText,
   Tag,
@@ -181,6 +182,14 @@ const GROUPES = [
        * caisses rien ne s'imprime encore : l'écran le dit en toutes lettres.
        */
       { chemin: 'imprimantes', libelle: 'Imprimantes cuisine', icone: Printer, gestionnaire: true },
+      /*
+       * « Options de restauration » APRÈS les taxes, et ce n'est pas anodin :
+       * le service et le timbre s'ajoutent APRÈS elles dans l'ordre figé de
+       * `totaux.ts` (étapes 7 et 8). L'ordre de la colonne suit celui du
+       * calcul, ce qui est la seule façon de ranger deux réglages dont l'un
+       * dépend de l'autre.
+       */
+      { chemin: 'restauration', libelle: 'Options de restauration', icone: HandPlatter, gestionnaire: true },
     ],
   },
 ] as const

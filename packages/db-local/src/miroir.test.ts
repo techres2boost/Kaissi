@@ -20,7 +20,7 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest'
-import { hacherPin } from '@kaissi/domain'
+import { configEtablissement, hacherPin } from '@kaissi/domain'
 import { adaptateurNode } from './adaptateurs/node.js'
 import type { AdaptateurSqlite } from './adaptateur.js'
 import { migrer } from './migrateur.js'
@@ -32,6 +32,8 @@ import { depotCatalogue } from './depots/catalogue.js'
 /** Salma Trabelsi, caissière du jeu de démonstration. PIN d'origine : 2468. */
 const SALMA = '01930000-0000-7000-8000-000000000701'
 const PIZZA = '01930000-0000-7000-8000-000000000201'
+/** TVA 19 % du jeu de démonstration — un identifiant RÉEL, pas un UUID inventé. */
+const TVA_19 = '01930000-0000-7000-8000-000000000010'
 
 let db: AdaptateurSqlite
 let seq = 0
@@ -262,5 +264,122 @@ describe('le miroir recopie sans raisonner', () => {
       [PIZZA],
     )
     expect(ligne?.n).toBe(0)
+  })
+})
+
+/*
+ * ── Les OPTIONS DE RESTAURATION arrivent-elles jusqu'à la caisse ? ─────────
+ *
+ * Le chemin complet fait quatre sauts, comme celui du PIN : le back-office
+ * écrit `restaurants`, le déclencheur `restaurants_change_log` (0035)
+ * journalise, la tablette tire la page, et `appliquerMiroir` l'applique.
+ *
+ * `apps/sync/test/options-de-restauration.test.ts` couvre les trois premiers
+ * contre un vrai PostgreSQL. Le quatrième ne l'est que par ici — et il tient
+ * à une liste de chaînes dans `TABLES_MIROIR`, où une colonne oubliée ne
+ * produit AUCUNE erreur : la ligne est simplement écrite sans elle, la caisse
+ * calcule sans service, et le total du ticket cesse de valoir celui du
+ * back-office. Rien ne le dit.
+ */
+describe('les options de restauration descendent jusqu’à la base locale', () => {
+  /** La charge utile « restaurants », à la forme de `to_jsonb(new)`. */
+  const etablissement = (surcharges: Record<string, unknown> = {}) => ({
+    id: DEMO_RESTO,
+    organization_id: DEMO_ORG,
+    name: 'Snack Lac 1',
+    timezone: 'Africa/Tunis',
+    address: '12 rue du Lac',
+    phone: '+216 71 000 000',
+    fiscal_id: null,
+    receipt_footer: null,
+    // Postgres rend un vrai booléen ; SQLite n'en a pas. C'est `normaliser()`
+    // qui convertit, et ce test le vérifie en passant `true`, pas 1.
+    service_taxable: false,
+    service_rate_bp: 0,
+    service_tax_rate_id: null,
+    stamp_duty_millimes: 0,
+    ...surcharges,
+  })
+
+  it('écrit les quatre colonnes que le calcul du total lit', async () => {
+    await appliquerMiroir(db, [
+      changement(
+        'restaurants',
+        DEMO_RESTO,
+        etablissement({
+          service_rate_bp: 1000,
+          service_taxable: true,
+          service_tax_rate_id: TVA_19,
+          stamp_duty_millimes: 600,
+        }),
+      ),
+    ])
+
+    const ligne = await db.lireUne<{
+      service_rate_bp: number
+      service_taxable: number
+      service_tax_rate_id: string | null
+      stamp_duty_millimes: number
+    }>(
+      `SELECT service_rate_bp, service_taxable, service_tax_rate_id,
+              stamp_duty_millimes FROM restaurants WHERE id = ?`,
+      [DEMO_RESTO],
+    )
+
+    expect(ligne?.service_rate_bp).toBe(1000)
+    // Le booléen de Postgres est devenu un entier SQLite. Sans `normaliser()`,
+    // l'écriture échouerait — et la page ENTIÈRE du catalogue serait annulée.
+    expect(ligne?.service_taxable).toBe(1)
+    expect(ligne?.service_tax_rate_id).toBe(TVA_19)
+    expect(ligne?.stamp_duty_millimes).toBe(600)
+  })
+
+  it('la caisse en tire la MÊME configuration que le serveur', async () => {
+    /*
+     * On ne vérifie pas seulement que les colonnes sont écrites : on refait le
+     * geste du POS, `configEtablissement` sur ce qu'il vient de lire. C'est ce
+     * qui relie le miroir au TOTAL — sans cela, le test dirait « la colonne
+     * est là » sans rien dire de ce qu'elle produit.
+     */
+    await appliquerMiroir(db, [
+      changement(
+        'restaurants',
+        DEMO_RESTO,
+        etablissement({ service_rate_bp: 1000, stamp_duty_millimes: 600 }),
+      ),
+    ])
+    const l = await db.lireUne<{
+      service_rate_bp: number
+      service_taxable: number
+      service_tax_rate_id: string | null
+      stamp_duty_millimes: number
+    }>(
+      `SELECT service_rate_bp, service_taxable, service_tax_rate_id,
+              stamp_duty_millimes FROM restaurants WHERE id = ?`,
+      [DEMO_RESTO],
+    )
+
+    const config = configEtablissement([], {
+      tauxServiceBp: l?.service_rate_bp ?? 0,
+      serviceTaxable: Boolean(l?.service_taxable),
+      serviceTauxTaxeId: l?.service_tax_rate_id ?? null,
+      timbreMillimes: l?.stamp_duty_millimes ?? 0,
+    })
+
+    expect(config.service?.tauxBp).toBe(1000)
+    expect(config.timbreFiscalMillimes).toBe(600)
+  })
+
+  it('un service à ZÉRO reste ABSENT, et ne pose aucune ligne sur le ticket', async () => {
+    // La graine n'a pas d'options : c'est l'état d'un restaurant ordinaire, et
+    // il ne doit produire ni « Service 0,000 » ni « Timbre 0,000 ».
+    const config = configEtablissement([], {
+      tauxServiceBp: 0,
+      serviceTaxable: false,
+      serviceTauxTaxeId: null,
+      timbreMillimes: 0,
+    })
+    expect(config.service).toBeUndefined()
+    expect(config.timbreFiscalMillimes).toBeUndefined()
   })
 })
