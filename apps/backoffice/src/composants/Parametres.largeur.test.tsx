@@ -51,6 +51,9 @@ const { GestionTaxes } = await import('./GestionTaxes.js')
 const { GestionModesPaiement } = await import('./GestionModesPaiement.js')
 const { GestionImprimantes } = await import('./GestionImprimantes.js')
 const { OptionsRestauration } = await import('./OptionsRestauration.js')
+// Aucune action serveur à simuler : `ListeFonctionnalites` est en LECTURE
+// seule, et c'est le sujet de l'écran.
+const { ListeFonctionnalites, ICONES } = await import('./ListeFonctionnalites.js')
 
 const STYLES = readFileSync(new URL('../app/styles.css', import.meta.url), 'utf8')
 
@@ -214,6 +217,51 @@ const POSTES = [
   { id: 'p4', nom: 'Pâtisserie-Boulangerie-Viennoiserie', hote: null, port: 9100, rattachements: 2, ticketClient: false },
 ]
 
+const FONCTIONNALITES = [
+  {
+    cle: 'tickets',
+    nom: 'Tickets ouverts',
+    icone: ICONES.Ticket,
+    etat: 'structurelle' as const,
+    quoi: 'Une commande reste ouverte sur une table, s’enrichit au fil du service, et ne s’encaisse qu’à la fin.',
+    pourquoi:
+      'Non débrayable, parce que ce n’est pas une option chez Kaissi : la salle est BÂTIE dessus. ' +
+      'Une commande est un journal d’événements, pas une ligne qu’on remplit d’un coup — c’est ce ' +
+      'qui permet à deux tablettes hors ligne d’ajouter chacune un article à la table 12 sans le moindre conflit.',
+    chemin: 'preparation',
+    lien: 'Voir les commandes en cours',
+  },
+  {
+    cle: 'postes',
+    nom: 'Postes de préparation',
+    icone: ICONES.UtensilsCrossed,
+    etat: 'active' as const,
+    quoi: 'Cuisine, bar, pâtisserie : chaque poste voit les lignes qu’il prépare, et rien d’autre.',
+    pourquoi: 'Le poste vient de la CATÉGORIE, pas de l’article.',
+    constat: '3 poste(s), dont 1 avec une imprimante réglée.',
+    chemin: 'categories',
+    lien: 'Régler les postes et leurs catégories',
+  },
+  {
+    cle: 'impression',
+    nom: 'Impression des tickets et bons',
+    icone: ICONES.Printer,
+    etat: 'eteinte' as const,
+    quoi: 'Ticket client et bon de cuisine envoyés à une imprimante réseau.',
+    pourquoi: 'Le module est ÉCRIT, TESTÉ et embarqué — simplement pas allumé dans cette version.',
+    chemin: 'imprimantes',
+    lien: 'Régler les imprimantes malgré tout',
+  },
+  {
+    cle: 'fidelite',
+    nom: 'Programme de fidélité',
+    icone: ICONES.Percent,
+    etat: 'absente' as const,
+    quoi: 'Points cumulés par client, et récompenses à dépenser en caisse.',
+    pourquoi: 'Rien n’existe en base pour le porter — ni les points, ni leur historique.',
+  },
+]
+
 describe('les écrans de Paramètres, en largeur téléphone', () => {
   const cas = [
     {
@@ -263,6 +311,20 @@ describe('les écrans de Paramètres, en largeur téléphone', () => {
               incluse: t.incluse,
             }))}
           />,
+        ),
+    },
+    {
+      /*
+       * Les quatre états à la fois, avec les textes les PLUS LONGS de
+       * l'écran — l'explication des tickets ouverts fait quatre lignes sur un
+       * téléphone, et l'étiquette « Éteinte dans cette version » est la plus
+       * large. Un jeu court aurait laissé passer l'en-tête, qui pose le nom et
+       * l'étiquette sur une même rangée.
+       */
+      nom: 'Fonctionnalités',
+      html: () =>
+        renderToStaticMarkup(
+          <ListeFonctionnalites restaurantId="r1" fonctionnalites={FONCTIONNALITES} />,
         ),
     },
   ]

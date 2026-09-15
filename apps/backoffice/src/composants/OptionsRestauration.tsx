@@ -18,13 +18,7 @@
  */
 
 import { useActionState, useMemo, useState } from 'react'
-import {
-  calculerTotaux,
-  configEtablissement,
-  formaterTND,
-  millimes,
-  pointsDeBase,
-} from '@kaissi/domain'
+import { calculerTotaux, configEtablissement, formaterTND, millimes } from '@kaissi/domain'
 import { Info, TriangleAlert } from 'lucide-react'
 import {
   enregistrerOptions,

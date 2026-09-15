@@ -1,0 +1,315 @@
+/**
+ * Paramètres → Fonctionnalités.
+ *
+ * ── Ce que cet écran répond, et que rien d'autre ne répondait ─────────────
+ *
+ * « Qu'est-ce que ce logiciel fait, au juste ? » — la question d'un
+ * restaurateur qui l'évalue, et celle d'un gérant qui cherche un réglage
+ * depuis vingt minutes. Il fallait jusqu'ici ouvrir douze écrans pour y
+ * répondre, et deux des réponses n'étaient nulle part : l'impression est
+ * éteinte dans cette version, et la fidélité n'existe pas.
+ *
+ * ── Les états ne sont pas écrits en dur ───────────────────────────────────
+ *
+ * Ils se LISENT. « Vous avez 3 postes dont 1 avec imprimante », « 8 articles
+ * suivis en stock », « aucune réduction enregistrée » : un écran qui
+ * affirmerait « Stock : actif » sur un établissement qui ne suit aucun article
+ * dirait quelque chose de vrai et d'inutile. Ce qu'on veut savoir, c'est ce
+ * que CE restaurant a réellement mis en place.
+ */
+
+import Link from 'next/link'
+import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
+import { supabaseServeur } from '../../../serveur/supabase.js'
+import {
+  ICONES,
+  ListeFonctionnalites,
+  type Fonctionnalite,
+} from '../../../composants/ListeFonctionnalites.js'
+
+export const dynamic = 'force-dynamic'
+
+/**
+ * Compte les lignes ACTIVES d'une table pour cet établissement.
+ *
+ * `head: true` ne rend que le total : aucune ligne ne remonte, et un
+ * établissement à quarante mille clients ne coûte pas plus cher qu'un autre.
+ * Cette page est ouverte pour être LUE, pas pour tirer des données.
+ */
+async function actives(
+  supabase: Awaited<ReturnType<typeof supabaseServeur>>,
+  table: 'stations' | 'discounts' | 'customers' | 'products' | 'payment_methods' | 'memberships',
+  restaurantId: string,
+  colonneRetrait: 'archived_at' | 'revoked_at' = 'archived_at',
+): Promise<number> {
+  const { count } = await supabase
+    .from(table)
+    .select('id', { count: 'exact', head: true })
+    .eq('restaurant_id', restaurantId)
+    .is(colonneRetrait, null)
+  return count ?? 0
+}
+
+export default async function PageFonctionnalites({
+  params,
+}: {
+  params: Promise<{ restaurant: string }>
+}) {
+  const { restaurant } = await params
+  const { etablissement } = await etablissementObligatoire(restaurant)
+  ecranReserve(etablissement, 'gestion')
+  const supabase = await supabaseServeur()
+
+  const [
+    postes,
+    postesImprimante,
+    reductions,
+    clients,
+    suivis,
+    modes,
+    equipe,
+    options,
+  ] = await Promise.all([
+    actives(supabase, 'stations', restaurant),
+    // Les postes qui portent VRAIMENT une adresse d'imprimante : c'est la
+    // seule mesure qui distingue « configuré » de « créé ».
+    supabase
+      .from('stations')
+      .select('id', { count: 'exact', head: true })
+      .eq('restaurant_id', restaurant)
+      .is('archived_at', null)
+      .not('printer_host', 'is', null)
+      .then((r) => r.count ?? 0),
+    actives(supabase, 'discounts', restaurant),
+    actives(supabase, 'customers', restaurant),
+    supabase
+      .from('products')
+      .select('id', { count: 'exact', head: true })
+      .eq('restaurant_id', restaurant)
+      .is('archived_at', null)
+      .eq('track_stock', true)
+      .then((r) => r.count ?? 0),
+    actives(supabase, 'payment_methods', restaurant),
+    /*
+     * L'équipe DE CE RESTAURANT, donc `memberships` et non `users`.
+     *
+     * `users` est porté par l'ORGANISATION : sur un client à deux
+     * établissements, le compter rendrait le personnel des deux, et l'écran
+     * annoncerait douze personnes à un patron qui en emploie cinq ici.
+     */
+    actives(supabase, 'memberships', restaurant, 'revoked_at'),
+    supabase
+      .from('restaurants')
+      .select('service_rate_bp, stamp_duty_millimes')
+      .eq('id', restaurant)
+      .single(),
+  ])
+
+  const service = Number(options.data?.service_rate_bp ?? 0)
+  const timbre = Number(options.data?.stamp_duty_millimes ?? 0)
+
+  const fonctionnalites: Fonctionnalite[] = [
+    {
+      cle: 'tickets-ouverts',
+      nom: 'Tickets ouverts',
+      icone: ICONES.Ticket,
+      etat: 'structurelle',
+      quoi:
+        'Une commande reste ouverte sur une table, s’enrichit au fil du service, ' +
+        'et ne s’encaisse qu’à la fin.',
+      pourquoi:
+        'Non débrayable, parce que ce n’est pas une option chez Kaissi : la salle ' +
+        'est BÂTIE dessus. Une commande est un journal d’événements, pas une ligne ' +
+        'qu’on remplit d’un coup — c’est ce qui permet à deux tablettes hors ligne ' +
+        'd’ajouter chacune un article à la table 12 sans le moindre conflit.',
+      chemin: 'preparation',
+      lien: 'Voir les commandes en cours',
+    },
+    {
+      cle: 'modes-paiement',
+      nom: 'Modes de paiement',
+      icone: ICONES.CreditCard,
+      etat: 'active',
+      quoi: 'Espèces, carte, paiement en ligne, et tout libellé que vous ajoutez.',
+      pourquoi:
+        'Le nom sert au caissier et au ticket ; le type sert au rapport, qui regroupe. ' +
+        '« Flouci » et « D17 » sont deux noms pour un même type.',
+      constat: `${modes} mode(s) actif(s).`,
+      chemin: 'paiements',
+      lien: 'Régler les modes de paiement',
+    },
+    {
+      cle: 'reductions',
+      nom: 'Réductions prédéfinies',
+      icone: ICONES.Tag,
+      etat: 'active',
+      quoi:
+        'Des remises nommées, en pourcentage ou en montant, proposées au caissier ' +
+        'et retrouvées telles quelles dans les rapports.',
+      pourquoi:
+        'Le nom est RECOPIÉ sur la vente, jamais joint : renommer une réduction ne ' +
+        'réécrit pas ce qui a été accordé l’an dernier.',
+      constat:
+        reductions === 0
+          ? 'Aucune réduction enregistrée — le caissier ne peut accorder qu’une remise libre, s’il en a le droit.'
+          : `${reductions} réduction(s) enregistrée(s).`,
+      chemin: 'reductions/gestion',
+      lien: 'Gérer les réductions',
+    },
+    {
+      cle: 'clients',
+      nom: 'Fiches clients',
+      icone: ICONES.Contact,
+      etat: 'active',
+      quoi:
+        'Un carnet d’adresses : rappeler quelqu’un pour une commande à emporter, ' +
+        'reconnaître un habitué, rattacher une vente à un nom.',
+      pourquoi:
+        'Les visites et le total dépensé ne sont pas stockés — ils se CALCULENT à la ' +
+        'lecture. Un compteur entretenu par déclencheur dériverait en silence à chaque ' +
+        'reprojection, et personne ne saurait depuis quand.',
+      constat: `${clients} fiche(s) client.`,
+      chemin: 'clients',
+      lien: 'Ouvrir le carnet',
+    },
+    {
+      cle: 'stock',
+      nom: 'Suivi du stock',
+      icone: ICONES.Package,
+      etat: 'active',
+      quoi:
+        'Comptage de référence, mouvements, alerte de seuil, et retrait automatique ' +
+        'de la carte à zéro.',
+      pourquoi:
+        'Le stock ne BLOQUE jamais une vente hors ligne : la tablette travaille sur un ' +
+        'souvenir, refuser de vendre sur une donnée périmée serait le pire des deux ' +
+        'mondes. C’est le SERVEUR qui retire un produit de la carte, sur le stock ' +
+        'calculé à l’instant.',
+      constat:
+        suivis === 0
+          ? 'Aucun article suivi — activez le suivi article par article dans le stock.'
+          : `${suivis} article(s) suivi(s).`,
+      chemin: 'stock',
+      lien: 'Ouvrir le stock',
+    },
+    {
+      cle: 'equipe',
+      nom: 'Employés et code PIN',
+      icone: ICONES.Users,
+      etat: 'active',
+      quoi:
+        'Chaque action de caisse porte le nom de qui l’a faite, via un code PIN validé ' +
+        'HORS LIGNE.',
+      pourquoi:
+        'Le PIN TRACE, il ne protège pas : quatre chiffres n’ont que dix mille ' +
+        'combinaisons. Ce qui protège l’argent, c’est le jeton d’appareil révocable, ' +
+        'RLS, et le journal d’audit.',
+      constat: `${equipe} personne(s) dans l’équipe.`,
+      chemin: 'employes',
+      lien: 'Gérer l’équipe',
+    },
+    {
+      cle: 'postes',
+      nom: 'Postes de préparation',
+      icone: ICONES.UtensilsCrossed,
+      etat: postes === 0 ? 'absente' : 'active',
+      quoi: 'Cuisine, bar, pâtisserie : chaque poste voit les lignes qu’il prépare, et rien d’autre.',
+      pourquoi:
+        'Le poste vient de la CATÉGORIE, pas de l’article : le porter sur le produit ' +
+        'obligeait à s’en souvenir à chaque création, et un produit sans poste ' +
+        'n’apparaît sur AUCUN écran — ce qui ne se voit qu’en plein service.',
+      constat:
+        postes === 0
+          ? 'Aucun poste : l’écran de préparation restera vide.'
+          : `${postes} poste(s), dont ${postesImprimante} avec une imprimante réglée.`,
+      chemin: 'categories',
+      lien: 'Régler les postes et leurs catégories',
+    },
+    {
+      cle: 'restauration',
+      nom: 'Service et droit de timbre',
+      icone: ICONES.HandPlatter,
+      etat: 'active',
+      quoi: 'Des frais de service en pourcentage, et un montant fixe par ticket.',
+      pourquoi:
+        'Kaissi n’applique que ce que vous saisissez, et ne propose aucune valeur par ' +
+        'défaut : ce sont des paramètres réglementaires, à valider avec votre comptable.',
+      constat:
+        service === 0 && timbre === 0
+          ? 'Ni service ni timbre : les tickets portent le total des articles et de leurs taxes.'
+          : `Service ${(service / 100).toString().replace('.', ',')} %` +
+            (timbre > 0 ? ` · timbre ${(timbre / 1000).toFixed(3).replace('.', ',')} TND` : ''),
+      chemin: 'restauration',
+      lien: 'Régler les options de restauration',
+    },
+    {
+      cle: 'impression',
+      nom: 'Impression des tickets et bons',
+      icone: ICONES.Printer,
+      etat: 'eteinte',
+      quoi:
+        'Ticket client et bon de cuisine envoyés à une imprimante réseau, par une file ' +
+        'persistante qui survit au redémarrage.',
+      pourquoi:
+        'Le module est ÉCRIT, TESTÉ et embarqué — simplement pas allumé dans cette ' +
+        'version des caisses. Le bon s’affiche à l’écran, et la cuisine lit ses ' +
+        'commandes dans Préparation. Les adresses d’imprimante que vous réglez sont ' +
+        'conservées et descendent déjà : elles serviront telles quelles le jour où ' +
+        'l’impression sera activée.',
+      chemin: 'imprimantes',
+      lien: 'Régler les imprimantes malgré tout',
+    },
+    {
+      cle: 'fidelite',
+      nom: 'Programme de fidélité',
+      icone: ICONES.Percent,
+      etat: 'absente',
+      quoi: 'Points cumulés par client, et récompenses à dépenser en caisse.',
+      pourquoi:
+        'Rien n’existe en base pour le porter — ni les points, ni leur historique, ni ' +
+        'les règles de cumul. Le carnet clients n’en est pas un début : il ne compte ' +
+        'rien. Annoncer la fonctionnalité en attendant reviendrait à la vendre deux ' +
+        'fois, dont une qui n’arrive pas.',
+      chemin: 'clients',
+      lien: 'Voir ce qui existe : le carnet clients',
+    },
+    {
+      cle: 'facturation',
+      nom: 'Abonnement et facturation',
+      icone: ICONES.BookOpen,
+      etat: 'absente',
+      quoi: 'Formule, échéances, factures et moyens de paiement de votre abonnement Kaissi.',
+      pourquoi:
+        'Kaissi se vend et s’installe aujourd’hui ; il n’y a ni formule ni prélèvement ' +
+        'à afficher. Le jour où il y en aura, cette page dira laquelle — pas avant.',
+    },
+  ]
+
+  return (
+    <>
+      <h1>Fonctionnalités</h1>
+      <p className="sous-titre">
+        Ce que Kaissi fait pour <strong>{etablissement.nom}</strong> aujourd’hui,
+        et ce qu’il ne fait pas. Les états sont lus dans vos données — ce n’est
+        pas une plaquette.
+      </p>
+
+      {/*
+        Le paragraphe qui explique l'absence d'interrupteurs. Sans lui, un
+        restaurateur qui vient de Loyverse cherche les bascules et conclut que
+        l'écran est cassé.
+      */}
+      <div className="message info">
+        <strong>Pas d’interrupteurs sur cette page, et c’est voulu.</strong> Une
+        fonctionnalité se règle là où elle vit — les modes de paiement dans{' '}
+        <Link href={{ pathname: `/${restaurant}/paiements` }}>Modes de paiement</Link>,
+        le suivi article par article dans{' '}
+        <Link href={{ pathname: `/${restaurant}/stock` }}>Stock</Link>. Une
+        bascule ici, qu’il faudrait tenir d’accord avec le réglage réel, finirait
+        par dire le contraire de ce qui se passe vraiment.
+      </div>
+
+      <ListeFonctionnalites restaurantId={restaurant} fonctionnalites={fonctionnalites} />
+    </>
+  )
+}

@@ -18,6 +18,7 @@ import {
   Package,
   Percent,
   HandPlatter,
+  LayoutList,
   Printer,
   ReceiptText,
   Tag,
@@ -190,6 +191,15 @@ const GROUPES = [
        * dépend de l'autre.
        */
       { chemin: 'restauration', libelle: 'Options de restauration', icone: HandPlatter, gestionnaire: true },
+      /*
+       * « Fonctionnalités » en DERNIER de la rubrique, et c'est sa place.
+       *
+       * Ce n'est pas un réglage : c'est la carte de tous les autres — ce qui
+       * est actif, ce qui est éteint, ce qui n'est pas construit. On l'ouvre
+       * quand on cherche où régler quelque chose, ou ce que le produit sait
+       * faire ; jamais au milieu d'un réglage en cours.
+       */
+      { chemin: 'fonctionnalites', libelle: 'Fonctionnalités', icone: LayoutList, gestionnaire: true },
     ],
   },
 ] as const
