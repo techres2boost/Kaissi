@@ -182,6 +182,7 @@ export class DepotPostgres implements DepotSync {
       nom: string
       role: string
       employe_id: string
+      statut: string
     }>(
       // On entre par `auth_user_id`, JAMAIS par `users.id`.
       //
@@ -191,7 +192,7 @@ export class DepotPostgres implements DepotSync {
       // Comparer avec `memberships.user_id` ne rendrait aucune ligne — et
       // l'appairage refuserait un gérant parfaitement légitime.
       `select m.restaurant_id, m.organization_id, r.name as nom, m.role,
-              u.id as employe_id
+              u.id as employe_id, r.status as statut
          from kaissi.users u
          join kaissi.memberships m on m.user_id = u.id
          join kaissi.restaurants r on r.id = m.restaurant_id
@@ -208,7 +209,87 @@ export class DepotPostgres implements DepotSync {
       nom: l.nom,
       role: l.role,
       employeId: l.employe_id,
+      statut: l.statut,
     }))
+  }
+
+  /**
+   * Ce qui EMPÊCHE de supprimer un établissement.
+   *
+   * On compte AVANT d'essayer, pour pouvoir le dire dans les mots de
+   * l'écran. La base refuserait de toute façon — `on delete restrict` sur
+   * toutes les tables transactionnelles — mais elle répondrait par une
+   * violation de contrainte, qui ne nomme ni ce qui bloque ni quoi faire.
+   *
+   * Les appareils, eux, ne bloquent PAS (`on delete cascade`) : ils sont
+   * comptés parce qu'un administrateur doit savoir qu'il va révoquer trois
+   * tablettes, pas parce que la base l'en empêcherait.
+   */
+  async obstaclesSuppression(restaurantId: string): Promise<{
+    ventes: number
+    services: number
+    evenements: number
+    appareils: number
+    audit: number
+  }> {
+    const { rows } = await this.pool.query<{
+      ventes: string
+      services: string
+      evenements: string
+      appareils: string
+      audit: string
+    }>(
+      `select
+         (select count(*) from kaissi.orders        where restaurant_id = $1) as ventes,
+         (select count(*) from kaissi.shifts        where restaurant_id = $1) as services,
+         (select count(*) from kaissi.order_events  where restaurant_id = $1) as evenements,
+         (select count(*) from kaissi.devices       where restaurant_id = $1) as appareils,
+         (select count(*) from kaissi.audit_events  where restaurant_id = $1) as audit`,
+      [restaurantId],
+    )
+    const l = rows[0]
+    // `pg` rend `count(*)` en CHAÎNE : sans `Number()`, « 0 » serait vrai et
+    // l'écran annoncerait des ventes là où il n'y en a aucune.
+    return {
+      ventes: Number(l?.ventes ?? 0),
+      services: Number(l?.services ?? 0),
+      evenements: Number(l?.evenements ?? 0),
+      appareils: Number(l?.appareils ?? 0),
+      audit: Number(l?.audit ?? 0),
+    }
+  }
+
+  async changerStatutEtablissement(
+    restaurantId: string,
+    statut: 'actif' | 'ferme',
+  ): Promise<void> {
+    await this.pool.query(
+      `update kaissi.restaurants
+          set status = $2,
+              -- La DATE de fermeture, posée et retirée avec le statut : un
+              -- établissement rouvert qui garderait sa date de fermeture ferait
+              -- lire « fermé depuis mars » sur un restaurant en service.
+              closed_at = case when $2 = 'ferme' then now() else null end,
+              updated_at = now()
+        where id = $1`,
+      [restaurantId, statut],
+    )
+  }
+
+  async supprimerEtablissement(restaurantId: string): Promise<void> {
+    /*
+     * Un simple DELETE, et rien de plus.
+     *
+     * Pas de `cascade` forcée, pas de suppression préalable des lignes qui
+     * bloquent : les contraintes `on delete restrict` sont la DERNIÈRE ligne
+     * de défense contre la destruction d'écritures comptables. Les contourner
+     * ici reviendrait à les retirer.
+     *
+     * Le référentiel (produits, catégories, postes, taux) part en cascade,
+     * ainsi que les appartenances et les appareils : c'est voulu, ce sont des
+     * réglages, pas des écritures.
+     */
+    await this.pool.query('delete from kaissi.restaurants where id = $1', [restaurantId])
   }
 
   async enrolerAppareil(demande: DemandeEnrolement): Promise<AppareilEnrole> {

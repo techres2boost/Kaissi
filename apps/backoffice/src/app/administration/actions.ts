@@ -92,3 +92,98 @@ export async function ouvrirEtablissement(
     return { erreur: erreur instanceof Error ? erreur.message : 'Échec inattendu.' }
   }
 }
+
+/**
+ * Fermer ou rouvrir un établissement.
+ *
+ * ── Ce que FERMER veut dire, et ce que ça ne veut pas dire ────────────────
+ *
+ * `restaurants.status` existe depuis la 0002 et n'était lu NULLE PART : le
+ * basculer n'aurait rien changé. La 0038 lui donne enfin un effet, et il est
+ * volontairement étroit :
+ *
+ *   • aucune NOUVELLE caisse ne peut être mise en service ;
+ *   • l'établissement est rangé à part au back-office.
+ *
+ * Et pas davantage. Les terminaux déjà appairés continuent d'envoyer : une
+ * tablette garde ses ventes tant qu'elles ne sont pas accusées de réception,
+ * et refuser ses envois le jour où l'on ferme perdrait les encaissements de la
+ * dernière soirée. Un rejet ne se réessaie jamais tout seul.
+ */
+export async function changerStatutEtablissement(
+  restaurantId: string,
+  statut: 'actif' | 'ferme',
+): Promise<Resultat> {
+  try {
+    // La session est relue à chaque appel : le service revérifiera de toute
+    // façon, mais éconduire ici évite un aller-retour inutile.
+    await sessionObligatoire()
+    const reponse = await appelerService('/admin/restaurants/statut', {
+      restaurantId,
+      statut,
+    })
+    revalidatePath('/')
+    revalidatePath('/administration')
+    return { succes: reponse.message ?? 'Établissement mis à jour.' }
+  } catch (erreur) {
+    if (erreur instanceof ErreurSaisie) return { erreur: erreur.message }
+    if (erreur && typeof erreur === 'object' && 'digest' in erreur) throw erreur
+    return { erreur: erreur instanceof Error ? erreur.message : 'Échec inattendu.' }
+  }
+}
+
+/** Ce qui empêche de supprimer, compté avant de proposer le geste. */
+export async function obstaclesSuppression(restaurantId: string): Promise<{
+  erreur?: string
+  ventes?: number
+  services?: number
+  evenements?: number
+  appareils?: number
+  audit?: number
+}> {
+  try {
+    await sessionObligatoire()
+    const reponse = await appelerService('/admin/restaurants/obstacles', { restaurantId })
+    return {
+      ventes: Number(reponse['ventes'] ?? 0),
+      services: Number(reponse['services'] ?? 0),
+      evenements: Number(reponse['evenements'] ?? 0),
+      appareils: Number(reponse['appareils'] ?? 0),
+      audit: Number(reponse['audit'] ?? 0),
+    }
+  } catch (erreur) {
+    if (erreur && typeof erreur === 'object' && 'digest' in erreur) throw erreur
+    return { erreur: erreur instanceof Error ? erreur.message : 'Échec inattendu.' }
+  }
+}
+
+/**
+ * Supprimer définitivement un établissement VIERGE.
+ *
+ * Le nom exact doit être retapé. Pas une case à cocher : on coche par
+ * réflexe, on ne retape pas un nom par réflexe — et le retaper oblige à lire
+ * LEQUEL on supprime, ce qui est exactement la question qu'on veut poser à
+ * quelqu'un qui administre trois restaurants aux noms voisins.
+ *
+ * Le service revérifie tout : le rôle, le nom, et l'absence d'écriture
+ * comptable. Cet écran ne fait qu'éviter un aller-retour.
+ */
+export async function supprimerEtablissement(
+  restaurantId: string,
+  confirmation: string,
+): Promise<Resultat> {
+  try {
+    await sessionObligatoire()
+    const reponse = await appelerService('/admin/restaurants/supprimer', {
+      restaurantId,
+      confirmation,
+    })
+    revalidatePath('/')
+    revalidatePath('/administration')
+    return { succes: reponse.message ?? 'Établissement supprimé.' }
+  } catch (erreur) {
+    if (erreur instanceof ErreurSaisie) return { erreur: erreur.message }
+    if (erreur && typeof erreur === 'object' && 'digest' in erreur) throw erreur
+    return { erreur: erreur instanceof Error ? erreur.message : 'Échec inattendu.' }
+  }
+}

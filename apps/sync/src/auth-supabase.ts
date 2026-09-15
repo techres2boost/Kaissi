@@ -32,9 +32,18 @@ export class ErreurAuth extends Error {
   // n'est pas une syntaxe qu'il sait retirer. Le process refuserait de
   // démarrer — sur un fichier qui passe pourtant tous les tests unitaires,
   // parce que Vitest, lui, transforme.
-  readonly statut: 401 | 500 | 503
+  /*
+   * `409` n'est pas un défaut d'authentification, et c'est pourquoi il est
+   * listé à part.
+   *
+   * « Cet établissement porte des ventes, il ne se supprime pas » est un
+   * CONFLIT avec l'état des données : le compte a tous les droits, c'est le
+   * geste qui est impossible. Le rendre en 401 ferait croire à une session
+   * expirée et enverrait se reconnecter — sans rien changer au refus.
+   */
+  readonly statut: 401 | 409 | 500 | 503
 
-  constructor(message: string, statut: 401 | 500 | 503) {
+  constructor(message: string, statut: 401 | 409 | 500 | 503) {
     super(message)
     this.statut = statut
     this.name = 'ErreurAuth'

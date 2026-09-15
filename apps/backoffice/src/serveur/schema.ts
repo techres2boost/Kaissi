@@ -78,7 +78,13 @@ export type Restaurant = {
   service_taxable: boolean
   service_tax_rate_id: Uuid | null
   stamp_duty_millimes: Millimes
+  /**
+   * `actif` | `ferme` | `suspendu`. Lu par personne jusqu'à la 0038 — le
+   * basculer n'aurait rien changé.
+   */
   status: string
+  /** Quand l'établissement a été fermé (0038). Nul tant qu'il est actif. */
+  closed_at: Horodatage | null
   /*
    * ── L'en-tête et le pied du REÇU ────────────────────────────────────────
    *

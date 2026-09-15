@@ -34,6 +34,16 @@ export interface EtablissementEnrolable {
   readonly nom: string
   readonly role: string
   /**
+   * `actif` | `ferme` | `suspendu` (migrations 0002 et 0038).
+   *
+   * Rendu plutôt que filtré en SQL, et c'est délibéré : un établissement
+   * fermé disparaît de la liste PROPOSÉE, mais un gérant qui le désigne
+   * explicitement doit lire sa VRAIE raison. Le filtrer ici ferait répondre
+   * « ce compte n'est pas gérant de cet établissement » — ce qui est faux,
+   * et envoie chercher un problème de droits qui n'existe pas.
+   */
+  readonly statut: string
+  /**
    * L'employé — `kaissi.users.id`, donc l'identifiant que la caisse connaît —
    * derrière le compte qui vient de s'authentifier.
    *
@@ -293,6 +303,45 @@ export interface DepotSync {
     /** Le créateur, qui en devient administrateur. */
     authUserId: string
   }): Promise<{ restaurantId: string; reglagesCopies: number }>
+
+  /**
+   * Ce qui EMPÊCHE de supprimer un établissement, compté avant d'essayer.
+   *
+   * Les tables transactionnelles le référencent en `on delete restrict`
+   * (migration 0004, et `audit_events` depuis la 0006) : la base refuse déjà
+   * la suppression d'un établissement qui a vendu, et c'est la bonne place
+   * pour cette règle — détruire des écritures comptables ne doit pas
+   * dépendre de la vigilance d'un `where` écrit à la main.
+   *
+   * Ce qui manquait n'était donc pas la règle, mais le fait de la DIRE avant
+   * le clic. Sans ce compte, l'administrateur recevait « update or delete on
+   * table "restaurants" violates foreign key constraint » : un message qui ne
+   * nomme ni ce qui bloque, ni quoi faire à la place.
+   */
+  obstaclesSuppression(restaurantId: string): Promise<{
+    ventes: number
+    services: number
+    evenements: number
+    appareils: number
+    /** Le journal d'audit — lui aussi en `restrict`, et lui aussi définitif. */
+    audit: number
+  }>
+
+  /** Ferme ou rouvre un établissement (migration 0038). */
+  changerStatutEtablissement(
+    restaurantId: string,
+    statut: 'actif' | 'ferme',
+  ): Promise<void>
+
+  /**
+   * Supprime un établissement VIERGE.
+   *
+   * Ne force rien : les contraintes `on delete restrict` restent la dernière
+   * ligne de défense. Si elles se déclenchent, c'est que le compte préalable
+   * a raté quelque chose — et l'erreur doit remonter telle quelle plutôt
+   * qu'être contournée.
+   */
+  supprimerEtablissement(restaurantId: string): Promise<void>
 
   /**
    * Ouvre une organisation ENTIÈRE pour un compte qui n'a encore rien.

@@ -47,6 +47,17 @@ export interface Etablissement {
    */
   administrateur: boolean
   /**
+   * L'établissement est-il FERMÉ (`restaurants.status`, migration 0038) ?
+   *
+   * Fermer coupe les NOUVEAUX appairages et range l'établissement à part ;
+   * les terminaux déjà en service continuent d'envoyer. C'est délibéré :
+   * refuser leurs envois le jour de la fermeture perdrait les ventes de la
+   * dernière soirée, et un rejet ne se réessaie jamais tout seul.
+   */
+  ferme: boolean
+  /** Depuis quand, pour ne pas avoir à fouiller le journal d'audit. */
+  fermeLe: string | null
+  /**
    * Vrai pour `cuisine` et `bar` : ce membre PRÉPARE, il n'encaisse pas.
    *
    * Il n'a qu'un seul écran, et aucun montant n'y figure. Le back-office ne
@@ -123,7 +134,7 @@ export async function sessionObligatoire(): Promise<SessionBackoffice> {
   const { data, error } = moi
     ? await supabase
         .from('memberships')
-        .select('role, organization_id, restaurant_id, station_id, stations(name), restaurants(name)')
+        .select('role, organization_id, restaurant_id, station_id, stations(name), restaurants(name, status, closed_at)')
         .eq('user_id', moi.id as string)
         .is('revoked_at', null)
     : { data: [], error: null }
@@ -138,8 +149,10 @@ export async function sessionObligatoire(): Promise<SessionBackoffice> {
 
   const etablissements: Etablissement[] = (data ?? []).map((ligne) => {
     const role = ligne.role as RoleMembre
-    const restaurant = ligne.restaurants as { name: string } | { name: string }[] | null
-    const nom = Array.isArray(restaurant) ? restaurant[0]?.name : restaurant?.name
+    type LigneResto = { name: string; status: string; closed_at: string | null }
+    const restaurant = ligne.restaurants as LigneResto | LigneResto[] | null
+    const resto = Array.isArray(restaurant) ? restaurant[0] : restaurant
+    const nom = resto?.name
     const station = ligne.stations as { name: string } | { name: string }[] | null
     const stationNom = Array.isArray(station) ? station[0]?.name : station?.name
     return {
@@ -152,6 +165,19 @@ export async function sessionObligatoire(): Promise<SessionBackoffice> {
       preparation: estPreparation(role),
       stationId: (ligne.station_id as string | null) ?? null,
       stationNom: stationNom ?? null,
+      /*
+       * Le statut de l'établissement (0002, rendu effectif par la 0038).
+       *
+       * Lu ICI plutôt que dans l'écran Administration, parce que la session est
+       * déjà la seule lecture des établissements : une seconde requête ailleurs
+       * les ferait diverger le jour où l'une filtre et pas l'autre.
+       *
+       * Un établissement fermé reste dans la liste — on ne cache pas à
+       * quelqu'un un restaurant dont il est gérant. C'est la NAVIGATION qui le
+       * range à part.
+       */
+      ferme: (resto?.status ?? 'actif') === 'ferme',
+      fermeLe: resto?.closed_at ?? null,
     }
   })
 

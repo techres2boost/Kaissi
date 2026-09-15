@@ -201,6 +201,8 @@ export type CodeErreur =
   | 'aucun_etablissement'
   /** Le compte n'est pas gérant de l'établissement demandé. */
   | 'etablissement_refuse'
+  /** L'établissement existe et le compte en est gérant — mais il est FERMÉ (0038). */
+  | 'etablissement_ferme'
   // ── Gestion des accès au back-office (/admin/*) ─────────────────────────
   /** Le serveur n'a pas SUPABASE_SERVICE_ROLE_KEY : `pnpm sync:acces` reste
    *  le chemin, et rien d'autre n'en dépend. */

@@ -244,6 +244,14 @@ export function creerServeur({
       parCompte.reussite(cleCompte)
       const etablissements = await depot.etablissementsEnrolables(identite.userId)
 
+      /*
+       * Un établissement FERMÉ n'accepte plus de nouvel appairage (0038).
+       *
+       * On le retire de ce qu'on PROPOSE, mais on garde la liste complète
+       * pour pouvoir expliquer : voir le refus nommé plus bas.
+       */
+      const ouverts = etablissements.filter((e) => e.statut === 'actif')
+
       if (etablissements.length === 0) {
         const corps: ReponseErreur = {
           erreur: 'aucun_etablissement',
@@ -254,18 +262,57 @@ export function creerServeur({
         return c.json(corps, 403)
       }
 
+      /*
+       * Gérant de quelque chose, mais tout est fermé.
+       *
+       * Message distinct du précédent : « vous n'êtes gérant de rien » ferait
+       * chercher un problème de droits, et l'administrateur vérifierait des
+       * appartenances parfaitement correctes.
+       */
+      if (ouverts.length === 0) {
+        const corps: ReponseErreur = {
+          erreur: 'etablissement_ferme',
+          message:
+            etablissements.length === 1
+              ? `« ${etablissements[0]!.nom} » est fermé : aucune nouvelle caisse ne ` +
+                "peut y être mise en service. Un administrateur peut le rouvrir depuis " +
+                'Administration.'
+              : 'Tous vos établissements sont fermés : aucune nouvelle caisse ne peut ' +
+                'être mise en service. Un administrateur peut en rouvrir un depuis ' +
+                'Administration.',
+        }
+        return c.json(corps, 403)
+      }
+
       // Plusieurs établissements et aucun choix : on rend la liste plutôt
       // que d'en choisir un au hasard. Enrôler la caisse dans le mauvais
       // restaurant enverrait ses ventes au mauvais endroit.
       const choisi =
         typeof restaurantId === 'string'
-          ? etablissements.find((e) => e.restaurantId === restaurantId)
-          : etablissements.length === 1
-            ? etablissements[0]
+          ? ouverts.find((e) => e.restaurantId === restaurantId)
+          : ouverts.length === 1
+            ? ouverts[0]
             : undefined
 
       if (!choisi) {
         if (typeof restaurantId === 'string') {
+          /*
+           * Désigner un établissement FERMÉ n'est pas un problème de droits.
+           *
+           * Le confondre avec « vous n'êtes pas gérant » enverrait vérifier
+           * des appartenances correctes pendant que la vraie cause — une
+           * fermeture décidée la semaine dernière — reste invisible.
+           */
+          const ferme = etablissements.find((e) => e.restaurantId === restaurantId)
+          if (ferme) {
+            const corps: ReponseErreur = {
+              erreur: 'etablissement_ferme',
+              message:
+                `« ${ferme.nom} » est fermé : aucune nouvelle caisse ne peut y être ` +
+                'mise en service. Un administrateur peut le rouvrir depuis Administration.',
+            }
+            return c.json(corps, 403)
+          }
           const corps: ReponseErreur = {
             erreur: 'etablissement_refuse',
             message: "Ce compte n'est pas gérant de cet établissement.",
@@ -273,7 +320,7 @@ export function creerServeur({
           return c.json(corps, 403)
         }
         return c.json({
-          choix: etablissements.map((e) => ({ restaurantId: e.restaurantId, nom: e.nom })),
+          choix: ouverts.map((e) => ({ restaurantId: e.restaurantId, nom: e.nom })),
         })
       }
 
@@ -670,6 +717,147 @@ export function creerServeur({
           `Établissement « ${nom} » ouvert, avec ${reglagesCopies} réglage(s) repris de ` +
           `« ${modele.nom} » — taux de taxe, modes de paiement et postes. La carte, elle, ` +
           'reste à saisir : on ne devine pas un menu.',
+      }
+    })
+  })
+
+  /*
+   * ── POST /admin/restaurants/statut ───────────────────────────────────
+   *
+   * Fermer ou rouvrir un établissement (migration 0038).
+   *
+   * Par le SERVICE et non sous RLS, comme l'ouverture : ce sont des gestes
+   * d'administration, et le service relit les droits en base plutôt que de
+   * croire l'écran. Masquer un bouton évite une erreur, pas une malveillance.
+   */
+  app.post('/admin/restaurants/statut', async (c) => {
+    return adminSupabase(c, async ({ appelant, corps }) => {
+      const restaurantId = String(corps['restaurantId'] ?? '')
+      const statut = String(corps['statut'] ?? '')
+      if (!UUID.test(restaurantId)) {
+        throw new ErreurAuth("L'établissement doit être un UUID.", 401)
+      }
+      if (statut !== 'actif' && statut !== 'ferme') {
+        throw new ErreurAuth('Le statut doit être « actif » ou « ferme ».', 401)
+      }
+
+      /*
+       * ADMINISTRATEUR de CET établissement-là.
+       *
+       * `etablissementsAdministres` dirait seulement qu'il administre quelque
+       * chose : un administrateur de la chaîne A pourrait alors fermer un
+       * restaurant de la chaîne B. On relit son rôle sur l'établissement visé.
+       */
+      const role = await depot.roleDansEtablissement(appelant.userId, restaurantId)
+      if (role !== 'admin') {
+        throw new ErreurAuth(
+          'Seul un administrateur de cet établissement peut le fermer ou le rouvrir.',
+          401,
+        )
+      }
+
+      await depot.changerStatutEtablissement(restaurantId, statut)
+      return {
+        statut,
+        message:
+          statut === 'ferme'
+            ? 'Établissement fermé. Aucune NOUVELLE caisse ne peut y être mise en ' +
+              'service ; les terminaux déjà appairés continuent d’envoyer leurs ventes ' +
+              '— sans quoi celles de la dernière soirée seraient perdues.'
+            : 'Établissement rouvert. Les mises en service sont à nouveau possibles.',
+      }
+    })
+  })
+
+  /*
+   * ── POST /admin/restaurants/obstacles ────────────────────────────────
+   *
+   * Ce qui empêche de supprimer, compté AVANT de proposer le geste.
+   *
+   * En lecture, mais en POST et derrière la même garde : la réponse dit
+   * combien de ventes porte un établissement, ce qui n'a pas à être lisible
+   * par quelqu'un qui n'y a rien à faire.
+   */
+  app.post('/admin/restaurants/obstacles', async (c) => {
+    return adminSupabase(c, async ({ appelant, corps }) => {
+      const restaurantId = String(corps['restaurantId'] ?? '')
+      if (!UUID.test(restaurantId)) {
+        throw new ErreurAuth("L'établissement doit être un UUID.", 401)
+      }
+      const role = await depot.roleDansEtablissement(appelant.userId, restaurantId)
+      if (role !== 'admin') {
+        throw new ErreurAuth('Seul un administrateur de cet établissement peut le supprimer.', 401)
+      }
+      return await depot.obstaclesSuppression(restaurantId)
+    })
+  })
+
+  /*
+   * ── POST /admin/restaurants/supprimer ────────────────────────────────
+   *
+   * La suppression DÉFINITIVE, et les trois verrous qui l'encadrent.
+   *
+   *   1. administrateur DE CET établissement, relu en base ;
+   *   2. le NOM exact retapé — pas une case à cocher : on ne supprime pas un
+   *      restaurant par inadvertance, et retaper son nom oblige à lire lequel ;
+   *   3. aucune écriture comptable, vérifié ici ET par les contraintes
+   *      `on delete restrict` de la base, qui restent la dernière défense.
+   *
+   * On ne supprime jamais le DERNIER établissement d'un administrateur : il se
+   * retrouverait avec un compte qui ouvre sur rien, et sans moyen d'en rouvrir
+   * un — l'ouverture exige un établissement modèle.
+   */
+  app.post('/admin/restaurants/supprimer', async (c) => {
+    return adminSupabase(c, async ({ appelant, corps }) => {
+      const restaurantId = String(corps['restaurantId'] ?? '')
+      const confirmation = String(corps['confirmation'] ?? '').trim()
+      if (!UUID.test(restaurantId)) {
+        throw new ErreurAuth("L'établissement doit être un UUID.", 401)
+      }
+
+      const role = await depot.roleDansEtablissement(appelant.userId, restaurantId)
+      if (role !== 'admin') {
+        throw new ErreurAuth('Seul un administrateur de cet établissement peut le supprimer.', 401)
+      }
+
+      const administres = await depot.etablissementsAdministres(appelant.userId)
+      const cible = administres.find((e) => e.restaurantId === restaurantId)
+      if (!cible) {
+        throw new ErreurAuth("Cet établissement n'est pas dans ceux que vous administrez.", 401)
+      }
+      if (administres.length === 1) {
+        throw new ErreurAuth(
+          `« ${cible.nom} » est le seul établissement que vous administrez. Le supprimer ` +
+            'vous laisserait un compte qui n’ouvre sur rien, et sans moyen d’en rouvrir un : ' +
+            'l’ouverture d’un établissement exige un modèle existant.',
+          401,
+        )
+      }
+
+      if (confirmation !== cible.nom) {
+        throw new ErreurAuth(
+          `Pour confirmer, retapez le nom exact de l’établissement : « ${cible.nom} ».`,
+          401,
+        )
+      }
+
+      const obstacles = await depot.obstaclesSuppression(restaurantId)
+      if (obstacles.ventes > 0 || obstacles.evenements > 0 || obstacles.audit > 0) {
+        throw new ErreurAuth(
+          `« ${cible.nom} » porte ${obstacles.ventes} vente(s), ` +
+            `${obstacles.evenements} événement(s) de commande et ${obstacles.audit} entrée(s) ` +
+            'de journal d’audit. Ce sont des écritures comptables : elles ne se ' +
+            'suppriment pas. Fermez l’établissement — il disparaît de l’exploitation ' +
+            'et ses données restent consultables.',
+          409,
+        )
+      }
+
+      await depot.supprimerEtablissement(restaurantId)
+      return {
+        message:
+          `« ${cible.nom} » a été supprimé définitivement, avec sa carte, ses postes et ` +
+          `ses ${obstacles.appareils} appareil(s). Il n’avait jamais rien encaissé.`,
       }
     })
   })

@@ -1195,6 +1195,47 @@ th .tri:hover { color: var(--texte); }
 .formulaire-taux label:not(.case) { font-size: 0.85rem; color: var(--attenue); }
 .formulaire-taux .principal { margin-top: 0.75rem; justify-self: start; }
 
+/* ── Administration → cycle de vie d'un établissement ───────────── */
+.cycle-etablissement { display: grid; gap: 0.5rem; justify-items: end; margin-top: 0.4rem; }
+.cycle-etablissement .actions-taux { justify-content: flex-end; }
+.cycle-etablissement button { display: inline-flex; align-items: center; gap: 0.3rem; }
+
+/*
+ * Le panneau de suppression prend TOUTE la largeur de la cellule et revient
+ * à gauche : il porte un avertissement et un champ à remplir, pas une action
+ * de plus. Aligné à droite avec les boutons, on le lirait comme une
+ * infobulle — alors qu'il faut s'y arrêter.
+ */
+.panneau-suppression {
+  display: grid; gap: 0.5rem; justify-items: stretch; text-align: left;
+  width: 100%; max-width: 34rem;
+  border: 1px solid var(--danger); border-radius: var(--rayon);
+  background: var(--fond-danger); padding: 0.9rem;
+}
+.panneau-suppression .message { margin-bottom: 0; }
+.panneau-suppression label { font-size: 0.85rem; color: var(--texte); }
+
+/*
+ * Le bouton d'action IRRÉVERSIBLE — plein, et le seul du back-office.
+ *
+ * ⚑ `danger-plein` et NON `danger`. Cinq écrans utilisent déjà
+ *   `class="discret danger"` : un archivage, une suppression de catégorie —
+ *   des gestes réversibles, rendus en texte rouge sur fond transparent.
+ *   Redéfinir `button.danger` en plein ici les aurait TOUS repeints en rouge
+ *   massif, et un écran où tout crie ne signale plus rien. La CSS ne l'aurait
+ *   pas dit : ma règle venant plus bas dans le fichier, elle gagnait.
+ *
+ * La couleur ne suffit pas à elle seule — elle ne dit rien à qui ne la
+ * distingue pas. D'où le mot « définitivement » dans le libellé et le nom à
+ * retaper : trois signaux, dont deux non visuels.
+ */
+button.danger-plein {
+  background: var(--danger); color: #FFFFFF; border-color: var(--danger);
+  font-weight: 650; justify-self: start;
+}
+button.danger-plein:hover:not(:disabled) { background: #8E1D17; border-color: #8E1D17; }
+button.danger-plein:disabled { opacity: 0.55; cursor: not-allowed; }
+
 /* ── Articles → Modificateurs ─────────────────────────── */
 .carte-groupe { display: grid; gap: 0.6rem; }
 /*
