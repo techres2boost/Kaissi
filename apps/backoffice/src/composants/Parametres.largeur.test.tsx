@@ -1,13 +1,17 @@
 /**
- * Taxes, modes de paiement et imprimantes tiennent-ils dans un téléphone ?
+ * Les écrans à FORMULAIRES EN RANGÉE tiennent-ils dans un téléphone ?
  *
- * ── Pourquoi ces deux écrans-là, et pas seulement « ça compile » ──────────
+ * ── Pourquoi ces écrans-là, et pas seulement « ça compile » ───────────────
  *
- * Ce sont les premiers FORMULAIRES du back-office à poser plusieurs champs
- * sur une même ligne : un nom, un taux, une case, un bouton. C'est exactement
- * la forme qui a cassé sur l'iPhone — l'adresse e-mail et « Se déconnecter »
- * l'un par-dessus l'autre — et elle ne casse aucun test fonctionnel : l'écran
- * devient inutilisable sans que rien n'échoue.
+ * Ce sont ceux qui posent plusieurs champs sur une MÊME LIGNE : un nom, un
+ * taux, une case, un bouton. C'est exactement la forme qui a cassé sur
+ * l'iPhone — l'adresse e-mail et « Se déconnecter » l'un par-dessus l'autre —
+ * et elle ne casse aucun test fonctionnel : l'écran devient inutilisable sans
+ * que rien n'échoue.
+ *
+ * Le fichier porte encore le nom « Parametres » ; « Modificateurs » vit dans
+ * « Articles ». Ce qui les réunit n'est pas la rubrique mais la FORME, et
+ * c'est elle qu'on mesure.
  *
  * On rend les VRAIS composants contre la VRAIE feuille de style. Les actions
  * serveur sont remplacées — elles tirent `next/cache` et le client Supabase,
@@ -47,6 +51,16 @@ vi.mock('../app/[restaurant]/restauration/actions.js', () => ({
   enregistrerOptions: () => undefined,
 }))
 
+vi.mock('../app/[restaurant]/modificateurs/actions.js', () => ({
+  archiverGroupe: () => undefined,
+  archiverModificateur: () => undefined,
+  creerGroupe: () => undefined,
+  creerModificateur: () => undefined,
+  modifierGroupe: () => undefined,
+  modifierModificateur: () => undefined,
+  rattacherGroupe: () => undefined,
+}))
+
 const { GestionTaxes } = await import('./GestionTaxes.js')
 const { GestionModesPaiement } = await import('./GestionModesPaiement.js')
 const { GestionImprimantes } = await import('./GestionImprimantes.js')
@@ -54,6 +68,7 @@ const { OptionsRestauration } = await import('./OptionsRestauration.js')
 // Aucune action serveur à simuler : `ListeFonctionnalites` est en LECTURE
 // seule, et c'est le sujet de l'écran.
 const { ListeFonctionnalites, ICONES } = await import('./ListeFonctionnalites.js')
+const { GestionModificateurs } = await import('./GestionModificateurs.js')
 
 const STYLES = readFileSync(new URL('../app/styles.css', import.meta.url), 'utf8')
 
@@ -262,7 +277,43 @@ const FONCTIONNALITES = [
   },
 ]
 
-describe('les écrans de Paramètres, en largeur téléphone', () => {
+/*
+ * Un groupe RATTACHÉ et un groupe ORPHELIN : le second déplie tout seul sa
+ * liste d'articles — c'est l'état le plus large de l'écran, et celui qu'un
+ * jeu « propre » aurait laissé replié, donc jamais mesuré.
+ */
+const MODIF_ARTICLES = [
+  { id: 'p1', nom: 'Pizza Quatre Fromages', categorieNom: 'Plats' },
+  { id: 'p2', nom: 'Ojja merguez aux œufs', categorieNom: 'Plats' },
+  { id: 'p3', nom: 'Coca', categorieNom: 'Boissons' },
+]
+const MODIF_GROUPES = [
+  {
+    id: 'g1',
+    nom: 'Cuisson',
+    minSelect: 1,
+    maxSelect: 1,
+    archive: false,
+    choix: [
+      { id: 'c1', nom: 'Saignant', deltaMillimes: 0, archive: false },
+      { id: 'c2', nom: 'Bien cuit', deltaMillimes: 0, archive: false },
+    ],
+    produits: ['p2'],
+  },
+  {
+    id: 'g2',
+    nom: 'Suppléments à la demande',
+    minSelect: 0,
+    maxSelect: 0,
+    archive: false,
+    // Un delta NÉGATIF : le champ affiche alors un signe en plus, et c'est
+    // la valeur la plus large que ce champ reçoive.
+    choix: [{ id: 'c3', nom: 'Sans oignon', deltaMillimes: -500, archive: false }],
+    produits: [],
+  },
+]
+
+describe('les écrans de réglage, en largeur téléphone', () => {
   const cas = [
     {
       nom: 'Taxes',
@@ -310,6 +361,18 @@ describe('les écrans de Paramètres, en largeur téléphone', () => {
               tauxBp: t.tauxBp,
               incluse: t.incluse,
             }))}
+          />,
+        ),
+    },
+    {
+      nom: 'Modificateurs',
+      html: () =>
+        renderToStaticMarkup(
+          <GestionModificateurs
+            restaurantId="r1"
+            modifiable
+            groupes={MODIF_GROUPES}
+            articles={MODIF_ARTICLES}
           />,
         ),
     },

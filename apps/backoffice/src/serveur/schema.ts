@@ -227,6 +227,76 @@ export type ClientVisites = {
   depense_millimes: Millimes
 }
 
+/**
+ * Un GROUPE de modificateurs — « Cuisson », « Suppléments ».
+ *
+ * Existe depuis la migration 0003 ; déclaré ici depuis que l'écran
+ * « Articles → Modificateurs » le modifie. Avant lui, ces trois tables
+ * n'avaient AUCUNE porte : un restaurateur qui voulait proposer
+ * « + Fromage 1,500 » devait passer par une console SQL.
+ */
+export type GroupeModificateurs = {
+  id: Uuid
+  organization_id: Uuid
+  restaurant_id: Uuid
+  name: string
+  /** Combien de choix AU MOINS. Zéro = facultatif. */
+  min_select: number
+  /** Combien AU PLUS. Zéro = sans limite (contrainte de la 0003). */
+  max_select: number
+  /**
+   * Se DÉDUIT de `min_select > 0` : exiger au moins un choix EST le sens de
+   * « obligatoire ». Deux réglages pour une seule idée finissent par se
+   * contredire — un groupe « obligatoire » avec un minimum à zéro ne veut
+   * plus rien dire. La colonne reste, la caisse la lit.
+   */
+  is_required: boolean
+  position: number
+  updated_at: Horodatage
+  archived_at: Horodatage | null
+}
+
+/**
+ * Un CHOIX dans un groupe — « Fromage +1,500 », « Bien cuit +0 ».
+ *
+ * `price_delta_millimes` peut être NÉGATIF : « sans fromage −0,500 » est un
+ * usage réel, et le schéma ne pose aucune contrainte de positivité. Il entre
+ * dans l'étape 1 de `totaux.ts` : `prixBase + Σ modificateurs`.
+ */
+export type Modificateur = {
+  id: Uuid
+  organization_id: Uuid
+  restaurant_id: Uuid
+  modifier_group_id: Uuid
+  name: string
+  price_delta_millimes: Millimes
+  position: number
+  is_available: boolean
+  updated_at: Horodatage
+  archived_at: Horodatage | null
+}
+
+/**
+ * Le lien ARTICLE ↔ GROUPE.
+ *
+ * ⚑ Pas de colonne `id`, et ce n'est pas un oubli : son identité est le
+ *   COUPLE (`primary key (product_id, modifier_group_id)`). C'est pour cela
+ *   que la migration 0037 lui donne un déclencheur dédié qui journalise
+ *   l'ENSEMBLE des groupes d'un produit — le déclencheur générique du
+ *   référentiel écrit `ligne.id`, et échouerait ici à chaque écriture.
+ *
+ *   Cette table n'a jamais descendu jusqu'à la 0037. La caisse joint dessus
+ *   pour lire ses modificateurs : absente, la jointure ne rend rien, et aucun
+ *   produit ne proposait de supplément sur un terminal appairé.
+ */
+export type ProduitModificateur = {
+  organization_id: Uuid
+  restaurant_id: Uuid
+  product_id: Uuid
+  modifier_group_id: Uuid
+  position: number
+}
+
 export type TauxTaxe = {
   id: Uuid
   organization_id: Uuid
@@ -579,6 +649,9 @@ export type Database = {
       >
       categories: Table<Categorie>
       stations: Table<Station>
+      modifier_groups: Table<GroupeModificateurs>
+      modifiers: Table<Modificateur>
+      product_modifiers: Table<ProduitModificateur>
       tax_rates: Table<TauxTaxe>
       discounts: Table<Reduction>
       customers: Table<Client>

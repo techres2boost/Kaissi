@@ -35,6 +35,11 @@ const SALMA = '01930000-0000-7000-8000-000000000701'
 const PIZZA = '01930000-0000-7000-8000-000000000201'
 /** TVA 19 % du jeu de démonstration — un identifiant RÉEL, pas un UUID inventé. */
 const TVA_19 = '01930000-0000-7000-8000-000000000010'
+/** Groupes de modificateurs du jeu de démonstration — des identifiants RÉELS. */
+const GRP_CUISSON = '01930000-0000-7000-8000-000000000050'
+const GRP_SUPP = '01930000-0000-7000-8000-000000000051'
+/** Un second produit, pour prouver que le remplacement est borné. */
+const AUTRE_PRODUIT = '01930000-0000-7000-8000-000000000202'
 
 let db: AdaptateurSqlite
 let seq = 0
@@ -282,6 +287,116 @@ describe('le miroir recopie sans raisonner', () => {
  * calcule sans service, et le total du ticket cesse de valoir celui du
  * back-office. Rien ne le dit.
  */
+/*
+ * ── Les MODIFICATEURS : le lien produit ↔ groupe ─────────────────────────
+ *
+ * `product_modifiers` n'a jamais descendu — elle est absente de la liste de
+ * déclencheurs de la migration 0005. La caisse lit pourtant ses modificateurs
+ * en JOIGNANT cette table : sans elle, la jointure ne rend rien, et aucun
+ * produit ne propose le moindre supplément.
+ *
+ * Personne ne l'avait signalé parce que le jeu de DÉMONSTRATION pose ces
+ * lignes localement : la caisse de démonstration montrait « Fromage +1,500 »,
+ * et celle d'un vrai client, rien.
+ *
+ * La 0037 la fait descendre par ENSEMBLE — « voici tous les groupes du produit
+ * X » — parce qu'une table de liaison n'a pas d'identité à elle. Ces tests
+ * portent sur ce que cela implique : remplacement, retrait, idempotence.
+ */
+describe('les modificateurs d’un produit descendent par ENSEMBLE', () => {
+  /** La charge utile de `journalise_modificateurs_produit()` (0037). */
+  const lot = (produit: string, groupes: string[]) => ({
+    product_id: produit,
+    groupes: groupes.map((g, i) => ({
+      product_id: produit,
+      modifier_group_id: g,
+      restaurant_id: DEMO_RESTO,
+      position: i + 1,
+    })),
+  })
+
+  const groupesDe = async (produit: string) =>
+    (
+      await db.lire<{ modifier_group_id: string }>(
+        'SELECT modifier_group_id FROM product_modifiers WHERE product_id = ? ORDER BY position',
+        [produit],
+      )
+    ).map((l) => l.modifier_group_id)
+
+  it('pose les groupes reçus', async () => {
+    await appliquerMiroir(db, [
+      changement('product_modifiers', PIZZA, lot(PIZZA, [GRP_CUISSON])),
+    ])
+    expect(await groupesDe(PIZZA)).toEqual([GRP_CUISSON])
+  })
+
+  it('REMPLACE l’ensemble — un groupe détaché disparaît de la caisse', async () => {
+    /*
+     * LE point du mode ensemble. Sans l'effacement préalable, un groupe retiré
+     * au back-office resterait proposé sur la caisse POUR TOUJOURS : rien dans
+     * la charge utile ne dirait qu'il faut l'enlever, et le gérant qui vient de
+     * le détacher ne comprendrait pas pourquoi le supplément est encore là.
+     */
+    await appliquerMiroir(db, [
+      changement('product_modifiers', PIZZA, lot(PIZZA, [GRP_CUISSON, GRP_SUPP])),
+    ])
+    expect(await groupesDe(PIZZA)).toHaveLength(2)
+
+    await appliquerMiroir(db, [
+      changement('product_modifiers', PIZZA, lot(PIZZA, [GRP_SUPP])),
+    ])
+    expect(await groupesDe(PIZZA)).toEqual([GRP_SUPP])
+  })
+
+  it('un ensemble VIDE retire le dernier groupe', async () => {
+    await appliquerMiroir(db, [
+      changement('product_modifiers', PIZZA, lot(PIZZA, [GRP_SUPP])),
+    ])
+    await appliquerMiroir(db, [changement('product_modifiers', PIZZA, lot(PIZZA, []))])
+    expect(await groupesDe(PIZZA)).toEqual([])
+  })
+
+  it('est IDEMPOTENT — rejouer ne duplique pas', async () => {
+    /*
+     * Le déclencheur écrit une entrée PAR LIGNE modifiée, chacune portant
+     * l'ensemble complet : attacher trois groupes d'un coup produit trois
+     * entrées identiques. Sans idempotence, le produit se retrouverait avec
+     * neuf liens et proposerait chaque supplément trois fois.
+     */
+    const page = changement('product_modifiers', PIZZA, lot(PIZZA, [GRP_CUISSON, GRP_SUPP]))
+    await appliquerMiroir(db, [page])
+    await appliquerMiroir(db, [page])
+    await appliquerMiroir(db, [page])
+    expect(await groupesDe(PIZZA)).toEqual([GRP_CUISSON, GRP_SUPP])
+  })
+
+  it('ne touche PAS les autres produits', async () => {
+    // Le remplacement est borné au parent. Effacer large viderait la carte
+    // entière à la première page de rattrapage.
+    await appliquerMiroir(db, [
+      changement('product_modifiers', AUTRE_PRODUIT, lot(AUTRE_PRODUIT, [GRP_SUPP])),
+    ])
+    await appliquerMiroir(db, [
+      changement('product_modifiers', PIZZA, lot(PIZZA, [GRP_CUISSON])),
+    ])
+    expect(await groupesDe(AUTRE_PRODUIT)).toEqual([GRP_SUPP])
+  })
+
+  it('la caisse retrouve alors les modificateurs du produit', async () => {
+    /*
+     * Le bout de la chaîne : la requête que le POS exécute vraiment, celle qui
+     * JOINT les trois tables. C'est elle qui ne rendait rien.
+     */
+    await appliquerMiroir(db, [
+      changement('product_modifiers', PIZZA, lot(PIZZA, [GRP_SUPP])),
+    ])
+    const mods = await depotCatalogue(db).modificateurs(PIZZA)
+    expect(mods.length).toBeGreaterThan(0)
+    expect(mods.every((m) => m.groupeId === GRP_SUPP)).toBe(true)
+    expect(mods.map((m) => m.nom)).toContain('Fromage')
+  })
+})
+
 describe('les options de restauration descendent jusqu’à la base locale', () => {
   /** La charge utile « restaurants », à la forme de `to_jsonb(new)`. */
   const etablissement = (surcharges: Record<string, unknown> = {}) => ({

@@ -38,7 +38,14 @@ export const dynamic = 'force-dynamic'
  */
 async function actives(
   supabase: Awaited<ReturnType<typeof supabaseServeur>>,
-  table: 'stations' | 'discounts' | 'customers' | 'products' | 'payment_methods' | 'memberships',
+  table:
+    | 'stations'
+    | 'discounts'
+    | 'customers'
+    | 'products'
+    | 'payment_methods'
+    | 'modifier_groups'
+    | 'memberships',
   restaurantId: string,
   colonneRetrait: 'archived_at' | 'revoked_at' = 'archived_at',
 ): Promise<number> {
@@ -64,6 +71,7 @@ export default async function PageFonctionnalites({
     postes,
     postesImprimante,
     reductions,
+    groupesModif,
     clients,
     suivis,
     modes,
@@ -81,6 +89,7 @@ export default async function PageFonctionnalites({
       .not('printer_host', 'is', null)
       .then((r) => r.count ?? 0),
     actives(supabase, 'discounts', restaurant),
+    actives(supabase, 'modifier_groups', restaurant),
     actives(supabase, 'customers', restaurant),
     supabase
       .from('products')
@@ -155,6 +164,25 @@ export default async function PageFonctionnalites({
           : `${reductions} réduction(s) enregistrée(s).`,
       chemin: 'reductions/gestion',
       lien: 'Gérer les réductions',
+    },
+    {
+      cle: 'modificateurs',
+      nom: 'Modificateurs',
+      icone: ICONES.UtensilsCrossed,
+      etat: groupesModif === 0 ? 'absente' : 'active',
+      quoi:
+        'La cuisson d’une viande, les suppléments d’une pizza — proposés au caissier ' +
+        'quand il touche l’article.',
+      pourquoi:
+        'Ils s’ajoutent au prix de la LIGNE, jamais à la taxe ni au stock : le taux de ' +
+        'l’article s’applique au tout, et un supplément n’est pas un article vendu. ' +
+        'Un choix peut être négatif — « sans fromage −0,500 ».',
+      constat:
+        groupesModif === 0
+          ? 'Aucun groupe : les articles se vendent tels quels, sans choix proposé.'
+          : `${groupesModif} groupe(s) de modificateurs.`,
+      chemin: 'modificateurs',
+      lien: 'Gérer les modificateurs',
     },
     {
       cle: 'clients',

@@ -1229,7 +1229,7 @@ le marché connaît : un restaurateur qui vient de Loyverse cherche
 | Groupe | Écrans |
 |---|---|
 | **Rapports** | Récapitulatif des ventes · Ventes par article · par catégorie · par employé · par mode de paiement · Reçus · Réductions · Périodes de travail |
-| **Articles** | Liste d'articles · Catégories · Stock · Réductions |
+| **Articles** | Liste d'articles · Catégories · Stock · Modificateurs · Réductions |
 | **Paramètres** | Employés · Clients · Taxes · Modes de paiement · Reçu · Imprimantes cuisine · Options de restauration · Fonctionnalités · Aide |
 
 > **« Tickets » s'appelle « Reçus ».** L'ancienne adresse `/‹resto›/tickets`
@@ -2718,6 +2718,101 @@ où la caisse aurait offert le bouton, c'est-à-dire au pire moment.
 en direct**. Il est prévu avec les formules d'abonnement, qui ne sont pas en
 place. Laisser la page muette ferait chercher un bouton de discussion qui
 n'est nulle part.
+
+
+---
+
+### T. Modificateurs — et la table qui ne descendait pas
+
+**Articles → Modificateurs.** Les groupes de choix qu'on propose au caissier
+quand il touche un article : la cuisson d'une viande, les suppléments d'une
+pizza.
+
+> ⚑ **Le modèle existait depuis la migration 0003, l'écran n'existait pas.**
+> Trois tables, RLS comprise, et la caisse sait les lire depuis toujours. Un
+> restaurateur qui voulait proposer « + Fromage 1,500 » devait passer par une
+> console SQL. C'est la même panne que les postes de préparation avant qu'on
+> les rende créables : un mécanisme complet, et aucune porte pour y entrer.
+
+#### T.1 — Créer un groupe, ses choix, et le rattacher
+
+1. **Nouveau groupe** : nom « Cuisson », obligatoires **1**, maximum **1**.
+2. Ajoutez trois choix à **0,000** : Saignant, À point, Bien cuit.
+3. Dépliez **Aucun article — ce groupe ne s'affichera nulle part** et cochez
+   un plat.
+
+**Attendu** : le panneau de rattachement s'ouvre **tout seul** tant qu'aucun
+article ne porte le groupe. C'est l'erreur qu'on veut voir sans cliquer — un
+groupe sans article ne s'affiche nulle part en caisse. Une fois rattaché, il se
+replie.
+
+4. Créez un second groupe « Suppléments », **0** et **0**, avec
+   « Fromage 1,500 » et « Sans oignon **−0,500** ».
+
+**Attendu** : un supplément **négatif** est accepté. « Sans fromage −0,500 »
+est un usage réel, et le schéma ne pose aucune contrainte de positivité. Un
+choix à **zéro** l'est aussi — « Bien cuit » ne coûte rien mais doit figurer
+sur le bon de cuisine.
+
+5. Essayez un maximum **inférieur** au minimum.
+
+**Attendu** : refus en français. La contrainte de base l'interdit déjà, mais
+elle répondrait par un message que personne ne peut lire.
+
+#### T.2 — La descente, qui est le vrai sujet
+
+6. Sur la caisse : **Synchronisation → Synchroniser maintenant**, puis
+   rechargez. Touchez le plat rattaché.
+
+**Attendu** : la modale des choix s'ouvre, et le total de la ligne monte de la
+valeur du supplément.
+
+> ⚑ **Ça ne marchait pas, et personne ne l'avait signalé.**
+>
+> `modifier_groups` et `modifiers` descendaient depuis la 0005.
+> `product_modifiers` — la table qui dit quel groupe s'applique à quel produit
+> — est **absente de sa liste de déclencheurs**. Elle n'a jamais rien
+> journalisé.
+>
+> Or la caisse lit ses modificateurs en JOIGNANT cette table. Sans elle, la
+> jointure ne rend rien : sur un terminal appairé, **aucun produit n'a jamais
+> proposé le moindre supplément**. Le silence s'explique : le jeu de
+> DÉMONSTRATION pose ces lignes localement. La caisse de démonstration montrait
+> « Fromage +1,500 », celle d'un vrai client, rien.
+
+7. Au back-office, **décochez** l'article. Resynchronisez, rechargez, retouchez
+   le plat.
+
+**Attendu** : les choix ont disparu.
+
+> **Pourquoi le retrait descend.** `product_modifiers` n'a pas de colonne `id`
+> — son identité est le COUPLE (produit, groupe) — et le déclencheur générique
+> du référentiel écrit `ligne.id` : l'ajouter à la liste aurait fait échouer
+> toute écriture.
+>
+> La 0037 journalise donc **l'ENSEMBLE des groupes d'un produit**, clé =
+> `product_id`. Une entrée dit « voici TOUS les groupes du produit X,
+> maintenant », et la caisse remplace les siens. Trois propriétés qu'on ne
+> voulait pas perdre : c'est **idempotent** (rejouer redonne le même état),
+> **auto-réparateur** (quoi qu'une tablette ait accumulé avant, l'appliquer la
+> remet d'aplomb — c'est ce qui rattrape les terminaux déjà en service), et le
+> **retrait se transmet** : un groupe détaché disparaît simplement de
+> l'ensemble, au lieu de rester proposé pour toujours.
+
+#### T.3 — Ce qu'un modificateur ne fait PAS
+
+| | |
+|---|---|
+| Le **prix de la ligne** | il s'y ajoute : `prix de l'article + Σ choix`, puis la quantité (étape 1 de l'ordre figé) |
+| La **taxe** | non — le taux de l'article s'applique au tout. Un supplément n'a pas de taux à lui |
+| Le **stock** | non — un supplément n'est pas un article vendu |
+| Les **ventes passées** | non — chaque ligne recopie le nom ET le prix du choix au moment de la vente |
+
+8. Archivez un groupe, puis remettez-le en service.
+
+**Attendu** : les articles rattachés **le sont restés**. On ne détache pas au
+passage : retrouver les douze articles auxquels un groupe s'appliquait pour le
+rétablir serait une punition pour avoir archivé par erreur.
 
 
 ---

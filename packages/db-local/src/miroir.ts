@@ -39,7 +39,27 @@ export interface ChangementMiroir {
  */
 export const TABLES_MIROIR: Record<
   string,
-  { nom: string; colonnes: string[]; /** Clé primaire, `id` par défaut. */ cle?: string }
+  {
+    nom: string
+    colonnes: string[]
+    /** Clé primaire, `id` par défaut. */
+    cle?: string
+    /**
+     * Table de LIAISON, descendue par ENSEMBLE et non ligne à ligne.
+     *
+     * `entity_id` désigne alors le PARENT (le produit), et la charge utile
+     * porte la liste complète de ses liens sous `lot.champ`. Appliquer revient
+     * à remplacer : on efface les lignes du parent, on pose celles reçues.
+     *
+     * Pourquoi un mode à part plutôt qu'une clé de plus : une table de liaison
+     * n'a pas d'identité à elle, son identité est le COUPLE. La descendre ligne
+     * à ligne laisserait une tablette qui en manque une afficher un produit avec
+     * la moitié de ses suppléments, sans que rien ne permette de s'en apercevoir.
+     * Un ensemble, lui, se rejoue : quoi que la tablette ait accumulé avant,
+     * l'appliquer la remet d'aplomb.
+     */
+    lot?: { parent: string; champ: string }
+  }
 > = {
   /*
    * L'ÉTABLISSEMENT lui-même — l'en-tête et le pied de son reçu, et ce qui
@@ -106,6 +126,22 @@ export const TABLES_MIROIR: Record<
     nom: 'modifiers',
     colonnes: ['id', 'organization_id', 'restaurant_id', 'modifier_group_id', 'name',
                'price_delta_millimes', 'position', 'is_available', 'archived_at'],
+  },
+  /*
+   * Le lien PRODUIT ↔ GROUPE — sans lui, rien de ce qui précède ne sert.
+   *
+   * La caisse lit ses modificateurs en joignant cette table ; absente, la
+   * jointure ne rend rien et aucun produit ne propose de supplément. Elle n'a
+   * jamais descendu : la migration Postgres 0037 lui pose enfin un déclencheur,
+   * et celui-ci journalise l'ENSEMBLE des groupes d'un produit à la fois.
+   *
+   * `restaurant_id` est dans les colonnes parce que la table locale l'exige
+   * (NOT NULL) ; `organization_id` n'y est pas, la table locale ne l'a pas.
+   */
+  product_modifiers: {
+    nom: 'product_modifiers',
+    colonnes: ['product_id', 'modifier_group_id', 'restaurant_id', 'position'],
+    lot: { parent: 'product_id', champ: 'groupes' },
   },
   areas: {
     nom: 'areas',
@@ -218,6 +254,42 @@ export async function appliquerMiroir(
       continue
     }
     if (!c.donnees) continue
+
+    /*
+     * ── Le mode ENSEMBLE, pour les tables de liaison ────────────────────
+     *
+     * `entity_id` désigne le PARENT, la charge utile porte la liste complète
+     * de ses liens. On efface puis on repose : c'est un REMPLACEMENT, pas une
+     * mise à jour.
+     *
+     * L'effacement d'abord, et sans condition : c'est lui qui transmet les
+     * RETRAITS. Un groupe détaché d'un produit disparaît simplement de
+     * l'ensemble reçu — sans cette suppression préalable, il resterait
+     * proposé sur la caisse pour toujours, et le gérant qui vient de le
+     * retirer au back-office ne comprendrait pas pourquoi.
+     *
+     * Une liste VIDE est une valeur légitime : c'est ce qui retire le dernier
+     * groupe. D'où le comptage à part, `touchees += 1` même sans ligne posée.
+     */
+    if (table.lot) {
+      const lignes = c.donnees[table.lot.champ]
+      if (!Array.isArray(lignes)) continue
+      await db.executer(
+        `DELETE FROM ${table.nom} WHERE ${table.lot.parent} = ?`,
+        [c.entiteId],
+      )
+      for (const ligne of lignes as Record<string, unknown>[]) {
+        const cols = table.colonnes.filter((col) => col in ligne)
+        if (cols.length === 0) continue
+        await db.executer(
+          `INSERT INTO ${table.nom} (${cols.join(', ')})
+           VALUES (${cols.map(() => '?').join(', ')})`,
+          cols.map((col) => normaliser(ligne[col])),
+        )
+      }
+      touchees += 1
+      continue
+    }
 
     // Les colonnes que CETTE version connaît, et que le serveur a envoyées.
     // L'intersection dans les deux sens : un serveur plus récent peut en

@@ -1195,6 +1195,52 @@ th .tri:hover { color: var(--texte); }
 .formulaire-taux label:not(.case) { font-size: 0.85rem; color: var(--attenue); }
 .formulaire-taux .principal { margin-top: 0.75rem; justify-self: start; }
 
+/* ── Articles → Modificateurs ─────────────────────────── */
+.carte-groupe { display: grid; gap: 0.6rem; }
+/*
+ * Le NOM partage la rangée avec min, max et les boutons.
+ *
+ * Sans cette règle il hérite du `width: 100%` des champs de formulaire — juste
+ * dans une colonne, faux dans une RANGÉE : il prenait la ligne entière et
+ * repoussait min/max en dessous. Même défaut que le `<select>` des modes de
+ * paiement, même correction.
+ */
+.carte-groupe .ligne-imprimante input[name='nom'] { flex: 1 1 12rem; min-width: 0; }
+.carte-groupe .ligne-imprimante .champ-taux input { width: 4rem; }
+.carte-groupe.archive { background: var(--panneau-clair); }
+.carte-groupe > .indication { margin-top: 0; }
+/* La rangée d'ajout se détache de la liste : c'est une action, pas une ligne. */
+.ajout-choix { border-top: 1px dashed var(--bordure); padding-top: 0.75rem; }
+.carte-groupe .liste-taux { margin-bottom: 0; }
+
+/*
+ * Le RATTACHEMENT, replié par défaut — sauf quand il est vide.
+ *
+ * Un groupe sans article ne s'affiche NULLE PART en caisse : c'est l'erreur
+ * qu'on veut voir sans cliquer, et c'est pourquoi le panneau s'ouvre tout seul
+ * dans ce cas-là. Une fois rattaché, il se replie : quarante cases à cocher
+ * sous chacun des huit groupes rendraient la page illisible.
+ */
+.rattachement { border-top: 1px dashed var(--bordure); padding-top: 0.6rem; }
+.rattachement > summary {
+  cursor: pointer; font-size: 0.9rem; color: var(--attenue);
+  display: flex; align-items: center; gap: 0.35rem;
+}
+.rattachement > summary:hover { color: var(--texte); }
+.filtre-articles { margin-top: 0.6rem; }
+.cases-articles {
+  list-style: none; margin: 0.6rem 0 0; padding: 0;
+  display: grid; gap: 0.3rem;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  /*
+   * Borné en hauteur : une carte de cent plats pousserait le groupe suivant
+   * trois écrans plus bas, et on perdrait le fil de ce qu'on réglait.
+   */
+  max-height: 16rem; overflow-y: auto;
+}
+.cases-articles .case { align-items: flex-start; }
+.cases-articles .detail { color: var(--attenue); }
+
 /* ── Paramètres → Imprimantes cuisine ──────────────────────── */
 /*
  * ⛑ CE BLOC DOIT RESTER AVANT `@media (max-width: 720px)`.
@@ -1232,6 +1278,8 @@ th .tri:hover { color: var(--texte); }
   /* Les champs passent en colonne : trois côte à côte sur 390 px font des
      boîtes de 6 caractères, où l'on ne relit pas ce qu'on vient de taper. */
   .ligne-taux, .ligne-paiement, .ligne-imprimante { flex-direction: column; align-items: stretch; }
+  .carte-groupe .ligne-imprimante input[name='nom'] { flex: 1 1 auto; }
+  .carte-groupe .ligne-imprimante .champ-taux input { width: 100%; }
   .ligne-taux input[name='nom'],
   .ligne-paiement input[name='nom'],
   .ligne-imprimante input[name='hote'] { flex: 1 1 auto; }

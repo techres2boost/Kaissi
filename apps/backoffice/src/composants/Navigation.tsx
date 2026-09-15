@@ -19,6 +19,7 @@ import {
   Percent,
   HandPlatter,
   LayoutList,
+  ListPlus,
   LifeBuoy,
   Printer,
   ReceiptText,
@@ -140,6 +141,13 @@ const GROUPES = [
       { chemin: 'catalogue', libelle: 'Liste d’articles', icone: BookOpen, gestionnaire: true },
       { chemin: 'categories', libelle: 'Catégories', icone: Boxes, gestionnaire: true },
       { chemin: 'stock', libelle: 'Stock', icone: Package, gestionnaire: true },
+      /*
+       * « Modificateurs » avec les ARTICLES, pas avec les Paramètres : ce sont
+       * des éléments de la carte, au même titre qu'un produit ou une
+       * catégorie. C'est aussi là que Loyverse les range, et donc là qu'un
+       * restaurateur qui en vient les cherche.
+       */
+      { chemin: 'modificateurs', libelle: 'Modificateurs', icone: ListPlus, gestionnaire: true },
       /*
        * Le RÉFÉRENTIEL des réductions, pas leur rapport.
        *
