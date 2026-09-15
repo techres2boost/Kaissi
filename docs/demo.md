@@ -1230,7 +1230,7 @@ le marché connaît : un restaurateur qui vient de Loyverse cherche
 |---|---|
 | **Rapports** | Récapitulatif des ventes · Ventes par article · par catégorie · par employé · par mode de paiement · Reçus · Réductions · Périodes de travail |
 | **Articles** | Liste d'articles · Catégories · Stock · Réductions |
-| **Paramètres** | Employés · Clients · Taxes · Modes de paiement · Reçu · Imprimantes cuisine |
+| **Paramètres** | Employés · Clients · Taxes · Modes de paiement · Reçu · Imprimantes cuisine · Options de restauration · Fonctionnalités |
 
 > **« Tickets » s'appelle « Reçus ».** L'ancienne adresse `/‹resto›/tickets`
 > redirige : un favori ou un lien envoyé par message continue de marcher.
@@ -2416,12 +2416,13 @@ reste tout seul.
 
 ---
 
-### S. Paramètres — taxes, paiements, reçu et imprimantes
+### S. Paramètres — la rubrique complète
 
 La rubrique **Configuration** s'appelle désormais **Paramètres**, comme chez
-Loyverse, et elle contient enfin ce qu'un restaurateur y cherche. Quatre
-écrans nouveaux, tous réservés au gérant par `ecranReserve()` — c'est-à-dire
-côté serveur, pas en masquant un lien.
+Loyverse, et elle contient enfin ce qu'un restaurateur y cherche. Six écrans
+nouveaux, tous réservés au gérant par `ecranReserve()` — c'est-à-dire côté
+serveur, pas en masquant un lien. Tapez l'une de ces adresses à la main avec
+un compte `caissier` : elle répond « introuvable ».
 
 #### S.1 — Taxes : le premier réglage à corriger
 
@@ -2511,6 +2512,172 @@ qui contient un espace ou un `/`. Le schéma ne contraint que le **port** —
 sans ce contrôle, les deux premières s'enregistreraient sans broncher, et le
 bon ne partirait jamais le jour où l'impression est allumée, en plein
 service.
+
+
+#### S.5 — Options de restauration : le seul réglage qui change le TOTAL
+
+C'est **le parcours à faire de bout en bout**, parce qu'il traverse tout le
+produit : back-office → `change_log` → tablette → ticket → reprojection
+serveur → back-office. Comptez dix minutes.
+
+**ÉTAPE 1 — Encaissez une vente TÉMOIN, avant tout réglage**
+
+1. Sur la caisse : prise de poste, ouverture de caisse, une commande avec
+   **deux articles de taux de TVA différents** (une Ojja et un Coca, par
+   exemple), puis encaissement en espèces.
+2. **Notez le total du ticket.** C'est votre point de comparaison.
+
+**ÉTAPE 2 — Réglez le service et le timbre**
+
+3. Au back-office : **Paramètres → Options de restauration**.
+4. Taux de service : **10**. Cochez **le service est lui-même soumis à la
+   taxe**, et choisissez **TVA 19 %**. Timbre : **0,600**.
+
+**Attendu, immédiatement et sans enregistrer** : l'aperçu de droite recalcule
+à chaque frappe, sur une addition d'exemple.
+
+> **L'aperçu appelle le VRAI calcul.** `calculerTotaux` de
+> `packages/domain` — la fonction que la caisse et le serveur appellent, pas
+> une imitation. Un aperçu qui referait le calcul « à peu près » serait la
+> TROISIÈME implémentation du total : juste pendant six mois, puis faux le
+> jour où l'ordre des étapes changerait — et c'est ce chiffre-là que le
+> gérant aurait utilisé pour décider.
+
+5. **Vérifiez que la colonne TOMBE sur le total.** Articles + Service +
+   Timbre = Total. La taxe sur le service apparaît en retrait, précédée de
+   « **dont** » : avec un taux INCLUS elle est déjà dans le service, elle ne
+   s'y ajoute pas.
+
+> **C'est un défaut qui a existé.** L'aperçu la listait comme un montant
+> ajouté : la colonne affichait 19,500 + 1,950 + 0,311 + 0,600 sous un total
+> de 22,050. Les chiffres étaient justes un par un, bien alignés, dans le bon
+> ordre ; seule leur **somme** était fausse. Un gérant qui additionne quatre
+> lignes et trouve autre chose que le total conclut que le logiciel compte
+> faux, et il a raison de le croire.
+
+6. **Décochez** « taxable », recochez-la, et **enregistrez sans choisir de
+   taux**.
+
+**Attendu** : refus explicite — « Choisissez le taux applicable au service.
+Cocher « taxable » sans taux ne taxerait rien. »
+
+> **Pourquoi refuser plutôt que deviner.** Le domaine ne calcule la taxe du
+> service que s'il connaît le taux. Sans ce refus, la case resterait cochée,
+> l'écran aurait l'air réglé, et le service sortirait hors taxe pendant des
+> mois. Prendre le taux par défaut à la place du gérant aurait été le
+> raccourci tentant : le taux applicable au service est une **question
+> fiscale**, pas une commodité d'interface.
+
+7. Choisissez **TVA 19 %**, enregistrez.
+
+**ÉTAPE 3 — Faites descendre le réglage jusqu'à la caisse**
+
+8. Sur la caisse : **Synchronisation → Synchroniser maintenant**, puis
+   **rechargez l'application** (le contexte lit ses options au démarrage).
+
+> Le réglage descend par le **catalogue**, exactement comme un changement de
+> prix — aucune ressaisie sur les tablettes, rien à redémarrer côté serveur.
+> Une caisse hors ligne l'appliquera à sa prochaine synchronisation.
+
+**ÉTAPE 4 — Encaissez la MÊME commande, et comparez**
+
+9. Refaites **exactement la même commande** qu'à l'étape 1, et encaissez.
+
+**Attendu, sur le ticket affiché à l'écran** : une ligne **Service**, une
+ligne **Timbre fiscal**, et un total **supérieur de service + 0,600** à celui
+de l'étape 1.
+
+10. Au back-office : **Rapports → Reçus**, ouvrez les deux ventes.
+
+**Attendu** : le total du back-office est **identique au millime** à celui du
+ticket, pour les deux. C'est LE point de ce parcours.
+
+> **Pourquoi c'est le point.** Le serveur ne fait pas confiance aux totaux que
+> la tablette envoie : il **reprojette** chaque commande à l'arrivée, en
+> recalculant depuis le journal d'événements. Si sa configuration différait de
+> celle de la caisse — ne serait-ce que d'une colonne non lue — il réécrirait
+> tranquillement le total. Sans erreur, sans alerte, sans rien dans les
+> journaux : juste deux chiffres qui ne se rejoignent jamais, celui que le
+> client a payé et celui que le patron regarde.
+>
+> Les deux passent donc par la **même fonction**, `configEtablissement` de
+> `packages/domain`, et `apps/sync/test/options-de-restauration.test.ts` fait
+> tourner les deux chemins sur les mêmes ventes en exigeant l'égalité au
+> millime.
+
+**ÉTAPE 5 — Remettez à zéro**
+
+11. **Paramètres → Options de restauration**, videz les deux champs,
+    enregistrez.
+
+**Attendu** : « Aucun service ni timbre : les tickets portent le total des
+articles et de leurs taxes, rien de plus. » Et **aucune ligne « Service
+0,000 »** sur les tickets suivants — un service à zéro est ABSENT, pas nul.
+Les ventes déjà encaissées, elles, **ne bougent pas** : chacune porte le total
+calculé au moment de la vente.
+
+> ⚠ **Les valeurs de ce parcours sont des valeurs de TEST.** 10 % de service
+> et 600 millimes de timbre ne sont pas une recommandation. Kaissi n'applique
+> que ce que vous saisissez et ne propose **aucune** valeur par défaut : le
+> droit de timbre s'applique-t-il à un ticket de restaurant, à quel montant,
+> et les frais de service sont-ils soumis à la TVA ? Ce sont des questions
+> pour un expert-comptable tunisien. Un logiciel qui poserait « 1 % de
+> service, 600 millimes de timbre, parce que c'est l'usage » ferait facturer
+> faux pendant des mois sans que personne ne le relise.
+
+#### S.6 — Fonctionnalités : ce que le produit fait, et ce qu'il ne fait pas
+
+12. **Paramètres → Fonctionnalités.**
+
+**Attendu** : deux blocs — « Ce qui fonctionne aujourd'hui » et « Ce qui
+n'est pas là » — et **aucun interrupteur**.
+
+> **L'absence de bascules est le sujet.** Chez Loyverse, cette page en est une
+> liste. Kaissi n'a pas de table de drapeaux par établissement, et en poser
+> une pour la remplir de bascules qui n'éteignent rien serait exactement ce
+> que l'écran Imprimantes refuse déjà. Un interrupteur qu'on actionne et qui
+> ne change rien est **pire** qu'un interrupteur absent : il fait perdre une
+> heure à chercher pourquoi.
+
+13. Lisez les **constats** : « 3 poste(s), dont 1 avec une imprimante
+    réglée », « 8 article(s) suivi(s) », « Aucune réduction enregistrée ».
+
+**Attendu** : ils décrivent **vos** données, pas le produit en général.
+Archivez une réduction, revenez : le compte a changé.
+
+| État | Ce qu'il veut dire |
+|---|---|
+| **Active** | fonctionne, et le lien mène à l'écran où la régler |
+| **Toujours active** | non débrayable, et la raison est dite — les tickets ouverts en sont : la salle est BÂTIE sur le journal d'événements |
+| **Éteinte dans cette version** | écrite et testée, pas allumée — l'impression |
+| **Pas construite** | la fidélité, la facturation. Dit tel quel plutôt que masqué |
+
+> Il n'y a **pas de cinquième état « bientôt »** : une date qu'on ne tient pas
+> vaut moins qu'un « pas construit » assumé. Une fonctionnalité annoncée et
+> absente coûte plus cher qu'une fonctionnalité absente et annoncée comme
+> telle.
+
+#### S.7 — Le service posé SUR UNE COMMANDE (et l'écart qu'il cachait)
+
+Le journal d'événements connaît un `service.set` : une commande peut porter
+son propre service, qui **prime** sur celui de l'établissement. Un serveur
+retire le service sur une vente à emporter, ou l'ajoute sur une table.
+
+> ⚑ **Le serveur l'ignorait.** La reprojection passait la configuration de
+> l'établissement telle quelle, alors que le projecteur LOCAL appliquait, lui,
+> la surcharge. La tablette imprimait donc un ticket **avec** service, le
+> back-office affichait la même vente **sans**, et le total du back-office
+> était inférieur à ce que le client avait payé. Aucune erreur nulle part.
+>
+> C'était une RÈGLE 7 violée : la résolution existait en **deux copies**, et
+> l'une des deux était incomplète. Elle n'en a plus qu'une
+> (`configEffective`), et deux tests la tiennent — vérifiés par sabotage :
+> rétablir l'ancien comportement les fait échouer tous les deux, dans les deux
+> sens (le service ajouté disparaît ; le service retiré revient).
+
+Rien à cliquer pour celui-là : aucun écran n'émet encore `service.set`. Il est
+listé ici parce que le défaut était **latent** — il se serait réveillé le jour
+où la caisse aurait offert le bouton, c'est-à-dire au pire moment.
 
 
 ---

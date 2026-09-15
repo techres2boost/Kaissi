@@ -78,30 +78,6 @@ interface Props {
 }
 
 /** Ce que la table `restaurants` locale porte, côté reçu (migration 012). */
-interface LigneEtablissement {
-  name: string
-  address: string | null
-  phone: string | null
-  fiscal_id: string | null
-  receipt_footer: string | null
-  /*
-   * ── Les options de restauration (migrations Postgres 0036, locale 013) ──
-   *
-   * Elles s'ajoutent au TOTAL, après les taxes. Le serveur lit exactement les
-   * mêmes colonnes dans `chargerConfig()` : c'est ce qui garantit que le
-   * ticket remis au client et la vente affichée au back-office portent le même
-   * chiffre. Deux lectures différentes donneraient deux totaux, sans qu'aucune
-   * erreur ne soit levée nulle part.
-   *
-   * SQLite n'a pas de booléen : `service_taxable` arrive en 0/1 — c'est
-   * `normaliser()` du miroir qui convertit.
-   */
-  service_rate_bp: number | null
-  service_taxable: number | null
-  service_tax_rate_id: string | null
-  stamp_duty_millimes: number | null
-}
-
 interface DonneesChargees {
   identite: IdentiteTerminal
   config: ConfigCalcul
@@ -230,62 +206,23 @@ export function FournisseurApp({ app, children }: Props) {
         app.etat.lire('device_id'),
       ])
 
-      const lignesStations = await app.base.adaptateur.lire<{
-        id: string
-        name: string
-        printer_host: string | null
-        printer_port: number
-      }>(
-        /*
-         * `ORDER BY position, name` — et ce tri n'est PAS cosmétique.
-         *
-         * Le ticket CLIENT n'a pas de poste à lui : `EcranPaiement.tsx`
-         * l'envoie au PREMIER poste qui porte une adresse d'imprimante. Sans
-         * `ORDER BY`, ce « premier » était celui que SQLite rendait en tête,
-         * donc potentiellement un autre après chaque synchronisation : le
-         * ticket sortait au bar un jour, en cuisine le lendemain, sans que
-         * rien n'ait changé dans les réglages.
-         *
-         * C'est déjà l'ordre qu'appliquent `depotStations.toutes()` et le
-         * repli « caisse » de la file d'impression — et c'est celui que
-         * l'écran « Imprimantes cuisine » du back-office affiche, en nommant
-         * le poste qui sortira le ticket. Trois endroits qui devaient déjà
-         * s'accorder, dont celui-ci ne s'accordait pas.
-         */
-        `SELECT id, name, printer_host, printer_port
-           FROM stations
-          WHERE archived_at IS NULL
-          ORDER BY position, name`,
-      )
-
       /*
-       * ── L'établissement se lit PAR SON IDENTIFIANT, pas « LIMIT 1 » ─────
+       * `app.stations.toutes()` et non un SELECT recopié ici.
        *
-       * Depuis que `restaurants` descend par le catalogue (migration Postgres
-       * 0035, locale 012), la table peut contenir DEUX lignes : celle de la
-       * graine de démonstration, et celle que le serveur envoie. `LIMIT 1`
-       * sans `ORDER BY` rendait alors l'une ou l'autre au gré de SQLite — un
-       * ticket au nom du restaurant de démonstration, une fois sur deux, sans
-       * que rien n'échoue.
-       *
-       * Le repli sur `LIMIT 1` reste pour une caisse jamais appairée, qui n'a
-       * pas encore de `restaurant_id` : elle n'a alors qu'une ligne, celle de
-       * la démonstration, et c'est bien celle-là qu'il faut.
+       * Le dépôt trie par `position, name`, et ce tri n'est PAS cosmétique :
+       * le ticket CLIENT n'a pas de poste à lui, `EcranPaiement.tsx` l'envoie
+       * au PREMIER poste qui porte une adresse d'imprimante. Recopier le
+       * SELECT ici, c'était se donner une seconde chance de l'oublier — et
+       * elle avait été prise : sans `ORDER BY`, le « premier » était celui que
+       * SQLite rendait en tête, donc potentiellement un autre après chaque
+       * synchronisation.
        */
-      const etab = resto
-        ? await app.base.adaptateur.lireUne<LigneEtablissement>(
-            `SELECT name, address, phone, fiscal_id, receipt_footer,
-                    service_rate_bp, service_taxable, service_tax_rate_id,
-                    stamp_duty_millimes
-               FROM restaurants WHERE id = ?`,
-            [resto],
-          )
-        : await app.base.adaptateur.lireUne<LigneEtablissement>(
-            `SELECT name, address, phone, fiscal_id, receipt_footer,
-                    service_rate_bp, service_taxable, service_tax_rate_id,
-                    stamp_duty_millimes
-               FROM restaurants LIMIT 1`,
-          )
+      const lignesStations = await app.stations.toutes()
+
+      // Les colonnes, le repli « jamais appairée » et la raison de ne pas
+      // faire de `LIMIT 1` vivent dans `depotEtablissement` — c'est ce SELECT
+      // qui décide du total, il ne doit pas exister en double.
+      const etab = await app.etablissement.lire(resto ?? null)
 
       if (!vivant) return
       setDonnees({
@@ -322,12 +259,7 @@ export function FournisseurApp({ app, children }: Props) {
           .split('\n')
           .map((l) => l.trim())
           .filter((l) => l !== ''),
-        stations: new Map(
-          lignesStations.map((s) => [
-            s.id,
-            { id: s.id, nom: s.name, hote: s.printer_host, port: s.printer_port },
-          ]),
-        ),
+        stations: new Map(lignesStations.map((s) => [s.id, s])),
         tables,
         methodesPaiement: methodes,
         reductions,

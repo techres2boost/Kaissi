@@ -16,6 +16,7 @@ import {
   depotCaisse,
   depotCatalogue,
   depotEmployes,
+  depotEtablissement,
   depotEtat,
   depotImpression,
   depotJournal,
@@ -44,6 +45,7 @@ export interface ContexteApplication {
   readonly employes: ReturnType<typeof depotEmployes>
   readonly fileImpression: ReturnType<typeof depotImpression>
   readonly stations: ReturnType<typeof depotStations>
+  readonly etablissement: ReturnType<typeof depotEtablissement>
   readonly etapes: readonly EtapeDemarrage[]
   readonly versionSchema: number
   readonly migrations: readonly MigrationAppliquee[]
@@ -118,6 +120,7 @@ export async function demarrer(): Promise<ContexteApplication> {
     employes: depotEmployes(base.adaptateur),
     fileImpression: depotImpression(base.adaptateur),
     stations: depotStations(base.adaptateur),
+    etablissement: depotEtablissement(base.adaptateur),
     etapes,
     versionSchema: VERSION_SCHEMA_LOCAL,
     migrations: await journalMigrations(base.adaptateur),

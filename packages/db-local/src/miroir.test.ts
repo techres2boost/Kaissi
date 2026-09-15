@@ -26,6 +26,7 @@ import type { AdaptateurSqlite } from './adaptateur.js'
 import { migrer } from './migrateur.js'
 import { installerGraine, DEMO_ORG, DEMO_RESTO } from './graine.js'
 import { appliquerMiroir, type ChangementMiroir } from './miroir.js'
+import { depotEtablissement } from './depots/etablissement.js'
 import { depotEmployes } from './depots/employes.js'
 import { depotCatalogue } from './depots/catalogue.js'
 
@@ -332,6 +333,47 @@ describe('les options de restauration descendent jusqu’à la base locale', () 
     expect(ligne?.service_taxable).toBe(1)
     expect(ligne?.service_tax_rate_id).toBe(TVA_19)
     expect(ligne?.stamp_duty_millimes).toBe(600)
+  })
+
+  it('le DÉPÔT de la caisse relit ce que le miroir vient d’écrire', async () => {
+    /*
+     * Le dernier maillon, et celui qu'aucun test d'intégration n'atteignait :
+     * le SELECT que la caisse exécute vraiment. Il vivait EN LIGNE dans un
+     * composant React, où une faute de frappe sur `service_rate_bp` ne lève
+     * aucune erreur — SQLite rend `undefined`, la configuration lit zéro, et la
+     * caisse encaisse sans service. Le ticket cesse alors de valoir le total du
+     * back-office, sans que rien nulle part ne le signale.
+     */
+    await appliquerMiroir(db, [
+      changement(
+        'restaurants',
+        DEMO_RESTO,
+        etablissement({
+          service_rate_bp: 1000,
+          service_taxable: true,
+          service_tax_rate_id: TVA_19,
+          stamp_duty_millimes: 600,
+        }),
+      ),
+    ])
+
+    const lu = await depotEtablissement(db).lire(DEMO_RESTO)
+    expect(lu?.service_rate_bp).toBe(1000)
+    expect(lu?.service_taxable).toBe(1)
+    expect(lu?.service_tax_rate_id).toBe(TVA_19)
+    expect(lu?.stamp_duty_millimes).toBe(600)
+    // Et l'en-tête du reçu par le même chemin : le dépôt les lit ensemble.
+    expect(lu?.address).toBe('12 rue du Lac')
+  })
+
+  it('sans `restaurant_id`, le dépôt retombe sur la graine', async () => {
+    /*
+     * Une caisse JAMAIS appairée n'a pas d'identifiant d'établissement. Elle
+     * n'a alors qu'une ligne — celle de la démonstration — et c'est bien
+     * celle-là qu'il faut, sinon l'écran de démonstration s'ouvre sans nom.
+     */
+    const lu = await depotEtablissement(db).lire(null)
+    expect(lu?.name).toBeTruthy()
   })
 
   it('la caisse en tire la MÊME configuration que le serveur', async () => {
