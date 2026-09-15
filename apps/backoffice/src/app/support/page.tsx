@@ -1,4 +1,7 @@
 import type { Metadata } from 'next'
+// Le contact vit dans UN seul module : cette page et « Paramètres → Aide »
+// l'affichent toutes les deux, et deux copies finiraient par diverger.
+import { DELAI_PAR_DEFAUT, EDITEUR } from '../../editeur.js'
 
 /**
  * La page d'assistance — publique, et exigée par l'App Store.
@@ -30,15 +33,6 @@ export const metadata: Metadata = {
     'Comment obtenir de l’aide sur Kaissi : nous joindre, et les réponses aux questions les plus fréquentes.',
 }
 
-/** À compléter par l'éditeur — voir l'avertissement en tête de fichier. */
-const EDITEUR = {
-  nom: 'Res2Boost',
-  contact: 'contact@res2boost.com',
-  /** Laisser vide tant qu'aucune ligne n'est réellement tenue. */
-  telephone: '',
-  /** Idem : `''` affiche « nous répondons sous un jour ouvré » à la place. */
-  horaires: '',
-}
 
 const MAJ = '13 septembre 2026'
 
@@ -158,7 +152,7 @@ export default function Support() {
         <p className="indication">
           {EDITEUR.horaires
             ? EDITEUR.horaires
-            : 'Nous répondons sous un jour ouvré. Le service se fait en français et en arabe.'}
+            : DELAI_PAR_DEFAUT}
         </p>
         <p className="indication">
           Pour aller plus vite, indiquez le <strong>nom de votre

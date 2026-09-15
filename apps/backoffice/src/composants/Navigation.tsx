@@ -19,6 +19,7 @@ import {
   Percent,
   HandPlatter,
   LayoutList,
+  LifeBuoy,
   Printer,
   ReceiptText,
   Tag,
@@ -200,6 +201,9 @@ const GROUPES = [
        * faire ; jamais au milieu d'un réglage en cours.
        */
       { chemin: 'fonctionnalites', libelle: 'Fonctionnalités', icone: LayoutList, gestionnaire: true },
+      // « Aide » tout en bas, comme partout : c'est là qu'on la cherche, et
+      // c'est le seul écran de la rubrique qui ne règle rien.
+      { chemin: 'aide', libelle: 'Aide', icone: LifeBuoy, gestionnaire: true },
     ],
   },
 ] as const

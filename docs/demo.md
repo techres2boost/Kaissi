@@ -1230,7 +1230,7 @@ le marché connaît : un restaurateur qui vient de Loyverse cherche
 |---|---|
 | **Rapports** | Récapitulatif des ventes · Ventes par article · par catégorie · par employé · par mode de paiement · Reçus · Réductions · Périodes de travail |
 | **Articles** | Liste d'articles · Catégories · Stock · Réductions |
-| **Paramètres** | Employés · Clients · Taxes · Modes de paiement · Reçu · Imprimantes cuisine · Options de restauration · Fonctionnalités |
+| **Paramètres** | Employés · Clients · Taxes · Modes de paiement · Reçu · Imprimantes cuisine · Options de restauration · Fonctionnalités · Aide |
 
 > **« Tickets » s'appelle « Reçus ».** L'ancienne adresse `/‹resto›/tickets`
 > redirige : un favori ou un lien envoyé par message continue de marcher.
@@ -2419,7 +2419,7 @@ reste tout seul.
 ### S. Paramètres — la rubrique complète
 
 La rubrique **Configuration** s'appelle désormais **Paramètres**, comme chez
-Loyverse, et elle contient enfin ce qu'un restaurateur y cherche. Six écrans
+Loyverse, et elle contient enfin ce qu'un restaurateur y cherche. Sept écrans
 nouveaux, tous réservés au gérant par `ecranReserve()` — c'est-à-dire côté
 serveur, pas en masquant un lien. Tapez l'une de ces adresses à la main avec
 un compte `caissier` : elle répond « introuvable ».
@@ -2678,6 +2678,46 @@ retire le service sur une vente à emporter, ou l'ajoute sur une table.
 Rien à cliquer pour celui-là : aucun écran n'émet encore `service.set`. Il est
 listé ici parce que le défaut était **latent** — il se serait réveillé le jour
 où la caisse aurait offert le bouton, c'est-à-dire au pire moment.
+
+
+#### S.8 — Aide : les trois écrans à regarder
+
+14. **Paramètres → Aide.**
+
+**Attendu** : l'ordre dans lequel chercher quand quelque chose ne va pas —
+**Diagnostic** sur la tablette, **Synchronisation** sur la tablette,
+**Journée** ici — avec ce que chacun répond, puis le contact.
+
+> **La distinction qui évite un appel.** Une vente **en attente** finit
+> toujours par partir : c'est le fonctionnement normal hors ligne, et rien
+> n'est perdu. Une vente **refusée** ne se réessaie JAMAIS toute seule —
+> c'est une règle métier, elle remonte au gérant. C'est le seul des deux cas
+> où il faut agir, et les confondre fait soit s'inquiéter pour rien, soit
+> laisser une vente dehors.
+
+15. Suivez le lien **page d'assistance** : il s'ouvre dans un onglet, sur
+    `/support`.
+
+**Attendu** : la foire aux questions n'est PAS recopiée dans l'écran Aide.
+
+> Elle vit sur une page **publique**, et c'est voulu : elle s'ouvre depuis
+> n'importe quel téléphone, y compris quand personne n'arrive plus à se
+> connecter au back-office — c'est-à-dire précisément le jour où l'on en a
+> besoin. (Apple la visite aussi pendant la revue de l'application.) La
+> recopier ici en ferait deux versions, dont la seconde cesserait d'être vraie
+> sans que personne ne le remarque : celui qui lit une réponse périmée ne
+> signale pas qu'elle l'est, il abandonne.
+>
+> L'adresse de contact, elle, vient d'un **seul module**
+> (`apps/backoffice/src/editeur.ts`). Deux copies finiraient par diverger, et
+> le jour où l'adresse change, l'une des deux enverrait les clients dans le
+> vide pendant des mois — sans retour, puisque celui qui écrit à la mauvaise
+> adresse n'obtient pas de réponse.
+
+**Ce que l'écran dit aussi, et qu'on aurait pu taire** : il n'y a **pas de chat
+en direct**. Il est prévu avec les formules d'abonnement, qui ne sont pas en
+place. Laisser la page muette ferait chercher un bouton de discussion qui
+n'est nulle part.
 
 
 ---

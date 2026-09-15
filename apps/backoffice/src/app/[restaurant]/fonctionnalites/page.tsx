@@ -274,6 +274,21 @@ export default async function PageFonctionnalites({
       lien: 'Voir ce qui existe : le carnet clients',
     },
     {
+      cle: 'assistance',
+      nom: 'Assistance',
+      icone: ICONES.BookOpen,
+      etat: 'active',
+      quoi:
+        'Les trois écrans à regarder quand quelque chose ne va pas, et par où nous joindre.',
+      pourquoi:
+        'La foire aux questions vit sur une page PUBLIQUE, qui s’ouvre depuis n’importe ' +
+        'quel téléphone — y compris quand personne n’arrive plus à se connecter au ' +
+        'back-office, c’est-à-dire précisément le jour où l’on en a besoin.',
+      constat: 'Pas de chat en direct : il est prévu avec les abonnements, qui n’existent pas encore.',
+      chemin: 'aide',
+      lien: 'Ouvrir l’aide',
+    },
+    {
       cle: 'facturation',
       nom: 'Abonnement et facturation',
       icone: ICONES.BookOpen,
