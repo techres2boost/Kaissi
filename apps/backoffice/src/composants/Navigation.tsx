@@ -25,9 +25,11 @@ import {
   ReceiptText,
   Tag,
   Ticket,
+  Truck,
   UserRound,
   Users,
   UtensilsCrossed,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react'
 import { seDeconnecter } from '../app/connexion/actions.js'
@@ -142,6 +144,14 @@ const GROUPES = [
       { chemin: 'categories', libelle: 'Catégories', icone: Boxes, gestionnaire: true },
       { chemin: 'stock', libelle: 'Stock', icone: Package, gestionnaire: true },
       /*
+       * « Inventaire avancé » JUSTE sous « Stock », et pas ailleurs : c'est le
+       * même sujet regardé par l'autre bout — ce qu'il reste d'un côté, ce que
+       * ça vaut et d'où ça vient de l'autre. L'entrée reste visible quand le
+       * module n'est pas ouvert : l'écran explique alors ce qu'il ajoute.
+       * La cacher ferait vendre une fonctionnalité que personne ne découvre.
+       */
+      { chemin: 'inventaire', libelle: 'Inventaire avancé', icone: Truck, gestionnaire: true },
+      /*
        * « Modificateurs » avec les ARTICLES, pas avec les Paramètres : ce sont
        * des éléments de la carte, au même titre qu'un produit ou une
        * catégorie. C'est aussi là que Loyverse les range, et donc là qu'un
@@ -209,6 +219,16 @@ const GROUPES = [
        * faire ; jamais au milieu d'un réglage en cours.
        */
       { chemin: 'fonctionnalites', libelle: 'Fonctionnalités', icone: LayoutList, gestionnaire: true },
+      /*
+       * « Abonnement » juste après « Fonctionnalités », et pas ailleurs : les
+       * deux répondent à la même question à un jour d'intervalle — « qu'est-ce
+       * que ce logiciel fait ? », puis « qu'est-ce que MA formule ouvre ? ».
+       * Les séparer obligerait à traverser la colonne entre les deux.
+       */
+      // Un portefeuille, et surtout pas une icône de MONNAIE : lucide n'en
+      // propose qu'en euro, dollar et livre. Kaissi facture en dinars, et un
+      // « € » dans la colonne d'un restaurant tunisien se remarque tout de suite.
+      { chemin: 'abonnement', libelle: 'Abonnement', icone: Wallet, gestionnaire: true },
       // « Aide » tout en bas, comme partout : c'est là qu'on la cherche, et
       // c'est le seul écran de la rubrique qui ne règle rien.
       { chemin: 'aide', libelle: 'Aide', icone: LifeBuoy, gestionnaire: true },

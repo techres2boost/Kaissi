@@ -17,7 +17,13 @@
  */
 
 import { notFound } from 'next/navigation'
-import { formaterPourcentage, formaterTND, millimes } from '@kaissi/domain'
+import {
+  coutLigneExact,
+  formaterPourcentage,
+  formaterTND,
+  millimes,
+  valoriserStock,
+} from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../../serveur/session.js'
 import { supabaseServeur } from '../../../../serveur/supabase.js'
 import {
@@ -31,6 +37,7 @@ import {
 import { chargerAgregats } from '../../../../serveur/agregats.js'
 import { nomFichier, reponseCsv, versCsv, type Cellule } from '../../../../serveur/export-csv.js'
 import { reconstruireTicket } from '../../../../serveur/ticket.js'
+import { abonnementDe, exigerModule } from '../../../../serveur/abonnement.js'
 
 /** Un export est une photo d'un instant : jamais de rendu mis en cache. */
 export const dynamic = 'force-dynamic'
@@ -44,6 +51,14 @@ const SUJETS = [
   'tickets',
   'stock',
   'mouvements',
+  /**
+   * La valeur d'achat du stock — module « inventaire avancé » (0041).
+   *
+   * ⚑ C'est le SEUL export soumis à une garde de module, et il l'est pour la
+   *   raison de toujours : un export sans garde rendrait exactement ce qu'on
+   *   vient de retirer de l'écran. `exporterValorisation` la pose.
+   */
+  'valorisation',
   /** UN ticket, tel qu'il s'imprime — pas un tableau. */
   'ticket',
   'periodes',
@@ -123,6 +138,19 @@ export async function GET(
     return quoi === 'stock'
       ? exporterStock(restaurant, etablissement.nom)
       : exporterMouvements(restaurant, etablissement.nom, fiche.timezone)
+  }
+
+  if (quoi === 'valorisation') {
+    /*
+     * La garde de MODULE, côté serveur, et avant toute lecture.
+     *
+     * Masquer le bouton n'interdit rien : une adresse tapée à la main rendrait
+     * le fichier. C'est la même leçon que pour les rôles — `ventes`, `tickets`
+     * et `tableau-bord` ne vérifiaient rien, et une URL suffisait à lire le
+     * chiffre d'affaires.
+     */
+    exigerModule(await abonnementDe(etablissement.organizationId), 'inventaire_avance')
+    return exporterValorisation(restaurant, etablissement.nom)
   }
 
   /*
@@ -462,6 +490,72 @@ async function exporterStock(restaurantId: string, etablissement: string): Promi
       }),
     ),
     nomFichier('stock', etablissement),
+  )
+}
+
+/**
+ * La VALORISATION du stock, article par article — module « inventaire avancé ».
+ *
+ * Le total est calculé par `valoriserStock()` de `@kaissi/domain`, comme à
+ * l'écran : RÈGLE 7, une seule addition pour une seule question. Les valeurs
+ * de chaque ligne sont arrondies pour la lecture, et la dernière ligne du
+ * fichier porte le total NON reconstitué à partir d'elles — la même nuance
+ * qu'à l'écran, et le fichier la dit.
+ */
+async function exporterValorisation(
+  restaurantId: string,
+  etablissement: string,
+): Promise<Response> {
+  const supabase = await supabaseServeur()
+  const [produitsRes, stockRes] = await Promise.all([
+    supabase
+      .from('products')
+      .select('id, name, cost_per_unit')
+      .eq('restaurant_id', restaurantId)
+      .is('archived_at', null)
+      .order('position'),
+    supabase
+      .from('stock_actuel')
+      .select('product_id, qty_on_hand')
+      .eq('restaurant_id', restaurantId),
+  ])
+
+  const quantites = new Map(
+    (stockRes.data ?? []).map((s) => [s.product_id, Number(s.qty_on_hand)]),
+  )
+  // Seuls les produits SUIVIS : un produit qu'on ne compte pas n'a pas de
+  // quantité, et l'exporter à zéro noierait les lignes qui comptent.
+  const lignes = (produitsRes.data ?? [])
+    .filter((p) => quantites.has(p.id))
+    .map((p) => ({
+      nom: p.name as string,
+      quantite: quantites.get(p.id) ?? 0,
+      coutUnitaire: (p.cost_per_unit as number | null) ?? null,
+    }))
+
+  const valorisation = valoriserStock(lignes)
+
+  return reponseCsv(
+    versCsv(
+      ['Article', 'Quantité', 'Coût unitaire', 'Valeur (TND)', 'Valeur (millimes)'],
+      [
+        ...lignes.map((l) => [
+          l.nom,
+          l.quantite,
+          l.coutUnitaire ?? 'non saisi',
+          l.coutUnitaire === null ? '' : tnd(coutLigneExact(l.coutUnitaire, l.quantite)),
+          l.coutUnitaire === null ? '' : Math.round(coutLigneExact(l.coutUnitaire, l.quantite)),
+        ]),
+        [
+          `TOTAL (${valorisation.lignesSansCout} article(s) sans coût saisi, comptés pour zéro)`,
+          '',
+          '',
+          tnd(valorisation.valeurMillimes),
+          valorisation.valeurMillimes,
+        ],
+      ],
+    ),
+    nomFichier('valorisation-du-stock', etablissement),
   )
 }
 

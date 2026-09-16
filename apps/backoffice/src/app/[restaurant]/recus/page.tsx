@@ -15,6 +15,7 @@ import { formaterPourcentage, formaterTND } from '@kaissi/domain'
 import { montant } from '../../../serveur/montant.js'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { libelleJournee } from '../../../serveur/journee.js'
+import { AvertissementFormule } from '../../../composants/AvertissementFormule.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { reconstruireTicket } from '../../../serveur/ticket.js'
 import { chargerRapport } from '../../../serveur/rapport.js'
@@ -89,6 +90,8 @@ export default async function PageRecus({
       </header>
 
       <AvertissementTronque tronque={ventes.tronque} />
+
+      <AvertissementFormule restaurantId={restaurant} periode={periode} />
 
       <FiltresRapport
         du={periode.du}

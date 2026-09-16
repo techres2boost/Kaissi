@@ -1440,3 +1440,86 @@ button.danger-plein:disabled { opacity: 0.55; cursor: not-allowed; }
 /* Une ligne trop longue est SIGNALÉE, pas coupée : elle repartira à la ligne
    à l'impression, et c'est cela qu'il faut voir avant d'imprimer. */
 .apercu-ticket .trop-long { background: var(--fond-or); color: var(--or); }
+
+/* ── Abonnement : le comparatif des formules ───────────────────────────────
+   Deux colonnes de droits, et une première colonne qui porte l'explication.
+   C'est elle qui fait le travail : « Historique consultable » ne veut rien
+   dire seul, « jusqu'où les rapports remontent » se comprend sans aide. */
+.comparatif-formules { width: 100%; border-collapse: collapse; }
+.comparatif-formules th, .comparatif-formules td {
+  border-bottom: 1px solid var(--bordure);
+  padding: 0.7rem 0.75rem;
+  vertical-align: top;
+}
+.comparatif-formules thead th { text-align: center; white-space: nowrap; }
+.comparatif-formules thead th:first-child { text-align: left; }
+.comparatif-formules thead th .etiquette { display: block; margin-top: 0.2rem; }
+/*
+ * Les en-têtes de LIGNE reprennent le texte courant.
+ *
+ * Le `th` global est en petites capitales espacées — parfait pour une
+ * colonne « Montant », illisible pour une phrase de deux lignes. Ici, la
+ * première colonne porte le libellé ET son explication : en capitales, elle
+ * devient un pavé qu'on ne lit pas, et le tableau perd la moitié de ce qu'il
+ * a à dire. Les en-têtes de COLONNE, eux, gardent la forme habituelle.
+ */
+.comparatif-formules tbody th {
+  text-transform: none; letter-spacing: normal;
+  font-size: 0.95rem; color: var(--texte);
+  text-align: left; font-weight: 600;
+  /* La colonne d'explication prend la place qui reste, sans jamais forcer
+     la table plus large que l'écran — d'où le `min-width: 0` implicite d'une
+     largeur en pourcentage plutôt qu'en `rem`. */
+  width: 60%;
+}
+.comparatif-formules tbody th .detail {
+  display: block; margin-top: 0.2rem;
+  font-weight: 400; font-size: 0.85rem; color: var(--attenue);
+}
+.comparatif-formules tbody td { text-align: center; white-space: nowrap; }
+.comparatif-formules .oui { color: var(--succes); }
+.comparatif-formules .non { color: var(--attenue); }
+/* La colonne en cours est TEINTÉE, pas encadrée : un cadre sur une colonne
+   de tableau se dessine au pixel près ou pas du tout, et les bordures de
+   cellules s'en mêlent. Un fond tient à toutes les largeurs. */
+.comparatif-formules .colonne-actuelle { background: var(--panneau-clair); }
+
+/* Sous 640 px, l'explication passe sous le libellé et la table respire.
+   Les deux colonnes de droits restent à droite : ce sont elles qu'on compare,
+   les empiler retirerait la seule chose que ce tableau fait. */
+@media (max-width: 640px) {
+  .comparatif-formules th, .comparatif-formules td { padding: 0.6rem 0.4rem; }
+  .comparatif-formules tbody th { width: auto; }
+  .comparatif-formules tbody th .detail { font-size: 0.8rem; }
+}
+
+/* ── Inventaire avancé : la valorisation ───────────────────────────────────
+   Quatre colonnes de chiffres ne tiennent pas dans 320 px, et c'est la
+   colonne « Valeur » — celle qu'on vient lire — qui sortait de l'écran.
+   Sous 560 px, le coût unitaire passe donc SOUS le nom de l'article plutôt
+   que de disparaître : c'est une donnée de vérification, pas la réponse. */
+/*
+ * Le NOM de l'article reprend le texte courant.
+ *
+ * Le `th` global est en petites capitales espacées, ce qui convient à un
+ * en-tête de colonne et pas au nom d'un produit : « PIZZA QUATRE FROMAGES »
+ * sur trois lignes se lit moins vite que la même chose en bas de casse, et
+ * mange la largeur dont la colonne « Valeur » a besoin.
+ */
+.valorisation tbody th {
+  text-transform: none; letter-spacing: normal;
+  font-size: 0.95rem; color: var(--texte);
+}
+/* Un montant ne se coupe pas en deux lignes : « 53,127 » au-dessus de « TND »
+   se relit comme deux nombres. Le conteneur défile si besoin. */
+.valorisation td.nombre { white-space: nowrap; }
+
+.cout-replie { display: none; }
+@media (max-width: 560px) {
+  .comparatif-formules .cout-unitaire, th.cout-unitaire, td.cout-unitaire { display: none; }
+  .cout-replie {
+    display: block; margin-top: 0.2rem;
+    font-weight: 400; font-size: 0.8rem; color: var(--attenue);
+    text-transform: none; letter-spacing: normal;
+  }
+}

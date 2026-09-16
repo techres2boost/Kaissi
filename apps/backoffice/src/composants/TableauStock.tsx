@@ -31,11 +31,18 @@ export function TableauStock({
   restaurantId,
   produits,
   categories,
+  fournisseurs,
 }: {
   restaurantId: string
   produits: ProduitStock[]
   /** Les catégories DANS L'ORDRE du Menu — c'est l'ordre des groupes. */
   categories: readonly { id: string; nom: string }[]
+  /**
+   * Les fiches fournisseurs actives, quand le module « inventaire avancé »
+   * est ouvert. VIDE sinon, et le champ reste alors le texte libre qu'il a
+   * toujours été — ces noms ne sont qu'une SUGGESTION.
+   */
+  fournisseurs: readonly string[]
 }) {
   const router = useRouter()
   const [ouvert, setOuvert] = useState<string | null>(null)
@@ -60,6 +67,19 @@ export function TableauStock({
   return (
     <section className="bloc">
       <h2>Tous les produits</h2>
+
+      {/*
+        La liste est déclarée UNE fois pour tout l'écran, et non dans chaque
+        rangée dépliée : un `datalist` par produit, ce sont quatre cents
+        copies du même contenu dans le document.
+      */}
+      {fournisseurs.length > 0 && (
+        <datalist id="liste-fournisseurs">
+          {fournisseurs.map((f) => (
+            <option key={f} value={f} />
+          ))}
+        </datalist>
+      )}
 
       {message && (
         <p className={`message ${message.erreur ? 'erreur' : 'succes'}`}>{message.texte}</p>
@@ -301,7 +321,31 @@ export function TableauStock({
                           <div className="champs deux">
                             <label className="champ">
                               Fournisseur (facultatif)
-                              <input name="fournisseur" placeholder="Sfax Primeurs" />
+                              {/*
+                                Un `datalist`, et surtout pas un `select`.
+
+                                Une liste fermée obligerait à créer une fiche
+                                avant de saisir une réception — exactement ce
+                                que la migration 0026 refusait : « un
+                                formulaire de plus au moment où quelqu'un
+                                décharge des cageots ». Ici, on tape ce qu'on
+                                veut ; les noms connus se proposent, et la
+                                réception se rattache à la fiche quand le nom
+                                correspond.
+
+                                La liste est vide sans le module : le champ
+                                redevient alors exactement ce qu'il était.
+                              */}
+                              <input
+                                name="fournisseur"
+                                placeholder="Sfax Primeurs"
+                                list={
+                                  fournisseurs.length > 0
+                                    ? 'liste-fournisseurs'
+                                    : undefined
+                                }
+                                autoComplete="off"
+                              />
                             </label>
                             <label className="champ">
                               Note (facultatif)

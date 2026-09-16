@@ -35,8 +35,10 @@ import {
   Printer,
   Tag,
   Ticket,
+  Truck,
   Users,
   UtensilsCrossed,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -151,6 +153,8 @@ export const ICONES = {
   Printer,
   Tag,
   Ticket,
+  Truck,
   Users,
   UtensilsCrossed,
+  Wallet,
 }

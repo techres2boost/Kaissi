@@ -104,3 +104,79 @@ export function margeProduit(
   const cout = totaliserCouts([coutLigneExact(coutUnitaire, 1)])
   return calculerMarge(prixVenteMillimes, cout)
 }
+
+/** Une ligne de stock à valoriser : ce qu'il reste, et ce qu'il a coûté. */
+export interface LigneStock {
+  /** Quantité en stock. PEUT être négative — voir `valoriserStock`. */
+  readonly quantite: number
+  /** Coût d'achat unitaire, `null` quand personne ne l'a saisi. */
+  readonly coutUnitaire: number | null | undefined
+}
+
+export interface ValorisationStock {
+  /** Valeur d'achat du stock, arrondie UNE fois au total. */
+  readonly valeurMillimes: Millimes
+  /** Lignes valorisées, c'est-à-dire celles qui portent un coût. */
+  readonly lignesValorisees: number
+  /**
+   * Lignes SANS coût saisi. Elles comptent pour zéro dans le total, et ce
+   * nombre existe pour que l'écran le dise.
+   *
+   * Un coût non saisi n'est pas un coût nul. Sans ce compte, un restaurant
+   * qui n'a renseigné aucun coût verrait « Valeur du stock : 0,000 TND » et
+   * le croirait — alors que la vraie réponse est « on ne sait pas ».
+   */
+  readonly lignesSansCout: number
+  /**
+   * Lignes à quantité NÉGATIVE, et leur valeur retirée du total.
+   *
+   * Une quantité négative est le cas normal d'une vente encaissée hors ligne
+   * qui arrive après coup, ou d'une réception oubliée. On ne la borne donc
+   * pas à zéro : la borner ferait paraître juste un stock faux. Mais elle
+   * RETIRE de la valeur, et une valorisation qu'un seul produit à −40 tire
+   * vers le bas doit pouvoir s'expliquer — d'où ce compte.
+   */
+  readonly lignesNegatives: number
+}
+
+/**
+ * Valeur d'achat d'un stock — la question « combien dort dans mes frigos ? ».
+ *
+ * ── Pourquoi c'est une RÈGLE, donc ici ────────────────────────────────────
+ *
+ * Trois décisions, et aucune n'est évidente :
+ *
+ *   • on multiplie par le coût d'ACHAT, jamais par le prix de vente. Un stock
+ *     valorisé au prix de vente compte une marge qui n'a pas été réalisée —
+ *     c'est un chiffre que le comptable refuse, et qu'on ne peut pas
+ *     rapprocher d'une facture ;
+ *   • on n'arrondit qu'au TOTAL. Le coût d'un gramme de mozzarella est
+ *     inférieur au millime : arrondir ligne à ligne ferait dériver la valeur
+ *     d'un stock de plusieurs dinars ;
+ *   • un coût non saisi vaut ZÉRO dans le total, et le dit. C'est le même
+ *     arbitrage que `coutLigneExact` : mieux vaut un total incomplet annoncé
+ *     comme tel qu'un total faux qui a l'air juste.
+ */
+export function valoriserStock(lignes: readonly LigneStock[]): ValorisationStock {
+  let lignesValorisees = 0
+  let lignesSansCout = 0
+  let lignesNegatives = 0
+  const exacts: number[] = []
+
+  for (const ligne of lignes) {
+    if (ligne.coutUnitaire === null || ligne.coutUnitaire === undefined) {
+      lignesSansCout += 1
+      continue
+    }
+    lignesValorisees += 1
+    if (ligne.quantite < 0) lignesNegatives += 1
+    exacts.push(coutLigneExact(ligne.coutUnitaire, ligne.quantite))
+  }
+
+  return {
+    valeurMillimes: totaliserCouts(exacts),
+    lignesValorisees,
+    lignesSansCout,
+    lignesNegatives,
+  }
+}

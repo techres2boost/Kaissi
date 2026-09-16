@@ -2715,9 +2715,9 @@ où la caisse aurait offert le bouton, c'est-à-dire au pire moment.
 > adresse n'obtient pas de réponse.
 
 **Ce que l'écran dit aussi, et qu'on aurait pu taire** : il n'y a **pas de chat
-en direct**. Il est prévu avec les formules d'abonnement, qui ne sont pas en
-place. Laisser la page muette ferait chercher un bouton de discussion qui
-n'est nulle part.
+en direct**. Les formules d'abonnement existent depuis (§ U), mais le chat,
+lui, n'est pas en place. Laisser la page muette ferait chercher un bouton de
+discussion qui n'est nulle part.
 
 
 ---
@@ -2814,6 +2814,186 @@ valeur du supplément.
 passage : retrouver les douze articles auxquels un groupe s'appliquait pour le
 rétablir serait une punition pour avoir archivé par erreur.
 
+
+### U. Abonnement — ce qu'une formule peut fermer, et ce qu'elle ne peut pas
+
+**Paramètres → Abonnement.** La formule du compte, ce qu'elle ouvre, et par où
+en changer.
+
+> ⚑ **La frontière, et elle n'est pas négociable : un abonnement ne ferme QUE
+> des écrans de gestion. Jamais un geste de caisse.**
+>
+> Le cahier des charges demandait que la formule gratuite « n'ait pas la partie
+> offline qui fonctionne ». C'est infaisable ici, et le dire vaut mieux que le
+> contourner : le POS est EMPAQUETÉ dans l'APK, il n'a pas de mode « connecté »
+> dont on pourrait le priver. Sa base est locale, ses ventes sont un journal
+> local, et il encaisse avant même d'avoir vu un serveur. « Désactiver
+> l'offline » voudrait dire écrire du code qui EMPÊCHE la caisse de fonctionner
+> sans réseau — démonter exprès la seule chose que ce produit promet.
+>
+> Et une caisse qui refuserait d'encaisser parce qu'un essai a expiré
+> s'arrêterait un vendredi soir, en plein service, devant des clients qui
+> attendent. Aucune ligne de revenu ne justifie cela.
+>
+> Ce qu'une formule peut fermer, ce sont donc deux choses, et deux seulement :
+> **l'inventaire avancé** et **la profondeur d'historique des rapports**.
+
+#### U.1 — Lire la formule en cours
+
+1. **Paramètres → Abonnement.**
+
+**Attendu** : la formule, et si c'est un essai, le nombre de jours restants et
+sa date de fin. Puis un tableau comparatif dont la **première ligne** est
+« Encaissement, même sans Internet », cochée dans toutes les colonnes.
+
+Aucun bouton pour changer de formule, et c'est voulu : le back-office n'a que
+la clé PUBLIQUE de Supabase, donc tout ce qu'il peut écrire, n'importe qui peut
+le rejouer depuis la console de son navigateur. La table `subscriptions` n'a
+**aucune politique d'écriture** (migration 0040) — un bouton « passer en Pro »
+serait littéralement un `update` offert à tous.
+
+#### U.2 — Changer de formule (côté éditeur)
+
+Dans le dépôt, sur le poste qui porte `DATABASE_URL` :
+
+```bash
+pnpm sync:abonnement                                          # voir l'état
+pnpm sync:abonnement --organisation <uuid> --formule gratuit
+pnpm sync:abonnement --organisation <uuid> --formule pro
+pnpm sync:abonnement --organisation <uuid> --formule essai --jours 30
+```
+
+Rechargez le back-office : la formule a changé, **sans rien réinstaller et sans
+toucher une tablette**.
+
+#### U.3 — Ce que « gratuit » ferme vraiment
+
+Passez en `gratuit`, puis :
+
+1. **Rapports → Récapitulatif des ventes**, choisissez une période qui démarre
+   il y a quatre mois.
+
+**Attendu** : un bandeau « **Votre formule limite l'historique** — ce rapport
+commence au *date* ». Le rapport s'affiche, **raboté** ; il ne refuse pas.
+
+> Un écran vide avec « changez de formule » ferait croire qu'il n'y a pas eu de
+> ventes. Et les ventes plus anciennes **restent en base** : repassez en `pro`,
+> elles reviennent entières. Une formule qui effacerait des écritures
+> comptables serait bien autre chose qu'une formule.
+
+2. **Articles → Inventaire avancé.**
+
+**Attendu** : la page explique ce que le module ajoute, et **ne charge aucune
+donnée**. Elle rappelle aussi que le stock, lui, reste entier.
+
+3. Tentez l'export en tapant l'adresse à la main :
+   `/‹resto›/export/valorisation`
+
+**Attendu** : **404**. Masquer un bouton n'interdit rien — c'est la même leçon
+que pour les rôles, où une URL tapée à la main rendait le chiffre d'affaires.
+
+4. **Et la caisse ?** Coupez le réseau de la tablette, encaissez trois tickets,
+   rétablissez le réseau.
+
+**Attendu** : **rien n'a changé**. La caisse n'interroge aucun abonnement — elle
+n'en a pas les moyens, et c'est le but.
+
+#### U.4 — L'essai des quatorze jours
+
+Ouvrez un restaurant **depuis la caisse** (§ R.2). Puis, au back-office du
+nouveau compte : **Paramètres → Abonnement**.
+
+**Attendu** : formule « Essai », **14 jours restants**, tout ouvert.
+
+> L'échéance est posée dans la **même transaction** que l'organisation, et la
+> durée vient de `JOURS_ESSAI` du domaine — la même constante qui compte les
+> jours restants à l'écran. Deux durées écrites à deux endroits finiraient par
+> différer, et le bandeau annoncerait trois jours à quelqu'un qui n'en a plus.
+
+Pour voir l'essai **expiré** sans attendre deux semaines :
+
+```bash
+pnpm sync:abonnement --organisation <uuid> --formule essai --jours 1
+# puis, en SQL, reculer l'échéance :
+#   update kaissi.subscriptions set trial_ends_at = now() - interval '1 day'
+#    where organization_id = '<uuid>';
+```
+
+**Attendu** : « Votre essai s'est terminé le… Vous avez désormais les droits de
+la formule Gratuit. » **Rien n'est perdu**, et la caisse encaisse comme avant.
+
+### V. Inventaire avancé — la valeur du stock, et chez qui on achète
+
+**Articles → Inventaire avancé** (formule `pro` ou essai en cours).
+
+#### V.1 — Ce que le stock vaut
+
+**Attendu** : la valeur d'achat totale, puis le détail article par article.
+
+> ⚑ **Trois décisions, et aucune n'est évidente** — elles vivent dans
+> `packages/domain/src/marge.ts`, pas dans l'écran :
+>
+> - on multiplie par le **coût d'ACHAT**, jamais par le prix de vente. Un stock
+>   valorisé au prix de vente compte une marge non réalisée — un chiffre que le
+>   comptable refuse ;
+> - on **n'arrondit qu'au total**. Le coût d'un gramme de mozzarella est
+>   inférieur au millime : arrondir ligne à ligne ferait dériver la valeur de
+>   plusieurs dinars. **C'est pourquoi additionner la colonne de droite à la
+>   main peut donner quelques millimes d'écart — et c'est le total qui est
+>   juste.** L'écran le dit sous le tableau ;
+> - un **coût non saisi vaut zéro, et le dit**. Sans cet avertissement, un
+>   restaurant qui n'a renseigné aucun coût lirait « 0,000 TND » et le croirait,
+>   alors que la vraie réponse est « on ne sait pas ».
+
+1. Mettez un article suivi à **coût vide** (Articles → Liste d'articles).
+
+**Attendu** : un bandeau « *n* article(s) sans coût d'achat saisi… le total est
+donc **incomplet** ».
+
+2. Vendez hors ligne plus que le stock d'un article, puis synchronisez.
+
+**Attendu** : la quantité passe **négative**, un second bandeau le signale, et
+la valeur est **retirée** du total. Elle n'est pas bornée à zéro : la borner
+ferait paraître juste un stock faux.
+
+#### V.2 — Les fiches fournisseurs
+
+3. Créez **Sfax Primeurs**, avec une personne à joindre et un téléphone.
+4. **Articles → Stock** → dépliez un article → **Mouvement** → motif
+   « Réception », et tapez « Sfax » dans le champ Fournisseur.
+
+**Attendu** : le champ **propose** « Sfax Primeurs ». Choisissez-le, validez.
+
+5. Revenez à **Inventaire avancé**.
+
+**Attendu** : la fiche compte **1 réception rattachée**.
+
+6. Saisissez maintenant une réception au nom d'**un fournisseur qui n'a pas de
+   fiche** — « Un maraîcher de passage ».
+
+**Attendu** : **elle passe**. C'est le point de toute cette rubrique.
+
+> La migration 0026 avait volontairement laissé ce champ en texte libre :
+> « une table imposerait de créer un fournisseur avant de saisir une réception
+> — donc un formulaire de plus au moment où quelqu'un décharge des cageots ».
+> La 0041 ajoute la table **sans revenir là-dessus**. Le champ reste libre ; il
+> propose seulement les noms connus, et rattache quand ça correspond. D'où un
+> `datalist` et surtout **pas** une liste déroulante fermée.
+
+7. Archivez une fiche qui a des réceptions.
+
+**Attendu** : elle sort des propositions, **l'historique du stock ne bouge
+pas**, et le nom redevient disponible pour une nouvelle fiche — l'index unique
+est partiel sur les fiches actives.
+
+#### V.3 — Ce que le module ne ferme PAS
+
+| | |
+|---|---|
+| **Le stock** | entier, quelle que soit la formule : comptages, mouvements, seuils, retrait automatique de la carte |
+| **La caisse** | jamais concernée — elle n'interroge aucun abonnement |
+| **Les rapports de vente** | ouverts dans toutes les formules ; seule leur **profondeur** dépend de la formule |
+| **Les fiches déjà créées** | conservées. Repasser en `gratuit` les masque, il ne les efface pas |
 
 ---
 
@@ -3059,7 +3239,7 @@ tape un PIN sur la tablette, c'est tout.
 
 ## 10. Ce qui n'est pas encore là — et pourquoi
 
-Trois limites que la démonstration met en évidence. Elles sont assumées, pas
+Les limites que la démonstration met en évidence. Elles sont assumées, pas
 oubliées : chacune est écrite ici pour qu'on la choisisse, plutôt que de la
 découvrir en clientèle.
 
@@ -3099,6 +3279,21 @@ et un `server.url` — le mécanisme qui convient très bien à Stampi — sont
 réseau, et sans connexion elle ne s'ouvrirait même pas. La garde du mode
 avion le vérifie à chaque construction, sur la configuration `.ts` **et** sur
 les configurations natives générées.
+
+**5. L'abonnement se LIT, il ne se PAIE pas.** Les formules existent (§ U),
+elles ouvrent et ferment réellement des écrans, et l'essai de quatorze jours
+se pose tout seul à l'inscription. Ce qui n'existe pas, c'est la facturation :
+ni échéancier, ni facture téléchargeable, ni moyen de paiement enregistré.
+Kaissi ne prélève rien tout seul, et le changement de formule passe par
+`pnpm sync:abonnement`, côté éditeur.
+
+> C'est un choix, pas un oubli. Un bouton « passer en Pro » dans le
+> back-office serait un `update` que n'importe qui peut rejouer depuis la
+> console de son navigateur — la table n'a donc **aucune politique
+> d'écriture** sous RLS. Et brancher un prélèvement demande une décision
+> commerciale (la grille tarifaire) qui n'est pas prise : **aucun montant
+> n'est écrit nulle part dans ce dépôt**, et surtout pas dans une page qui
+> finirait dans une capture d'écran.
 
 Et une question ouverte, volontairement laissée telle quelle :
 

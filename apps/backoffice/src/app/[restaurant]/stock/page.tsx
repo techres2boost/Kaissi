@@ -13,11 +13,12 @@
  * signale une réception qu'on a oublié de saisir.
  */
 
-import { formaterTND, margeProduit, millimes } from '@kaissi/domain'
+import { formaterTND, margeProduit, moduleOuvert, valoriserStock } from '@kaissi/domain'
 import { montant } from '../../../serveur/montant.js'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { etatStock, type EtatStock } from '../../../serveur/rapports.js'
+import { abonnementDe } from '../../../serveur/abonnement.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
 import { HistoriqueStock, type Mouvement } from '../../../composants/HistoriqueStock.js'
 import { TableauStock } from '../../../composants/TableauStock.js'
@@ -165,12 +166,44 @@ export default async function PageStock({
     creeA: m.created_at,
   }))
 
+  /*
+   * Les fiches FOURNISSEURS, pour la saisie d'une réception — et seulement
+   * si le module est ouvert.
+   *
+   * Sans le module, le champ reste ce qu'il a toujours été : un texte libre.
+   * Le module ne remplace rien, il PROPOSE les noms déjà connus. C'est la
+   * raison écrite dans la migration 0026, et elle tient toujours : personne
+   * ne crée une fiche au moment où il décharge des cageots.
+   */
+  const abonnement = await abonnementDe(etablissement.organizationId)
+  const fournisseursRes = moduleOuvert(abonnement, 'inventaire_avance')
+    ? await supabase
+        .from('suppliers')
+        .select('id, name')
+        .eq('restaurant_id', restaurant)
+        .is('archived_at', null)
+        .order('name')
+    : { data: [] }
+  const fournisseurs = (fournisseursRes.data ?? []).map((f) => f.name as string)
+
   const ruptures = produits.filter((p) => p.etat === 'rupture')
   const faibles = produits.filter((p) => p.etat === 'faible')
   const suivis = produits.filter((p) => p.suivi)
-  const valeurStock = suivis.reduce(
-    (total, p) => total + (p.quantite ?? 0) * (p.coutUnitaire ?? 0),
-    0,
+  /*
+   * La valeur du stock passe par `valoriserStock()` de `@kaissi/domain`.
+   *
+   * RÈGLE 7 : cette somme-là porte des DÉCISIONS — coût d'achat et non prix
+   * de vente, arrondi une seule fois au total, coût non saisi compté pour
+   * zéro. Elle était écrite ici, à la main, et l'écran « Inventaire avancé »
+   * allait l'écrire une seconde fois : deux additions de la même chose
+   * finissent par répondre deux chiffres, et personne ne sait lequel croire.
+   *
+   * Le `?? 0` d'alors comptait un coût NON SAISI comme un coût nul, en
+   * silence. Il est toujours compté pour zéro — mais l'indication sous le
+   * chiffre le dit maintenant.
+   */
+  const valorisation = valoriserStock(
+    suivis.map((p) => ({ quantite: p.quantite ?? 0, coutUnitaire: p.coutUnitaire })),
   )
 
   return (
@@ -219,9 +252,18 @@ export default async function PageStock({
         <div className="kpi">
           <span className="kpi-libelle">Valeur du stock</span>
           <span className="kpi-valeur">
-            {formaterTND(millimes(Math.round(valeurStock)))}
+            {formaterTND(montant(valorisation.valeurMillimes))}
           </span>
-          <span className="kpi-aide">Quantités × coût d’achat.</span>
+          <span className="kpi-aide">
+            Quantités × coût d’achat.
+            {valorisation.lignesSansCout > 0 && (
+              <>
+                {' '}
+                <strong>Incomplet</strong> : {valorisation.lignesSansCout} article(s)
+                sans coût saisi comptent pour zéro.
+              </>
+            )}
+          </span>
         </div>
       </div>
 
@@ -257,6 +299,7 @@ export default async function PageStock({
           id: c.id as string,
           nom: c.name as string,
         }))}
+        fournisseurs={fournisseurs}
       />
 
       <HistoriqueStock mouvements={mouvements} />

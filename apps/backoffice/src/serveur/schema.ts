@@ -102,6 +102,27 @@ export type Restaurant = {
   receipt_footer: string | null
 }
 
+/**
+ * La formule d'une organisation (migration 0040).
+ *
+ * ⚠ En LECTURE SEULE sous RLS, et c'est le point : le back-office n'utilise
+ *   que la clé publique. Une politique d'écriture ici serait un bouton
+ *   « je m'offre la formule payante », actionnable depuis la console du
+ *   navigateur. Les changements passent par le service de synchronisation.
+ *
+ * Elle ne ferme QUE des écrans de gestion — jamais un geste de caisse. La
+ * raison complète est en tête de `packages/domain/src/abonnement.ts`.
+ */
+export type Abonnement = {
+  organization_id: Uuid
+  /** `essai` | `gratuit` | `pro`. */
+  plan: string
+  trial_ends_at: Horodatage | null
+  started_at: Horodatage
+  updated_at: Horodatage
+  note: string | null
+}
+
 export type Utilisateur = {
   id: Uuid
   organization_id: Uuid
@@ -497,10 +518,38 @@ export type MouvementStock = {
   qty_delta: number
   reason: string
   note: string | null
-  /** Nom du fournisseur, facultatif et libre (0026). */
+  /** Nom du fournisseur, facultatif et libre (0026). Fait foi pour l'affichage. */
   supplier: string | null
+  /**
+   * Fiche fournisseur, quand le nom saisi correspondait à une fiche (0041).
+   *
+   * `null` est le cas NORMAL, et pas une anomalie : une réception se saisit
+   * toujours avec un nom libre, sans obliger personne à créer une fiche au
+   * moment où il décharge des cageots.
+   */
+  supplier_id: Uuid | null
   created_by: Uuid | null
   created_at: Horodatage
+}
+
+/**
+ * Fiche fournisseur (migration 0041) — module « inventaire avancé ».
+ *
+ * Référentiel ordinaire : lue par les membres, écrite par l'encadrement,
+ * archivée et jamais supprimée. Elle ne descend PAS à la caisse : une
+ * tablette n'enregistre aucune réception.
+ */
+export type Fournisseur = {
+  id: Uuid
+  organization_id: Uuid
+  restaurant_id: Uuid
+  name: string
+  contact: string | null
+  phone: string | null
+  note: string | null
+  archived_at: Horodatage | null
+  created_at: Horodatage
+  updated_at: Horodatage
 }
 
 /**
@@ -632,6 +681,7 @@ export type Database = {
   kaissi: {
     Tables: {
       restaurants: Table<Restaurant>
+      subscriptions: Table<Abonnement>
       users: Table<Utilisateur>
       memberships: Table<
         Appartenance,
@@ -671,6 +721,7 @@ export type Database = {
       refunds: Table<Remboursement>
       stock_items: Table<StockItem>
       stock_movements: Table<MouvementStock>
+      suppliers: Table<Fournisseur>
       stock_actuel: Table<StockActuel>
       push_subscriptions: Table<AbonnementPush>
       /**

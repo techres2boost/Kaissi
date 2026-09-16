@@ -172,6 +172,10 @@ export async function enregistrerMouvement(
     // gérant de taper « −3 » invite à la faute de signe.
     const signe = raison === 'perte' ? -Math.abs(delta) : delta
 
+    // Facultatif, et libre : « +12 le 3 septembre » ne se rapproche d'aucune
+    // facture ; « +12 le 3 septembre, Sfax Primeurs » se rapproche tout seul.
+    const fournisseur = texteFacultatif(donnees, 'fournisseur')
+
     const { error } = await supabase.from('stock_movements').insert({
       organization_id: organizationId,
       restaurant_id: restaurantId,
@@ -179,16 +183,51 @@ export async function enregistrerMouvement(
       qty_delta: signe,
       reason: raison,
       note: texteFacultatif(donnees, 'note'),
-      // Facultatif, et libre : « +12 le 3 septembre » ne se rapproche
-      // d'aucune facture ; « +12 le 3 septembre, Sfax Primeurs » se
-      // rapproche tout seul.
-      supplier: texteFacultatif(donnees, 'fournisseur'),
+      supplier: fournisseur,
+      supplier_id: await fiche(supabase, restaurantId, fournisseur),
       created_by: employeId,
     })
     if (error) throw new Error(error.message)
     await realignerCarte(supabase, restaurantId, produitId)
     return 'Mouvement enregistré.'
   })
+}
+
+/**
+ * Le nom saisi correspond-il à une FICHE fournisseur ? (migration 0041)
+ *
+ * ── Ce rattachement ne conditionne RIEN ───────────────────────────────────
+ *
+ * Il n'est pas obligatoire, il n'empêche aucune saisie, et son absence n'est
+ * pas une anomalie : un nom inconnu s'enregistre exactement comme avant. La
+ * colonne `supplier` porte de toute façon le nom tapé, et c'est elle qui
+ * s'affiche. La fiche n'ajoute qu'un LIEN, qui permet de compter les
+ * réceptions d'un fournisseur.
+ *
+ * ── La comparaison est insensible à la casse et aux espaces ───────────────
+ *
+ * `ilike` sur le nom exact, pas `like '%…%'` : « Sfax » ne doit pas se
+ * rattacher à « Sfax Primeurs », qui est un AUTRE fournisseur. C'est le même
+ * découpage que l'index unique de la 0041, qui compare `lower(btrim(name))`.
+ *
+ * Et si la lecture échoue — module fermé, RLS, réseau — on rend `null` plutôt
+ * que de faire échouer la réception. Perdre un lien de confort coûte
+ * infiniment moins cher que perdre une saisie de stock.
+ */
+async function fiche(
+  supabase: Awaited<ReturnType<typeof supabaseServeur>>,
+  restaurantId: string,
+  nom: string | null,
+): Promise<string | null> {
+  if (nom === null) return null
+  const { data } = await supabase
+    .from('suppliers')
+    .select('id')
+    .eq('restaurant_id', restaurantId)
+    .is('archived_at', null)
+    .ilike('name', nom)
+    .maybeSingle()
+  return (data?.id as string | undefined) ?? null
 }
 
 /**

@@ -16,6 +16,7 @@
 import { formaterPourcentage } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { libelleJournee } from '../../../serveur/journee.js'
+import { AvertissementFormule } from '../../../composants/AvertissementFormule.js'
 import { chargerRapport } from '../../../serveur/rapport.js'
 import { agregerSerie } from '../../../serveur/rapports.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
@@ -102,6 +103,8 @@ export default async function PageVentes({
             : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
         </p>
       </header>
+
+      <AvertissementFormule restaurantId={restaurant} periode={periode} />
 
       <FiltresRapport
         du={periode.du}

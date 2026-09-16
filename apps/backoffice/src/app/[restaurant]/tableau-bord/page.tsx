@@ -14,6 +14,7 @@ import { chargerFiche, resoudrePeriode } from '../../../serveur/ventes.js'
 import { chargerAgregats } from '../../../serveur/agregats.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
 import { SelecteurPeriode } from '../../../composants/SelecteurPeriode.js'
+import { AvertissementFormule } from '../../../composants/AvertissementFormule.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,6 +65,8 @@ export default async function PageTableauBord({
             : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
         </p>
       </header>
+
+      <AvertissementFormule restaurantId={restaurant} periode={periode} />
 
       <SelecteurPeriode du={periode.du} au={periode.au} aujourdhui={aujourdhui} />
 

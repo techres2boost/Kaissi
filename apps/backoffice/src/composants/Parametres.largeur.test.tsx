@@ -23,6 +23,7 @@ import { readFileSync } from 'node:fs'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { chromium, type Browser } from 'playwright'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { etatAbonnement, finEssaiDepuis } from '@kaissi/domain'
 
 vi.mock('../app/[restaurant]/taxes/actions.js', () => ({
   creerTaux: () => undefined,
@@ -69,6 +70,21 @@ const { OptionsRestauration } = await import('./OptionsRestauration.js')
 // seule, et c'est le sujet de l'écran.
 const { ListeFonctionnalites, ICONES } = await import('./ListeFonctionnalites.js')
 const { GestionModificateurs } = await import('./GestionModificateurs.js')
+// En lecture seule lui aussi, et c'est un TABLEAU — la forme qui déborde le
+// plus facilement d'un téléphone, et celle que `.tableau-defilant` est censé
+// tenir. Le mesurer vérifie que ce conteneur fait bien son travail.
+const { ComparatifFormules } = await import('./ComparatifFormules.js')
+vi.mock('../app/[restaurant]/inventaire/actions.js', () => ({
+  archiverFournisseur: () => undefined,
+  creerFournisseur: () => undefined,
+  modifierFournisseur: () => undefined,
+}))
+// Quatre champs et un bouton sur une même rangée : la forme exacte qui a
+// cassé sur l'iPhone, et celle que ce fichier existe pour mesurer.
+const { GestionFournisseurs } = await import('./GestionFournisseurs.js')
+// Un TABLEAU de chiffres à quatre colonnes — l'autre forme qui déborde, et
+// que `.tableau-defilant` doit tenir.
+const { TableauValorisation } = await import('./TableauValorisation.js')
 
 const STYLES = readFileSync(new URL('../app/styles.css', import.meta.url), 'utf8')
 
@@ -137,10 +153,35 @@ async function mesurer(html: string, largeur: number, hauteur: number) {
       // quelque chose l'a poussée — et c'est un débordement, même si plus
       // aucun élément ne « dépasse » d'une fenêtre qui a cédé.
       const fenetreReelle = window.innerWidth
+
+      /*
+       * Dans un conteneur qui DÉFILE à l'horizontale, dépasser est le
+       * comportement voulu.
+       *
+       * `.tableau-defilant` existe pour cela : un tableau de chiffres à
+       * quatre colonnes ne rentre pas dans 320 px, et le comprimer jusqu'à ce
+       * qu'il rentre le rendrait illisible. Ce qu'on exige alors, c'est que
+       * le CONTENEUR, lui, tienne — il est mesuré comme tout le reste, et la
+       * page ne défile donc jamais latéralement.
+       *
+       * Sans cette exception, le garde-fou interdirait le seul motif que ce
+       * dépôt a retenu pour les tableaux larges, et on le contournerait en
+       * ajoutant des exclusions au cas par cas — ce qui finirait par le
+       * rendre inoffensif.
+       */
+      const dansUnDefilant = (el: Element): boolean => {
+        for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+          const o = getComputedStyle(p).overflowX
+          if (o === 'auto' || o === 'scroll') return true
+        }
+        return false
+      }
+
       const depassent: string[] = []
       for (const el of document.querySelectorAll('body *')) {
         const r = el.getBoundingClientRect()
         if (r.width === 0 && r.height === 0) continue
+        if (dansUnDefilant(el)) continue
         if (r.right > fenetre + tolerance) {
           depassent.push(`${nommer(el)} jusqu'à ${Math.round(r.right)} px`)
         }
@@ -157,6 +198,23 @@ async function mesurer(html: string, largeur: number, hauteur: number) {
         const cs = getComputedStyle(el)
         if (cs.overflowX !== 'hidden' && cs.overflowX !== 'clip') continue
         if (cs.textOverflow === 'ellipsis') continue
+        /*
+         * Le texte réservé aux lecteurs d'écran est rogné EXPRÈS, à 1 px :
+         * c'est toute sa raison d'être. Le compter ferait échouer le garde-fou
+         * sur chaque écran qui nomme une icône — c'est-à-dire sur les écrans
+         * les plus soigneusement accessibles, et ce serait le contraire de ce
+         * qu'on veut encourager.
+         */
+        if (el.classList.contains('visuellement-cache')) continue
+        /*
+         * Un CHAMP de saisie n'est pas un contenu hors d'atteinte : son texte
+         * défile avec le curseur, et c'est ainsi que tout champ se comporte
+         * dès qu'on y tape plus large que lui. Le compter ferait échouer ce
+         * garde-fou sur chaque écran dont un champ porte une valeur longue —
+         * une note de fournisseur, une adresse — alors que rien n'est perdu
+         * ni inaccessible.
+         */
+        if (el.matches('input, textarea, select')) continue
         if (el.scrollWidth > el.clientWidth + tolerance) {
           rognes.push(`${nommer(el)} montre ${el.clientWidth} px sur ${el.scrollWidth}`)
         }
@@ -313,6 +371,36 @@ const MODIF_GROUPES = [
   },
 ]
 
+const FOURNISSEURS = [
+  {
+    id: 'f1',
+    nom: 'Sfax Primeurs et Maraîchers Réunis',
+    contact: 'Monsieur Slim Ben Abdallah',
+    telephone: '+216 74 000 000',
+    note: 'Livraisons le mardi et le vendredi matin, facture à trente jours.',
+    archive: false,
+    receptions: 24,
+  },
+  { id: 'f2', nom: 'Boucherie', contact: null, telephone: null, note: null, archive: false, receptions: 0 },
+  {
+    id: 'f3',
+    nom: 'Ancien Grossiste',
+    contact: null,
+    telephone: null,
+    note: null,
+    archive: true,
+    receptions: 3,
+  },
+]
+
+const VALORISATION = [
+  { id: 'v1', nom: 'Pizza Quatre Fromages surgelée', quantite: 12.5, coutUnitaire: 4250.125 },
+  // Le coût non saisi : la cellule dit « non saisi », la valeur reste vide.
+  { id: 'v2', nom: 'Ojja merguez', quantite: 3, coutUnitaire: null },
+  // La quantité négative — le cas normal d'une réception oubliée.
+  { id: 'v3', nom: 'Coca 33 cl', quantite: -40, coutUnitaire: 0.6 },
+]
+
 describe('les écrans de réglage, en largeur téléphone', () => {
   const cas = [
     {
@@ -373,6 +461,46 @@ describe('les écrans de réglage, en largeur téléphone', () => {
             modifiable
             groupes={MODIF_GROUPES}
             articles={MODIF_ARTICLES}
+          />,
+        ),
+    },
+    {
+      /*
+       * Les fiches fournisseurs avec le jeu le plus LARGE : un nom long d'un
+       * seul tenant, une note de deux lignes, et une fiche archivée — celle
+       * qui déplie son bloc et ajoute une phrase de plus sous la rangée.
+       */
+      nom: 'Fournisseurs',
+      html: () =>
+        renderToStaticMarkup(
+          <GestionFournisseurs restaurantId="r1" modifiable fournisseurs={FOURNISSEURS} />,
+        ),
+    },
+    {
+      /*
+       * La valorisation avec un coût NON SAISI et une quantité NÉGATIVE :
+       * les deux cellules les plus larges de ce tableau, et les deux cas que
+       * l'écran existe pour montrer.
+       */
+      nom: 'Valorisation du stock',
+      html: () => renderToStaticMarkup(<TableauValorisation lignes={VALORISATION} />),
+    },
+    {
+      /*
+       * Le comparatif des formules PENDANT UN ESSAI : aucune colonne n'est
+       * mise en évidence, l'en-tête porte deux noms de formule, et le rappel
+       * sous le tableau est la phrase la plus longue de l'écran. C'est aussi
+       * le seul tableau de la rubrique, donc le seul endroit où une colonne
+       * qui refuse de rétrécir pousserait la page entière.
+       */
+      nom: 'Comparatif des formules',
+      html: () =>
+        renderToStaticMarkup(
+          <ComparatifFormules
+            etat={etatAbonnement(
+              { plan: 'essai', finEssai: finEssaiDepuis(new Date('2026-09-15T10:00:00Z')) },
+              new Date('2026-09-15T10:00:00Z'),
+            )}
           />,
         ),
     },

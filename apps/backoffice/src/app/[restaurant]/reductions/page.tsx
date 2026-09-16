@@ -36,6 +36,7 @@
 import { formaterPourcentage } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { libelleJournee } from '../../../serveur/journee.js'
+import { AvertissementFormule } from '../../../composants/AvertissementFormule.js'
 import { chargerRapport } from '../../../serveur/rapport.js'
 import { BandeauIndicateurs } from '../../../composants/BandeauIndicateurs.js'
 import { FiltresRapport } from '../../../composants/FiltresRapport.js'
@@ -146,6 +147,8 @@ export default async function PageReductions({
       </header>
 
       <AvertissementTronque tronque={ventes.tronque} />
+
+      <AvertissementFormule restaurantId={restaurant} periode={periode} />
 
       <FiltresRapport
         du={periode.du}

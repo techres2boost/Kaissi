@@ -6,6 +6,7 @@ import {
   margeProduit,
   panierMoyen,
   totaliserCouts,
+  valoriserStock,
 } from './marge.js'
 
 describe('coût unitaire — la seule exception au tout-entier', () => {
@@ -84,5 +85,71 @@ describe('margeProduit — ce que le catalogue affiche', () => {
     const m = margeProduit(millimes(15000), null)
     expect(m.coutMillimes).toBe(0)
     expect(m.margeBp).toBe(10000)
+  })
+})
+
+describe('valoriserStock — combien dort dans les frigos', () => {
+  it('multiplie par le coût d’ACHAT, et n’arrondit qu’au total', () => {
+    /*
+     * Trois lignes dont chacune, arrondie seule, perdrait une fraction :
+     * 1 200 × 0,4 = 480, 800 × 0,4 = 320, 3 × 0,4 = 1,2. Arrondies ligne à
+     * ligne : 480 + 320 + 1 = 801. Au total : 801,2 → 801. Ici les deux
+     * coïncident ; c'est le test suivant qui les sépare.
+     */
+    const v = valoriserStock([
+      { quantite: 1200, coutUnitaire: 0.4 },
+      { quantite: 800, coutUnitaire: 0.4 },
+      { quantite: 3, coutUnitaire: 0.4 },
+    ])
+    expect(v.valeurMillimes).toBe(801)
+    expect(v.lignesValorisees).toBe(3)
+  })
+
+  it('l’arrondi UNE fois change le total — et c’est tout le sujet', () => {
+    /*
+     * Cinq lignes à 0,6 millime l'unité, une unité chacune. Arrondies ligne
+     * à ligne : 1 × 5 = 5. Au total : 3,0 → 3. L'écart est de deux millimes
+     * sur cinq lignes ; sur les quatre cents références d'un restaurant, il
+     * se compte en dinars.
+     */
+    const parLigne = [0.6, 0.6, 0.6, 0.6, 0.6].reduce((t, c) => t + Math.round(c), 0)
+    expect(parLigne).toBe(5)
+    expect(
+      valoriserStock(Array.from({ length: 5 }, () => ({ quantite: 1, coutUnitaire: 0.6 })))
+        .valeurMillimes,
+    ).toBe(3)
+  })
+
+  it('un coût NON SAISI vaut zéro dans le total, et se compte à part', () => {
+    const v = valoriserStock([
+      { quantite: 10, coutUnitaire: 2000 },
+      { quantite: 10, coutUnitaire: null },
+      { quantite: 10, coutUnitaire: undefined },
+    ])
+    expect(v.valeurMillimes).toBe(20000)
+    expect(v.lignesValorisees).toBe(1)
+    // Sans ce compte, l'écran afficherait 20,000 TND comme s'il savait tout.
+    expect(v.lignesSansCout).toBe(2)
+  })
+
+  it('une quantité NÉGATIVE retire de la valeur, elle ne se borne pas à zéro', () => {
+    /*
+     * Le cas normal d'une vente encaissée hors ligne qui arrive après coup.
+     * La borner à zéro ferait paraître juste un stock faux — c'est la règle
+     * du dépôt, et elle vaut ici comme ailleurs.
+     */
+    const v = valoriserStock([
+      { quantite: 10, coutUnitaire: 1000 },
+      { quantite: -4, coutUnitaire: 1000 },
+    ])
+    expect(v.valeurMillimes).toBe(6000)
+    expect(v.lignesNegatives).toBe(1)
+  })
+
+  it('un stock vide vaut zéro, sans rien signaler', () => {
+    const v = valoriserStock([])
+    expect(v.valeurMillimes).toBe(0)
+    expect(v.lignesSansCout).toBe(0)
+    expect(v.lignesNegatives).toBe(0)
   })
 })

@@ -21,6 +21,8 @@
 import Link from 'next/link'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
+import { moduleOuvert } from '@kaissi/domain'
+import { abonnementDe } from '../../../serveur/abonnement.js'
 import {
   ICONES,
   ListeFonctionnalites,
@@ -45,6 +47,7 @@ async function actives(
     | 'products'
     | 'payment_methods'
     | 'modifier_groups'
+    | 'suppliers'
     | 'memberships',
   restaurantId: string,
   colonneRetrait: 'archived_at' | 'revoked_at' = 'archived_at',
@@ -113,6 +116,19 @@ export default async function PageFonctionnalites({
       .eq('id', restaurant)
       .single(),
   ])
+
+  /*
+   * La formule, lue APRÈS les comptages : elle porte sur l'organisation et
+   * non sur l'établissement, donc elle ne se glisse pas dans le `Promise.all`
+   * ci-dessus, qui compte des lignes par restaurant.
+   */
+  const abonnement = await abonnementDe(etablissement.organizationId)
+  // Les fiches ne se comptent que si le module est ouvert : sans lui, l'écran
+  // n'en montre aucune, et annoncer « 4 fiches » à qui ne peut pas les ouvrir
+  // serait une promesse à rebours.
+  const fournisseurs = moduleOuvert(abonnement, 'inventaire_avance')
+    ? await actives(supabase, 'suppliers', restaurant)
+    : 0
 
   const service = Number(options.data?.service_rate_bp ?? 0)
   const timbre = Number(options.data?.stamp_duty_millimes ?? 0)
@@ -183,6 +199,27 @@ export default async function PageFonctionnalites({
           : `${groupesModif} groupe(s) de modificateurs.`,
       chemin: 'modificateurs',
       lien: 'Gérer les modificateurs',
+    },
+    {
+      cle: 'inventaire',
+      nom: 'Inventaire avancé',
+      icone: ICONES.Truck,
+      etat: moduleOuvert(abonnement, 'inventaire_avance') ? 'active' : 'absente',
+      quoi:
+        'La valeur d’achat de votre stock, et des fiches fournisseurs rattachées aux ' +
+        'réceptions.',
+      pourquoi:
+        'C’est le seul module que la formule peut fermer, avec la profondeur d’historique ' +
+        'des rapports. Le stock lui-même — comptages, mouvements, seuils, retrait ' +
+        'automatique de la carte — reste entier quelle que soit la formule, et la caisse ' +
+        'n’est jamais concernée.',
+      constat: moduleOuvert(abonnement, 'inventaire_avance')
+        ? `${fournisseurs} fiche(s) fournisseur.`
+        : `Fermé avec la formule « ${abonnement.nom} ».`,
+      chemin: 'inventaire',
+      lien: moduleOuvert(abonnement, 'inventaire_avance')
+        ? 'Ouvrir l’inventaire avancé'
+        : 'Voir ce qu’il ajoute',
     },
     {
       cle: 'clients',
@@ -317,14 +354,38 @@ export default async function PageFonctionnalites({
       lien: 'Ouvrir l’aide',
     },
     {
+      cle: 'abonnement',
+      nom: 'Abonnement',
+      icone: ICONES.Wallet,
+      etat: 'active',
+      quoi:
+        'La formule de votre compte, ce qu’elle ouvre, et ce qu’elle laisse fermé — ' +
+        'aujourd’hui l’inventaire avancé et la profondeur d’historique des rapports.',
+      pourquoi:
+        'Une formule ne ferme JAMAIS un geste de caisse. La tablette encaisse hors ligne ' +
+        'quelle que soit la formule, et même expirée : son code est dans l’application, ' +
+        'il n’interroge aucun abonnement, et lui apprendre à le faire reviendrait à ' +
+        'écrire de quoi arrêter un service un vendredi soir.',
+      constat: abonnement.enEssai
+        ? `Essai en cours — ${abonnement.joursRestants} jour(s) restant(s), tout est ouvert.`
+        : abonnement.essaiExpire
+          ? 'Essai terminé : vous avez les droits de la formule « Gratuit ».'
+          : `Formule « ${abonnement.nom} ».`,
+      chemin: 'abonnement',
+      lien: 'Voir la formule',
+    },
+    {
       cle: 'facturation',
-      nom: 'Abonnement et facturation',
+      nom: 'Factures et prélèvement',
       icone: ICONES.BookOpen,
       etat: 'absente',
-      quoi: 'Formule, échéances, factures et moyens de paiement de votre abonnement Kaissi.',
+      quoi: 'Échéances, factures téléchargeables et moyen de paiement enregistré.',
       pourquoi:
-        'Kaissi se vend et s’installe aujourd’hui ; il n’y a ni formule ni prélèvement ' +
-        'à afficher. Le jour où il y en aura, cette page dira laquelle — pas avant.',
+        'Kaissi ne conserve aucun moyen de paiement et ne prélève rien tout seul : un ' +
+        'abonnement se règle avec quelqu’un. Afficher un échéancier qui ne déclenche ' +
+        'aucun prélèvement ferait croire que la facturation tourne.',
+      chemin: 'abonnement',
+      lien: 'Voir la formule en cours',
     },
   ]
 

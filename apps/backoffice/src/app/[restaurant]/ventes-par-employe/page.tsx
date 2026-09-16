@@ -22,6 +22,7 @@ import { chargerRapport } from '../../../serveur/rapport.js'
 import {
 } from '../../../serveur/rapports.js'
 import { libelleJournee } from '../../../serveur/journee.js'
+import { AvertissementFormule } from '../../../composants/AvertissementFormule.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
 import { BandeauIndicateurs } from '../../../composants/BandeauIndicateurs.js'
 import { FiltresRapport } from '../../../composants/FiltresRapport.js'
@@ -82,6 +83,8 @@ export default async function PageVentesParEmploye({
             : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
         </p>
       </header>
+
+      <AvertissementFormule restaurantId={restaurant} periode={periode} />
 
       <FiltresRapport
         du={periode.du}

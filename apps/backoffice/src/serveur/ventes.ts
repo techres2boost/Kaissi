@@ -22,6 +22,7 @@ import {
   type BornesJournee,
 } from './journee.js'
 import { FILTRES_PAR_DEFAUT, type FiltresRapport } from './filtres.js'
+import { plancherHistorique } from './abonnement.js'
 import { supabaseServeur } from './supabase.js'
 import type {
   CommandeVendue,
@@ -39,6 +40,15 @@ export interface Periode {
   readonly bornes: BornesJournee
   /** Vrai si la demande a été rabotée au plafond ci-dessus. */
   readonly tronquee: boolean
+  /**
+   * Vrai si c'est la FORMULE, et non le plafond technique, qui a raboté.
+   *
+   * Deux causes distinctes, deux messages distincts : « votre période
+   * dépasse 92 jours » invite à la raccourcir, « votre formule remonte à
+   * deux mois » invite à en changer. Les confondre ferait chercher pendant
+   * dix minutes pourquoi une période de trente jours est tronquée.
+   */
+  readonly limiteeParFormule: boolean
 }
 
 export interface FicheRestaurant {
@@ -46,6 +56,19 @@ export interface FicheRestaurant {
   readonly bascule: string
   readonly serviceRateBp: number
   readonly timbreMillimes: number
+  /**
+   * La journée la plus ANCIENNE que la formule laisse consulter, ou `null`
+   * quand elle ne limite rien.
+   *
+   * ⚑ Elle est portée par la FICHE, et pas passée en argument à chaque appel
+   *   de `resoudrePeriode`. C'est la seule façon de ne pas l'oublier : cinq
+   *   écrans et la route d'export résolvent leur période eux-mêmes, et un
+   *   argument facultatif oublié à un seul endroit rendrait, par cet
+   *   endroit-là, exactement ce que la formule est censée fermer. Les
+   *   exports passent par le même garde que les écrans — c'est la règle du
+   *   dépôt, déjà écrite pour les rôles.
+   */
+  readonly plancherHistorique: string | null
 }
 
 /**
@@ -81,14 +104,39 @@ export function resoudrePeriode(
     debut = limite.toISOString().slice(0, 10)
   }
 
+  /*
+   * Le plancher de la FORMULE, appliqué après le plafond technique.
+   *
+   * Deux nuances, et elles se voient toutes les deux à l'écran :
+   *
+   *   • il RABOTE, il ne refuse pas. Une demande qui commence trop tôt rend
+   *     ce que la formule couvre, en le disant. Un écran vide avec « changez
+   *     de formule » ferait croire qu'il n'y a pas eu de ventes ;
+   *
+   *   • et quand la période demandée est ENTIÈREMENT hors de portée — juin
+   *     dernier sur une formule à deux mois — le début remonte au plancher
+   *     et dépasse la fin. Les bornes seraient alors inversées et la requête
+   *     rendrait zéro ligne sans rien dire. On ramène donc la fin au
+   *     plancher elle aussi : la période devient vide, mais cohérente, et
+   *     le bandeau explique pourquoi.
+   */
+  let fin = finDemandee
+  let limiteeParFormule = false
+  if (fiche.plancherHistorique !== null && debut < fiche.plancherHistorique) {
+    debut = fiche.plancherHistorique
+    limiteeParFormule = true
+    if (fin < debut) fin = debut
+  }
+
   return {
     du: debut,
-    au: finDemandee,
+    au: fin,
     bornes: {
       debut: bornesJourneeCommerciale(debut, fiche.timezone, fiche.bascule).debut,
-      fin: bornesJourneeCommerciale(finDemandee, fiche.timezone, fiche.bascule).fin,
+      fin: bornesJourneeCommerciale(fin, fiche.timezone, fiche.bascule).fin,
     },
     tronquee,
+    limiteeParFormule,
   }
 }
 
@@ -217,14 +265,33 @@ export async function chargerFiche(restaurantId: string): Promise<FicheRestauran
   const supabase = await supabaseServeur()
   const { data } = await supabase
     .from('restaurants')
-    .select('timezone, business_day_start, service_rate_bp, stamp_duty_millimes')
+    .select('organization_id, timezone, business_day_start, service_rate_bp, stamp_duty_millimes')
     .eq('id', restaurantId)
     .maybeSingle()
+
+  const timezone = data?.timezone ?? 'Africa/Tunis'
+  const bascule = data?.business_day_start ?? '04:00:00'
+
   return {
-    timezone: data?.timezone ?? 'Africa/Tunis',
-    bascule: data?.business_day_start ?? '04:00:00',
+    timezone,
+    bascule,
     serviceRateBp: data?.service_rate_bp ?? 0,
     timbreMillimes: data?.stamp_duty_millimes ?? 0,
+    /*
+     * Le plancher de la formule, exprimé en JOURNÉE COMMERCIALE.
+     *
+     * Pas en instant : les périodes de ce fichier sont des journées, et
+     * comparer un instant à une journée demanderait de choisir un fuseau à
+     * chaque comparaison — donc de se tromper une fois sur deux à Tunis,
+     * où l'écart avec UTC suffit à changer de jour.
+     *
+     * Une fiche sans établissement (identifiant inconnu, RLS qui ne rend
+     * rien) ne limite rien : la page ne rendra de toute façon aucune vente,
+     * et y ajouter un bandeau de formule brouillerait le vrai problème.
+     */
+    plancherHistorique: data?.organization_id
+      ? await plancherHistorique(data.organization_id, timezone, bascule)
+      : null,
   }
 }
 
