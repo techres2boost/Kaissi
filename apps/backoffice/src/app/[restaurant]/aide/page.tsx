@@ -146,17 +146,26 @@ export default async function PageAide({
         </div>
 
         {/*
-          ⚠ La mention qui évite une attente. Le chat en direct figure dans les
-          formules payantes envisagées ; il n'existe pas. Laisser la page muette
-          laisserait chercher un bouton de discussion qui n'est nulle part.
+          ⚠ La mention qui évite une attente. Le chat en direct n'existe pas.
+
+          Le texte disait « prévu avec les formules d'abonnement, qui ne sont
+          pas encore en place » — et les formules SONT en place depuis la
+          migration 0040. La phrase est donc devenue fausse en même temps
+          qu'elles sont arrivées : un lecteur pouvait en conclure que le chat
+          arrivait avec elles, et l'attendre. Ce qui manque, c'est le chat, pas
+          les formules.
         */}
         <div className="message info">
           <MessageSquareOff size={16} strokeWidth={2} aria-hidden="true" />{' '}
-          <strong>Pas de chat en direct pour l’instant.</strong> Il est prévu
-          avec les formules d’abonnement, qui ne sont pas encore en place — et
-          tant qu’elles ne le sont pas, annoncer un bouton de discussion
-          ferait attendre devant un écran où il n’y en a pas. L’e-mail
-          ci-dessus est lu par la même équipe.
+          <strong>Pas de chat en direct.</strong> Les formules d’abonnement
+          existent ({' '}
+          <Link href={{ pathname: `/${restaurant}/abonnement` }}>
+            voir la vôtre
+          </Link>
+          ), mais aucune n’ouvre de discussion instantanée : il n’y a pas
+          d’équipe pour la tenir, et annoncer un bouton ferait attendre devant
+          un écran où il n’y en a pas. L’e-mail ci-dessus est lu par la même
+          équipe, et c’est le chemin le plus rapide.
         </div>
       </section>
 

@@ -30,6 +30,7 @@
     "sync:cles": "node apps/sync/scripts/cles-vapid.mjs",
     "sync:acces": "node --experimental-strip-types --import ./apps/sync/scripts/charger-ts.mjs apps/sync/scripts/acces.mjs",
     "sync:nouveau-client": "node --experimental-strip-types --import ./apps/sync/scripts/charger-ts.mjs apps/sync/scripts/nouveau-client.mjs",
+    "verifier:docs": "node scripts/verifier-docs.mjs",
     "sync:abonnement": "node --experimental-strip-types --import ./apps/sync/scripts/charger-ts.mjs apps/sync/scripts/abonnement.mjs",
     "backoffice:dev": "pnpm --filter @kaissi/backoffice dev",
     "verifier:natif": "pnpm --filter @kaissi/pos verifier:natif",

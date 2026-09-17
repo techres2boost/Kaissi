@@ -45,7 +45,20 @@ export type Plan = (typeof PLANS)[number]
  * Volontairement court. Chaque entrée ajoutée ici est une chose de plus qu'un
  * client peut perdre du jour au lendemain : on n'en ajoute pas « au cas où ».
  */
-export const MODULES = ['inventaire_avance', 'historique_illimite'] as const
+/*
+ * ⚑ Un seul, et pas deux.
+ *
+ * « historique_illimite » a figuré ici, et personne ne l'a jamais consulté :
+ * la profondeur d'historique vient de `joursHistorique`, qui est la vraie
+ * règle. Deux représentations de la même décision ne restent d'accord que
+ * tant qu'on y pense — le jour où l'une change, l'écran annonce une chose et
+ * la garde en applique une autre, sans que rien n'échoue.
+ *
+ * Quand une formule doit ouvrir quelque chose de mesurable en jours, cela
+ * s'écrit dans `Formule`. `MODULES` ne sert qu'à ce qui s'ouvre ou se ferme
+ * entièrement.
+ */
+export const MODULES = ['inventaire_avance'] as const
 export type ModulePayant = (typeof MODULES)[number]
 
 export interface Formule {

@@ -349,7 +349,15 @@ export default async function PageFonctionnalites({
         'La foire aux questions vit sur une page PUBLIQUE, qui s’ouvre depuis n’importe ' +
         'quel téléphone — y compris quand personne n’arrive plus à se connecter au ' +
         'back-office, c’est-à-dire précisément le jour où l’on en a besoin.',
-      constat: 'Pas de chat en direct : il est prévu avec les abonnements, qui n’existent pas encore.',
+      /*
+       * Le constat disait « prévu avec les abonnements, qui n'existent pas
+       * encore ». Les abonnements existent depuis la migration 0040 : la
+       * phrase promettait donc un chat qui arriverait « avec » quelque chose
+       * de déjà arrivé. Ce qui manque, c'est le chat.
+       */
+      constat:
+        'Pas de chat en direct : aucune formule n’en ouvre un, et il n’y a pas ' +
+        'd’équipe pour le tenir.',
       chemin: 'aide',
       lien: 'Ouvrir l’aide',
     },

@@ -25,8 +25,6 @@ import {
   totalVerse,
   type ConfigCalcul,
   type EvenementCommande,
-  type Millimes,
-  type PointsDeBase,
 } from '@kaissi/domain'
 import { estUuid, uuidV7 } from '@kaissi/domain'
 import type { MutationCatalogue } from '@kaissi/domain'

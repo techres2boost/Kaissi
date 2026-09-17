@@ -18,7 +18,6 @@ import {
   construireTicketClient,
   configEtablissement,
   construireTicketCuisine,
-  pointsDeBase,
   reduireEvenements,
   transitionAutorisee,
   uuidV7,

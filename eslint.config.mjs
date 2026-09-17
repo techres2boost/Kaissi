@@ -32,6 +32,14 @@ export default tseslint.config(
       // Configurations de test : hors de tout `tsconfig`, donc hors de portée
       // des règles typées. Les y forcer demanderait un projet TypeScript de
       // plus, pour zéro bogue attrapé.
+      //
+      // ⚑ Le motif couvre les VARIANTES, et pas seulement `vitest.config.ts`.
+      //   Le back-office en a une seconde — `vitest.largeur.config.ts`, pour
+      //   les mesures dans un vrai navigateur — et elle faisait échouer
+      //   `pnpm lint` sur « was not found by the project service ». Une erreur
+      //   de PARSING, donc rouge, sur un fichier que ce dépôt a délibérément
+      //   laissé hors des projets TypeScript.
+      '**/vitest.*config.ts',
       '**/vitest.config.ts',
     ],
   },

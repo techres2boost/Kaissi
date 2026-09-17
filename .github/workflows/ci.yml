@@ -227,6 +227,12 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+      # Les renvois de la documentation mènent-ils quelque part ? Un titre
+      # reformulé casse son ancre EN SILENCE, et un fichier renommé laisse un
+      # renvoi qui pointe dans le vide. Ni l'un ni l'autre ne fait échouer
+      # quoi que ce soit — d'où cette garde.
+      - name: Les renvois de docs/ mènent quelque part
+        run: pnpm verifier:docs
 
   # ── Dépendances et secrets ────────────────────────────────────────────────
   #

@@ -28,7 +28,7 @@ renvoi les donne tous : c'est précisément ce qui rend le patron visible.
 Un patron sans renvoi n'existe pas dans ce dépôt. S'il en manque un, c'est un
 défaut de ce document, pas une abstraction.
 
-### Les 33 patrons, en un coup d'œil
+### Les 38 patrons, en un coup d'œil
 
 - [0. La contrainte qui décide de tout](#0-la-contrainte-qui-décide-de-tout)
 
@@ -51,9 +51,12 @@ défaut de ce document, pas une abstraction.
 - [12. Horloge logique — un curseur, jamais un timestamp](#12-horloge-logique--un-curseur-jamais-un-timestamp)
 - [13. Journal append-only + chaînage par hash](#13-journal-append-only--chaînage-par-hash)
 - [13 bis. L'exception nommée — lever une invariance sans la perdre](#13-bis-lexception-nommée--comment-on-lève-une-invariance-sans-la-perdre)
+- [13 ter. L'exception étroite — pourquoi CRÉER n'est pas MODIFIER](#13-ter-lexception-étroite--pourquoi-créer-nest-pas-modifier)
 - [14. UUIDv7 — l'identifiant vient de celui qui crée](#14-uuidv7--lidentifiant-vient-de-celui-qui-crée)
 - [15. Instantané ponctuel — copier plutôt que joindre](#15-instantané-ponctuel--copier-plutôt-que-joindre)
 - [16. Index unique partiel — la contrainte qui sait faire une exception](#16-index-unique-partiel--la-contrainte-qui-sait-faire-une-exception)
+- [16 bis. Le cycle de vie d'un agrégat racine — fermer, puis supprimer sous obstacles](#16-bis-le-cycle-de-vie-dun-agrégat-racine--fermer-puis-supprimer-sous-obstacles)
+- [16 ter. La fiche facultative — structurer sans imposer la saisie](#16-ter-la-fiche-facultative--structurer-sans-imposer-la-saisie)
 - [17. Migrations — en avant seulement, et additives](#17-migrations--en-avant-seulement-et-additives)
 - [17 bis. Aggregation pushdown — additionner là où sont les lignes](#17-bis-aggregation-pushdown--additionner-là-où-sont-les-lignes)
 - [17 ter. Le piège du plan générique — quand PostgreSQL devine mal](#17-ter-le-piège-du-plan-générique--quand-postgresql-devine-mal)
@@ -63,6 +66,7 @@ défaut de ce document, pas une abstraction.
 - [18. Trois identités distinctes, jamais confondues](#18-trois-identités-distinctes-jamais-confondues)
 - [19. RLS — l'autorisation au plus près de la donnée](#19-rls--lautorisation-au-plus-près-de-la-donnée)
 - [20. Moindre privilège — trois rôles, trois portées](#20-moindre-privilège--trois-rôles-trois-portées)
+- [20 bis. La frontière exprimée en privilèges — ce que la caisse ne peut même pas lire](#20-bis-la-frontière-exprimée-en-privilèges--ce-que-la-caisse-ne-peut-même-pas-lire)
 - [21. Le député confus — pourquoi le service relit les droits](#21-le-député-confus--pourquoi-le-service-relit-les-droits)
 - [22. Le privilège de colonne, et l'incident qu'il a causé](#22-le-privilège-de-colonne-et-lincident-quil-a-causé)
 - [23. Le hachage des PIN — Argon2id, et pourquoi pas autre chose](#23-le-hachage-des-pin--argon2id-et-pourquoi-pas-autre-chose)
@@ -73,6 +77,7 @@ défaut de ce document, pas une abstraction.
 
 - [24. Auto-réparation — le bug qui a justifié le patron](#24-auto-réparation--le-bug-qui-a-justifié-le-patron)
 - [25. Les gardes de CI — les règles qu'une relecture ne tient pas](#25-les-gardes-de-ci--les-règles-quune-relecture-ne-tient-pas)
+- [25 bis. La garde d'énumération — vérifier la RÈGLE, pas l'instance](#25-bis-la-garde-dénumération--vérifier-la-règle-pas-linstance)
 - [26. Observabilité — l'écran qui répond à la vraie question](#26-observabilité--lécran-qui-répond-à-la-vraie-question)
 - [26 bis. Journal structuré — pour qu'une panne se cherche, pas se devine](#26-bis-journal-structuré--pour-quune-panne-se-cherche-pas-se-devine)
 - [26 ter. Frontière d'erreur — ce que voit le client quand ça casse](#26-ter-frontière-derreur--ce-que-voit-le-client-quand-ça-casse)
@@ -521,6 +526,60 @@ Trois propriétés, et il faut les trois :
 
 ---
 
+## 13 ter. L'exception étroite — pourquoi CRÉER n'est pas MODIFIER
+> ⟶ `supabase/migrations/0034_article_cree_sur_la_caisse.sql` — la politique `products_creation_caisse`
+> ⟶ `apps/sync/test/rls-partout.test.ts` — `update` jamais accordé à `kaissi_device`
+
+**Le problème.** Le référentiel descend dans un seul sens : serveur → caisse
+(§12). C'est ce qui rend la synchronisation simple — aucun arbitrage, aucun
+conflit. Puis arrive une demande légitime : un caissier veut vendre un article
+qui n'est pas à la carte, maintenant, devant un client.
+
+La réponse spontanée est « ouvrons l'écriture du catalogue à la caisse ». Elle
+coûte cher : deux caisses hors ligne qui modifient le même produit exigent un
+dernier-écrivain-gagne arbitré par `(server_seq, device_id)`, donc un champ de
+version, donc une reprise de toute la descente. On ne l'ajoute pas « en
+passant ».
+
+**Le patron.** Distinguer la **création** de la **modification**, et n'ouvrir
+que la première.
+
+> **Créer n'est pas écrire sur un état partagé.**
+
+Deux caisses hors ligne qui créent un article produisent **deux lignes
+distinctes**, avec leurs identifiants propres (§14). Au pire deux fois le même
+nom, que le back-office fusionne : un désagrément, pas une perte. Deux caisses
+qui MODIFIENT la même ligne, elles, en écrasent une — et l'écrasée est perdue
+sans que rien ne le dise.
+
+La création commute ; la modification, non. C'est le même critère qui fait
+qu'un journal d'événements additifs n'a pas de conflits (§1) : **on ouvre ce
+qui commute, on refuse ce qui arbitre.**
+
+**Ce que l'exception a coûté pour rester étroite** — et les trois points sont
+indispensables :
+
+1. la demande voyage dans **l'outbox existante** (`kind = 'catalogue'`), après
+   les ventes : si le réseau ne tient que trois secondes, ce sont les
+   encaissements qui en profitent. Aucune voie de synchronisation nouvelle ;
+2. l'article **redescend par `change_log`**, comme un changement de prix. La
+   caisse ne garde pas « sa » version : elle reçoit celle du serveur ;
+3. le privilège `update` n'est **pas accordé** à `kaissi_device`. La politique
+   RLS dit *quelles lignes* ; le privilège dit *quel verbe*. La seconde
+   serrure tient même si la politique était réécrite un jour par mégarde.
+
+**Et ce qui reste fermé, exprès :** `is_available`. Basculer un produit hors
+carte reste la décision du serveur, parce qu'il calcule le stock à l'instant
+alors qu'une tablette hors ligne travaille sur un souvenir de trois heures.
+L'exception porte sur un verbe, pas sur une table.
+
+**L'exercice à retenir** : avant d'ouvrir une écriture distribuée, demande-toi
+si l'opération **commute**. Si deux exécutions concurrentes produisent le même
+résultat dans n'importe quel ordre, elle est ouvrable sans machinerie. Sinon,
+le coût réel n'est pas l'écriture — c'est l'arbitrage qu'elle traîne derrière.
+
+---
+
 ## 14. UUIDv7 — l'identifiant vient de celui qui crée
 > ⟶ `packages/domain/src/uuid.ts:48` — `uuidV7()`
 
@@ -590,6 +649,105 @@ create unique index … on kaissi.stock_alerts (product_id)
 **Le patron :** l'unicité ne porte pas sur toute la table, mais sur le
 **sous-ensemble qui a un sens métier**. C'est presque toujours ce qu'on veut,
 et presque jamais ce qu'on écrit du premier coup.
+
+---
+
+## 16 bis. Le cycle de vie d'un agrégat racine — fermer, puis supprimer sous obstacles
+> ⟶ `supabase/migrations/0038_fermer_un_etablissement.sql` — `restaurants.closed_at`
+> ⟶ `supabase/migrations/0039_journal_et_suppression.sql` — `kaissi.etablissement_vivant()`
+> ⟶ `apps/sync/src/depot-postgres.ts` — `obstaclesSuppression()`
+
+**Le problème.** Un client ferme son restaurant. Que fait le logiciel ?
+
+Les deux réponses spontanées sont mauvaises. **Supprimer** efface des ventes,
+donc des écritures comptables, que la loi et le client exigent de conserver.
+**Ne rien faire** laisse un établissement mort dans toutes les listes,
+appairable, facturable, et indistinguable d'un vivant.
+
+**Le patron.** Deux gestes distincts, et une porte qui se referme entre les
+deux.
+
+| | **Fermer** | **Supprimer** |
+|---|---|---|
+| Ce que ça fait | pose `closed_at`, range l'établissement à part | efface la ligne et ses dépendances |
+| Réversible | oui | non |
+| Quand c'est permis | toujours | **seulement si aucun obstacle** |
+| Sur les ventes | aucun effet | interdit s'il y en a une |
+
+Un **obstacle** est une raison nommée de refuser, comptée en base : une vente,
+un service de caisse, un événement d'audit. Le geste n'est pas « supprimer, on
+verra » mais « voici les trois choses qui l'empêchent ». La différence se lit
+à l'écran : un refus qui ÉNUMÈRE est actionnable, un refus opaque envoie
+ouvrir une console SQL.
+
+**Ce que fermer ne fait PAS, et c'est délibéré :** couper les terminaux déjà
+appairés. Ils continuent d'envoyer. Refuser leurs envois le jour de la
+fermeture perdrait les ventes de la dernière soirée — celles qui sont encore
+dans les outbox — et **un rejet ne se réessaie jamais tout seul** (§5). La
+fermeture coupe les NOUVEAUX appairages, rien d'autre.
+
+> **Le piège qu'on n'a vu qu'en le heurtant.**
+>
+> Supprimer un établissement supprime ses produits, ses catégories, ses
+> stations — en cascade. Or chacune de ces tables porte un déclencheur qui
+> JOURNALISE le changement dans `change_log`, avec le `restaurant_id` de la
+> ligne. La cascade insérait donc des lignes de journal **pointant vers un
+> établissement en train de disparaître**, et la suppression échouait sur une
+> violation de clé étrangère — un message qui ne nomme ni la cause, ni le
+> remède.
+>
+> Trois correctifs ont été envisagés et **rejetés** : retirer la clé étrangère
+> (elle protège du vrai défaut), la passer en `on delete cascade` (le problème
+> n'est pas les anciennes lignes, ce sont les NOUVELLES), énumérer les tables
+> à désactiver (ça casse à la prochaine table de référentiel ajoutée).
+>
+> Le correctif retenu tient en une fonction, `kaissi.etablissement_vivant()`,
+> que **les cinq fonctions de journalisation** consultent en première ligne.
+> Un déclencheur doit pouvoir savoir qu'il s'exécute à l'intérieur d'une
+> suppression — sans quoi il travaille pour un monde qui n'existe plus.
+
+**L'exercice à retenir** : pour tout agrégat racine, écris son cycle de vie
+AVANT d'écrire sa table. « Créé → actif → fermé → supprimable sous conditions »
+tient en une ligne, et décide de la moitié des colonnes.
+
+---
+
+## 16 ter. La fiche facultative — structurer sans imposer la saisie
+> ⟶ `supabase/migrations/0026_historique_stock.sql` — le champ libre, et sa promesse
+> ⟶ `supabase/migrations/0041_fournisseurs.sql` — la table, ajoutée À CÔTÉ
+
+**Le problème.** Une donnée saisie en texte libre finit par mériter une table :
+on veut compter, regrouper, rapprocher d'une facture. Mais la table apporte
+avec elle une contrainte que le texte n'avait pas — **il faut créer la fiche
+avant de pouvoir saisir**.
+
+Pour un fournisseur, cela veut dire : remplir un formulaire au moment où
+quelqu'un décharge des cageots. C'est le genre d'exigence qui ne se discute
+pas en réunion et se contourne sur le terrain — on tape « divers », et la
+donnée qu'on voulait structurer est perdue pour de bon.
+
+**Le patron.** La table s'ajoute **à côté** du champ libre, jamais à sa place.
+
+```
+stock_movements.supplier      text      -- ce qui a été TAPÉ. Fait foi à l'affichage.
+stock_movements.supplier_id   uuid null -- la fiche, QUAND le nom correspondait.
+```
+
+Quatre propriétés, et ce sont elles qui rendent l'ajout indolore :
+
+1. `supplier_id` **nul est le cas normal**, pas une anomalie à corriger ;
+2. l'interface propose (`datalist`) et ne contraint pas (`select`) : un nom
+   inconnu passe exactement comme avant ;
+3. l'historique déjà saisi **n'est pas migré**. Décider que « Sfax Primeurs »
+   et « sfax primeur » sont le même fournisseur appartient au gérant, pas à
+   une migration qui s'exécute une nuit ;
+4. le rattachement **ne conditionne rien** — il ajoute un lien, il n'ouvre
+   aucune porte. Si la lecture échoue, on écrit `null` et la réception passe :
+   perdre un lien de confort coûte moins cher que perdre une saisie de stock.
+
+**Ce que ça coûte :** deux colonnes pour une information, et la discipline de
+se souvenir laquelle fait foi. C'est écrit dans le schéma, à l'endroit où on
+le lira.
 
 ---
 
@@ -832,6 +990,53 @@ c'est exactement ainsi qu'on fabrique une fuite entre clients.
 
 ---
 
+## 20 bis. La frontière exprimée en privilèges — ce que la caisse ne peut même pas lire
+> ⟶ `supabase/migrations/0042_moindre_privilege_abonnements.sql` — le `revoke`
+> ⟶ `apps/sync/test/rls-partout.test.ts` — la garde qui l'exige
+
+**Le problème.** Kaissi vend des formules d'abonnement. La règle qui les
+encadre est absolue :
+
+> **Un abonnement ne ferme QUE des écrans de gestion. Jamais un geste de
+> caisse.**
+
+Elle est écrite en tête de `packages/domain/src/abonnement.ts`, répétée dans
+la migration qui crée la table, et tenue par un test de conception qui refuse
+tout nom de module contenant « caisse », « encaissement », « hors_ligne »,
+« vente » ou « impression ».
+
+Cela ne suffit pas. Un commentaire, même excellent, ne survit pas à une
+demande pressante un mardi après-midi. Quelqu'un écrira, de bonne foi, un
+`if (formule === 'gratuit')` sur un chemin de vente — et personne ne le verra
+passer, parce que rien ne l'en empêchait.
+
+**Le patron.** Retirer au rôle la capacité **physique** de poser la question.
+
+```sql
+revoke select on kaissi.subscriptions from kaissi_device;
+```
+
+La caisse n'a plus rien à lire. Aucun code du POS ne peut se mettre à dépendre
+d'un abonnement, parce qu'il n'obtiendrait qu'une erreur de privilège — au
+premier essai, sur le poste du développeur, et non six mois plus tard chez un
+client.
+
+**C'est une règle qu'on ne peut pas enfreindre, au lieu d'une règle qu'on
+rappelle.** La différence est tout le sujet de cette section.
+
+> **Le privilège avait été accordé, et sa justification paraissait raisonnable :**
+> « l'écran Diagnostic de la caisse peut vouloir dire quelle formule est en
+> cours ». *Peut vouloir* n'est pas un besoin. Un privilège accordé pour un
+> usage qui n'existe pas est un usage qui finit par exister — et c'est
+> exactement ce que le moindre privilège (§20) interdit, sans exception « au
+> cas où ».
+
+**Comment savoir qu'un privilège exprime une frontière** : demande-toi ce
+qu'un développeur pressé pourrait construire avec. Si la réponse est « la
+chose que ce document interdit », le privilège fait partie du problème.
+
+---
+
 ## 21. Le député confus — pourquoi le service relit les droits
 > ⟶ `apps/sync/src/serveur.ts` — les routes `/admin`, qui relisent les droits en base
 
@@ -860,7 +1065,7 @@ l'identité de l'appelant.
 ---
 
 ## 22. Le privilège de colonne, et l'incident qu'il a causé
-> ⟶ `supabase/migrations/0024_admin_distribue_les_pouvoirs.sql` — le privilège de colonne
+> ⟶ `supabase/migrations/0024_admin_seul_donne_les_cles.sql` — le privilège de colonne
 
 
 La migration `0014` accorde à un gérant l'écriture sur `users`, **colonne par
@@ -1066,6 +1271,66 @@ détail de confort. C'est ce qui décide s'il survivra.
 
 ---
 
+## 25 bis. La garde d'énumération — vérifier la RÈGLE, pas l'instance
+> ⟶ `apps/sync/test/rls-partout.test.ts` — aucune table sans RLS
+> ⟶ `apps/backoffice/src/serveur/ecrans-reserves.test.ts` — aucun écran sans garde de rôle
+> ⟶ `apps/backoffice/src/serveur/use-server.test.ts` — aucun export non-async dans un `'use server'`
+
+**Le problème.** Les deux incidents les plus graves de ce dépôt ont la même
+forme, et ce n'est pas une coïncidence.
+
+- Trois écrans — `ventes`, `tickets`, `tableau-bord` — ne vérifiaient aucun
+  rôle. Une URL tapée à la main rendait le chiffre d'affaires à un cuisinier.
+- Une table écrite à la main (`subscriptions`) portait sa politique de lecture
+  **sans le `grant` correspondant** : la politique existait, la lecture
+  échouait quand même.
+
+Dans les deux cas, la règle était écrite, comprise, et appliquée **partout
+sauf à un endroit**. On a corrigé l'endroit. Rien n'empêchait le suivant.
+
+**Le patron.** Ne pas tester les instances — **énumérer l'univers et tester la
+règle**.
+
+```
+pour chaque table du schéma kaissi     → RLS + force + au moins une politique
+pour chaque page sous [restaurant]/    → appelle ecranReserve(), ou déclare son exemption
+pour chaque export de fichier 'use server' → est une fonction async
+```
+
+Ce qui change : une garde d'instance protège ce qu'on a pensé à lui donner ;
+une garde d'énumération protège **ce qui n'existe pas encore**. Le code neuf
+naît couvert.
+
+**Trois propriétés, et il faut les trois** :
+
+1. **un plancher sur le compte.** Un test qui balaie un dossier peut passer en
+   ne trouvant RIEN : un chemin faux, une arborescence déplacée, et la garde
+   devient une décoration verte. `expect(tous.length).toBeGreaterThan(20)`
+   coûte une ligne et transforme un faux ✓ en échec ;
+2. **des exemptions déclarées, avec leur raison.** Trois écrans n'ont
+   légitimement pas de garde — une racine qui redirige, l'écran de la cuisine,
+   une ancienne adresse. Les nommer fait de chaque exemption une décision
+   relue, et non un oubli qui ressemble à une décision. Un test supplémentaire
+   exige que la raison fasse plus de trois mots ;
+3. **l'exemption se périme.** Une quatrième assertion vérifie qu'aucune
+   exemption n'est devenue fausse. Une exemption qui n'a plus lieu d'être
+   n'ouvre rien aujourd'hui — mais elle rouvre la porte le jour où quelqu'un
+   retire un garde en croyant que la liste dit vrai.
+
+> **Comment on sait qu'une garde d'énumération fonctionne :** on la sabote.
+> Retirer `force row level security` d'une table, retirer `security_invoker`
+> d'une vue, accorder un `select` à `anon`, retirer l'appel d'un écran, ajouter
+> un écran vide — chacun de ces cinq gestes doit faire échouer un test
+> **qui nomme le coupable**. Une garde qui échoue sans dire quoi déplace la
+> recherche du côté du dépôt.
+
+**Et la limite, assumée :** la garde des écrans lit le TEXTE du module, elle ne
+vérifie pas que l'appel est atteint. C'est grossier. Mais un écran qui ne
+nomme pas son garde ne peut certainement pas le franchir — et c'est ce
+défaut-là qui s'est produit trois fois.
+
+---
+
 ## 26. Observabilité — l'écran qui répond à la vraie question
 > ⟶ `apps/pos/src/ecrans/EcranDiagnostic.tsx:34` — l'écran du gérant
 
@@ -1233,7 +1498,10 @@ un garde-fou et un décor.
 
 # Comment décider, la prochaine fois
 
-Les six questions qui ont produit toutes les décisions ci-dessus :
+Les questions qui ont produit toutes les décisions ci-dessus. Elles ne sont
+plus six — chaque incident en a ajouté une, et c'est ainsi que la liste doit
+grandir : une question qu'on n'a pas su se poser coûte toujours une panne
+avant d'être écrite.
 
 1. **Quelle est la contrainte dominante ?** Écris-la en une phrase. Tout ce
    qui ne s'y rapporte pas est du logiciel ordinaire.
@@ -1260,6 +1528,18 @@ Les six questions qui ont produit toutes les décisions ci-dessus :
 9. **Ai-je mesuré, ou ai-je supposé ?** Et si j'ai mesuré : *où le chiffre
    est-il écrit ?* Une optimisation écartée sans trace revient tous les six
    mois.
+10. **Cette opération COMMUTE-t-elle ?** Si deux exécutions concurrentes
+    donnent le même résultat dans n'importe quel ordre, elle s'ouvre sans
+    machinerie. Sinon, ce qui coûte n'est pas l'écriture — c'est l'arbitrage
+    qu'elle traîne derrière (§13 ter).
+11. **Ce privilège exprime-t-il une frontière ?** Demande-toi ce qu'un
+    développeur pressé pourrait construire avec. Si la réponse est « la chose
+    que la documentation interdit », le privilège fait partie du problème :
+    une règle qu'on ne PEUT pas enfreindre vaut mieux qu'une règle qu'on
+    rappelle (§20 bis).
+12. **Est-ce que je teste une instance, ou la RÈGLE ?** Corriger l'endroit où
+    la règle a été oubliée ne protège pas le suivant. Énumérer l'univers, si
+    (§25 bis).
 
 ---
 

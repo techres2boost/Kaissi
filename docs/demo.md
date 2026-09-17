@@ -14,6 +14,152 @@ tableau de bord, ventes, tickets, journée, stock, cuisine.
 
 ---
 
+## 0 bis. Le cahier de recette — tout ce qui se teste, et où
+
+Cette table est la **liste complète** de ce que Kaissi sait faire aujourd'hui.
+Une ligne par fonctionnalité, l'écran où la voir, ce qu'on doit constater, et
+le renvoi vers la section qui la détaille.
+
+Elle sert à deux choses : **passer tout en revue** sans rien oublier, et
+**retrouver une fonctionnalité** sans relire trois mille lignes.
+
+> **Comment la lire.** ⚑ marque les points où le produit fait quelque chose de
+> contre-intuitif *à dessein* — ce sont eux qu'il faut vérifier, parce qu'un
+> défaut y ressemble à un fonctionnement normal.
+
+### A. La caisse, hors ligne
+
+| # | Ce qui se teste | Où | Ce qu'on doit voir |
+|---|---|---|---|
+| A1 | ⚑ **Encaisser sans réseau** | Caisse, mode avion | La vente passe, le ticket sort. Rien ne bloque, jamais — § 3 |
+| A2 | Mise en service d'un terminal | Caisse → Sync | E-mail + mot de passe du gérant. Aucun jeton à recopier — § 7 |
+| A3 | ⚑ Remise en service d'un terminal | Caisse → Sync, après purge | **Le MÊME appareil**, même préfixe de tickets — § R.1 |
+| A4 | Prise de poste par PIN | Caisse | Validé **hors ligne**, en Argon2id — § H |
+| A5 | Tickets ouverts, tables | Caisse → Salle | Une commande s'enrichit au fil du service — § 3 |
+| A6 | Modificateurs | Caisse → article | Les choix s'ajoutent au prix de la LIGNE — § T.3 |
+| A7 | Remises, plafonds par rôle | Caisse | 10 % caissier, 5 % serveur, illimité gérant — § K |
+| A8 | ⚑ Créer un article depuis la caisse | Caisse → Commande | Vendable **immédiatement**, tuile « en attente » — § Q.1 bis |
+| A9 | Service de caisse, écart | Caisse → Journée | Fond de caisse, comptage, écart — § E |
+| A10 | ⚑ « Périodes de travail » | Caisse → Périodes | **Cette caisse seulement**, et l'écran le dit — § Q.2 ter |
+| A11 | Bouton « Back-office » | Caisse | Ouvre le NAVIGATEUR. Hors ligne, il explique — § Q.2 ter |
+| A12 | Diagnostic | Caisse → Diagnostic | Quatre phrases, le technique replié — § 1.2 |
+
+### B. La synchronisation
+
+| # | Ce qui se teste | Où | Ce qu'on doit voir |
+|---|---|---|---|
+| B1 | ⚑ **Aucune vente perdue ni dupliquée** | Coupure réseau en plein service | Tout remonte, une seule fois — § 3 |
+| B2 | Push avant pull | Caisse → Sync | Les encaissements partent d'abord — § 1.3 |
+| B3 | ⚑ Un rejet ne se réessaie jamais seul | Caisse → Sync | Il remonte au gérant, il ne disparaît pas — § 7 |
+| B4 | Descente du catalogue | Back-office → prix, puis Caisse | Le nouveau prix arrive sans rien réinstaller — § D |
+| B5 | Descente des modificateurs | Back-office → Modificateurs | Groupes ET choix arrivent ensemble — § T.2 |
+| B6 | Descente des options de restauration | Back-office → Restauration | Service et timbre changent le total — § S.5 |
+| B7 | Descente du réglage de reçu | Back-office → Reçu | En-tête et pied changent sur le ticket — § S.3 |
+| B8 | Marqueur « prêt » vers la salle | Back-office → Préparation | Il descend jusqu'à la tablette — § B bis |
+
+### C. Le back-office — rapports
+
+| # | Ce qui se teste | Où | Ce qu'on doit voir |
+|---|---|---|---|
+| C1 | Tableau de bord | Rapports | CA **hors taxe**, marge, panier moyen — § 4 |
+| C2 | Récapitulatif des ventes | Rapports → Ventes | Le détail du CA, période comparée — § J |
+| C3 | Ventes par article / catégorie / employé / paiement | Rapports | Quatre découpages du même chiffre — § J |
+| C4 | Reçus, et le détail d'un ticket | Rapports → Reçus | Le ticket reconstruit à l'identique — § E ter |
+| C5 | Réductions accordées | Rapports → Réductions | Ce que les remises ont coûté — § K |
+| C6 | Périodes de travail | Rapports → Périodes | **Toutes** les caisses, contrairement à A10 — § E ter |
+| C7 | ⚑ Tronqué au-delà de 20 000 ventes | Période d'un an | Un bandeau le DIT. Un total amputé ressemble à un total — § P.1 |
+| C8 | ⚑ Historique borné par la formule | Formule gratuite, 4 mois en arrière | Bandeau « votre formule limite l'historique » — § U.3 |
+| C9 | Exports CSV | Chaque rapport | Même garde de rôle que l'écran — § F |
+
+### D. Le back-office — exploitation
+
+| # | Ce qui se teste | Où | Ce qu'on doit voir |
+|---|---|---|---|
+| D1 | Carte : articles, catégories | Articles | Prix, coût, poste de préparation — § D |
+| D2 | ⚑ Le poste vient de la CATÉGORIE | Articles → Catégories | Le produit n'est qu'un repli — § A |
+| D3 | Stock : comptage, mouvements, seuils | Articles → Stock | Calculé à la lecture, jamais un compteur — § I |
+| D4 | ⚑ Stock négatif possible | Vente hors ligne en excès | Il n'est PAS borné à zéro — § 6 |
+| D5 | ⚑ Rupture automatique | Stock à zéro | Le SERVEUR retire de la carte, pas la tablette — § 5.3 |
+| D6 | Alerte de rupture (push) | Stock → Notifications | Immédiate, pas au balayage suivant — § O |
+| D7 | Modificateurs | Articles → Modificateurs | Groupes, choix, rattachement — § T.1 |
+| D8 | Réductions prédéfinies | Articles → Réductions | Le nom est RECOPIÉ sur la vente — § K |
+| D9 | Inventaire avancé — valorisation | Articles → Inventaire avancé | ⚑ Coût d'achat, arrondi UNE fois — § V.1 |
+| D10 | Inventaire avancé — fournisseurs | Articles → Inventaire avancé | ⚑ Le champ reste LIBRE — § V.2 |
+| D11 | Préparation (cuisine, bar) | Préparation | ⚑ **Aucun montant**, jamais — § B |
+| D12 | Clients | Paramètres → Clients | Visites et total CALCULÉS — § M |
+
+### E. Le back-office — paramètres
+
+| # | Ce qui se teste | Où | Ce qu'on doit voir |
+|---|---|---|---|
+| E1 | ⚠ Taxes | Paramètres → Taxes | Un restaurant neuf reçoit **0 %**, exprès — § S.1 |
+| E2 | Modes de paiement | Paramètres → Paiements | Nom libre, type qui regroupe — § S.2 |
+| E3 | Reçu : en-tête et pied | Paramètres → Reçu | Aperçu fidèle au papier — § S.3 |
+| E4 | Imprimantes cuisine | Paramètres → Imprimantes | ⚑ Le ticket client n'a pas de poste à lui — § S.4 |
+| E5 | ⚠ Service et droit de timbre | Paramètres → Restauration | Les deux seuls réglages qui changent le TOTAL — § S.5 |
+| E6 | Employés, PIN, accès | Paramètres → Employés | ⚑ Le PIN TRACE, il ne protège pas — § G et § H |
+| E7 | Fonctionnalités | Paramètres → Fonctionnalités | ⚑ Aucun interrupteur, et c'est voulu — § S.6 |
+| E8 | Abonnement | Paramètres → Abonnement | ⚑ Aucun bouton, aucun montant — § U.1 |
+| E9 | Aide | Paramètres → Aide | Les trois écrans à regarder — § S.8 |
+
+### F. Administration et cycle de vie
+
+| # | Ce qui se teste | Où | Ce qu'on doit voir |
+|---|---|---|---|
+| F1 | Ouvrir un établissement | Administration | Réglages copiés d'un modèle — § N |
+| F2 | Ouvrir un compte depuis la CAISSE | Caisse, sans compte | Restaurant + admin + appairage, d'un coup — § R.2 |
+| F3 | ⚑ Fermer un établissement | Administration | Coupe les NOUVEAUX appairages, pas les envois — § W.1 |
+| F4 | ⚑ Supprimer — sous obstacles | Administration | Le refus ÉNUMÈRE ce qui l'empêche — § W.2 |
+| F5 | ⚑ Changer une caisse d'établissement | Caisse → Sync | Refusé s'il reste des ventes à remonter — § R.1 |
+| F6 | Changer de formule | `pnpm sync:abonnement` | Effet immédiat, rien à réinstaller — § U.2 |
+
+### G. Ce qui protège — à éprouver en tapant l'URL à la main
+
+| # | Ce qui se teste | Comment | Ce qu'on doit voir |
+|---|---|---|---|
+| G1 | ⚑ Rôle de préparation sur un écran d'argent | `/‹resto›/ventes` en cuisine | **Refus côté serveur** — § 9 |
+| G2 | ⚑ Export sans le rôle | `/‹resto›/export/ventes` | Même refus que l'écran — § 9 |
+| G3 | ⚑ Module fermé | `/‹resto›/export/valorisation` en gratuit | **404** — § U.3 |
+| G4 | ⚑ Un gérant nomme un gérant | Employés | Refusé — seul un `admin` le peut — § 9 |
+| G5 | ⚑ Les données d'un autre client | N'importe quel écran | RLS ne rend **aucune** ligne — § 9 |
+| G6 | ⚑ S'offrir la formule payante | Console du navigateur | Refusé : aucune politique d'écriture — § U.1 |
+| G7 | Journal d'audit intègre | `kaissi.verifie_chaine_audit()` | « Journal intègre » — § P |
+
+> **Les lignes ⚑ sont celles qui distinguent ce produit.** Si tu ne testes que
+> dix choses, teste celles-là : A1, A3, B1, B3, C7, C8, D4, D5, F4, G1.
+
+### Ce qui est ARRIVÉ depuis la dernière lecture de ce document
+
+Si tu as déjà fait la démonstration et que tu cherches ce qui a changé, tout
+tient dans ces neuf lignes — chacune avec sa migration et sa section.
+
+| Migration | Ce qui est arrivé | À tester |
+|---|---|---|
+| 0034 | Créer un article **depuis la caisse** | § Q.1 bis |
+| 0035 | Réglage de l'en-tête et du pied du **reçu** | § S.3 |
+| 0036 | **Service et droit de timbre** — les deux réglages qui changent le total | § S.5 |
+| 0037 | Les **modificateurs descendent** enfin à la caisse | § T.2 |
+| 0038–0039 | **Fermer** un établissement, et le **supprimer** sous obstacles | § W |
+| 0040 | Les **formules d'abonnement**, et l'essai de 14 jours | § U |
+| 0041 | **Fournisseurs** et **valorisation du stock** | § V |
+| 0042 | La caisse **ne peut même pas lire** la table des abonnements | § U.1 |
+| — | Deux **gardes d'énumération** : aucune table sans RLS, aucun écran sans garde de rôle | ci-dessous |
+
+> **Les deux gardes ne se testent pas à l'écran**, et c'est leur raison d'être.
+> Elles s'exécutent en intégration continue :
+>
+> ```bash
+> pnpm --filter @kaissi/sync test rls-partout        # aucune table sans RLS
+> pnpm --filter @kaissi/backoffice test ecrans-reserves  # aucun écran sans garde
+> pnpm verifier:docs                                  # aucun renvoi cassé dans docs/
+> ```
+>
+> Les deux premières énumèrent l'univers au lieu de vérifier des cas : une
+> table neuve ou un écran neuf naît donc couvert. Le raisonnement complet est
+> dans [`system-design.md`](system-design.md) § 25 bis.
+
+---
+
 ## 0. Les trois adresses
 
 | Rôle | Adresse |
@@ -2994,6 +3140,100 @@ est partiel sur les fiches actives.
 | **La caisse** | jamais concernée — elle n'interroge aucun abonnement |
 | **Les rapports de vente** | ouverts dans toutes les formules ; seule leur **profondeur** dépend de la formule |
 | **Les fiches déjà créées** | conservées. Repasser en `gratuit` les masque, il ne les efface pas |
+
+### W. Fermer un établissement, et le supprimer quand c'est encore possible
+
+**Administration → l'établissement.** Un client ferme son restaurant, ou en a
+ouvert un par erreur. Ce sont **deux gestes différents**, et ils ne se
+confondent pas.
+
+> ⚑ **Supprimer effacerait des ventes, c'est-à-dire des écritures
+> comptables.** Fermer n'efface rien. C'est pourquoi la suppression n'est
+> offerte que tant qu'il n'y a **rien à perdre** — et qu'elle se refuse, en
+> disant quoi, dès qu'il y a quelque chose.
+
+#### W.1 — Fermer : réversible, et sans couper les caisses
+
+1. **Administration** → un établissement → **Fermer l'établissement**.
+
+**Attendu** : il est rangé à part dans la liste, avec sa date de fermeture. Il
+reste **visible** — on ne cache pas à quelqu'un un restaurant dont il est
+gérant.
+
+2. Essayez d'appairer une **nouvelle** caisse dessus.
+
+**Attendu** : refusé, avec le motif `etablissement_ferme`.
+
+3. Prenez maintenant une caisse **déjà appairée** sur cet établissement, avec
+   des ventes en attente dans son outbox, et synchronisez.
+
+**Attendu** : **elles remontent.** C'est délibéré, et c'est le point de cette
+section.
+
+> Refuser les envois d'un terminal le jour de la fermeture perdrait les
+> ventes de la **dernière soirée** — précisément celles qui n'ont pas encore
+> pu partir. Et un rejet ne se réessaie jamais tout seul : elles n'arriveraient
+> JAMAIS, sans que rien ne le dise. Fermer coupe les **nouveaux appairages**,
+> rien d'autre.
+
+4. **Rouvrir l'établissement.**
+
+**Attendu** : tout revient, y compris la possibilité d'appairer. Fermer est
+réversible ; c'est ce qui le distingue de l'autre geste.
+
+#### W.2 — Supprimer : le refus qui ÉNUMÈRE
+
+5. Sur un établissement qui a servi, demandez **Supprimer**.
+
+**Attendu** : l'écran liste **les obstacles** — « 47 ventes », « 3 services de
+caisse », « 128 événements d'audit » — et le champ de confirmation n'apparaît
+même pas.
+
+> Un refus opaque (« suppression impossible ») envoie ouvrir une console SQL.
+> Un refus qui énumère est **actionnable** : on sait ce qu'on perdrait, donc
+> on sait si l'on veut vraiment. Les obstacles sont comptés **en base**, au
+> moment où on les demande — pas devinés.
+
+6. Ouvrez maintenant un établissement **neuf** (§ R.2), n'y encaissez rien, et
+   demandez sa suppression.
+
+**Attendu** : aucun obstacle, et un champ qui demande de **retaper le nom
+exact**.
+
+7. Tapez un nom approchant. Puis le nom exact.
+
+**Attendu** : le premier est refusé, le second passe.
+
+> **Trois serrures, et aucune ne remplace les autres :** le rôle `admin` **de
+> cet établissement**, relu **en base** par le service — l'appareil déclare
+> qui demande, le serveur ne le croit pas ; le nom retapé à l'identique ; et
+> le refus de supprimer **le dernier** établissement qu'on administre, qui
+> laisserait son propriétaire dehors, sans aucun moyen de rentrer.
+
+8. Essayez de supprimer le **seul** établissement que vous administrez.
+
+**Attendu** : refusé, et l'écran dit pourquoi.
+
+#### W.3 — Le piège qu'on n'a vu qu'en le heurtant
+
+Supprimer un établissement supprime ses produits, ses catégories, ses postes —
+en cascade. Or chacune de ces tables porte un déclencheur qui **journalise** le
+changement dans `change_log`, avec le `restaurant_id` de la ligne.
+
+La cascade insérait donc des lignes de journal pointant vers un établissement
+**en train de disparaître**, et la suppression échouait sur une violation de
+clé étrangère — un message qui ne nomme ni la cause, ni le remède.
+
+| Correctif envisagé | Pourquoi écarté |
+|---|---|
+| Retirer la clé étrangère | Elle protège du vrai défaut : un journal orphelin |
+| La passer en `on delete cascade` | Le problème n'est pas les anciennes lignes, ce sont les NOUVELLES |
+| Énumérer les tables à désactiver | Ça casse à la prochaine table de référentiel ajoutée |
+
+Le correctif retenu tient en une fonction — `kaissi.etablissement_vivant()` —
+que **les cinq** fonctions de journalisation consultent en première ligne. Un
+déclencheur doit pouvoir savoir qu'il s'exécute à l'intérieur d'une
+suppression, sans quoi il travaille pour un monde qui n'existe plus.
 
 ---
 
