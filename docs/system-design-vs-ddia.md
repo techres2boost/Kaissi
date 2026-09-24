@@ -316,10 +316,10 @@ attribués par le serveur. Chaque tablette retient jusqu'où elle a lu
 (`last_catalog_seq`) : c'est l'**offset de consommateur** de la p. 446, sous un
 autre nom.
 
-**Même logique ?** Oui pour le refus des timestamps. **Non pour une propriété que
-le md affirme** : voir la **partie C**. Le livre, p. 348, exige qu'un journal
-soit lu **sans trous**, et un compteur de base de données ne le garantit pas
-tout seul.
+**Même logique ?** Oui pour le refus des timestamps. Pour l'absence de trous,
+**oui depuis la migration 0043** : le livre, p. 348, exige qu'un journal soit
+lu sans trous, et un compteur de base de données ne le garantit pas tout seul.
+Voir la **partie C**.
 
 ### 12 bis. Un seul canal de descente — et l'ensemble complet quand l'élément ne suffit pas
 
@@ -540,9 +540,10 @@ corrélées et plus dangereuses que les pannes matérielles.
 événements mais pas de projection, et les reprojette
 (`apps/sync/src/reparation.ts`).
 
-**Même logique ?** Oui. ⚠ Mais ce balayage ne répare que les projections **du
-serveur**. Il ne voit pas le problème décrit en partie C, qui touche les
-**tablettes**.
+**Même logique ?** Oui. Ce balayage ne répare que les projections **du
+serveur** : il ne voyait pas le trou de la partie C, qui touchait les
+**tablettes** — d'où un correctif à la source (0043) plutôt qu'une réparation
+après coup.
 
 ### 25 et 25 bis. Les gardes de CI, et la garde d'énumération
 
@@ -577,7 +578,16 @@ pas pour un opérateur technique : même intention, public différent.
 
 ## Partie C — Là où le livre et notre md ne disent pas la même chose
 
-### ⚠ Le curseur de synchronisation peut sauter un événement
+### ✅ Le curseur de synchronisation pouvait sauter un événement — corrigé
+
+> **Corrigé par la migration 0043** (`supabase/migrations/0043_curseur_sans_trou.sql`),
+> selon le remède n° 1 ci-dessous : un verrou par établissement, pris par un
+> déclencheur `before insert` sur `order_events` et sur `change_log`, avant de
+> tirer le numéro. `apps/sync/test/curseur-sans-trou.test.ts` reproduit la
+> course avec le vrai code : il échouait avant la migration, il passe après,
+> et il échoue aussi si le verrou devient global au lieu d'être par
+> établissement. L'analyse ci-dessous est conservée telle qu'elle a été
+> écrite, pour qu'on voie d'où vient le correctif.
 
 **Ce que dit notre md (§12).** Un timestamp est un mauvais curseur, entre autres
 parce que « une transaction longue peut valider un `now()` antérieur à une
@@ -631,8 +641,7 @@ moment exact d'un tirage — mais elle grandit avec le nombre de caisses, et ell
 est invisible quand elle se produit. C'est le genre de défaut que le livre
 décrit : rare, silencieux, définitif.
 
-**Ce document ne corrige rien** (la consigne était de ne pas toucher au code ni à
-`system-design.md`). Les remèdes connus, pour décider ensuite :
+**Les remèdes envisagés** (le n° 1 a été retenu) :
 
 1. **Sérialiser les insertions par établissement** (verrou consultatif pris à
    l'insertion, comme on le fait déjà pour le préfixe de tickets). Simple ;

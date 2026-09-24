@@ -511,6 +511,8 @@ le ticket.
 
 ## 12. Horloge logique — un curseur, jamais un timestamp
 > ⟶ `supabase/migrations/0005_sync.sql` — `change_log.seq`, un `bigint generated always as identity`
+> ⟶ `supabase/migrations/0043_curseur_sans_trou.sql` — `numerote_changement_sous_verrou()`, le numéro tiré sous verrou
+> ⟶ `apps/sync/test/curseur-sans-trou.test.ts` — la course reproduite avec le vrai code
 
 
 **Le problème.** Sur quoi une tablette dit-elle « donne-moi ce qui a changé
@@ -532,6 +534,35 @@ ce document et CLAUDE.md continuent d'appeler ainsi par commodité.
 **La leçon générale :** dans un système distribué, le temps n'est pas un
 ordre. Chaque fois qu'un `order by created_at` sert à la **correction** d'un
 algorithme (et non au confort d'affichage), c'est un bug qui attend.
+
+> **Le compteur avait le même trou — corrigé par la migration 0043.**
+>
+> PostgreSQL attribue un numéro d'identité au moment de l'**insertion**, pas de
+> la validation. Si la transaction A reçoit 100 et tarde à valider pendant que
+> B reçoit 101 et valide, une tablette qui tire à ce moment voit 101, avance
+> son curseur, et ne reçoit **jamais** le 100. Le reproche fait plus haut au
+> timestamp valait donc aussi pour le compteur : c'est le problème que DDIA
+> décrit au ch. 9, « Total Order Broadcast » — un journal doit être lu dans
+> l'ordre **et sans trous**.
+>
+> Le correctif : un déclencheur `before insert` sur `order_events` et sur
+> `change_log` prend un **verrou par établissement**, gardé jusqu'à la
+> validation, et tire **alors seulement** le numéro. Deux transactions d'un
+> même établissement ne peuvent plus détenir de numéro en même temps : l'ordre
+> des numéros devient l'ordre des validations.
+>
+> Deux détails qui comptent :
+>
+> - **le numéro est retiré, pas seulement verrouillé.** La valeur par défaut
+>   est calculée *avant* les déclencheurs ; un simple verrou arriverait trop
+>   tard. Le numéro réservé d'abord est perdu : la séquence peut sauter
+>   (100, 102…), ce qui n'est pas un trou de livraison ;
+> - **le verrou est par établissement.** Deux restaurants ne s'attendent
+>   jamais, et le test le mesure : un verrou global y échoue.
+>
+> Il est dans la **base** et non dans le service, parce que `change_log` a six
+> écrivains : un déclencheur sur la table les couvre tous, y compris ceux qui
+> n'existent pas encore.
 
 ---
 
