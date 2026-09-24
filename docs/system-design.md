@@ -28,7 +28,7 @@ renvoi les donne tous : c'est précisément ce qui rend le patron visible.
 Un patron sans renvoi n'existe pas dans ce dépôt. S'il en manque un, c'est un
 défaut de ce document, pas une abstraction.
 
-### Les 38 patrons, en un coup d'œil
+### Les 42 patrons, en un coup d'œil
 
 - [0. La contrainte qui décide de tout](#0-la-contrainte-qui-décide-de-tout)
 
@@ -39,6 +39,7 @@ défaut de ce document, pas une abstraction.
 - [3. Shared kernel — un seul endroit calcule l'argent](#3-shared-kernel--un-seul-endroit-calcule-largent)
 - [4. Ports & adapters — la même base sur trois runtimes](#4-ports--adapters--la-même-base-sur-trois-runtimes)
 - [5. Transactional outbox — ne jamais perdre une vente](#5-transactional-outbox--ne-jamais-perdre-une-vente)
+- [5 bis. File persistante et trace d'effet — imprimer sans bloquer, ne jamais réimprimer](#5-bis-file-persistante-et-trace-deffet--imprimer-sans-bloquer-ne-jamais-réimprimer)
 - [6. Clé d'idempotence — la garantie « jamais de double encaissement »](#6-clé-didempotence--la-garantie--jamais-de-double-encaissement-)
 - [7. Machine à états — interdire au lieu de vérifier partout](#7-machine-à-états--interdire-au-lieu-de-vérifier-partout)
 - [8. Types marqués — rendre l'état illégal impossible à écrire](#8-types-marqués--rendre-létat-illégal-impossible-à-écrire)
@@ -48,12 +49,15 @@ défaut de ce document, pas une abstraction.
 **PARTIE II — La base de données**
 
 - [11. Multi-tenance — la colonne discriminante, partout](#11-multi-tenance--la-colonne-discriminante-partout)
+- [11 bis. Numéroter hors ligne — l'espace de noms vient du serveur](#11-bis-numéroter-hors-ligne--lespace-de-noms-vient-du-serveur)
 - [12. Horloge logique — un curseur, jamais un timestamp](#12-horloge-logique--un-curseur-jamais-un-timestamp)
+- [12 bis. Un seul canal de descente — et l'ensemble complet quand l'élément ne suffit pas](#12-bis-un-seul-canal-de-descente--et-lensemble-complet-quand-lélément-ne-suffit-pas)
 - [13. Journal append-only + chaînage par hash](#13-journal-append-only--chaînage-par-hash)
 - [13 bis. L'exception nommée — lever une invariance sans la perdre](#13-bis-lexception-nommée--comment-on-lève-une-invariance-sans-la-perdre)
 - [13 ter. L'exception étroite — pourquoi CRÉER n'est pas MODIFIER](#13-ter-lexception-étroite--pourquoi-créer-nest-pas-modifier)
 - [14. UUIDv7 — l'identifiant vient de celui qui crée](#14-uuidv7--lidentifiant-vient-de-celui-qui-crée)
 - [15. Instantané ponctuel — copier plutôt que joindre](#15-instantané-ponctuel--copier-plutôt-que-joindre)
+- [15 bis. État dérivé — le stock se calcule, il ne se décrémente pas](#15-bis-état-dérivé--le-stock-se-calcule-il-ne-se-décrémente-pas)
 - [16. Index unique partiel — la contrainte qui sait faire une exception](#16-index-unique-partiel--la-contrainte-qui-sait-faire-une-exception)
 - [16 bis. Le cycle de vie d'un agrégat racine — fermer, puis supprimer sous obstacles](#16-bis-le-cycle-de-vie-dun-agrégat-racine--fermer-puis-supprimer-sous-obstacles)
 - [16 ter. La fiche facultative — structurer sans imposer la saisie](#16-ter-la-fiche-facultative--structurer-sans-imposer-la-saisie)
@@ -164,7 +168,7 @@ PowerSync (qui les implémente) est resté la porte de sortie, jamais franchie
 
 ## 2. CQRS — écrire dans le journal, lire dans une projection
 > ⟶ `packages/db-local/src/projecteur.ts` — la projection sur la tablette
-> ⟶ `apps/sync/src/depot-postgres.ts:716` — `reprojeter()`, côté serveur
+> ⟶ `apps/sync/src/depot-postgres.ts:910` — `reprojeter()`, côté serveur
 
 
 **Le problème créé par la partie 1.** Rejouer trois mille événements pour
@@ -232,19 +236,33 @@ exhaustive, sans base ni serveur — 168 tests en 6 secondes.
 ---
 
 ## 4. Ports & adapters — la même base sur trois runtimes
-> ⟶ `packages/db-local/src/adaptateur.ts:15` — le port, six méthodes
-> ⟶ `packages/db-local/src/adaptateurs/` — Capacitor, Node, navigateur
+> ⟶ `packages/db-local/src/adaptateur.ts:15` — `AdaptateurSqlite`, le port, six méthodes
+> ⟶ `packages/db-local/src/adaptateurs/capacitor.ts` — Android et iOS
+> ⟶ `packages/db-local/src/adaptateurs/node.ts` — les tests, sur `node:sqlite`
+> ⟶ `apps/pos/src/donnees/sqlite-web.ts` — le navigateur, `sql.js` + IndexedDB
 
 
-**Le problème.** SQLite s'appelle différemment sur Android (plugin Capacitor),
-dans un navigateur (wa-sqlite/OPFS) et sous Node (better-sqlite3). Écrire trois
-fois la logique métier serait garantir trois comportements.
+**Le problème.** SQLite s'appelle différemment sur la tablette (plugin
+Capacitor), dans un navigateur (`sql.js`, compilé en WebAssembly) et sous Node
+(`node:sqlite`, pour les tests). Écrire trois fois la logique métier serait
+garantir trois comportements.
 
 **Le patron : Ports & Adapters** (*hexagonal architecture*). Le port est une
 interface ; les adaptateurs l'implémentent.
 
-**Où :** `packages/db-local/src/adaptateur.ts` (le port — six méthodes),
-`adaptateurs/capacitor.ts` et `adaptateurs/node.ts` (les adaptateurs).
+**Où :** `packages/db-local/src/adaptateur.ts` (le port — six méthodes :
+`executer`, `executerScript`, `lire`, `lireUne`, `transaction`, `fermer`), et
+trois adaptateurs. Les deux premiers vivent dans `db-local/adaptateurs/` ; le
+troisième, celui du navigateur, vit dans `apps/pos/src/donnees/sqlite-web.ts`,
+parce qu'il dépend de Vite pour charger son fichier `.wasm`.
+
+**Ce que l'adaptateur web a de particulier :** `sql.js` tient la base **en
+mémoire**, sans fichier. La persistance consiste à exporter l'image entière
+dans IndexedDB à la sortie de chaque transaction — et à **attendre** cette
+écriture : la différer ferait perdre l'encaissement qui vient d'être validé si
+l'onglet meurt dans l'intervalle. C'est aussi pourquoi l'écran Diagnostic dit
+en clair que ce stockage est évinçable par le navigateur, et que l'APK reste la
+cible nominale.
 
 **Le bénéfice concret, et il est plus grand qu'il n'y paraît :** les
 migrations, les dépôts et le projecteur sont testés **contre le vrai SQLite**,
@@ -289,9 +307,38 @@ serveur reçoit cinquante lots simultanés — le *thundering herd*.
 
 ---
 
+## 5 bis. File persistante et trace d'effet — imprimer sans bloquer, ne jamais réimprimer
+> ⟶ `packages/db-local/src/migrations/001_schema_initial.ts:363` — `print_queue`
+> ⟶ `packages/db-local/src/migrations/002_phase1_caisse.ts:49` — `kitchen_sends`
+> ⟶ `apps/pos/src/donnees/impression.ts:27` — `ServiceImpression`
+
+**Le problème.** Une imprimante s'éteint, manque de papier, perd le Wi-Fi.
+Si l'encaissement attend l'imprimante, la caisse s'arrête avec elle.
+
+**Le patron, en deux morceaux.**
+
+1. **File persistante** (*persistent job queue*). Un ticket n'est pas envoyé à
+   l'imprimante : il est **écrit dans `print_queue`**, déjà rendu en ESC/POS.
+   Une boucle vide la file, réessaie seule, et survit au redémarrage. La
+   caisse, elle, est déjà passée au client suivant. Un échec allume un badge ;
+   il ne supprime **jamais** un travail.
+2. **Trace d'effet** (*side-effect log*). `kitchen_sends` retient **quelle
+   ligne** est déjà partie en cuisine, avec un index unique sur
+   `order_item_id`. C'est ce qui empêche une deuxième tournée de réimprimer
+   la première — la cuisine referait les plats déjà servis.
+
+C'est le même raisonnement que l'idempotence (§6), appliqué à un effet
+physique : on ne peut pas « annuler » un bon imprimé, donc on retient qu'il
+l'a été.
+
+**Aujourd'hui éteint** (§10), mais la table `kitchen_sends` sert déjà : elle
+dit à l'écran quelles lignes ont été envoyées.
+
+---
+
 ## 6. Clé d'idempotence — la garantie « jamais de double encaissement »
 > ⟶ `supabase/migrations/0005_sync.sql:8` — `sync_mutations.event_id`, clé primaire
-> ⟶ `apps/sync/src/service.ts:149` — `push()`, l'idempotence consultée AVANT le métier
+> ⟶ `apps/sync/src/service.ts:157` — `push()`, l'idempotence consultée AVANT le métier
 
 
 **Le problème.** Le réseau coupe pendant le `POST`. La vente est-elle
@@ -367,7 +414,7 @@ type manque.
 ---
 
 ## 9. Anti-corruption layer — le schéma écrit à la main
-> ⟶ `apps/backoffice/src/serveur/schema.ts:503` — `Database`, écrit à la main
+> ⟶ `apps/backoffice/src/serveur/schema.ts:679` — `Database`, écrit à la main
 
 
 **Le problème.** Le back-office lit Postgres via PostgREST. Un générateur de
@@ -432,8 +479,38 @@ quand elles paraissent prématurées. Les décisions réversibles se repoussent.
 
 ---
 
+## 11 bis. Numéroter hors ligne — l'espace de noms vient du serveur
+> ⟶ `supabase/migrations/0002_tenance.sql:120` — `ticket_prefix`, unique par établissement
+> ⟶ `apps/sync/src/depot-postgres.ts:2108` — `numeroTicketLibre()`, la collision désambiguïsée
+
+**Le problème.** Deux caisses hors ligne émettent chacune un ticket. Il leur
+faut un numéro lisible (« 000042 »), et un UUID (§14) ne se lit pas au
+comptoir. Si chacune compte de son côté, les deux émettent « 000042 ».
+
+**Le patron : un espace de noms par émetteur.** Le **serveur** attribue à
+chaque terminal un préfixe unique (`P1`, `P2`…) à l'appairage ; le terminal
+compte ensuite librement **dans son espace** : `P1-000042`, `P2-000042`.
+Aucune coordination n'est nécessaire hors ligne, parce que les deux espaces
+ne se recouvrent pas. C'est ce que font les plaques d'immatriculation par
+département, ou les blocs d'adresses IP.
+
+**Le filet, quand l'hypothèse casse quand même** (un terminal qui aurait gardé
+un préfixe local) : la projection **ne refuse pas** la vente. Elle
+désambiguïse le numéro (`P1-000042~25f8`), garde l'original dans le journal, et
+inscrit la collision dans `orders.exceptions`.
+
+> **Perdre une vente coûte infiniment plus cher qu'un numéro suffixé.** Un
+> refus ici ferait disparaître du back-office une vente dont les événements
+> sont pourtant arrivés — vu en production, avant ce correctif.
+
+Le suffixe vient de l'**appareil**, pas d'un compteur : deux reprojections de
+la même vente doivent donner le même numéro, sinon chaque balayage renommerait
+le ticket.
+
+---
+
 ## 12. Horloge logique — un curseur, jamais un timestamp
-> ⟶ `supabase/migrations/0005_sync.sql` — `change_log.seq`, un `bigserial`
+> ⟶ `supabase/migrations/0005_sync.sql` — `change_log.seq`, un `bigint generated always as identity`
 
 
 **Le problème.** Sur quoi une tablette dit-elle « donne-moi ce qui a changé
@@ -446,14 +523,42 @@ même milliseconde sont indiscernables. Une transaction longue peut valider un
 saute alors l'événement, **définitivement et sans trace**.
 
 **Le patron : Logical Clock** — un compteur monotone attribué par un seul
-acteur, le serveur. `change_log.seq`, `order_events.server_seq`, des
-`bigserial`.
+acteur, le serveur. `change_log.seq`, `order_events.server_seq` : des colonnes
+`bigint generated always as identity` — la forme moderne du `bigserial`, que
+ce document et CLAUDE.md continuent d'appeler ainsi par commodité.
 
 **Où :** `supabase/migrations/0005_sync.sql`.
 
 **La leçon générale :** dans un système distribué, le temps n'est pas un
 ordre. Chaque fois qu'un `order by created_at` sert à la **correction** d'un
 algorithme (et non au confort d'affichage), c'est un bug qui attend.
+
+---
+
+## 12 bis. Un seul canal de descente — et l'ensemble complet quand l'élément ne suffit pas
+> ⟶ `packages/db-local/src/miroir.ts:61` — `TABLES_MIROIR`, et son option `lot`
+> ⟶ `supabase/migrations/0037_modificateurs_descendent.sql:56` — `journalise_modificateurs_produit()`
+
+**Le problème.** Le catalogue descend par `change_log` (§12). Puis arrivent
+d'autres réglages : l'en-tête du reçu (0035), le service et le timbre (0036),
+les modificateurs (0037). La tentation est d'ouvrir une route par réglage.
+
+**Le patron : un seul canal.** Chaque réglage devient une ligne de
+`change_log`, exactement comme un changement de prix. La caisse n'apprend
+rien de nouveau : elle applique ce qui descend, dans l'ordre du curseur. Un
+réglage de plus, c'est une entrée dans `TABLES_MIROIR`, pas une voie de
+synchronisation à maintenir.
+
+**Le cas qui ne rentrait pas.** `product_modifiers` est une table de
+**liaison** (quel groupe s'applique à quel produit). Journaliser ligne à
+ligne un DÉTACHEMENT pose problème : la ligne n'existe plus, et la caisse ne
+saurait pas quoi retirer. La 0037 journalise donc **l'ensemble complet** des
+groupes d'un produit à chaque changement ; la caisse efface les liens de ce
+produit puis réinsère la liste reçue (option `lot` du miroir).
+
+**La règle générale :** quand un élément isolé ne suffit pas à reconstruire
+l'état, envoie l'ensemble dont il fait partie. Une liste complète est
+idempotente ; une suite de « ajoute / retire » ne l'est pas.
 
 ---
 
@@ -618,10 +723,53 @@ vente porte l'**identifiant** (pour regrouper) *et* le **libellé recopié**
 
 - `orders.discount_id` / `discount_label` (migration `0030`)
 - `orders.customer_id` / `customer_name` (migration `0031`)
+- **le taux de service de la commande** : quand le gérant change son taux,
+  une commande déjà ouverte garde celui qu'elle portait
+  (`configEffective()`, `packages/domain/src/commande.ts`). Le serveur
+  l'ignorait jusqu'à la migration 0036, et reprojetait avec le taux du jour :
+  la tablette imprimait un total, le back-office en affichait un autre.
 
 **Comment reconnaître ce cas :** demande-toi si la donnée décrit **un fait
 passé** ou **un état courant**. Un fait passé se copie ; un état courant se
 joint. Une facture est un fait ; un solde est un état.
+
+---
+
+## 15 bis. État dérivé — le stock se calcule, il ne se décrémente pas
+> ⟶ `supabase/migrations/0019_stock_simple.sql` — la vue `stock_actuel`
+> ⟶ `supabase/migrations/0023_rupture_automatique.sql` — `is_available`, décidé par le serveur
+
+**Le problème.** Le réflexe est un compteur `qty_on_hand` qu'un déclencheur
+décrémente à chaque vente. Ici, il dériverait en silence : la reprojection
+serveur réécrit **toutes** les lignes d'une commande (`DELETE` puis `INSERT`)
+à chaque nouvel événement. Le compteur devrait défaire exactement ce qu'il a
+fait — y compris quand la commande est passée « annulée » entre-temps.
+
+**Le patron : état dérivé** (*derived state*). On ne stocke que des faits —
+un comptage de référence, des mouvements manuels, des ventes — et le stock
+se **calcule à la lecture** :
+
+```
+stock = comptage de référence + mouvements depuis − ventes depuis
+```
+
+C'est exact par construction, insensible aux reprojections, et **borné** : un
+nouvel inventaire repose la référence, donc la somme ne balaie jamais tout
+l'historique.
+
+**Deux conséquences voulues :**
+
+- un stock **négatif reste possible**, et il n'est pas borné à zéro. C'est le
+  cas normal d'une vente encaissée hors ligne qui arrive après coup, et le
+  seul signal qu'il manque une réception ;
+- c'est le **serveur** qui retire un produit de la carte (`is_available`),
+  parce qu'il calcule sur la donnée de l'instant. Une tablette hors ligne
+  travaille sur un souvenir de trois heures : elle affiche, elle alerte, elle
+  ne bloque **jamais** une vente.
+
+**Quand préférer un compteur :** quand les faits sont trop nombreux pour être
+relus à chaque lecture, et qu'aucune réécriture ne les touche. Ce n'est le cas
+ni du volume d'un restaurant, ni de nos projections.
 
 ---
 
@@ -924,7 +1072,7 @@ C'est un modèle de menace, en une phrase.
 ---
 
 ## 19. RLS — l'autorisation au plus près de la donnée
-> ⟶ `supabase/migrations/0002_tenance.sql` — `protege_transactionnel()`
+> ⟶ `supabase/migrations/0003_taxes_et_catalogue.sql` — `protege_transactionnel()`
 > ⟶ `apps/backoffice/src/serveur/supabase.ts` — la clé publique, et rien d'autre
 
 

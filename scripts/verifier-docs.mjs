@@ -20,7 +20,7 @@
  * paragraphe périmé passe, et c'est une relecture humaine qui l'attrape.
  */
 
-import { readFileSync, existsSync, readdirSync } from 'node:fs'
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -71,10 +71,33 @@ for (const nom of readdirSync(DOCS).filter((f) => f.endsWith('.md'))) {
    * durable. Le fichier, lui, doit exister : un renvoi vers un fichier
    * supprimé est un patron qui n'est plus dans ce dépôt.
    */
-  for (const renvoi of texte.matchAll(/^>\s*⟶\s*`([^`:]+)(?::\d+)?`/gm)) {
+  for (const renvoi of texte.matchAll(/^>\s*⟶\s*`([^`:]+)(?::\d+)?`(.*)$/gm)) {
     const fichier = renvoi[1].trim()
-    if (!existsSync(join(RACINE, fichier))) {
+    const cible = join(RACINE, fichier)
+    if (!existsSync(cible)) {
       dire(`${nom} — renvoi vers un fichier absent : ${fichier}`)
+      continue
+    }
+    if (statSync(cible).isDirectory()) continue
+
+    /*
+     * Le SYMBOLE nommé après le chemin existe-t-il dans ce fichier ?
+     *
+     * C'est lui, l'ancre durable — le document le dit. Un renvoi
+     * « 0002_tenance.sql — `protege_transactionnel()` » pointait vers un
+     * fichier bien réel, qui ne contenait pas la fonction : elle vit dans la
+     * 0003. Vérifier le fichier seul laissait passer l'erreur.
+     *
+     * Seuls les noms d'un seul tenant sont vérifiés : une expression comme
+     * « bigint generated always as identity » dépend de l'alignement du SQL.
+     */
+    const contenu = readFileSync(cible, 'utf8')
+    for (const symbole of renvoi[2].matchAll(/`([^`]+)`/g)) {
+      const nomSymbole = symbole[1].replace(/\(.*\)$/, '').trim()
+      if (!nomSymbole || /\s/.test(nomSymbole)) continue
+      if (!contenu.includes(nomSymbole)) {
+        dire(`${nom} — « ${nomSymbole} » introuvable dans ${fichier}`)
+      }
     }
   }
 }
