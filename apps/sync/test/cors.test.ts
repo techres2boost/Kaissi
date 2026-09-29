@@ -66,3 +66,40 @@ describe('CORS sur /sync', () => {
     expect(r.headers.get('access-control-allow-origin')).not.toBe('https://site-tiers.example')
   })
 })
+
+describe('CORS sur TOUTES les routes', () => {
+  /*
+   * La règle, pas le cas. `/inscription` était absente de la liste des
+   * routes couvertes, et l'inscription depuis la caisse web échouait sur
+   * « Failed to fetch » sans que rien ne dise pourquoi. Ce test lit les
+   * routes que le serveur DÉCLARE : une route ajoutée demain y passe
+   * d'office, sans que personne ait à penser à ce fichier.
+   */
+  it('chaque route déclarée répond au préflight de la caisse', async () => {
+    const app = creerServeur({ depot: depotMuet })
+    const routes = app.routes
+      .filter((r) => r.method !== 'ALL' && !r.path.includes('*'))
+      .map((r) => ({ methode: r.method, chemin: r.path }))
+
+    // Garde-fou du garde-fou : une énumération vide passerait sans rien vérifier.
+    expect(routes.map((r) => r.chemin)).toEqual(
+      expect.arrayContaining(['/inscription', '/appairage', '/sync/push', '/admin/comptes']),
+    )
+
+    const sansCors: string[] = []
+    for (const { methode, chemin } of routes) {
+      const r = await app.request(`http://test${chemin}`, {
+        method: 'OPTIONS',
+        headers: {
+          origin: CAPACITOR,
+          'access-control-request-method': methode,
+          'access-control-request-headers': 'content-type',
+        },
+      })
+      if (r.headers.get('access-control-allow-origin') !== CAPACITOR) {
+        sansCors.push(`${methode} ${chemin}`)
+      }
+    }
+    expect(sansCors, 'routes que la caisse web ne peut pas appeler').toEqual([])
+  })
+})

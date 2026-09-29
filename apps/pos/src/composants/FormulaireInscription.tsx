@@ -22,6 +22,7 @@ import { useApp } from '../etat/contexte.js'
 import { URL_SYNC_PAR_DEFAUT } from '../config.js'
 import { identifiantInstallation } from '../donnees/installation.js'
 import { expliquerEchecReseau } from '../donnees/diagnostic-reseau.js'
+import { estNatif } from '../donnees/sqlite.js'
 
 export function FormulaireInscription({
   onInscrit,
@@ -113,7 +114,7 @@ export function FormulaireInscription({
       setMessage(
         expire
           ? 'Le serveur n’a pas répondu en 20 secondes. Réessayez : rien n’a été créé.'
-          : expliquerEchecReseau(erreur, base),
+          : expliquerEchecReseau(erreur, base, estNatif()),
       )
     }
   }
@@ -217,7 +218,11 @@ export function FormulaireInscription({
         {etat === 'envoi' ? 'Création…' : 'Ouvrir mon restaurant'}
       </button>
 
-      {etat === 'erreur' && message && <p className="erreur">{message}</p>}
+      {etat === 'erreur' && message && (
+        <p className="erreur" style={{ whiteSpace: 'pre-line' }}>
+          {message}
+        </p>
+      )}
 
       <button type="button" className="lien-discret" onClick={onDejaUnCompte}>
         J’ai déjà un compte — me connecter

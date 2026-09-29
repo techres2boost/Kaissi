@@ -129,7 +129,8 @@ Table 3 → **Coca-Cola 33cl** ×2 → **Frites** ×1 → **Encaisser** → Esp�
 Table 5 → **Couscous poulet** → **Remise** → choisis **Happy hour** →
 Encaisser.
 
-**Attendu** : les réductions de la maison sont proposées **en premier**.
+**Attendu** : les réductions de la maison sont proposées **en premier**,
+chacune **une seule fois**.
 « Autre remise… » ouvre une grille libre (0 à 50 %).
 
 Essaie aussi une remise de **20 %** avec Salma.
@@ -593,7 +594,7 @@ Lac 2, sans rien du premier.
 
 ### 10.3 Un nouveau client
 
-- **Depuis l'APK de la caisse** : écran de mise en service → ouvrir un
+- **Depuis la caisse** (APK ou web) : écran de mise en service → ouvrir un
   restaurant → e-mail, mot de passe, nom du restaurant. Le restaurant, le
   compte administrateur et l'appairage sont créés d'un coup, avec l'essai de
   14 jours. Le taux de TVA est posé à **0 %** : le régler en premier.
@@ -665,6 +666,9 @@ pnpm verifier:docs                              # aucun lien cassé dans docs/
 | `/sante` affiche **« Not Found — The train has not arrived at the station »** | Le serveur ne tourne pas. Railway → Deployments : le dernier déploiement a-t-il échoué ? Vérifie dans Settings que **Root Directory** est la **racine** du dépôt (pas `apps/sync`), puis redéploie |
 | « Railpack failed to prepare the build » dans Railway | Même cause : Root Directory n'est pas la racine, Railway n'a pas trouvé `railway.json` |
 | « Failed to fetch » à la mise en service | Ouvre d'abord `/sante`. S'il répond `ok`, la variable `SYNC_ORIGINES` (Railway) doit contenir l'adresse **exacte** de la caisse, sans `/` final, puis redéployer |
+| Synchronisation : **« Erreur »** et « Erreur interne du serveur », opérations en attente qui ne baissent pas | Le serveur répond mais n'enregistre pas. Rien n'est perdu : les ventes restent dans la caisse. Signale-le avec le message affiché ; une fois le serveur corrigé, elles partent seules |
+| Synchronisation : **« Hors ligne »** | Aucune réponse du serveur : réseau coupé, ou serveur arrêté (`/sante`) |
+| Chaque réduction apparaît **deux fois** sur la caisse | Caisse mise en service avec une version antérieure : mets l'application à jour, les réductions de démonstration disparaissent au démarrage |
 | La caisse affiche « Non appairé » | §2 |
 | Opérations refusées « signé par un autre appareil » | Synchronisation → bas de page → « Abandonner ces opérations d'un ancien appairage », puis recharger (Ctrl+Maj+R) |
 | Le back-office est vide ou le stock ne bouge pas | La caisse n'est pas « À jour » : synchronise |
@@ -728,4 +732,3 @@ dans le navigateur, puis refais le §2.
 | **Programme de fidélité** | Pas construit |
 | **Facturation de l'abonnement** (échéances, prélèvement) | Pas construite : la formule se lit, elle se change par `pnpm sync:abonnement` |
 | **Chat d'assistance** | Pas construit : le contact se fait par e-mail |
-| **Ouvrir un restaurant depuis la caisse web** | Fonctionne depuis l'APK. Depuis la caisse web (Vercel), la route `/inscription` du serveur n'autorise pas encore l'adresse de la caisse : défaut connu, à corriger |

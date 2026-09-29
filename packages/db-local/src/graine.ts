@@ -76,6 +76,53 @@ const EMPLOYES_DEMO: readonly (readonly [string, string, string, string, string]
 ]
 
 /**
+ * Le référentiel que SEULE la graine locale connaît.
+ *
+ * Produits, catégories, taux, postes, employés : la graine est le miroir de
+ * la migration Postgres 0007, avec les MÊMES identifiants. Au premier pull,
+ * le catalogue du serveur vient donc les recouvrir ligne pour ligne.
+ *
+ * Réductions et clients, non : ils n'existent que sur la caisse — les tables
+ * serveur sont venues après 0007, et le back-office y crée les siens avec
+ * leurs propres identifiants. Sans les retirer à la mise en service, la
+ * caisse affichait « Happy hour » DEUX fois : celle de la graine, et celle
+ * du back-office. Et choisir la mauvaise envoyait au serveur une réduction
+ * qu'il ne connaissait pas.
+ */
+export const GRAINE_SANS_EQUIVALENT_SERVEUR = {
+  discounts: [
+    id('0960'),
+    id('0961'),
+    id('0962'),
+    // Les identifiants mal formés des premières versions (voir plus bas).
+    id('960'),
+    id('961'),
+    id('962'),
+  ],
+  customers: [id('0801'), id('0802'), id('0803')],
+} as const
+
+/**
+ * Retire de la base locale ce que seule la graine connaissait.
+ *
+ * Appelé à la PREMIÈRE mise en service, jamais ensuite : sur une caisse en
+ * service, ces tables ne contiennent plus que ce que le serveur a envoyé.
+ * Aucune clé étrangère locale ne pointe ces tables — les commandes RECOPIENT
+ * le nom du client et le libellé de la remise —, donc un ticket déjà émis
+ * garde tout ce qu'il affiche.
+ */
+export async function retirerGraineSansEquivalentServeur(db: AdaptateurSqlite): Promise<void> {
+  await db.transaction(async () => {
+    for (const [table, ids] of Object.entries(GRAINE_SANS_EQUIVALENT_SERVEUR)) {
+      await db.executer(
+        `DELETE FROM ${table} WHERE id IN (${ids.map(() => '?').join(', ')})`,
+        [...ids],
+      )
+    }
+  })
+}
+
+/**
  * Installe la graine si — et seulement si — la base est vide.
  * Idempotent : rappeler cette fonction ne double jamais le catalogue.
  */
@@ -260,10 +307,16 @@ export async function installerGraine(db: AdaptateurSqlite): Promise<boolean> {
     // pourcentage réservé au personnel, et un montant fixe. En production
     // elles descendent par le catalogue ; ici elles permettent d'essayer
     // l'écran sans serveur.
+    //
+    // ⚑ Quatre chiffres de suffixe, comme partout ailleurs. Les trois
+    //   premières versions en portaient TROIS (« 960 ») : un identifiant de
+    //   35 caractères, que PostgreSQL refusait comme uuid. Une vente remisée
+    //   faisait alors échouer la projection côté serveur, et plus rien ne
+    //   remontait. La migration locale 014 répare les bases déjà posées.
     for (const [suffixe, nom, kind, bp, montant, pos] of [
-      ['960', 'Happy hour', 'pourcentage', 1000, null, 1],
-      ['961', 'Personnel', 'pourcentage', 2000, null, 2],
-      ['962', 'Geste commercial', 'montant', null, 2000, 3],
+      ['0960', 'Happy hour', 'pourcentage', 1000, null, 1],
+      ['0961', 'Personnel', 'pourcentage', 2000, null, 2],
+      ['0962', 'Geste commercial', 'montant', null, 2000, 3],
     ] as const) {
       await db.executer(
         `INSERT INTO discounts

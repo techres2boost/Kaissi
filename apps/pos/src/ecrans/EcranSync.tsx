@@ -19,12 +19,14 @@ import {
   motifDeRefus,
   peutBasculer,
   reinitialiserPourAutreEtablissement,
+  retirerGraineSansEquivalentServeur,
   type EnregistrementOutbox,
   type EtatBascule,
 } from '@kaissi/db-local'
 import type { ResumeSync } from '@kaissi/sync-client'
 import { useApp } from '../etat/contexte.js'
 import { expliquerEchecReseau } from '../donnees/diagnostic-reseau.js'
+import { estNatif } from '../donnees/sqlite.js'
 import { identifiantInstallation } from '../donnees/installation.js'
 import { URL_SYNC_PAR_DEFAUT } from '../config.js'
 
@@ -44,7 +46,12 @@ const EXPLICATIONS: Record<ResumeSync['etat'], string> = {
   hors_ligne:
     "Le serveur est injoignable. La caisse fonctionne normalement : les ventes " +
     'sont conservées et repartiront seules au retour du réseau.',
-  erreur: 'Une erreur inattendue est survenue. Les ventes locales sont intactes.',
+  // Le serveur a RÉPONDU — par une erreur. Ce n'est pas le réseau : c'est
+  // chez lui qu'il faut regarder, et le message ci-dessous le dit.
+  erreur:
+    'Le serveur répond, mais n’a pas pu enregistrer ces opérations. Les ventes ' +
+    'sont conservées et repartiront seules dès que ce sera corrigé. Si cela ' +
+    'dure, transmettez au support le message ci-dessous.',
   bloque:
     "Le serveur a refusé cet appareil. Les ventes sont conservées, mais elles ne " +
     'partiront pas tant que le problème n’est pas réglé avec le gérant.',
@@ -572,6 +579,18 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
         // ne pouvaient de toute façon plus partir. Le journal d'une caisse
         // déjà en service, lui, est remonté : il reste au serveur, immuable.
         await reinitialiserPourAutreEtablissement(app.base.adaptateur)
+      } else if (!dejaEnService(ancienDevice)) {
+        /*
+         * PREMIÈRE mise en service, dans l'établissement de la graine.
+         *
+         * Les produits de la graine portent les mêmes identifiants que ceux
+         * du serveur : le premier pull les recouvre. Ses réductions et ses
+         * clients, non — ils n'existent que sur la caisse. Les garder
+         * affichait chaque réduction DEUX fois (celle de la graine, celle du
+         * back-office), et choisir la mauvaise envoyait au serveur une
+         * référence qu'il ne connaissait pas.
+         */
+        await retirerGraineSansEquivalentServeur(app.base.adaptateur)
       }
 
       await app.etat.ecrire('url_sync', base)
@@ -645,7 +664,7 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
               `${erreur.message}\n\nRien n'a été modifié — la transaction a été ` +
               `annulée. Le serveur n'est pas en cause. Relevez ce message sur ` +
               `l'écran Diagnostic avant de recommencer.`
-            : expliquerEchecReseau(erreur, url),
+            : expliquerEchecReseau(erreur, url, estNatif()),
       )
     }
   }

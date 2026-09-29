@@ -642,6 +642,46 @@ export class DepotPostgres implements DepotSync {
         acceptes.push(m.mutationId)
       }
     })
+
+    /*
+     * Les ventes de cet article, arrivées AVANT lui, retrouvent leur produit.
+     *
+     * L'outbox pousse les ventes en premier et le catalogue en dernier — à
+     * dessein. Un plat du jour vendu hors ligne arrive donc au serveur avant
+     * sa propre création : l'arbitrage des références (`arbitrerReferences`)
+     * projette la vente sans `product_id` et le note dans `exceptions`. Sans
+     * cette reprojection, la vente resterait orpheline pour toujours — ni
+     * décrément de stock, ni coût dans la marge — puisqu'une commande close
+     * ne reçoit plus d'événement.
+     *
+     * HORS de la transaction de création, et sans jamais la faire échouer :
+     * l'article est créé, l'accusé doit partir, quoi qu'il arrive ensuite.
+     */
+    const produits = mutations.map((m) => m.produitId).filter((id) => estUuid(id))
+    if (produits.length > 0) {
+      try {
+        const { rows } = await this.pool.query<{ id: string }>(
+          `select o.id
+             from kaissi.orders o
+            where o.restaurant_id = $1
+              and exists (
+                select 1 from jsonb_array_elements(o.exceptions) e
+                 where e->>'type' = 'reference_inconnue'
+                   and e->>'colonne' = 'order_items.product_id'
+                   and e->>'valeur' = any($2::text[]))`,
+          [appareil.restaurantId, produits],
+        )
+        await this.reprojeter(
+          appareil.restaurantId,
+          rows.map((l) => l.id),
+        )
+      } catch (erreur) {
+        journal.avertissement('reprojection après création d’article non faite', {
+          restaurantId: appareil.restaurantId,
+          erreur,
+        })
+      }
+    }
     return acceptes
   }
 
@@ -967,12 +1007,31 @@ export class DepotPostgres implements DepotSync {
             etat.numeroTicket,
             etat.deviceProprietaireId,
           )
-          const client_ = await clientConnu(client, etat.restaurantId, etat.clientId)
-          const exceptions = [
-            ...etat.exceptions,
-            ...(collision ? [collision] : []),
-            ...(client_.anomalie ? [client_.anomalie] : []),
-          ]
+          const refs = await arbitrerReferences(client, etat, {
+            tables: [etat.tableId],
+            users: [etat.ouvertePar, etat.closePar],
+            discounts: [
+              etat.remiseGlobale?.reductionId,
+              ...etat.lignes.map((l) => l.remise?.reductionId),
+            ],
+            customers: [etat.clientId],
+            products: etat.lignes.map((l) => l.produitId),
+            product_variants: etat.lignes.map((l) => l.variantId),
+            stations: etat.lignes.map((l) => l.stationId),
+            tax_rates: etat.lignes.map((l) => l.tauxTaxeId),
+            payment_methods: etat.paiements.map((p) => p.methodeId),
+          })
+          // Les colonnes de la COMMANDE d'abord ; celles des lignes et des
+          // paiements s'arbitrent au fil de l'écriture, plus bas, et leurs
+          // anomalies rejoignent `exceptions` avant le commit.
+          const commande = {
+            tableId: refs.garder('tables', 'orders.table_id', etat.tableId),
+            ouvertePar: refs.garder('users', 'orders.opened_by', etat.ouvertePar),
+            closePar: refs.garder('users', 'orders.closed_by', etat.closePar),
+            reductionId: refs.garder('discounts', 'orders.discount_id', etat.remiseGlobale?.reductionId),
+            clientId: refs.garder('customers', 'orders.customer_id', etat.clientId),
+          }
+          const exceptions = [...etat.exceptions, ...(collision ? [collision] : [])]
 
           await client.query(
             `insert into kaissi.orders (
@@ -1012,8 +1071,8 @@ export class DepotPostgres implements DepotSync {
                customer_name = excluded.customer_name,
                updated_at = now()`,
             [
-              etat.id, etat.organizationId, etat.restaurantId, etat.tableId,
-              etat.deviceProprietaireId, etat.ouvertePar, etat.closePar,
+              etat.id, etat.organizationId, etat.restaurantId, commande.tableId,
+              etat.deviceProprietaireId, commande.ouvertePar, commande.closePar,
               etat.type, etat.statut, etat.couverts, numero,
               totaux.sousTotalMillimes, totaux.totalRemisesMillimes,
               totaux.taxeMillimes, totaux.serviceMillimes,
@@ -1031,7 +1090,7 @@ export class DepotPostgres implements DepotSync {
                * lui, permet de regrouper — et il vient de l'événement aussi,
                * donc d'une caisse qui pouvait être hors ligne.
                */
-              etat.remiseGlobale?.reductionId ?? null,
+              commande.reductionId,
               etat.remiseGlobale?.motif ?? null,
               /*
                * Le client rattaché, et son nom au moment de la vente (0031).
@@ -1048,7 +1107,7 @@ export class DepotPostgres implements DepotSync {
                * projection, donc le push, donc TOUT ce qui suit. Le nom, lui,
                * passe intact — c'est lui qui figure sur le ticket.
                */
-              client_.clientId,
+              commande.clientId,
               etat.clientNom ?? null,
             ],
           )
@@ -1067,7 +1126,10 @@ export class DepotPostgres implements DepotSync {
                ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
               [
                 ligne.id, etat.organizationId, etat.restaurantId, orderId,
-                ligne.produitId, ligne.variantId, ligne.stationId, ligne.tauxTaxeId,
+                refs.garder('products', 'order_items.product_id', ligne.produitId),
+                refs.garder('product_variants', 'order_items.variant_id', ligne.variantId),
+                refs.garder('stations', 'order_items.station_id', ligne.stationId),
+                refs.garder('tax_rates', 'order_items.tax_rate_id', ligne.tauxTaxeId),
                 ligne.designation, ligne.quantite,
                 calc?.prixUnitaireMillimes ?? ligne.prixBaseMillimes,
                 ligne.modificateursMillimes, calc?.totalBrutMillimes ?? 0,
@@ -1075,7 +1137,8 @@ export class DepotPostgres implements DepotSync {
                 calc?.baseApresRemisesMillimes ?? 0, calc?.taxeMillimes ?? 0,
                 JSON.stringify(ligne.modificateurs), ligne.note, position,
                 ligne.annulee ? ligne.ajouteeA : null,
-                ligne.remise?.reductionId ?? null, ligne.remise?.motif ?? null,
+                refs.garder('discounts', 'order_items.discount_id', ligne.remise?.reductionId),
+                ligne.remise?.motif ?? null,
               ],
             )
             position += 1
@@ -1091,11 +1154,21 @@ export class DepotPostgres implements DepotSync {
                ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
               [
                 p.id, etat.organizationId, etat.restaurantId, orderId,
-                p.methodeId, p.mode, p.montantMillimes, p.recuMillimes,
+                refs.garder('payment_methods', 'payments.method_id', p.methodeId), p.mode, p.montantMillimes, p.recuMillimes,
                 p.renduMillimes ?? 0, p.reference, etat.deviceProprietaireId,
                 p.annule ? p.enregistreA : null, p.enregistreA,
               ],
             )
+          }
+
+          // Les anomalies des lignes et des paiements n'étaient pas encore
+          // connues à l'insertion de la commande : on les y ajoute, dans la
+          // même transaction.
+          if (refs.anomalies.length > 0) {
+            await client.query('update kaissi.orders set exceptions = $2 where id = $1', [
+              orderId,
+              JSON.stringify([...exceptions, ...refs.anomalies]),
+            ])
           }
           await client.query('commit')
         } catch (erreur) {
@@ -2048,59 +2121,117 @@ async function prochainPrefixeLibre(
  * back-office indexe déjà (`orders_exceptions_idx`).
  */
 /**
- * Le client rattaché existe-t-il VRAIMENT côté serveur ?
+ * Les références d'une vente, ARBITRÉES avant d'être écrites.
  *
- * ── PANNE OBSERVÉE EN PRODUCTION, et elle gelait toute la caisse ─────────
+ * ── Deux pannes identiques, observées en production ─────────────────────
  *
- * `orders.customer_id` porte une clé étrangère vers `kaissi.customers`
- * (migration 0031). La graine de démonstration, elle, écrit ses clients
- * UNIQUEMENT dans la base locale du POS — la table `customers` n'existait pas
- * encore quand la migration 0007 a posé les données de démonstration.
- * Rattacher l'un d'eux produit donc un identifiant que le serveur ne connaît
- * pas, la projection viole la contrainte, et le push répond 500.
+ * Chaque colonne `*_id` de `orders`, `order_items` et `payments` porte une
+ * clé étrangère — et chacune reçoit un identifiant écrit par une CAISSE, qui
+ * pouvait être hors ligne, sur un référentiel périmé, ou dans une version
+ * boguée. Deux fois déjà, un seul identifiant a suffi à geler la file :
  *
- * Les événements, eux, sont bien arrivés — ils s'insèrent dans leur propre
- * transaction. Rien n'est perdu. Mais la projection échoue à chaque
- * tentative, sur le même événement, POUR TOUJOURS : la caisse réessaie comme
- * elle doit, et le mur est identique à chaque cycle. Une seule commande
- * fautive gèle la file de toutes les suivantes. Vu en clientèle : dix-huit
- * opérations en attente, cinq tentatives échouées, réseau parfait.
+ *   - un client de la graine locale, inconnu du serveur (clé étrangère
+ *     violée sur `customer_id`) ;
+ *   - une réduction de la graine locale dont l'identifiant faisait
+ *     TRENTE-CINQ caractères (« invalid input syntax for type uuid » sur
+ *     `discount_id`).
  *
- * ── Le même arbitrage que pour un numéro de ticket déjà pris ─────────────
+ * Les événements, eux, arrivent — dans leur propre transaction. Rien n'est
+ * perdu. Mais la projection échoue à chaque tentative, le push répond 500,
+ * et une seule commande fautive bloque TOUTES les suivantes.
  *
- * On écarte l'identifiant, on GARDE le nom — `customer_name` est une colonne
- * à part, et c'est elle que le ticket et les rapports utilisent. La commande
- * entre dans la projection, la file se vide, et l'anomalie est inscrite dans
- * `orders.exceptions` plutôt que de disparaître.
+ * ── La règle, et non plus le cas ────────────────────────────────────────
  *
- * Perdre une vente coûte infiniment plus cher qu'un rattachement client.
+ * Toute référence est vérifiée ici, en une requête par table : bien formée,
+ * existante, et de CET établissement. Sinon elle devient nulle, et
+ * l'anomalie est inscrite dans `orders.exceptions`. Les LIBELLÉS recopiés
+ * (`designation`, `discount_label`, `customer_name`) passent intacts : ce
+ * sont eux que le ticket et les rapports affichent. Les montants ne bougent
+ * pas d'un millime — une remise accordée reste accordée ; seul le
+ * rattachement au référentiel est perdu.
  *
- * ⚑ On ne se contente pas de vérifier l'existence : le client doit être de CE
- *   restaurant. Sans ce filtre, un identifiant valide ailleurs rattacherait
- *   une vente au client d'un autre établissement — une fuite de tenance, dans
- *   le sens le plus littéral.
+ * Perdre une vente coûte infiniment plus cher qu'un rattachement.
+ *
+ * ⚑ La portée est la TENANCE, pas la simple existence : la projection parle
+ *   à PostgreSQL avec un rôle privilégié, RLS ne la filtre pas. Sans le
+ *   filtre sur l'établissement, un identifiant valide ailleurs rattacherait
+ *   une vente au client — ou au produit — d'un autre restaurant.
+ *
+ * ⚑ `test/reference-inconnue-du-serveur.test.ts` pousse une vente dont
+ *   TOUTES les références sont fausses. Une colonne ajoutée sans passer par
+ *   ici le fait tomber.
  */
-async function clientConnu(
-  client: PoolClient,
-  restaurantId: string,
-  clientId: string | null | undefined,
-): Promise<{ clientId: string | null; anomalie: Record<string, unknown> | null }> {
-  if (!clientId) return { clientId: null, anomalie: null }
+const TABLES_REFERENCEES = {
+  tables: 'restaurant_id',
+  products: 'restaurant_id',
+  product_variants: 'restaurant_id',
+  stations: 'restaurant_id',
+  tax_rates: 'restaurant_id',
+  payment_methods: 'restaurant_id',
+  discounts: 'restaurant_id',
+  customers: 'restaurant_id',
+  // Les comptes sont rattachés à l'ORGANISATION : un gérant sert plusieurs
+  // établissements du même client.
+  users: 'organization_id',
+} as const
 
-  const { rows } = await client.query<{ id: string }>(
-    'select id from kaissi.customers where id = $1 and restaurant_id = $2 limit 1',
-    [clientId, restaurantId],
-  )
-  if (rows.length > 0) return { clientId, anomalie: null }
+type TableReferencee = keyof typeof TABLES_REFERENCEES
+
+interface Arbitre {
+  /** L'identifiant s'il est reconnu, `null` sinon — anomalie consignée. */
+  garder(table: TableReferencee, colonne: string, id: string | null | undefined): string | null
+  readonly anomalies: readonly Record<string, unknown>[]
+}
+
+async function arbitrerReferences(
+  client: PoolClient,
+  portee: { restaurantId: string; organizationId: string },
+  candidats: Partial<Record<TableReferencee, readonly (string | null | undefined)[]>>,
+): Promise<Arbitre> {
+  const connus = new Map<TableReferencee, Set<string>>()
+
+  for (const [table, valeurs] of Object.entries(candidats) as [
+    TableReferencee,
+    readonly (string | null | undefined)[],
+  ][]) {
+    // Filtrées AVANT le cast `::uuid[]` : un seul identifiant mal formé
+    // ferait échouer la requête entière — la panne même qu'on corrige.
+    const ids = [...new Set(uuidsValides(valeurs.filter((v): v is string => !!v)))]
+    if (ids.length === 0) {
+      connus.set(table, new Set())
+      continue
+    }
+    const colonnePortee = TABLES_REFERENCEES[table]
+    const { rows } = await client.query<{ id: string }>(
+      `select id from kaissi.${table} where id = any($1::uuid[]) and ${colonnePortee} = $2`,
+      [ids, colonnePortee === 'restaurant_id' ? portee.restaurantId : portee.organizationId],
+    )
+    connus.set(table, new Set(rows.map((l) => l.id)))
+  }
+
+  const anomalies: Record<string, unknown>[] = []
+  const dejaSignalees = new Set<string>()
 
   return {
-    clientId: null,
-    anomalie: {
-      type: 'client_inconnu',
-      clientId,
-      message:
-        "Le client rattaché à cette vente n'existe pas dans cet établissement. " +
-        'Son nom est conservé ; le rattachement, non.',
+    anomalies,
+    garder(table, colonne, id) {
+      if (!id) return null
+      if (connus.get(table)?.has(id)) return id
+
+      const cle = `${colonne}:${id}`
+      if (!dejaSignalees.has(cle)) {
+        dejaSignalees.add(cle)
+        anomalies.push({
+          type: 'reference_inconnue',
+          table,
+          colonne,
+          valeur: id,
+          message: estUuid(id)
+            ? `Référence inconnue dans cet établissement (${table}). Le libellé et les montants sont conservés ; le rattachement, non.`
+            : `Identifiant mal formé (${table}). Le libellé et les montants sont conservés ; le rattachement, non.`,
+        })
+      }
+      return null
     },
   }
 }

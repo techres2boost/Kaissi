@@ -203,6 +203,21 @@ C'est la même raison qui fait que le **stock est calculé à la lecture**
 La projection peut être en retard d'un instant sur le journal. Acceptable
 ici ; inacceptable si l'écran servait à décider d'un débit bancaire.
 
+**Le second point non évident : une projection qui échoue gèle TOUT.** Les
+colonnes `*_id` des projections portent des clés étrangères, et chacune reçoit
+un identifiant écrit par une caisse — peut-être hors ligne, peut-être sur un
+référentiel périmé, peut-être boguée. Deux fois en production, un seul
+identifiant inconnu ou mal formé a fait répondre le push 500 à chaque
+tentative : la commande fautive revenait en tête de file, et plus aucune
+vente ne remontait. D'où `arbitrerReferences()` : chaque référence est
+vérifiée (bien formée, existante, de CET établissement) ; sinon elle devient
+nulle, le libellé recopié reste, les montants ne bougent pas, et l'anomalie
+est inscrite dans `orders.exceptions`. Un article créé sur la caisse et vendu
+avant que sa création ne remonte retrouve son produit à l'arrivée de la
+création.
+Test : `apps/sync/test/reference-inconnue-du-serveur.test.ts`, qui pousse une
+vente dont toutes les références sont fausses.
+
 ---
 
 ## 3. Shared kernel — un seul endroit calcule l'argent

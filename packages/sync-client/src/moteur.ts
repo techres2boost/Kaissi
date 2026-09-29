@@ -92,6 +92,31 @@ export interface OptionsMoteur {
   readonly maintenant?: () => number
 }
 
+/**
+ * Ce qu'un échec de cycle dit de la situation — et donc ce qu'on affiche.
+ *
+ * Trois cas, qui appellent trois gestes différents :
+ *
+ *  • `bloque` : le serveur a REFUSÉ (401, 403, 413, 426). Rien ne changera
+ *    sans une action humaine ;
+ *  • `hors_ligne` : AUCUNE réponse — réseau coupé, DNS, délai dépassé.
+ *    Cela se résout tout seul au retour du réseau ;
+ *  • `erreur` : le serveur a RÉPONDU, mais par une erreur (500…), ou la
+ *    caisse elle-même a échoué.
+ *
+ * ⚑ PANNE OBSERVÉE. Un 500 était classé « hors ligne », parce que toute
+ *   `ErreurTransport` l'était. L'écran affichait donc « Hors ligne. Le
+ *   serveur est injoignable » — juste au-dessus de « Dernier message du
+ *   serveur : Erreur interne ». On cherchait une panne de réseau ; le
+ *   serveur répondait très bien, et c'est lui qu'il fallait regarder.
+ */
+export function etatApresEchec(erreur: unknown): EtatSync {
+  if (!(erreur instanceof ErreurTransport)) return 'erreur'
+  if (erreur.definitive) return 'bloque'
+  // Un statut HTTP prouve que le serveur a répondu : ce n'est pas le réseau.
+  return erreur.statut === undefined ? 'hors_ligne' : 'erreur'
+}
+
 export class MoteurSync {
   private minuteur: ReturnType<typeof setTimeout> | null = null
   private enCours = false
@@ -153,11 +178,8 @@ export class MoteurSync {
       })
     } catch (erreur) {
       this.tentatives += 1
-      const definitive = erreur instanceof ErreurTransport && erreur.definitive
       await this.publier({
-        // « bloqué » ≠ « hors ligne » : le premier exige une action humaine,
-        // le second se résout tout seul au retour du réseau.
-        etat: definitive ? 'bloque' : erreur instanceof ErreurTransport ? 'hors_ligne' : 'erreur',
+        etat: etatApresEchec(erreur),
         derniereErreur: erreur instanceof Error ? erreur.message : String(erreur),
         tentatives: this.tentatives,
       })

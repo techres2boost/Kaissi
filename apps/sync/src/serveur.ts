@@ -99,9 +99,21 @@ export function creerServeur({
     allowHeaders: ['authorization', 'content-type'],
     allowMethods: ['GET', 'POST', 'OPTIONS'],
   })
-  app.use('/sync/*', corsKaissi)
-  app.use('/appairage', corsKaissi)
-  app.use('/admin/*', corsKaissi)
+  /*
+   * Sur TOUTES les routes, et plus une liste.
+   *
+   * PANNE OBSERVÉE. La liste nommait `/sync/*`, `/appairage` et `/admin/*`.
+   * `/inscription` est venue après, et personne n'a pensé à l'y ajouter :
+   * l'inscription d'un restaurant depuis la caisse WEB échouait sur
+   * « Failed to fetch », alors que le serveur répondait parfaitement. Une
+   * liste à tenir à jour à la main finit toujours par oublier quelqu'un.
+   *
+   * Rien n'est relâché pour autant : CORS ne sert pas d'authentification
+   * ici (voir plus haut), et une origine inconnue reste refusée partout.
+   * `test/cors.test.ts` énumère les routes déclarées et exige l'en-tête sur
+   * chacune.
+   */
+  app.use('*', corsKaissi)
 
   /*
    * Limitation de débit — sur les identifiants SEULEMENT.

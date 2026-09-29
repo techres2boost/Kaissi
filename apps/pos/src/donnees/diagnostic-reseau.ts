@@ -12,7 +12,12 @@ function estBoucleLocale(hote: string): boolean {
   return hote === 'localhost' || hote === '127.0.0.1' || hote === '::1'
 }
 
-export function expliquerEchecReseau(erreur: unknown, url: string): string {
+export function expliquerEchecReseau(
+  erreur: unknown,
+  url: string,
+  /** Coque Android / iOS : les appels passent en natif, CORS ne s'applique pas. */
+  natif = false,
+): string {
   const origine = erreur instanceof Error ? erreur.message : String(erreur)
 
   // Déclarés SANS valeur : le `catch` ci-dessous retourne, donc un
@@ -48,21 +53,43 @@ export function expliquerEchecReseau(erreur: unknown, url: string): string {
     )
   }
 
-  // Hôte HTTPS distant + « Failed to fetch » = presque toujours CORS. Le
-  // serveur RÉPOND (curl .../sante le prouve), mais il n'autorise pas CE
-  // POS : le navigateur jette alors la réponse, et `fetch` ne peut pas dire
-  // pourquoi — la spécification le lui interdit. On donne donc le geste, et
-  // l'adresse EXACTE à autoriser.
+  const sante = `${url.replace(/\/+$/, '')}/sante`
+
+  /*
+   * Hôte HTTPS distant + « Failed to fetch » : DEUX causes, dans cet ordre.
+   *
+   * ⚑ PANNE DE DIAGNOSTIC OBSERVÉE. Ce message affirmait « blocage CORS »
+   *   d'emblée. Le serveur Railway, lui, ne démarrait même pas (build en
+   *   échec) — et son « Not Found » arrive SANS en-tête CORS, donc le
+   *   navigateur le traduit lui aussi en « Failed to fetch ». On a ajusté
+   *   SYNC_ORIGINES pendant une heure pour un serveur éteint.
+   *
+   *   1. Le serveur ne répond pas (éteint, en redéploiement, mauvaise
+   *      adresse). C'est le cas le plus fréquent, et il se vérifie en une
+   *      seconde : `/sante` doit afficher « etat : ok ».
+   *   2. Il répond, mais n'autorise pas CE POS (CORS). Seulement dans un
+   *      navigateur : la coque native appelle hors navigateur, CORS ne s'y
+   *      applique pas — l'évoquer là enverrait chercher au mauvais endroit.
+   */
+  if (natif) {
+    return (
+      `Serveur injoignable. Ouvre « ${sante} » dans un navigateur : il doit ` +
+      `afficher « etat : ok ». Sinon, le serveur est éteint ou en cours de ` +
+      `redéploiement — la caisse, elle, continue d'encaisser. — ${origine}`
+    )
+  }
+
   const moi =
     typeof window !== 'undefined' && window.location?.origin
       ? window.location.origin
       : "l'adresse de ce POS"
   return (
-    `Le serveur répond peut-être, mais il refuse ce terminal (blocage CORS). ` +
-    `Sur le serveur de synchronisation (Railway), la variable SYNC_ORIGINES ` +
-    `doit CONTENIR « ${moi} » — plusieurs adresses séparées par des virgules, ` +
-    `sans barre oblique finale — puis redéploie. Vérifie aussi que le serveur ` +
-    `répond : ouvre « ${url.replace(/\/+$/, '')}/sante » dans un navigateur. ` +
-    `— ${origine}`
+    `Serveur injoignable depuis ce navigateur. Deux causes possibles :\n` +
+    `1. Le serveur ne répond pas. Ouvre « ${sante} » : il doit afficher ` +
+    `« etat : ok ». Sinon, il est éteint ou en redéploiement (sur Railway, ` +
+    `regarde le dernier déploiement).\n` +
+    `2. Si « /sante » répond bien, le serveur refuse ce POS (CORS) : la ` +
+    `variable SYNC_ORIGINES doit CONTENIR « ${moi} », sans barre oblique ` +
+    `finale, puis redéploie. — ${origine}`
   )
 }

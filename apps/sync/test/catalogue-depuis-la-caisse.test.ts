@@ -29,6 +29,7 @@ import {
   DEMO_ORG,
   DEMO_RESTO,
   EMPLOYE_DEMO,
+  ev,
   GERANT_DEMO,
   TVA_19,
   URL_TEST,
@@ -286,5 +287,75 @@ describe('ce que l’exception NE ouvre PAS', () => {
       [m.produitId],
     )
     expect(Number(rows[0]!.base_price_millimes)).toBe(13_500)
+  })
+})
+
+describe('un article VENDU avant que sa création ne remonte', () => {
+  /*
+   * L'ordre de l'outbox est une décision : les ventes d'abord, le catalogue
+   * en dernier. Un plat du jour créé et vendu hors ligne arrive donc au
+   * serveur APRÈS sa propre vente.
+   *
+   * Avant l'arbitrage des références, cette vente faisait échouer la
+   * projection (clé étrangère sur `product_id`), le push répondait 500, et le
+   * cycle s'arrêtait AVANT d'envoyer la création — qui seule l'aurait
+   * débloquée. Une étreinte fatale : plus rien ne remontait jamais.
+   */
+  it('la vente passe, puis retrouve son produit quand la création arrive', async () => {
+    const m = mutation()
+    const orderId = uuidV7()
+    const ligneId = uuidV7()
+
+    const push = await app.request('/sync/push', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${appareil.jetonClair}`,
+      },
+      body: JSON.stringify({
+        batchId: uuidV7(),
+        protocolVersion: 1,
+        evenements: [
+          ev(appareil, orderId, 'order.opened', { type: 'takeaway', ouvertePar: EMPLOYE_DEMO }),
+          ev(appareil, orderId, 'line.added', {
+            ligneId,
+            produitId: m.produitId,
+            designation: m.nom,
+            quantite: 2,
+            prixBaseMillimes: m.prixBaseMillimes,
+            modificateursMillimes: millimes(0),
+            tauxTaxeId: TVA_19,
+          }),
+          ev(appareil, orderId, 'order.closed', { totalMillimes: millimes(27_000), closePar: EMPLOYE_DEMO }),
+        ],
+      }),
+    })
+    expect(push.status).toBe(200)
+
+    const avant = await client.query<{ product_id: string | null }>(
+      'select product_id from kaissi.order_items where id = $1',
+      [ligneId],
+    )
+    expect(avant.rows[0]!.product_id, 'le produit n’existe pas encore côté serveur').toBeNull()
+
+    const { corps } = await envoyer([m])
+    expect(corps.acceptes).toEqual([m.mutationId])
+
+    /*
+     * Sans la reprojection, la ligne resterait sans produit POUR TOUJOURS :
+     * une commande close ne reçoit plus d'événement. Ni décrément de stock,
+     * ni coût dans la marge.
+     */
+    const apres = await client.query<{ product_id: string | null }>(
+      'select product_id from kaissi.order_items where id = $1',
+      [ligneId],
+    )
+    expect(apres.rows[0]!.product_id).toBe(m.produitId)
+
+    const { rows } = await client.query<{ exceptions: { colonne?: string }[] }>(
+      'select exceptions from kaissi.orders where id = $1',
+      [orderId],
+    )
+    expect(rows[0]!.exceptions.map((e) => e.colonne)).not.toContain('order_items.product_id')
   })
 })
