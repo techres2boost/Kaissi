@@ -14,7 +14,14 @@ import {
   type TicketShift,
   type Millimes,
 } from '@kaissi/domain'
-import { assembler, COMMANDES, ligneAlignee, normaliserTexte, separateur } from './index.js'
+import {
+  assembler,
+  COMMANDES,
+  decoderCp858,
+  ligneAlignee,
+  normaliserTexte,
+  separateur,
+} from './index.js'
 
 /** Largeur du papier, en colonnes. 42 pour du 80 mm, 32 pour du 58 mm. */
 export type Largeur = 32 | 42
@@ -351,7 +358,9 @@ export function apercuTexte(charge: Uint8Array, largeur: Largeur = 42): string {
     if (octet === 0x0a) {
       poser()
     } else if (octet >= 0x20) {
-      courante += String.fromCharCode(octet)
+      // CP858, comme l'imprimante : un aperçu qui relit autrement que le
+      // papier cacherait exactement les défauts qu'il doit montrer.
+      courante += decoderCp858(octet)
     }
     i += 1
   }

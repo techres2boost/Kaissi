@@ -309,6 +309,6 @@ describe('mise en file', () => {
 
   it('rend une impulsion de tiroir seule', () => {
     const charge = rendreOuvertureTiroir()
-    expect([...charge]).toEqual([0x1b, 0x40, 0x1b, 0x70, 0x00, 0x19, 0xfa])
+    expect([...charge]).toEqual([0x1b, 0x40, 0x1b, 0x74, 19, 0x1b, 0x70, 0x00, 0x19, 0xfa])
   })
 })

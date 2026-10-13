@@ -1523,3 +1523,21 @@ button.danger-plein:disabled { opacity: 0.55; cursor: not-allowed; }
     text-transform: none; letter-spacing: normal;
   }
 }
+
+/* ── Silhouette de chargement (app/[restaurant]/loading.tsx) ─────────────
+ * Affichée dès le clic, pendant que la page se calcule côté serveur. */
+.chargement-page { display: flex; flex-direction: column; gap: 1rem; }
+.chargement-page > div,
+.chargement-cartes > div {
+  background: var(--panneau-clair);
+  border-radius: var(--rayon);
+  animation: chargement-pulse 1.2s ease-in-out infinite;
+}
+.chargement-titre { height: 2.2rem; width: min(22rem, 70%); }
+.chargement-cartes { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 1rem; }
+.chargement-cartes > div { height: 6rem; }
+.chargement-bloc { height: 18rem; }
+@keyframes chargement-pulse { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) {
+  .chargement-page > div, .chargement-cartes > div { animation: none; }
+}

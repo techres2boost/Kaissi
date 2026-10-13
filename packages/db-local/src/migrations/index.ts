@@ -31,6 +31,7 @@ import { SQL_011 } from './011_article_cree_sur_la_caisse.js'
 import { SQL_012 } from './012_reglages_du_recu.js'
 import { SQL_013 } from './013_options_de_restauration.js'
 import { SQL_014 } from './014_graine_sans_equivalent_serveur.js'
+import { SQL_015 } from './015_relire_les_evenements.js'
 
 export interface MigrationLocale {
   readonly version: number
@@ -53,6 +54,7 @@ export const MIGRATIONS: readonly MigrationLocale[] = [
   { version: 12, nom: 'reglages_du_recu', sql: SQL_012 },
   { version: 13, nom: 'options_de_restauration', sql: SQL_013 },
   { version: 14, nom: 'graine_sans_equivalent_serveur', sql: SQL_014 },
+  { version: 15, nom: 'relire_les_evenements', sql: SQL_015 },
 ]
 
 /** Version cible : celle de la dernière migration connue de ce binaire. */

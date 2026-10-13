@@ -206,6 +206,23 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
     }, 'Envoi en cuisine')
 
   const lignesActives = etat?.lignes.filter((l) => !l.annulee) ?? []
+  /*
+   * Les lignes RETIRÉES restent à l'écran, barrées, hors du total.
+   *
+   * Elles disparaissaient : le caissier qui venait de toucher « Retirer » ne
+   * voyait plus rien, ne savait pas si l'action avait pris, et recommençait
+   * sur la ligne suivante. Une annulation n'efface jamais rien (RÈGLE 6) —
+   * l'écran ne doit pas faire croire le contraire.
+   */
+  const lignesRetirees = etat?.lignes.filter((l) => l.annulee) ?? []
+
+  /** Retire une ligne — le même geste depuis « Retirer » et depuis « − » à 1. */
+  const retirerLigne = (ligneId: string) =>
+    executer(
+      (manager) =>
+        session.annulerLigne(employe, orderId, ligneId, 'Retiré par le caissier', manager),
+      'Annulation d’une ligne',
+    )
   const modifiable = etat ? estModifiable(etat.statut) : false
   const nonEnvoyees = lignesActives.length > 0
 
@@ -302,7 +319,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
           </div>
         </header>
 
-        {lignesActives.length === 0 ? (
+        {lignesActives.length === 0 && lignesRetirees.length === 0 ? (
           <p className="vide">Touchez un produit pour l'ajouter.</p>
         ) : (
           <ul className="lignes">
@@ -325,21 +342,23 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                   {l.note && <div className="note">{l.note}</div>}
                   {modifiable && (
                     <div className="actions-ligne">
+                      {/*
+                       * À 1, « − » RETIRE la ligne. Il était borné à 1 et ne
+                       * faisait donc rien : le bouton le plus naturel pour
+                       * enlever un article était le seul qui ne répondait pas.
+                       */}
                       <button
                         type="button"
                         onClick={() =>
-                          void executer(
-                            () =>
-                              session.changerQuantite(
-                                employe,
-                                orderId,
-                                l.id,
-                                Math.max(1, l.quantite - 1),
-                              ),
-                            'Modification de quantité',
-                          )
+                          void (l.quantite <= 1
+                            ? retirerLigne(l.id)
+                            : executer(
+                                () =>
+                                  session.changerQuantite(employe, orderId, l.id, l.quantite - 1),
+                                'Modification de quantité',
+                              ))
                         }
-                        aria-label="Diminuer"
+                        aria-label={l.quantite <= 1 ? `Retirer ${l.designation}` : 'Diminuer'}
                       >
                         −
                       </button>
@@ -359,19 +378,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                       <button
                         type="button"
                         className="retirer"
-                        onClick={() =>
-                          void executer(
-                            (manager) =>
-                              session.annulerLigne(
-                                employe,
-                                orderId,
-                                l.id,
-                                'Retiré par le caissier',
-                                manager,
-                              ),
-                            'Annulation d’une ligne',
-                          )
-                        }
+                        onClick={() => void retirerLigne(l.id)}
                         aria-label={`Retirer ${l.designation}`}
                       >
                         Retirer
@@ -381,6 +388,15 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                 </li>
               )
             })}
+            {lignesRetirees.map((l) => (
+              <li key={l.id} className="retiree" aria-label={`${l.designation}, retiré`}>
+                <div className="haut">
+                  <span className="qte">{l.quantite}×</span>
+                  <span className="designation">{l.designation}</span>
+                  <span className="montant">retiré</span>
+                </div>
+              </li>
+            ))}
           </ul>
         )}
 

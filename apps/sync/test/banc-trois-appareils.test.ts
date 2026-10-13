@@ -123,7 +123,9 @@ class Terminal {
 
       const acceptes = new Set(reponse.acceptes)
       this.outbox = this.outbox.filter((e) => !acceptes.has(e.eventId))
-      this.curseurEvenements = reponse.curseurEvenements
+      // Le curseur de lecture n'avance PAS sur un push — comme dans le
+      // moteur. L'avancer à la tête du journal sautait les événements
+      // qu'une autre caisse venait de pousser (test/curseur-apres-push).
     }
 
     for (let page = 0; page < 20; page += 1) {

@@ -207,8 +207,17 @@ export class MoteurSync {
       for (const rejet of reponse.rejetes) {
         await this.options.depot.marquerRejet(rejet.eventId, rejet.code, rejet.message)
       }
-      await this.options.depot.ecrireCurseur('evenements', reponse.curseurEvenements)
-      await this.publier({ curseurEvenements: reponse.curseurEvenements })
+      /*
+       * ⚑ Le curseur de LECTURE n'est PAS touché ici — et c'est voulu.
+       *
+       * La réponse porte la tête du journal du restaurant. L'écrire comme
+       * curseur faisait partir le pull suivant APRÈS nos propres événements
+       * (qui ne revenaient jamais numérotés : « en attente » à vie dans
+       * « Reçus ») et après ceux qu'une autre caisse avait poussés entre-temps
+       * — que cette caisse ne voyait alors JAMAIS. Un curseur n'avance que
+       * par ce qu'on a lu (RÈGLE 4). Le pull relit nos événements : c'est le
+       * prix, et c'est lui qui leur rend leur numéro serveur.
+       */
 
       // Ni accepté ni rejeté : le serveur n'a rien traité. Insister
       // boucherait la boucle à l'infini sur le même lot.

@@ -79,7 +79,9 @@ L'établissement de démonstration **Snack Lac 1** contient :
 
 - **3 réductions** : *Happy hour* (10 %), *Personnel* (20 %), *Geste
   commercial* (−2,000 TND) ;
-- **3 clients** : Salem Haddad, Amine Ben Youssef, « Dame de la 4 ».
+- **les clients se créent au back-office**. Avant de commencer :
+  **Clients → + Ajouter un client** → **Salem Haddad**, téléphone
+  `20 123 456`. Il redescend sur la caisse à la synchronisation suivante.
 
 ### Conseil pratique
 
@@ -156,11 +158,13 @@ Table 8 → **Pizza Quatre Fromages** + **Escalope panée frites** → bouton
 
 ### 3.6 Ticket 5 — ligne annulée et client
 
-Reprends avec **Salma**. Table 1 → **Tiramisu** + **Express** → annule la
-ligne **Express** (motif « erreur de saisie ») → bouton **Client** → cherche
+Reprends avec **Salma**. Table 1 → **Tiramisu** + **Express** → sur la ligne
+**Express**, touche **−** (ou **Retirer**) → bouton **Client** → cherche
 « Salem » → rattache **Salem Haddad** → Encaisser.
 
-**Attendu** : la ligne Express est barrée, hors du total.
+**Attendu** : la ligne Express reste affichée, **barrée**, marquée
+« retiré », et sort du total. Sur une ligne à 2 ou plus, **−** retire une
+unité ; à 1, il retire la ligne.
 
 ### 3.7 Créer un article depuis la caisse (gérant)
 
@@ -193,7 +197,7 @@ back-office.
 
 | Menu ☰ | Ce que tu dois voir |
 |---|---|
-| **Reçus** | les ventes du jour — numéro, heure, table, employé, paiement, montant. Badge **« en attente »** tant qu'une vente n'est pas remontée |
+| **Reçus** | les ventes — numéro, heure, table, employé, paiement, montant. Badge **« en attente »** tant qu'une vente n'est pas remontée ; il **disparaît** au cycle de synchronisation suivant. Les ventes des **autres** caisses y figurent aussi |
 | **Périodes de travail** | le service en cours et les services clos, **de cette caisse seulement** (l'écran le dit) |
 | **Synchronisation** | « À jour », et les opérations refusées s'il y en a |
 | **Diagnostic** | quatre phrases : la carte, les ventes, Internet, l'envoi au bureau |
@@ -294,14 +298,23 @@ vert, badge **« Prêt »**. Toucher le bandeau ouvre la commande.
 
 ### 5.3 Un compte pour le bar
 
-1. **Paramètres → Employés** → **Gérer** sur un employé → rôle **Bar** →
-   champ **Poste tenu** = **Bar** → enregistre.
-2. Bloc **Accès au back-office** → saisis un mot de passe (8 caractères
-   minimum) → **Ouvrir l'accès**.
+Le bar a **son propre compte** : un e-mail et un mot de passe à lui. Il n'a
+jamais besoin de ceux du gérant. Un seul compte suffit pour le poste bar,
+quelle que soit la personne qui y travaille ce soir-là.
+
+1. **Paramètres → Employés** → **Gérer** sur un employé (ou **Embaucher**
+   « Bar ») → rôle **Bar** → champ **Poste tenu** = **Bar** → enregistre.
+2. Bloc **Accès au back-office** → **e-mail** + **mot de passe** (8
+   caractères minimum) → **Ouvrir l'accès**.
+   L'e-mail sert d'**identifiant** : aucun message n'y est envoyé, il n'a
+   pas besoin d'exister. Un nom lisible suffit, par ex.
+   `bar@snack-lac1.tn`.
 
 **Attendu** : « Compte créé ». La personne peut se connecter tout de suite.
 
-3. Dans une **fenêtre privée**, connecte-toi avec ce compte.
+3. Dans une **fenêtre privée** (en vrai : sur la tablette du bar), ouvre le
+   back-office et connecte-toi avec **cet e-mail et ce mot de passe**. La
+   connexion reste ouverte : on ne la ressaisit pas à chaque service.
 
 **Attendu** : tu arrives directement sur **Préparation**, titrée **« Bar »**,
 avec une seule entrée dans le menu. Seuls les articles du bar s'affichent.
@@ -446,7 +459,7 @@ l'administrateur.
 | **Employés** | Gérer → **Réinitialiser le PIN** ; sur la caisse, Diagnostic → « envoyer maintenant », puis verrouiller | le **nouveau** PIN ouvre, l'ancien est refusé |
 | | **Suspendre**, puis **Réactiver** | l'employé passe dans « Ne prennent plus de poste », puis revient |
 | | En **gérant** (pas admin), essaie de donner le rôle **gérant** à quelqu'un | refusé : seul un administrateur nomme un gérant |
-| **Clients** | cherche « 20 12 » | la recherche porte sur nom, téléphone et e-mail ; Salem sort. Visites et total dépensé sont calculés |
+| **Clients** | cherche « 20 123 » | la recherche porte sur nom, téléphone et e-mail ; Salem sort. Visites et total dépensé sont calculés |
 | **Taxes** | ajoute un taux, change le taux par défaut | ⚠ un restaurant ouvert depuis la caisse démarre à **0 %** : c'est le premier réglage à faire, avec un expert-comptable |
 | **Modes de paiement** | ajoute « Flouci », type *En ligne* | proposé à la caisse ; le dernier mode actif refuse d'être archivé |
 | **Reçu** | saisis adresse, téléphone, identifiant fiscal, pied de page | l'aperçu fait 42 caractères de large, comme un ticket de 80 mm ; les tickets suivants portent ces lignes |
@@ -728,7 +741,7 @@ dans le navigateur, puis refais le §2.
 | Quoi | Où en est-on |
 |---|---|
 | **Rembourser** un ticket déjà payé | Les rapports savent l'afficher (ligne « Remboursements », à 0), mais aucun écran n'en crée. Une erreur se corrige avant l'encaissement : annuler la ligne ou la commande |
-| **Impression** des tickets et bons | Écrite et testée, mais éteinte dans cette version : tout s'affiche à l'écran, la cuisine lit **Préparation**. Se rallume avec `pnpm pos:build:impression` |
+| **Impression** des tickets et bons | Écrite et testée, mais éteinte dans cette version : tout s'affiche à l'écran, la cuisine lit **Préparation**. Achat, branchement, mise en route et test sans imprimante : [`imprimante.md`](imprimante.md) |
 | **Programme de fidélité** | Pas construit |
 | **Facturation de l'abonnement** (échéances, prélèvement) | Pas construite : la formule se lit, elle se change par `pnpm sync:abonnement` |
 | **Chat d'assistance** | Pas construit : le contact se fait par e-mail |

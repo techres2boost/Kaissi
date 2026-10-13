@@ -239,6 +239,24 @@ await etape('le total tient compte du supplément', async () => {
   if (!total.includes('20,200')) throw new Error(`total inattendu : ${total}`)
 })
 
+await etape('« − » sur une ligne à 1 la RETIRE — barrée, hors du total', async () => {
+  /*
+   * PANNE SIGNALÉE EN DÉMONSTRATION. « − » était borné à 1 : sur un article
+   * unique, il ne faisait rien. Et « Retirer » effaçait la ligne de l'écran —
+   * le caissier ne savait pas si son geste avait pris.
+   */
+  await page.click('.categories button:has-text("Boissons")')
+  await page.click('.carte-produit:has-text("Eau minérale 50cl")')
+  await page.waitForSelector('.lignes li:not(.retiree):has-text("Eau minérale")', { timeout: 10000 })
+
+  await page.click('.lignes li:has-text("Eau minérale") button[aria-label="Retirer Eau minérale 50cl"] >> nth=0')
+  await page.waitForSelector('.lignes li.retiree:has-text("Eau minérale")', { timeout: 10000 })
+
+  const total = await page.textContent('.grand-total span:last-child')
+  if (!total.includes('20,200')) throw new Error(`la ligne retirée compte encore : ${total}`)
+  await page.click('.categories button:has-text("Plats")')
+})
+
 await etape('envoi en cuisine — le bon s’affiche au lieu de s’imprimer', async () => {
   await page.click('.actions-commande button:has-text("Cuisine")')
   await page.waitForSelector('.modale:has-text("Envoyé en cuisine")', { timeout: 10000 })

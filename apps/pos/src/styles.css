@@ -1097,6 +1097,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
   min-width: 40px; min-height: 36px; font-size: 0.85rem; color: var(--texte-2);
 }
 .actions-ligne .retirer { color: var(--alerte); padding: 0 0.6rem; }
+/* Ligne retirée : visible, barrée, hors du total — jamais effacée. */
+.ticket .lignes li.retiree { background: transparent; border: 1px dashed var(--bordure); opacity: 0.75; }
+.ticket .lignes li.retiree .designation { text-decoration: line-through; color: var(--texte-2); }
+.ticket .lignes li.retiree .montant { font-size: 0.72rem; color: var(--alerte); }
 
 .actions-commande { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: auto; padding-top: 0.75rem; }
 .actions-commande .principal { grid-column: 1 / -1; }

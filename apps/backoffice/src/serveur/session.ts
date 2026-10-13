@@ -11,6 +11,7 @@
  * oubli ici ne rend rien du tout.
  */
 
+import { cache } from 'react'
 import { redirect } from 'next/navigation'
 import { supabaseServeur } from './supabase.js'
 
@@ -101,7 +102,19 @@ const ROLES_GESTIONNAIRES: readonly RoleMembre[] = ['admin', 'gerant']
  * revalider auprès de Supabase. Sur un rendu serveur, cela reviendrait à
  * faire confiance à un cookie que l'on n'a pas vérifié.
  */
-export async function sessionObligatoire(): Promise<SessionBackoffice> {
+/*
+ * MÉMORISÉE pour la durée d'UNE requête (`cache` de React).
+ *
+ * Le layout de l'établissement et la page appellent tous deux
+ * `etablissementObligatoire()` : sans mémoïsation, chaque navigation
+ * relisait deux fois l'utilisateur, sa fiche et ses appartenances — six
+ * allers-retours en série avant la première donnée utile. `cache` ne
+ * partage RIEN entre deux requêtes, ni entre deux utilisateurs : la portée
+ * est le rendu en cours, et la session reste revalidée à chaque navigation.
+ */
+export const sessionObligatoire = cache(sessionNonMemorisee)
+
+async function sessionNonMemorisee(): Promise<SessionBackoffice> {
   const supabase = await supabaseServeur()
   const {
     data: { user },
