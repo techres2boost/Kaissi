@@ -7,8 +7,8 @@
  *
  * ── La seule écriture, et pourquoi elle ne casse pas la règle ─────────────
  *
- * `creerProduitLocal` écrit un article dans la base de la tablette. Le
- * catalogue reste pourtant descendant : cette écriture est une DEMANDE,
+ * `creerCatalogueLocal` écrit une entité de catalogue dans la base de la
+ * tablette. Le catalogue reste pourtant descendant : cette écriture est une DEMANDE,
  * déposée dans l'outbox en même temps que la ligne. Le serveur tranche, puis
  * la redescend par `change_log` comme n'importe quel changement de prix. La
  * caisse n'a pas gagné le droit de décider — elle a gagné celui de proposer
@@ -236,28 +236,83 @@ export function depotCatalogue(db: AdaptateurSqlite) {
      * L'appelant a déjà validé la mutation avec `validerMutationCatalogue` —
      * la même fonction que le serveur appellera.
      */
-    async creerProduitLocal(m: MutationCatalogue): Promise<void> {
+    async creerCatalogueLocal(m: MutationCatalogue): Promise<void> {
       await db.transaction(async () => {
-        await db.executer(
-          `INSERT OR IGNORE INTO products
-             (id, organization_id, restaurant_id, category_id, station_id,
-              tax_rate_id, name, description, base_price_millimes, color,
-              position, is_available, track_stock, local_event_id)
-           VALUES (?, ?, ?, ?, NULL, ?, ?, NULL, ?, NULL, ?, 1, 0, ?)`,
-          [
-            m.produitId,
-            m.organizationId,
-            m.restaurantId,
-            m.categorieId,
-            m.tauxTvaId,
-            m.nom.trim(),
-            m.prixBaseMillimes,
-            // En FIN de catégorie : un article créé en plein service ne doit
-            // pas se glisser devant ceux que le caissier vise sans regarder.
-            9999,
-            m.mutationId,
-          ],
-        )
+        /*
+         * En FIN de liste (position 9999) : une entité créée en plein service
+         * ne doit pas se glisser devant celles que le caissier vise sans
+         * regarder. Le serveur lui attribuera sa vraie position au pull.
+         */
+        switch (m.type) {
+          case 'catalogue.produit.cree':
+            await db.executer(
+              `INSERT OR IGNORE INTO products
+                 (id, organization_id, restaurant_id, category_id, station_id,
+                  tax_rate_id, name, description, base_price_millimes, color,
+                  position, is_available, track_stock, local_event_id)
+               VALUES (?, ?, ?, ?, NULL, ?, ?, NULL, ?, NULL, 9999, 1, 0, ?)`,
+              [
+                m.produitId, m.organizationId, m.restaurantId, m.categorieId,
+                m.tauxTvaId, m.nom.trim(), m.prixBaseMillimes, m.mutationId,
+              ],
+            )
+            break
+          case 'catalogue.categorie.cree':
+            await db.executer(
+              `INSERT OR IGNORE INTO categories
+                 (id, organization_id, restaurant_id, name, position, color, station_id)
+               VALUES (?, ?, ?, ?, 9999, ?, ?)`,
+              [m.categorieId, m.organizationId, m.restaurantId, m.nom.trim(), m.couleur, m.stationId],
+            )
+            break
+          case 'catalogue.reduction.cree':
+            await db.executer(
+              `INSERT OR IGNORE INTO discounts
+                 (id, organization_id, restaurant_id, name, kind, value_bp, amount_millimes, position)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 9999)`,
+              [
+                m.reductionId, m.organizationId, m.restaurantId, m.nom.trim(),
+                m.kind, m.valeurBp, m.montantMillimes,
+              ],
+            )
+            break
+          case 'catalogue.modificateur.cree': {
+            await db.executer(
+              `INSERT OR IGNORE INTO modifier_groups
+                 (id, organization_id, restaurant_id, name, min_select, max_select, is_required, position)
+               VALUES (?, ?, ?, ?, ?, ?, ?, 9999)`,
+              [
+                m.groupeId, m.organizationId, m.restaurantId, m.nom.trim(),
+                m.minSelect, m.maxSelect, m.minSelect > 0 ? 1 : 0,
+              ],
+            )
+            let pos = 0
+            for (const c of m.choix) {
+              await db.executer(
+                `INSERT OR IGNORE INTO modifiers
+                   (id, organization_id, restaurant_id, modifier_group_id, name, price_delta_millimes, position, is_available)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+                [c.id, m.organizationId, m.restaurantId, m.groupeId, c.nom.trim(), c.prixDeltaMillimes, pos],
+              )
+              pos += 1
+            }
+            for (const produitId of m.produitIds) {
+              await db.executer(
+                `INSERT OR IGNORE INTO product_modifiers
+                   (product_id, modifier_group_id, restaurant_id, position)
+                 VALUES (?, ?, ?, 9999)`,
+                [produitId, m.groupeId, m.restaurantId],
+              )
+            }
+            break
+          }
+        }
+        /*
+         * L'outbox, dans la MÊME transaction. Ce n'est pas un raffinement :
+         * une entité visible sans entrée d'outbox ne remonterait JAMAIS, et
+         * rien ne le dirait. L'inverse ferait apparaître ce que le caissier
+         * n'a pas vu naître.
+         */
         await db.executer(
           `INSERT OR IGNORE INTO outbox
              (event_id, restaurant_id, kind, payload, created_at)
@@ -361,6 +416,21 @@ export function depotCatalogue(db: AdaptateurSqlite) {
         places: l.seats,
         zoneNom: l.zone_nom,
       }))
+    },
+
+    /**
+     * Les groupes d'options en service — pour l'écran Carte.
+     *
+     * Sans le NOMBRE de groupes déjà posés, « Nouveau groupe » invite à en
+     * recréer un qui existe : en créer deux fois « Cuisson » ne casse rien,
+     * mais le caissier se retrouve avec deux listes identiques à l'écran.
+     */
+    async groupesModificateurs(): Promise<{ id: string; nom: string }[]> {
+      const lignes = await db.lire<{ id: string; name: string }>(
+        `SELECT id, name FROM modifier_groups
+         WHERE archived_at IS NULL ORDER BY position, name`,
+      )
+      return lignes.map((l) => ({ id: l.id, nom: l.name }))
     },
 
     async reductions(): Promise<ReductionLocale[]> {

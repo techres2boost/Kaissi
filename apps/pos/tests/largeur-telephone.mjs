@@ -235,11 +235,17 @@ for (const appareil of APPAREILS) {
   await page.waitForSelector('text=Prise de poste', { timeout: 20000 })
   await mesurer('prise de poste')
 
-  await page.click('text=Salma Trabelsi')
+  /*
+   * Le GÉRANT, et non la caissière : lui seul voit l'entrée « Carte », et
+   * c'est l'écran le plus large de l'application. Devant un client qui
+   * attend, les deux rôles font le même travail à la caisse — aucune mesure
+   * de ce parcours ne dépend du plafond de remise.
+   */
+  await page.click('text=Ahmed Ben Salah')
   await page.waitForSelector('.pave', { timeout: 5000 })
   await mesurer('pavé du PIN')
 
-  for (const c of '2468') await page.click(`.pave button:has-text("${c}")`)
+  for (const c of '1357') await page.click(`.pave button:has-text("${c}")`)
   await page.click('.pave .valider')
   await page.waitForSelector('text=Ouverture de caisse', { timeout: 20000 })
   await mesurer('ouverture de caisse')
@@ -290,6 +296,23 @@ for (const appareil of APPAREILS) {
   await page.click('.tiroir-lien:has-text("Périodes de travail")')
   await page.waitForSelector('.periodes', { timeout: 10000 })
   await mesurer('périodes de travail')
+
+  /*
+   * La CARTE et ses formulaires de création. Le groupe d'options est le plus
+   * large de l'application : deux colonnes de saisie par choix, plus la liste
+   * des articles à rattacher. C'est lui qui déborde en premier sur 320 px.
+   *
+   * Ouvert avec le GÉRANT : un caissier ne voit pas cette entrée.
+   */
+  await page.click('.ouvrir-tiroir')
+  await page.click('.tiroir-lien:has-text("Carte")')
+  await page.waitForSelector('.ecran-carte', { timeout: 10000 })
+  await mesurer('carte')
+
+  await page.click('button:has-text("Nouveau groupe")')
+  await page.waitForSelector('#mod-nom', { timeout: 10000 })
+  await mesurer('carte — nouveau groupe d’options')
+  await page.click('.modale .fermer')
 
   await page.close()
 }

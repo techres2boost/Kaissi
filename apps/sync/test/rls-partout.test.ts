@@ -157,35 +157,68 @@ describe('kaissi_device — ce qu’une CAISSE peut atteindre', () => {
     expect(rows[0]?.lecture).toBe(false)
   })
 
-  it('ne peut rien écrire dans le référentiel qu’il reçoit', async () => {
+  /**
+   * Les tables du référentiel où la caisse peut CRÉER — et la raison.
+   *
+   * Ce n'est pas une liste d'exceptions, c'est la trace d'une décision :
+   * créer n'est pas écrire sur un état partagé (deux caisses hors ligne
+   * créent deux lignes DISTINCTES), là où MODIFIER exigerait le
+   * dernier-écrivain-gagne. Migrations 0034 (articles) et 0044 (le reste).
+   *
+   * Toute table ajoutée ici doit l'être sciemment ; toute table qui
+   * recevrait `insert` sans y figurer fait tomber le test suivant.
+   */
+  const CREATION_OUVERTE = new Set([
+    'products',          // 0034 — le plat du jour
+    'categories',        // 0044 — la catégorie qui le range
+    'discounts',         // 0044 — la remise de la maison
+    'modifier_groups',   // 0044 — « Cuisson », « Suppléments »
+    'modifiers',         // 0044 — leurs choix
+    'product_modifiers', // 0044 — le rattachement, additif donc sans conflit
+  ])
+
+  /** Le référentiel au complet — ce que la caisse REÇOIT. */
+  const REFERENTIEL = [
+    'products', 'categories', 'tax_rates', 'discounts', 'modifier_groups',
+    'modifiers', 'product_modifiers', 'stations', 'payment_methods', 'suppliers',
+  ]
+
+  it('ne peut JAMAIS modifier ni supprimer le référentiel — pas même ce qu’il crée', async () => {
     /*
-     * Le catalogue DESCEND : serveur → caisse. La seule exception est la
-     * CRÉATION d'un article (0034), et elle est étroite — `insert` seulement.
-     * `update` n'est PAS accordé, et c'est la seconde serrure : elle tient
-     * même si la politique `products_creation_caisse` était réécrite.
+     * LA garantie de fond, et elle vaut pour TOUTES les tables, y compris
+     * celles où la création est ouverte. `update` n'est accordé nulle part :
+     * c'est la seconde serrure, celle qui tient même si une politique
+     * `*_creation_caisse` était un jour réécrite en `for all`.
      */
     const { rows } = await client.query<{ table_name: string; privilege: string }>(
       `select t.table_name, p.privilege
-         from (values
-                ('categories'), ('tax_rates'), ('discounts'),
-                ('modifier_groups'), ('modifiers'), ('stations'),
-                ('payment_methods'), ('suppliers')
-              ) as t(table_name)
-         cross join (values ('insert'), ('update'), ('delete')) as p(privilege)
+         from unnest($1::text[]) as t(table_name)
+         cross join (values ('update'), ('delete')) as p(privilege)
         where has_table_privilege('kaissi_device', 'kaissi.' || t.table_name, p.privilege)`,
+      [REFERENTIEL],
     )
     const accordes = rows.map((r) => `${r.table_name}:${r.privilege}`)
-    expect(accordes, `écritures accordées à la caisse : ${accordes.join(' · ')}`).toEqual([])
+    expect(accordes, `modifications accordées à la caisse : ${accordes.join(' · ')}`).toEqual([])
   })
 
-  it('n’a QUE l’insertion sur les produits — jamais la modification', async () => {
-    const { rows } = await client.query<{ i: boolean; u: boolean; d: boolean }>(
-      `select has_table_privilege('kaissi_device', 'kaissi.products', 'insert') as i,
-              has_table_privilege('kaissi_device', 'kaissi.products', 'update') as u,
-              has_table_privilege('kaissi_device', 'kaissi.products', 'delete') as d`,
+  it('n’a l’INSERTION que sur les tables de création DÉCLARÉES', async () => {
+    const { rows } = await client.query<{ table_name: string }>(
+      `select t.table_name
+         from unnest($1::text[]) as t(table_name)
+        where has_table_privilege('kaissi_device', 'kaissi.' || t.table_name, 'insert')
+        order by 1`,
+      [REFERENTIEL],
     )
-    expect(rows[0]?.i).toBe(true)
-    expect(rows[0]?.u).toBe(false)
-    expect(rows[0]?.d).toBe(false)
+    const ouvertes = rows.map((r) => r.table_name)
+    const nonDeclarees = ouvertes.filter((t) => !CREATION_OUVERTE.has(t))
+    expect(
+      nonDeclarees,
+      `insertion ouverte SANS décision écrite : ${nonDeclarees.join(' · ')}`,
+    ).toEqual([])
+
+    // Et l'inverse : une table déclarée qui aurait perdu son privilège ferait
+    // échouer la création en clientèle, sans que rien ici ne le dise.
+    const manquantes = [...CREATION_OUVERTE].filter((t) => !ouvertes.includes(t))
+    expect(manquantes, `création déclarée mais NON accordée : ${manquantes.join(' · ')}`).toEqual([])
   })
 })

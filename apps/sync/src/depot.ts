@@ -190,14 +190,16 @@ export interface DepotSync {
   roleDeLEmploye(restaurantId: string, employeId: string): Promise<string | null>
 
   /**
-   * Applique un lot de créations d'articles, et rend ceux réellement écrits.
+   * Applique un lot de CRÉATIONS de catalogue (article, catégorie, réduction,
+   * groupe de modificateurs), et rend les mutations réellement écrites.
    *
    * L'idempotence est celle de `sync_mutations` : la même mutation renvoyée
-   * cinq fois n'insère qu'une fois. Les articles acceptés redescendent ensuite
-   * par `change_log`, comme n'importe quel changement de prix — le déclencheur
-   * `products_change_log` existe depuis la 0005, il n'y a aucune voie nouvelle.
+   * cinq fois n'insère qu'une fois. Les entités acceptées redescendent ensuite
+   * par `change_log`, comme n'importe quel changement de prix — les
+   * déclencheurs existent depuis les 0005/0030/0037, il n'y a aucune voie
+   * nouvelle.
    */
-  creerProduits(
+  appliquerMutationsCatalogue(
     appareil: AppareilAuthentifie,
     mutations: readonly MutationCatalogue[],
   ): Promise<readonly string[]>

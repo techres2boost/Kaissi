@@ -584,7 +584,7 @@ export class DepotPostgres implements DepotSync {
     return rows[0]?.role ?? null
   }
 
-  async creerProduits(
+  async appliquerMutationsCatalogue(
     appareil: AppareilAuthentifie,
     mutations: readonly MutationCatalogue[],
   ): Promise<readonly string[]> {
@@ -592,8 +592,8 @@ export class DepotPostgres implements DepotSync {
     const acceptes: string[] = []
 
     /*
-     * SOUS L'IDENTITÉ DE L'APPAREIL, donc sous RLS (politique
-     * `products_creation_caisse`, migration 0034). Le contrôle de rôle est
+     * SOUS L'IDENTITÉ DE L'APPAREIL, donc sous RLS (politiques
+     * `*_creation_caisse`, migrations 0034 et 0044). Le contrôle de rôle est
      * déjà fait par le service ; celui-ci répond à l'autre question — dans
      * quel établissement — et ne dépend d'aucun `where` écrit à la main.
      */
@@ -602,8 +602,8 @@ export class DepotPostgres implements DepotSync {
         /*
          * Le registre D'ABORD. `on conflict do nothing` + `returning` : la
          * ligne ne revient que si elle vient d'être écrite. Une mutation déjà
-         * appliquée ne réinsère donc pas l'article — et l'appareil reçoit
-         * quand même son accusé, sans quoi il la renverrait éternellement.
+         * appliquée ne réinsère donc rien — et l'appareil reçoit quand même
+         * son accusé, sans quoi il la renverrait éternellement.
          */
         const { rows } = await client.query<{ event_id: string }>(
           `insert into kaissi.sync_mutations
@@ -619,24 +619,7 @@ export class DepotPostgres implements DepotSync {
           continue
         }
 
-        await client.query(
-          `insert into kaissi.products
-             (id, organization_id, restaurant_id, category_id, tax_rate_id,
-              name, base_price_millimes, position)
-           values ($1, $2, $3, $4, $5, $6, $7,
-                   coalesce((select max(position) + 1 from kaissi.products
-                              where restaurant_id = $3), 0))
-           on conflict (id) do nothing`,
-          [
-            m.produitId,
-            appareil.organizationId,
-            appareil.restaurantId,
-            m.categorieId,
-            m.tauxTvaId,
-            m.nom.trim(),
-            m.prixBaseMillimes,
-          ],
-        )
+        await this.insererMutation(client, appareil, m)
         acceptes.push(m.mutationId)
       }
     })
@@ -655,7 +638,12 @@ export class DepotPostgres implements DepotSync {
      * HORS de la transaction de création, et sans jamais la faire échouer :
      * l'article est créé, l'accusé doit partir, quoi qu'il arrive ensuite.
      */
-    const produits = mutations.map((m) => m.produitId).filter((id) => estUuid(id))
+    const produits = mutations
+      .filter((m): m is Extract<MutationCatalogue, { type: 'catalogue.produit.cree' }> =>
+        m.type === 'catalogue.produit.cree',
+      )
+      .map((m) => m.produitId)
+      .filter((id) => estUuid(id))
     if (produits.length > 0) {
       try {
         const { rows } = await this.pool.query<{ id: string }>(
@@ -681,6 +669,88 @@ export class DepotPostgres implements DepotSync {
       }
     }
     return acceptes
+  }
+
+  /**
+   * L'INSERT propre à chaque entité. `on conflict do nothing` partout : une
+   * même mutation rejouée (l'idempotence l'écarte en amont, mais la ceinture
+   * et les bretelles) ne double rien. La `position` est posée en fin de liste.
+   */
+  private async insererMutation(
+    client: PoolClient,
+    appareil: AppareilAuthentifie,
+    m: MutationCatalogue,
+  ): Promise<void> {
+    const org = appareil.organizationId
+    const resto = appareil.restaurantId
+    switch (m.type) {
+      case 'catalogue.produit.cree':
+        await client.query(
+          `insert into kaissi.products
+             (id, organization_id, restaurant_id, category_id, tax_rate_id,
+              name, base_price_millimes, position)
+           values ($1,$2,$3,$4,$5,$6,$7,
+                   coalesce((select max(position)+1 from kaissi.products where restaurant_id=$3),0))
+           on conflict (id) do nothing`,
+          [m.produitId, org, resto, m.categorieId, m.tauxTvaId, m.nom.trim(), m.prixBaseMillimes],
+        )
+        return
+      case 'catalogue.categorie.cree':
+        await client.query(
+          `insert into kaissi.categories
+             (id, organization_id, restaurant_id, name, color, station_id, position)
+           values ($1,$2,$3,$4,$5,$6,
+                   coalesce((select max(position)+1 from kaissi.categories where restaurant_id=$3),0))
+           on conflict (id) do nothing`,
+          [m.categorieId, org, resto, m.nom.trim(), m.couleur, m.stationId],
+        )
+        return
+      case 'catalogue.reduction.cree':
+        await client.query(
+          `insert into kaissi.discounts
+             (id, organization_id, restaurant_id, name, kind, value_bp, amount_millimes, position)
+           values ($1,$2,$3,$4,$5,$6,$7,
+                   coalesce((select max(position)+1 from kaissi.discounts where restaurant_id=$3),0))
+           on conflict (id) do nothing`,
+          [m.reductionId, org, resto, m.nom.trim(), m.kind, m.valeurBp, m.montantMillimes],
+        )
+        return
+      case 'catalogue.modificateur.cree': {
+        await client.query(
+          `insert into kaissi.modifier_groups
+             (id, organization_id, restaurant_id, name, min_select, max_select, is_required, position)
+           values ($1,$2,$3,$4,$5,$6,$7,
+                   coalesce((select max(position)+1 from kaissi.modifier_groups where restaurant_id=$3),0))
+           on conflict (id) do nothing`,
+          [m.groupeId, org, resto, m.nom.trim(), m.minSelect, m.maxSelect, m.minSelect > 0],
+        )
+        let position = 0
+        for (const c of m.choix) {
+          await client.query(
+            `insert into kaissi.modifiers
+               (id, organization_id, restaurant_id, modifier_group_id, name, price_delta_millimes, position)
+             values ($1,$2,$3,$4,$5,$6,$7)
+             on conflict (id) do nothing`,
+            [c.id, org, resto, m.groupeId, c.nom.trim(), c.prixDeltaMillimes, position],
+          )
+          position += 1
+        }
+        // Rattachement ADDITIF : chaque (produit, groupe) est une ligne à
+        // part, `on conflict do nothing` la rend idempotente. Un produit d'un
+        // AUTRE établissement est refusé par la clé étrangère et par RLS.
+        for (const produitId of m.produitIds) {
+          await client.query(
+            `insert into kaissi.product_modifiers
+               (organization_id, restaurant_id, product_id, modifier_group_id, position)
+             values ($1,$2,$3,$4,
+                     coalesce((select max(position)+1 from kaissi.product_modifiers where product_id=$3),0))
+             on conflict (product_id, modifier_group_id) do nothing`,
+            [org, resto, produitId, m.groupeId],
+          )
+        }
+        return
+      }
+    }
   }
 
   async consignerRejetsCatalogue(

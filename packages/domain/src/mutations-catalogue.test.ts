@@ -98,3 +98,98 @@ describe('qui peut toucher au catalogue', () => {
     expect(peutModifierCatalogue('serveur')).toBe(false)
   })
 })
+
+// ── Les entités créées depuis la caisse, au-delà de l'article ────────────────
+
+const commun = {
+  mutationId: '01930000-0000-7000-8000-00000000000a',
+  organizationId: '01930000-0000-7000-8000-000000000001',
+  restaurantId: '01930000-0000-7000-8000-000000000002',
+  deviceId: '01930000-0000-7000-8000-000000000003',
+  parEmployeId: '01930000-0000-7000-8000-000000000004',
+  clientTs: '2026-10-15T10:00:00.000Z',
+  protocolVersion: 1,
+} as const
+
+describe('valider une création de catégorie', () => {
+  const cat: MutationCatalogue = {
+    ...commun,
+    type: 'catalogue.categorie.cree',
+    categorieId: '01930000-0000-7000-8000-000000000020',
+    nom: 'Entrées',
+    couleur: '#C4562B',
+    stationId: null,
+  }
+  it('accepte une saisie normale, avec ou sans couleur et poste', () => {
+    expect(validerMutationCatalogue(cat).valide).toBe(true)
+    expect(validerMutationCatalogue({ ...cat, couleur: null }).valide).toBe(true)
+  })
+  it('refuse un nom vide et une couleur mal formée', () => {
+    expect(validerMutationCatalogue({ ...cat, nom: '  ' }).valide).toBe(false)
+    expect(validerMutationCatalogue({ ...cat, couleur: 'rouge' }).valide).toBe(false)
+  })
+})
+
+describe('valider une création de réduction', () => {
+  const pct: MutationCatalogue = {
+    ...commun,
+    type: 'catalogue.reduction.cree',
+    reductionId: '01930000-0000-7000-8000-000000000030',
+    nom: 'Happy hour',
+    kind: 'pourcentage',
+    valeurBp: 1000 as never,
+    montantMillimes: null,
+  }
+  const montant: MutationCatalogue = {
+    ...pct,
+    nom: 'Geste',
+    kind: 'montant',
+    valeurBp: null,
+    montantMillimes: millimes(2000),
+  }
+  it('accepte un pourcentage et un montant', () => {
+    expect(validerMutationCatalogue(pct).valide).toBe(true)
+    expect(validerMutationCatalogue(montant).valide).toBe(true)
+  })
+  it('refuse un pourcentage hors 0–100', () => {
+    expect(validerMutationCatalogue({ ...pct, valeurBp: 15000 as never }).valide).toBe(false)
+  })
+  it('refuse de porter les DEUX valeurs à la fois', () => {
+    expect(validerMutationCatalogue({ ...pct, montantMillimes: millimes(500) }).valide).toBe(false)
+    expect(validerMutationCatalogue({ ...montant, valeurBp: 500 as never }).valide).toBe(false)
+  })
+})
+
+describe('valider une création de groupe de modificateurs', () => {
+  const grp: MutationCatalogue = {
+    ...commun,
+    type: 'catalogue.modificateur.cree',
+    groupeId: '01930000-0000-7000-8000-000000000040',
+    nom: 'Cuisson',
+    minSelect: 1,
+    maxSelect: 1,
+    choix: [
+      { id: '01930000-0000-7000-8000-000000000041', nom: 'Saignant', prixDeltaMillimes: millimes(0) },
+      { id: '01930000-0000-7000-8000-000000000042', nom: 'Supplément', prixDeltaMillimes: millimes(1500) },
+    ],
+    produitIds: ['01930000-0000-7000-8000-000000000005'],
+  }
+  it('accepte un groupe avec des choix', () => {
+    expect(validerMutationCatalogue(grp).valide).toBe(true)
+  })
+  it('accepte un choix à prix NÉGATIF (petite portion)', () => {
+    expect(
+      validerMutationCatalogue({
+        ...grp,
+        choix: [{ id: grp.choix[0]!.id, nom: 'Petite', prixDeltaMillimes: millimes(-1500) }],
+      }).valide,
+    ).toBe(true)
+  })
+  it('refuse un groupe sans aucun choix — il ne proposerait rien', () => {
+    expect(validerMutationCatalogue({ ...grp, choix: [] }).valide).toBe(false)
+  })
+  it('refuse un maximum sous le minimum (0 = sans limite reste permis)', () => {
+    expect(validerMutationCatalogue({ ...grp, minSelect: 2, maxSelect: 1 }).valide).toBe(false)
+    expect(validerMutationCatalogue({ ...grp, minSelect: 2, maxSelect: 0 }).valide).toBe(true)
+  })
+})

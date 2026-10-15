@@ -25,6 +25,7 @@
 
 import { useEffect, useRef } from 'react'
 import {
+  BookOpen,
   ClipboardList,
   Clock,
   ExternalLink,
@@ -184,6 +185,7 @@ export const ICONES_TIROIR = {
   salle: Store,
   recus: ReceiptText,
   periodes: Clock,
+  carte: BookOpen,
   sync: RefreshCw,
   diagnostic: Stethoscope,
   cloture: ClipboardList,

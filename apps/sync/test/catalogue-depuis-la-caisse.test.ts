@@ -20,7 +20,12 @@
 
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { Client } from 'pg'
-import { millimes, uuidV7, type MutationCatalogue } from '@kaissi/domain'
+import {
+  millimes,
+  uuidV7,
+  type MutationCatalogue,
+  type MutationProduitCree,
+} from '@kaissi/domain'
 import { DepotPostgres } from '../src/depot-postgres.js'
 import { creerServeur } from '../src/serveur.js'
 import {
@@ -44,9 +49,36 @@ const app = creerServeur({ depot })
 
 let appareil: AppareilTest
 
+/**
+ * Purge CHIRURGICALE — seulement ce que CE fichier a créé.
+ *
+ * La base de test est partagée entre les fichiers. Une purge par
+ * `entity_type` effacerait les entrées `change_log` du jeu de
+ * DÉMONSTRATION, dont `modificateurs.test.ts` et la pagination de
+ * `sync.test.ts` dépendent : deux tests tombaient, loin d'ici, pour une
+ * raison invisible depuis leur propre fichier. On ne cible donc que les
+ * identifiants portant un nom « TEST % ».
+ */
 async function purger() {
-  await client.query("delete from kaissi.change_log where entity_type = 'products'")
+  const testIds = `
+    select id from kaissi.products where name like 'TEST %'
+    union all select id from kaissi.categories where name like 'TEST %'
+    union all select id from kaissi.discounts where name like 'TEST %'
+    union all select id from kaissi.modifier_groups where name like 'TEST %'
+    union all select m.id from kaissi.modifiers m
+             join kaissi.modifier_groups g on g.id = m.modifier_group_id
+            where g.name like 'TEST %'`
+  await client.query(`delete from kaissi.change_log where entity_id in (${testIds})`)
+  await client.query(
+    "delete from kaissi.product_modifiers where modifier_group_id in (select id from kaissi.modifier_groups where name like 'TEST %')",
+  )
+  await client.query(
+    "delete from kaissi.modifiers where modifier_group_id in (select id from kaissi.modifier_groups where name like 'TEST %')",
+  )
+  await client.query("delete from kaissi.modifier_groups where name like 'TEST %'")
   await client.query("delete from kaissi.products where name like 'TEST %'")
+  await client.query("delete from kaissi.categories where name like 'TEST %'")
+  await client.query("delete from kaissi.discounts where name like 'TEST %'")
   await client.query("delete from kaissi.sync_mutations where kind = 'catalogue'")
 }
 
@@ -63,7 +95,7 @@ afterAll(async () => {
 })
 
 /** Une mutation bien formée, dont on ne change qu'un champ à la fois. */
-function mutation(surcharges: Partial<MutationCatalogue> = {}): MutationCatalogue {
+function mutation(surcharges: Partial<MutationProduitCree> = {}): MutationProduitCree {
   return {
     mutationId: uuidV7(),
     type: 'catalogue.produit.cree',
@@ -357,5 +389,204 @@ describe('un article VENDU avant que sa création ne remonte', () => {
       [orderId],
     )
     expect(rows[0]!.exceptions.map((e) => e.colonne)).not.toContain('order_items.product_id')
+  })
+})
+
+// ── Les autres entités du catalogue, créées depuis la caisse (0044) ─────────
+
+/** Le socle commun à toute mutation — seul le type et ses champs changent. */
+function commun() {
+  return {
+    mutationId: uuidV7(),
+    organizationId: DEMO_ORG,
+    restaurantId: DEMO_RESTO,
+    deviceId: appareil.id,
+    parEmployeId: GERANT_DEMO,
+    clientTs: new Date().toISOString(),
+    protocolVersion: 1,
+  } as const
+}
+
+describe('un gérant crée une CATÉGORIE depuis la caisse', () => {
+  it('la catégorie existe, avec sa couleur et son poste', async () => {
+    const categorieId = uuidV7()
+    const { corps } = await envoyer([
+      {
+        ...commun(),
+        type: 'catalogue.categorie.cree',
+        categorieId,
+        nom: 'TEST Entrées',
+        couleur: '#C4562B',
+        stationId: null,
+      },
+    ])
+    expect(corps.rejetes).toEqual([])
+
+    const { rows } = await client.query<{ name: string; color: string; restaurant_id: string }>(
+      'select name, color, restaurant_id from kaissi.categories where id = $1',
+      [categorieId],
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.name).toBe('TEST Entrées')
+    expect(rows[0]!.color).toBe('#C4562B')
+    expect(rows[0]!.restaurant_id).toBe(DEMO_RESTO)
+  })
+
+  it('redescend par change_log — aucune voie de synchronisation nouvelle', async () => {
+    const categorieId = uuidV7()
+    await envoyer([
+      { ...commun(), type: 'catalogue.categorie.cree', categorieId, nom: 'TEST Desserts', couleur: null, stationId: null },
+    ])
+    const { rows } = await client.query(
+      "select 1 from kaissi.change_log where entity_type = 'categories' and entity_id = $1",
+      [categorieId],
+    )
+    expect(rows).toHaveLength(1)
+  })
+})
+
+describe('un gérant crée une RÉDUCTION depuis la caisse', () => {
+  it('un pourcentage est écrit en points de base ENTIERS', async () => {
+    const reductionId = uuidV7()
+    const { corps } = await envoyer([
+      {
+        ...commun(),
+        type: 'catalogue.reduction.cree',
+        reductionId,
+        nom: 'TEST Happy hour',
+        kind: 'pourcentage',
+        valeurBp: 1500 as never,
+        montantMillimes: null,
+      },
+    ])
+    expect(corps.rejetes).toEqual([])
+
+    const { rows } = await client.query<{ kind: string; value_bp: number; amount_millimes: string | null }>(
+      'select kind, value_bp, amount_millimes from kaissi.discounts where id = $1',
+      [reductionId],
+    )
+    expect(rows[0]!.kind).toBe('pourcentage')
+    expect(rows[0]!.value_bp).toBe(1500)
+    expect(rows[0]!.amount_millimes).toBeNull()
+  })
+
+  it('un montant fixe est écrit en MILLIMES, et jamais les deux valeurs', async () => {
+    const reductionId = uuidV7()
+    await envoyer([
+      {
+        ...commun(),
+        type: 'catalogue.reduction.cree',
+        reductionId,
+        nom: 'TEST Geste',
+        kind: 'montant',
+        valeurBp: null,
+        montantMillimes: millimes(2000),
+      },
+    ])
+    const { rows } = await client.query<{ value_bp: number | null; amount_millimes: string }>(
+      'select value_bp, amount_millimes from kaissi.discounts where id = $1',
+      [reductionId],
+    )
+    expect(rows[0]!.value_bp).toBeNull()
+    expect(Number(rows[0]!.amount_millimes)).toBe(2000)
+  })
+})
+
+describe('un gérant crée un GROUPE DE MODIFICATEURS depuis la caisse', () => {
+  it('le groupe, ses choix et son rattachement au produit', async () => {
+    const groupeId = uuidV7()
+    const choixA = uuidV7()
+    const choixB = uuidV7()
+    /*
+     * Un produit À NOUS, et pas la pizza de démonstration : rattacher un
+     * groupe à une ligne partagée changerait ce que `modificateurs.test.ts`
+     * lit, et le ferait tomber depuis un autre fichier.
+     */
+    const produit = mutation({ nom: 'TEST Plat à options' })
+    await envoyer([produit])
+
+    const { corps } = await envoyer([
+      {
+        ...commun(),
+        type: 'catalogue.modificateur.cree',
+        groupeId,
+        nom: 'TEST Cuisson',
+        minSelect: 1,
+        maxSelect: 1,
+        choix: [
+          { id: choixA, nom: 'Saignant', prixDeltaMillimes: millimes(0) },
+          { id: choixB, nom: 'Supplément', prixDeltaMillimes: millimes(1500) },
+        ],
+        produitIds: [produit.produitId],
+      },
+    ])
+    expect(corps.rejetes).toEqual([])
+
+    const groupe = await client.query<{ min_select: number; max_select: number; is_required: boolean }>(
+      'select min_select, max_select, is_required from kaissi.modifier_groups where id = $1',
+      [groupeId],
+    )
+    expect(groupe.rows[0]!.min_select).toBe(1)
+    // `is_required` se DÉDUIT du minimum : deux réglages pour une seule idée
+    // finissent par se contredire.
+    expect(groupe.rows[0]!.is_required).toBe(true)
+
+    const choix = await client.query<{ name: string; price_delta_millimes: string }>(
+      'select name, price_delta_millimes from kaissi.modifiers where modifier_group_id = $1 order by position',
+      [groupeId],
+    )
+    expect(choix.rows.map((r) => r.name)).toEqual(['Saignant', 'Supplément'])
+    expect(Number(choix.rows[1]!.price_delta_millimes)).toBe(1500)
+
+    const lien = await client.query(
+      'select 1 from kaissi.product_modifiers where product_id = $1 and modifier_group_id = $2',
+      [produit.produitId, groupeId],
+    )
+    expect(lien.rows, 'le groupe doit être rattaché à l’article').toHaveLength(1)
+  })
+
+  it('REFUSE un groupe sans choix — il ne proposerait rien en caisse', async () => {
+    const { corps } = await envoyer([
+      {
+        ...commun(),
+        type: 'catalogue.modificateur.cree',
+        groupeId: uuidV7(),
+        nom: 'TEST Vide',
+        minSelect: 0,
+        maxSelect: 0,
+        choix: [],
+        produitIds: [],
+      },
+    ])
+    expect(corps.rejetes[0]!.code).toBe('requete_invalide')
+  })
+})
+
+describe('les droits valent pour TOUT le catalogue, pas seulement l’article', () => {
+  it('un SERVEUR ne crée ni catégorie, ni réduction, ni modificateur', async () => {
+    const refus = await envoyer([
+      { ...commun(), parEmployeId: EMPLOYE_DEMO, type: 'catalogue.categorie.cree', categorieId: uuidV7(), nom: 'TEST Refus', couleur: null, stationId: null },
+      { ...commun(), parEmployeId: EMPLOYE_DEMO, type: 'catalogue.reduction.cree', reductionId: uuidV7(), nom: 'TEST Refus', kind: 'montant', valeurBp: null, montantMillimes: millimes(1000) },
+      {
+        ...commun(),
+        parEmployeId: EMPLOYE_DEMO,
+        type: 'catalogue.modificateur.cree',
+        groupeId: uuidV7(),
+        nom: 'TEST Refus',
+        minSelect: 0,
+        maxSelect: 1,
+        choix: [{ id: uuidV7(), nom: 'Un', prixDeltaMillimes: millimes(0) }],
+        produitIds: [],
+      },
+    ])
+    expect(refus.corps.acceptes).toEqual([])
+    expect(refus.corps.rejetes.map((r) => r.code)).toEqual([
+      'droits_insuffisants',
+      'droits_insuffisants',
+      'droits_insuffisants',
+    ])
+
+    const restes = await client.query("select 1 from kaissi.categories where name = 'TEST Refus'")
+    expect(restes.rows, 'rien ne doit avoir été écrit').toHaveLength(0)
   })
 })

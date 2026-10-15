@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react'
 import { Menu, Printer, TriangleAlert } from 'lucide-react'
-import type { Shift } from '@kaissi/domain'
+import { peutModifierCatalogue, type Shift } from '@kaissi/domain'
 import { IMPRESSION_ACTIVE, URL_BACKOFFICE } from './config.js'
 import { demarrer, type ContexteApplication } from './donnees/demarrage.js'
 import { useEtatReseau } from './donnees/reseau.js'
@@ -18,6 +18,7 @@ import { EcranSalle } from './ecrans/EcranSalle.js'
 import { EcranCommande } from './ecrans/EcranCommande.js'
 import { EcranPaiement } from './ecrans/EcranPaiement.js'
 import { EcranClotureShift, EcranOuvertureShift } from './ecrans/EcranShift.js'
+import { EcranCarte } from './ecrans/EcranCarte.js'
 import { EcranDiagnostic } from './ecrans/EcranDiagnostic.js'
 import { Modale } from './composants/Modale.js'
 import { EcranPeriodes } from './ecrans/EcranPeriodes.js'
@@ -178,6 +179,24 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
       icone: ICONES_TIROIR.periodes,
       action: bascule('periodes'),
     },
+    /*
+      La CARTE — gérant et administrateur seulement.
+
+      Masquer l'entrée évite une erreur, pas une malveillance : le serveur
+      relit le rôle EN BASE et rejette la mutation d'un serveur de salle. Les
+      deux gardes existent, et aucune ne remplace l'autre.
+    */
+    ...(employe && peutModifierCatalogue(employe.role)
+      ? [
+          {
+            cle: 'carte',
+            vues: ['carte' as const],
+            libelle: 'Carte',
+            icone: ICONES_TIROIR.carte,
+            action: bascule('carte'),
+          },
+        ]
+      : []),
     {
       cle: 'sync',
       vues: ['sync'],
@@ -387,6 +406,8 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
             onAnnuler={() => setVue({ nom: 'salle' })}
           />
         )}
+
+        {vue.nom === 'carte' && <EcranCarte employe={employe} />}
 
         {vue.nom === 'diagnostic' && (
           <EcranDiagnostic contexte={contexte} reseau={reseau} />

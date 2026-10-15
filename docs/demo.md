@@ -184,6 +184,37 @@ disparaît et l'article existe au back-office (Articles → Liste d'articles).
 
 Avec **Salma** (caissier) : **la tuile n'apparaît pas**.
 
+### 3.7 bis Tenir sa carte depuis la caisse (gérant)
+
+Menu ☰ → **Carte**. Quatre créations, sans ouvrir le back-office.
+
+> On **crée** ici ; on ne **modifie** pas. Renommer, changer un prix,
+> archiver : back-office. La raison : deux caisses hors ligne qui créent font
+> deux lignes distinctes (au pire deux fois le même nom, que le bureau
+> fusionne) ; deux caisses qui modifient la même ligne, il faudrait arbitrer.
+
+1. **Nouvelle catégorie** → « Entrées », choisis un **poste de préparation**.
+   **Attendu** : créée. Sans poste, ses articles ne partent sur **aucun**
+   écran de préparation — l'écran le dit au moment du choix.
+2. **Nouvelle réduction** → « Midi », pourcentage `12,5`.
+   **Attendu** : créée, et proposée aussitôt au bouton **Remise** d'une
+   commande.
+3. **Nouveau groupe d'options** → « Cuisson », min **1**, max **1**, deux
+   choix (« Saignant », « Bien cuit »), et **rattache-le à un article**.
+   **Attendu** : créé. Ouvre une commande, touche cet article : la caisse
+   **demande la cuisson**. Un groupe rattaché à aucun article n'apparaît
+   nulle part — l'écran le dit aussi.
+4. **Nouvel article** → dans la catégorie « Entrées ».
+   **Attendu** : vendable tout de suite.
+
+5. Fais tout cela **hors ligne** (coupe le réseau).
+   **Attendu** : tout fonctionne, et les opérations attendent dans
+   **Synchronisation**. Au retour du réseau, tout remonte et apparaît au
+   back-office (Articles → Catégories, Réductions, Modificateurs).
+
+6. Avec **Salma** (caissier) ou **Karim** (serveur) : **l'entrée « Carte »
+   n'apparaît pas** dans le menu.
+
 ### 3.8 Encaisser sans Internet
 
 1. Coupe le Wi-Fi (la page doit avoir été chargée une première fois).
@@ -720,6 +751,7 @@ pnpm db:test:stop
 
 pnpm pos:build                                  # vérifie que la caisse ne dépend d'aucun réseau
 pnpm --filter @kaissi/pos test:parcours         # une journée de service jouée dans un navigateur
+pnpm --filter @kaissi/pos test:carte            # la carte tenue depuis la caisse, hors ligne
 pnpm verifier:docs                              # aucun lien cassé dans docs/
 ```
 

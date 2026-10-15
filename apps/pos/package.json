@@ -29,6 +29,7 @@
     "test:mise-en-service": "node tests/mise-en-service.mjs && node tests/premiere-mise-en-service.mjs",
     "test:persistance": "node tests/persistance-web.mjs",
     "test:inscription": "node tests/inscription-caisse.mjs",
+    "test:carte": "node tests/carte-depuis-la-caisse.mjs",
     "test": "vitest run",
     "verifier:gradle": "node scripts/verifier-gradle.mjs",
     "aab": "node scripts/aab.mjs",

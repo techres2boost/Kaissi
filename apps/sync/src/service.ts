@@ -41,6 +41,39 @@ import {
   type ShiftSynchronise,
 } from './protocole.js'
 
+/**
+ * Les identifiants qu'une mutation DOIT porter, bien formés, selon son type.
+ *
+ * Vérifiés AVANT le cast `::uuid` de l'insertion : un seul mal formé ferait
+ * sinon échouer la transaction, et la caisse réémettrait le lot à l'infini.
+ * Rend le motif du rejet, ou `null` si tout est bon.
+ */
+function identifiantsMalFormes(m: MutationCatalogue): string | null {
+  switch (m.type) {
+    case 'catalogue.produit.cree':
+      if (!estUuid(m.produitId) || !estUuid(m.tauxTvaId)) {
+        return 'Identifiant d’article ou de taux de TVA invalide.'
+      }
+      if (m.categorieId !== null && !estUuid(m.categorieId)) {
+        return 'Identifiant de catégorie invalide.'
+      }
+      return null
+    case 'catalogue.categorie.cree':
+      if (!estUuid(m.categorieId)) return 'Identifiant de catégorie invalide.'
+      if (m.stationId !== null && !estUuid(m.stationId)) return 'Identifiant de poste invalide.'
+      return null
+    case 'catalogue.reduction.cree':
+      return estUuid(m.reductionId) ? null : 'Identifiant de réduction invalide.'
+    case 'catalogue.modificateur.cree':
+      if (!estUuid(m.groupeId)) return 'Identifiant de groupe invalide.'
+      if (m.choix.some((c) => !estUuid(c.id))) return 'Identifiant de choix invalide.'
+      if (m.produitIds.some((p) => !estUuid(p))) return 'Identifiant de produit rattaché invalide.'
+      return null
+    default:
+      return 'Type de mutation inconnu.'
+  }
+}
+
 const TYPES_CONNUS = new Set([
   'order.opened', 'line.added', 'line.quantity_changed', 'line.voided',
   'line.note_set', 'discount.applied', 'discount.removed', 'service.set',
@@ -411,7 +444,13 @@ export class ServiceSync {
       const m = item as MutationCatalogue
       if (typeof m !== 'object' || m === null || !estUuid(m.mutationId)) continue
 
-      if (m.type !== 'catalogue.produit.cree') {
+      const typesConnus = [
+        'catalogue.produit.cree',
+        'catalogue.categorie.cree',
+        'catalogue.reduction.cree',
+        'catalogue.modificateur.cree',
+      ]
+      if (!typesConnus.includes(m.type)) {
         rejetes.push({
           eventId: m.mutationId,
           code: 'type_inconnu',
@@ -419,12 +458,12 @@ export class ServiceSync {
         })
         continue
       }
-      if (!estUuid(m.produitId) || !estUuid(m.tauxTvaId)) {
-        rejetes.push({
-          eventId: m.mutationId,
-          code: 'requete_invalide',
-          message: 'Identifiant d’article ou de taux de TVA invalide.',
-        })
+      // Les identifiants propres à CHAQUE type — bien formés AVANT le cast
+      // ::uuid de l'insertion, sinon un seul mal formé ferait échouer tout le
+      // lot (la panne même qu'`arbitrerReferences` corrige côté ventes).
+      const motifId = identifiantsMalFormes(m)
+      if (motifId) {
+        rejetes.push({ eventId: m.mutationId, code: 'requete_invalide', message: motifId })
         continue
       }
 
@@ -453,8 +492,8 @@ export class ServiceSync {
           // il doit dire quoi faire, pas seulement que c'est refusé.
           message:
             role === null
-              ? 'Cet employé n’appartient plus à cet établissement. L’article n’a pas été créé.'
-              : `Seul un gérant ou un administrateur peut créer un article (rôle « ${role} »).`,
+              ? 'Cet employé n’appartient plus à cet établissement. La création n’a pas eu lieu.'
+              : `Seul un gérant ou un administrateur peut modifier le catalogue (rôle « ${role} »).`,
         })
         continue
       }
@@ -463,7 +502,9 @@ export class ServiceSync {
     }
 
     const acceptes =
-      recevables.length === 0 ? [] : await this.depot.creerProduits(appareil, recevables)
+      recevables.length === 0
+        ? []
+        : await this.depot.appliquerMutationsCatalogue(appareil, recevables)
     if (rejetes.length > 0) {
       await this.depot.consignerRejetsCatalogue(appareil, rejetes)
     }

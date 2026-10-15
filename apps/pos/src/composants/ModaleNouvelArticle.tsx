@@ -116,7 +116,7 @@ export function ModaleNouvelArticle({
 
     setEnCours(true)
     try {
-      await app.catalogue.creerProduitLocal(mutation)
+      await app.catalogue.creerCatalogueLocal(mutation)
       rafraichir()
       await onCree(mutation.nom.trim())
       onFerme()

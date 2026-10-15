@@ -679,6 +679,7 @@ Trois propriétés, et il faut les trois :
 
 ## 13 ter. L'exception étroite — pourquoi CRÉER n'est pas MODIFIER
 > ⟶ `supabase/migrations/0034_article_cree_sur_la_caisse.sql` — la politique `products_creation_caisse`
+> ⟶ `supabase/migrations/0044_catalogue_cree_sur_la_caisse.sql` — la même, pour catégories, réductions et modificateurs
 > ⟶ `apps/sync/test/rls-partout.test.ts` — `update` jamais accordé à `kaissi_device`
 
 **Le problème.** Le référentiel descend dans un seul sens : serveur → caisse
@@ -718,6 +719,25 @@ indispensables :
 3. le privilège `update` n'est **pas accordé** à `kaissi_device`. La politique
    RLS dit *quelles lignes* ; le privilège dit *quel verbe*. La seconde
    serrure tient même si la politique était réécrite un jour par mégarde.
+
+**Ce que l'extension (0044) a vérifié, et c'est le vrai test du patron.** La
+0034 n'ouvrait qu'une table. Quand l'écran **Carte** a voulu créer aussi une
+catégorie, une réduction et un groupe de modificateurs, la question s'est
+posée pour chacune : *est-ce que ça commute ?* Trois fois oui — ce sont des
+lignes neuves, avec leurs identifiants propres. Et une fois **presque non** :
+le RATTACHEMENT d'un groupe à un article (`product_modifiers`) touche une
+ligne qui existe déjà. Il reste ouvrable parce qu'il est **additif** : deux
+caisses qui rattachent chacune un groupe au même article donnent un article à
+deux groupes, sans qu'aucune écriture n'en écrase une autre. C'est la même
+raison qui fait qu'un journal d'événements n'a pas de conflits.
+
+La garde a suivi : `rls-partout.test.ts` n'énumère plus « les tables où la
+caisse n'écrit rien », il affirme deux choses séparément — **aucun** `update`
+ni `delete` nulle part dans le référentiel, et `insert` **uniquement** sur les
+tables déclarées dans le test avec leur raison. Une table ouverte sans
+décision écrite fait tomber la garde ; une table déclarée qui perdrait son
+privilège aussi. C'est la différence entre une liste d'exceptions et la trace
+d'une décision.
 
 **Et ce qui reste fermé, exprès :** `is_available`. Basculer un produit hors
 carte reste la décision du serveur, parce qu'il calcule le stock à l'instant

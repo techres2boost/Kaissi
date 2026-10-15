@@ -157,6 +157,9 @@ jobs:
           # inutilisable sans que rien n'échoue. Il a fallu un vrai iPhone
           # pour le voir ; il ne faudra plus.
           node apps/pos/tests/largeur-telephone.mjs
+          # Tenir sa carte depuis la caisse (article, catégorie, réduction,
+          # options), hors ligne, et le REFUS opposé à un serveur de salle.
+          node apps/pos/tests/carte-depuis-la-caisse.mjs
 
       # L'inscription depuis la caisse, sur la cible WEB : sa base est
       # persistée (IndexedDB). En dev, la base est en mémoire et le test

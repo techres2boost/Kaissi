@@ -286,14 +286,18 @@ garde** : un export sans garde rendrait ce qu'on vient de retirer de l'écran.
 Le poste tenu vient de `memberships.station_id`, jamais du NOM de la station :
 renommer « Bar » en « Comptoir » viderait l'écran sans rien expliquer.
 
-### Le catalogue descend — sauf la CRÉATION d'un article
+### Le catalogue descend — sauf la CRÉATION
 
 `change_log` reste le sens unique du référentiel : serveur → caisse. Une seule
-exception, et elle est étroite (Postgres 0034, migration locale 011) : une
-caisse peut **créer** un article. Pas le modifier, pas l'archiver, pas
-basculer `is_available` — cette dernière reste la décision du serveur, pour la
-raison de toujours : il calcule le stock à l'instant, une tablette hors ligne
-travaille sur un souvenir de trois heures.
+exception, et elle est étroite (Postgres 0034 puis 0044, migration locale
+011) : une caisse peut **créer** un article, une catégorie, une réduction, un
+groupe de modificateurs (avec ses choix et son rattachement aux articles).
+Écran **Carte**, réservé au gérant et à l'administrateur.
+
+Pas les modifier, pas les archiver, pas basculer `is_available` — cette
+dernière reste la décision du serveur, pour la raison de toujours : il calcule
+le stock à l'instant, une tablette hors ligne travaille sur un souvenir de
+trois heures.
 
 Ce qui rend cette exception tenable, c'est que **créer n'est pas écrire sur un
 état partagé**. Deux caisses hors ligne créent deux lignes distinctes, avec
@@ -321,6 +325,17 @@ Côté caisse, l'article est vendable **immédiatement**, et sa tuile porte
 « en attente » tant qu'il n'est pas remonté, « refusé » s'il l'a été. L'état
 se déduit de l'outbox — jamais d'un drapeau à entretenir, qui dériverait le
 jour où l'on oublie de l'éteindre sur le chemin du rejet.
+
+Le RATTACHEMENT d'un groupe de modificateurs à des articles est additif, et
+c'est ce qui le rend sûr : deux caisses qui rattachent chacune un groupe au
+même article donnent un article à deux groupes, sans arbitrage — exactement
+comme deux articles ajoutés à la même table.
+
+⚑ `apps/sync/test/rls-partout.test.ts` énumère le référentiel et exige deux
+choses : **aucun** `update` ni `delete` pour `kaissi_device`, nulle part ; et
+`insert` uniquement sur les tables de création **déclarées** dans le test,
+avec leur raison. Ouvrir une table de plus sans l'y écrire fait tomber la
+garde.
 
 ### Le bouton « Back-office » n'est pas un `server.url`
 

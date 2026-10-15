@@ -15,3 +15,4 @@ export type Vue =
   | { nom: 'sync' }
   | { nom: 'recus' }
   | { nom: 'periodes' }
+  | { nom: 'carte' }
