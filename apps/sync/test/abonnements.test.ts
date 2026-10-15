@@ -24,7 +24,7 @@
 
 import { afterAll, describe, expect, it } from 'vitest'
 import { Client } from 'pg'
-import { JOURS_ESSAI, etatAbonnement, uuidV7 } from '@kaissi/domain'
+import { etatAbonnement, uuidV7 } from '@kaissi/domain'
 import { DepotPostgres } from '../src/depot-postgres.js'
 import { creerServeur } from '../src/serveur.js'
 import { URL_TEST } from './aide.js'
@@ -123,51 +123,38 @@ afterAll(async () => {
   await depot.fermer()
 })
 
-describe('POST /inscription — l’essai de quatorze jours', () => {
-  it('pose une formule « essai » datée, dans la même transaction', async () => {
+describe('POST /inscription — la formule GRATUITE dès le premier jour', () => {
+  /*
+   * Décision produit d'octobre 2026 : plus d'essai. Deux formules, Gratuit et
+   * Payant ; un restaurant inscrit depuis la caisse démarre en Gratuit, et
+   * l'éditeur le passe en Payant (POST /admin/abonnement).
+   */
+  it('pose « gratuit », sans échéance, dans la même transaction', async () => {
     const { statut, corps } = await inscrire('Chez la Formule')
     expect(statut).toBe(200)
 
     const { rows } = await client.query(
-      'select plan, trial_ends_at, note from kaissi.subscriptions where organization_id = $1',
+      'select plan, trial_ends_at from kaissi.subscriptions where organization_id = $1',
       [corps['organizationId']],
     )
     expect(rows).toHaveLength(1)
-    expect(rows[0].plan).toBe('essai')
-
-    /*
-     * L'échéance, à l'heure près. On ne compare pas à la milliseconde : entre
-     * le calcul en TypeScript et l'écriture en base, il s'écoule ce qu'il
-     * s'écoule. Ce que ce test attrape, c'est un essai d'un jour, de trente,
-     * ou sans fin — pas une dérive de deux cents millisecondes.
-     */
-    const jours =
-      (new Date(rows[0].trial_ends_at as string).getTime() - Date.now()) / 86_400_000
-    expect(jours).toBeGreaterThan(JOURS_ESSAI - 0.05)
-    expect(jours).toBeLessThan(JOURS_ESSAI + 0.05)
+    expect(rows[0].plan).toBe('gratuit')
+    expect(rows[0].trial_ends_at).toBeNull()
   })
 
-  it('l’essai posé se relit en « en cours », avec ses jours restants', async () => {
-    const { corps } = await inscrire('Le Comptoir des Essais')
+  it('se relit avec les droits du gratuit — la caisse, elle, n’est jamais concernée', async () => {
+    const { corps } = await inscrire('Le Comptoir Gratuit')
     const { rows } = await client.query(
       'select plan, trial_ends_at from kaissi.subscriptions where organization_id = $1',
       [corps['organizationId']],
     )
-    /*
-     * La MÊME fonction que le back-office, sur la ligne telle qu'elle est en
-     * base. C'est ce qui relie les deux moitiés : un essai écrit ici et lu
-     * là-bas avec deux règles différentes s'afficherait « terminé » le jour
-     * de l'installation.
-     */
     const etat = etatAbonnement({
       plan: rows[0].plan as string,
-      finEssai: rows[0].trial_ends_at as Date,
+      finEssai: rows[0].trial_ends_at as Date | null,
     })
-    expect(etat.enEssai).toBe(true)
-    expect(etat.essaiExpire).toBe(false)
-    expect(etat.joursRestants).toBe(JOURS_ESSAI)
-    expect(etat.modules).toContain('inventaire_avance')
-    expect(etat.joursHistorique).toBeNull()
+    expect(etat.enEssai).toBe(false)
+    expect(etat.modules).not.toContain('inventaire_avance')
+    expect(etat.joursHistorique).toBe(62)
   })
 })
 
@@ -208,7 +195,7 @@ describe('RLS — la formule se LIT, elle ne s’écrit jamais depuis le navigat
       'select plan from kaissi.subscriptions where organization_id = $1',
       [orgId],
     )
-    expect(rows[0].plan).toBe('essai')
+    expect(rows[0].plan).toBe('gratuit')
   })
 
   it('ni en insérant une seconde ligne, ni en effaçant la sienne', async () => {
@@ -242,7 +229,7 @@ describe('RLS — la formule se LIT, elle ne s’écrit jamais depuis le navigat
       [orgId],
     )
     expect(rows).toHaveLength(1)
-    expect(rows[0].plan).toBe('essai')
+    expect(rows[0].plan).toBe('gratuit')
   })
 
   it('la formule d’un AUTRE client ne se lit pas', async () => {

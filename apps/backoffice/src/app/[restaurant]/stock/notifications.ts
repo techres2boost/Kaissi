@@ -23,6 +23,8 @@
 import { revalidatePath } from 'next/cache'
 import { etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
+import { appelerService } from '../../../serveur/service-sync.js'
+import { ErreurSaisie } from '../../../serveur/formulaire.js'
 
 export interface AbonnementNavigateur {
   readonly endpoint: string
@@ -101,4 +103,32 @@ export async function retirerAbonnement(
   if (error) return { erreur: `Désactivation impossible : ${error.message}` }
   revalidatePath(`/${restaurantId}/stock`)
   return { succes: 'Alertes désactivées sur ce navigateur.' }
+}
+
+/**
+ * Fait sonner CE navigateur — par le VRAI chemin des alertes.
+ *
+ * Le service de synchronisation envoie la notification avec SES clés, comme
+ * il le fait pour une rupture. S'il ne peut pas, il dit pourquoi : clés
+ * absentes, clés qui ne forment pas une paire avec celle du back-office,
+ * abonnement inconnu. La clé publique du back-office part avec la demande
+ * pour que le service puisse les comparer — c'est une clé PUBLIQUE.
+ */
+export async function envoyerNotificationTest(
+  restaurantId: string,
+  endpoint: string,
+): Promise<ResultatAbonnement> {
+  await etablissementObligatoire(restaurantId)
+  try {
+    const reponse = await appelerService('/admin/notification-test', {
+      restaurantId,
+      endpoint,
+      clePublique: process.env['VAPID_PUBLIC_KEY']?.trim() || null,
+    })
+    const message = String(reponse.message ?? '')
+    return reponse['ok'] === true ? { succes: message } : { erreur: message }
+  } catch (erreur) {
+    if (erreur instanceof ErreurSaisie) return { erreur: erreur.message }
+    throw erreur
+  }
 }

@@ -150,7 +150,7 @@ Compter **24 à 48 h** pour la revue Apple, une fois la fiche complète.
 
 ## 3. Android — Google Play
 
-Le projet Android est prêt : `applicationId tn.res2boost.kaissi`, minSdk 23,
+Le projet Android est prêt : `applicationId tn.res2boost.kaissi`, minSdk 24 (exigé par Play),
 targetSdk 35, signature de production câblée.
 
 ### 3.1 Le keystore, une seule fois dans la vie du produit

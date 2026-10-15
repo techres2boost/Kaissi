@@ -19,8 +19,6 @@ import {
   calculerTotaux,
   configEffective,
   configEtablissement,
-  finEssaiDepuis,
-  JOURS_ESSAI,
   reduireEvenements,
   totalVerse,
   type ConfigCalcul,
@@ -1458,30 +1456,21 @@ export class DepotPostgres implements DepotSync {
       )
 
       /*
-       * L'ESSAI — quatorze jours, posés ici et nulle part ailleurs.
+       * La formule GRATUITE dès l'inscription — plus d'essai.
+       *
+       * Décision produit (octobre 2026) : deux formules seulement, Gratuit et
+       * Payant. Un restaurant qui s'inscrit encaisse, voit ses rapports sur
+       * 62 jours, et passe en Payant quand l'éditeur le décide.
        *
        * Dans la MÊME transaction que l'organisation : `subscriptions` n'a
        * aucune politique d'écriture sous RLS (migration 0040), donc une
        * organisation qui sortirait d'ici sans sa ligne ne pourrait plus en
-       * recevoir une depuis le back-office. `abonnementDe()` la traiterait
-       * alors comme « gratuit », et un nouveau client se verrait refuser
-       * l'inventaire avancé le jour de son installation — sans que rien,
-       * nulle part, ne dise pourquoi.
-       *
-       * L'échéance est CALCULÉE PAR LE DOMAINE, pas par un `interval '14
-       * days'` en SQL : c'est `JOURS_ESSAI` qui fait foi, et l'écran
-       * Abonnement compte les jours restants avec la même constante. Deux
-       * durées écrites à deux endroits finiraient par différer, et le
-       * bandeau annoncerait trois jours à quelqu'un qui n'en a plus.
+       * recevoir une depuis le back-office.
        */
       await client.query(
         `insert into kaissi.subscriptions (organization_id, plan, trial_ends_at, note)
-         values ($1, 'essai', $2, $3)`,
-        [
-          organizationId,
-          finEssaiDepuis().toISOString(),
-          `Essai de ${JOURS_ESSAI} jours ouvert à l'inscription depuis la caisse.`,
-        ],
+         values ($1, 'gratuit', null, $2)`,
+        [organizationId, 'Formule gratuite posée à l’inscription depuis la caisse.'],
       )
 
       await client.query('commit')
@@ -1906,6 +1895,48 @@ export class DepotPostgres implements DepotSync {
       [restaurantId],
     )
     return rows
+  }
+
+  async changerFormule(
+    restaurantId: string,
+    plan: 'gratuit' | 'pro',
+    note: string,
+  ): Promise<{ organizationId: string } | null> {
+    // Même écriture que `pnpm sync:abonnement` : l'échéance d'essai est
+    // remise à nul — une date vieille d'un an referait surface le jour où
+    // l'on repasserait en essai.
+    const { rows } = await this.pool.query<{ organization_id: string }>(
+      `insert into kaissi.subscriptions (organization_id, plan, trial_ends_at, note)
+       select r.organization_id, $2::text, null, $3::text
+         from kaissi.restaurants r
+        where r.id = $1::uuid
+       on conflict (organization_id) do update
+          set plan = excluded.plan,
+              trial_ends_at = null,
+              note = excluded.note,
+              updated_at = now()
+       returning organization_id`,
+      [restaurantId, plan, note],
+    )
+    return rows[0] ? { organizationId: rows[0].organization_id } : null
+  }
+
+  async abonnementDuCompte(
+    authUserId: string,
+    restaurantId: string,
+    endpoint: string,
+  ): Promise<AbonnementPush | null> {
+    const { rows } = await this.pool.query<AbonnementPush>(
+      `select s.id, s.endpoint, s.p256dh, s.auth
+         from kaissi.push_subscriptions s
+         join kaissi.users u on u.id = s.user_id
+        where s.endpoint = $1
+          and s.restaurant_id = $2
+          and u.auth_user_id = $3
+        limit 1`,
+      [endpoint, restaurantId, authUserId],
+    )
+    return rows[0] ?? null
   }
 
   async supprimerAbonnement(endpoint: string): Promise<void> {

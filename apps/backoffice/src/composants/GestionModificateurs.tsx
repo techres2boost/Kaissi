@@ -309,8 +309,9 @@ function CarteGroupe({
         )}
       </form>
       <p className="indication">
-        {reglesDuGroupe(groupe)}. Un maximum à <strong>0</strong> veut dire
-        « autant qu’on veut ».
+        {reglesDuGroupe(groupe)}. <strong>min</strong> : combien de choix le
+        caissier DOIT faire (0 = facultatif). <strong>max</strong> : combien il
+        PEUT en faire au plus (0 = autant qu’il veut).
       </p>
       {resultatGroupe?.erreur && <p className="message erreur">{resultatGroupe.erreur}</p>}
       {resultatGroupe?.succes && <p className="message succes">{resultatGroupe.succes}</p>}

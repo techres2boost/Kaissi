@@ -22,7 +22,7 @@ import { formaterPourcentage, formaterTND, millimes } from '@kaissi/domain'
 import {
   archiverReduction,
   creerReduction,
-  renommerReduction,
+  modifierReduction,
   type Resultat,
 } from '../app/[restaurant]/reductions/gestion/actions.js'
 
@@ -42,6 +42,13 @@ function valeurLisible(r: Reduction): string {
     : `− ${formaterPourcentage(r.valeurBp ?? 0)} %`
 }
 
+/** La valeur telle qu'un champ doit l'afficher : « 10 », « 12,5 », « 2,000 ». */
+function pourChamp(r: Reduction): string {
+  if (r.type === 'pourcentage') return formaterPourcentage(r.valeurBp ?? 0)
+  const m = r.montantMillimes ?? 0
+  return `${Math.floor(m / 1000)},${String(m % 1000).padStart(3, '0')}`
+}
+
 function LigneReduction({
   restaurantId,
   reduction,
@@ -50,11 +57,14 @@ function LigneReduction({
   reduction: Reduction
 }) {
   const [resultat, action] = useActionState(
-    renommerReduction.bind(null, restaurantId, reduction.id),
+    modifierReduction.bind(null, restaurantId, reduction.id, reduction.type),
     null as Resultat | null,
   )
   return (
-    <form action={action} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+    <form
+      action={action}
+      style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}
+    >
       <input
         name="nom"
         defaultValue={reduction.nom}
@@ -62,10 +72,23 @@ function LigneReduction({
         style={{ maxWidth: '14rem' }}
         maxLength={60}
       />
+      <input
+        name="valeur"
+        defaultValue={pourChamp(reduction)}
+        aria-label={
+          reduction.type === 'pourcentage'
+            ? `Pourcentage de ${reduction.nom}`
+            : `Montant de ${reduction.nom}, en dinars`
+        }
+        inputMode="decimal"
+        style={{ maxWidth: '6rem', textAlign: 'right' }}
+      />
+      <span className="detail">{reduction.type === 'pourcentage' ? '%' : 'TND'}</span>
       <button type="submit" className="discret">
-        Renommer
+        Enregistrer
       </button>
       {resultat?.erreur && <span className="ecart negatif">{resultat.erreur}</span>}
+      {resultat?.succes && <span className="detail">Enregistrée.</span>}
     </form>
   )
 }

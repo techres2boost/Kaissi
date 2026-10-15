@@ -100,7 +100,10 @@ export const FORMULES: Readonly<Record<Plan, Formule>> = {
   },
   pro: {
     plan: 'pro',
-    nom: 'Pro',
+    // « Payant », à l'écran : deux formules, Gratuit et Payant (octobre
+    // 2026). La valeur stockée reste `pro` — la renommer imposerait une
+    // migration pour un mot que personne ne lit en base.
+    nom: 'Payant',
     modules: MODULES,
     joursHistorique: null,
   },

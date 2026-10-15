@@ -25,6 +25,7 @@
 import { useEffect, useState, useTransition } from 'react'
 import {
   enregistrerAbonnement,
+  envoyerNotificationTest,
   retirerAbonnement,
   type ResultatAbonnement,
 } from '../app/[restaurant]/stock/notifications.js'
@@ -162,6 +163,26 @@ export function BoutonNotifications({
     })
   }
 
+  /*
+   * Le seul moyen de savoir si une alerte ARRIVERA, sans attendre une vraie
+   * rupture. « Activé » ne dit que ceci : ce navigateur a donné son accord.
+   * Les clés du service, leur appariement avec celles du back-office, et
+   * l'autorisation du système d'exploitation restent à prouver.
+   */
+  const tester = () => {
+    setMessage({})
+    demarrer(async () => {
+      const enregistrement = await navigator.serviceWorker.getRegistration('/sw-alertes.js')
+      const abonnement = await enregistrement?.pushManager.getSubscription()
+      if (!abonnement) {
+        setEtat('inactif')
+        setMessage({ erreur: 'Ce navigateur n’est plus abonné. Réactive les alertes.' })
+        return
+      }
+      setMessage(await envoyerNotificationTest(restaurant, abonnement.endpoint))
+    })
+  }
+
   return (
     <div className="notifications">
       {etat === 'indisponible' && (
@@ -183,9 +204,14 @@ export function BoutonNotifications({
         </button>
       )}
       {etat === 'actif' && (
-        <button type="button" className="discret" onClick={desactiver} disabled={enCours}>
-          Alertes actives sur ce navigateur — désactiver
-        </button>
+        <span style={{ display: 'inline-flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button type="button" onClick={tester} disabled={enCours}>
+            Envoyer une notification de test
+          </button>
+          <button type="button" className="discret" onClick={desactiver} disabled={enCours}>
+            Alertes actives sur ce navigateur — désactiver
+          </button>
+        </span>
       )}
       {!clePublique && etat === 'inactif' && (
         <p className="detail">

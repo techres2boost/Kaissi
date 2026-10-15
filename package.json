@@ -65,16 +65,20 @@
     ],
     "auditConfig": {
       "_commentaire": "Avis EXAMINÉS et écartés, avec leur raison. Ce n'est pas une liste d'exceptions : c'est la trace d'une décision. Tout avis NON listé fait échouer la CI — c'est ce qui rend ce contrôle utile plutôt que décoratif. Elle est VIDE aujourd'hui, et c'est le bon état : les avis qui s'y trouvaient (postcss) ne sont plus ignorés, ils sont CORRIGÉS par `pnpm.overrides`. Corriger vaut toujours mieux qu'écarter — une dérogation est faite pour ce qu'on ne PEUT pas corriger, pas pour ce qu'on n'a pas voulu faire.",
-      "_revu_le": "2026-09-09",
+      "_revu_le": "2026-10-14",
       "ignoreGhsas": []
     },
     "overrides": {
-      "sharp": ">=0.35.4",
-      "postcss": ">=8.5.23"
+      "sharp": ">=0.35.5",
+      "postcss": ">=8.5.23",
+      "source-map-js": ">=1.2.2",
+      "brace-expansion@>=4.0.0 <5.0.11": "^5.0.11"
     },
     "_overrides_pourquoi": {
-      "sharp": "GHSA-rgj7-g3m4-5g8c (HAUTE) — vulnérabilités libheif, corrigées en 0.35.4. Dépendance transitive de Next.js pour l'optimisation d'images ; Next tarde à remonter sa borne, on la force. Une alerte HAUTE ne se documente pas, elle se corrige.",
-      "postcss": "GHSA-qx2v-qp2m-jg93 et GHSA-fxqj-rqcc-2cmp — corrigés en 8.5.23. Ils étaient auparavant écartés comme « dépendance de développement » ; c'était devenu FAUX : postcss arrive maintenant par `next`, donc par le chemin de build du back-office. Une justification cesse d'être vraie sans prévenir — c'est pourquoi on préfère corriger."
+      "sharp": "GHSA-rgj7-g3m4-5g8c (libheif, corrigé en 0.35.4) puis CVE-2026-96889 (librsvg, HAUTE, corrigé en 0.35.5). Dépendance transitive de Next.js pour l'optimisation d'images ; Next tarde à remonter sa borne, on la force. Une alerte HAUTE ne se documente pas, elle se corrige.",
+      "postcss": "GHSA-qx2v-qp2m-jg93 et GHSA-fxqj-rqcc-2cmp — corrigés en 8.5.23. Ils étaient auparavant écartés comme « dépendance de développement » ; c'était devenu FAUX : postcss arrive maintenant par `next`, donc par le chemin de build du back-office. Une justification cesse d'être vraie sans prévenir — c'est pourquoi on préfère corriger.",
+      "source-map-js": "Déni de service (HAUTE), corrigé en 1.2.2. Arrive par next > postcss : le chemin de build du back-office.",
+      "brace-expansion@>=4.0.0 <5.0.11": "Déni de service par récursion (HAUTE), corrigé en 5.0.11. Arrive par eslint > minimatch. Borné à la branche 4–5 : les minimatch plus anciens dépendent de brace-expansion 1.x/2.x, qu'on ne force pas vers une majeure qu'ils ne connaissent pas."
     }
   }
 }

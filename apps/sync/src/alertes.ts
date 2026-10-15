@@ -143,10 +143,21 @@ export function messageAlerte(produits: readonly ProduitEnAlerte[]): {
  * indéfiniment un canal mort, et le journal se remplirait d'échecs qui ne
  * disent rien.
  */
-async function envoyerPush(
-  abonnement: AbonnementPush,
-  charge: unknown,
-): Promise<'envoye' | 'expire' | 'echec'> {
+/**
+ * L'issue d'un envoi — avec la RAISON quand il échoue.
+ *
+ * Le balayage n'a besoin que des trois cas. La notification de test, elle,
+ * doit dire pourquoi : un 403 du service de notification veut presque
+ * toujours dire que la clé publique du back-office n'est pas celle de la
+ * paire du service. Réduit à « échec », c'est une panne muette.
+ */
+export interface IssuePush {
+  readonly issue: 'envoye' | 'expire' | 'echec'
+  readonly statut?: number
+  readonly detail?: string
+}
+
+async function envoyerPushDetaille(abonnement: AbonnementPush, charge: unknown): Promise<IssuePush> {
   try {
     await webpush.sendNotification(
       {
@@ -155,11 +166,101 @@ async function envoyerPush(
       },
       JSON.stringify(charge),
     )
-    return 'envoye'
+    return { issue: 'envoye' }
   } catch (erreur) {
-    const statut = (erreur as { statusCode?: number }).statusCode
-    if (statut === 404 || statut === 410) return 'expire'
-    return 'echec'
+    const e = erreur as { statusCode?: number; body?: string; message?: string }
+    const statut = e.statusCode
+    const detail = (e.body || e.message || '').toString().slice(0, 300)
+    if (statut === 404 || statut === 410) return { issue: 'expire', statut, detail }
+    return { issue: 'echec', ...(statut ? { statut } : {}), detail }
+  }
+}
+
+async function envoyerPush(
+  abonnement: AbonnementPush,
+  charge: unknown,
+): Promise<'envoye' | 'expire' | 'echec'> {
+  return (await envoyerPushDetaille(abonnement, charge)).issue
+}
+
+/**
+ * Envoie une notification de TEST à un seul navigateur, et dit en clair ce
+ * qui empêche les alertes d'arriver.
+ *
+ * PANNE SIGNALÉE : un produit passe en rupture, l'alerte est « activée »,
+ * rien ne sonne — et rien ne permettait de savoir lequel des maillons
+ * manquait : clés absentes du service, clés différentes entre le
+ * back-office et le service, abonnement inconnu, ou autorisation coupée
+ * par le système d'exploitation. Chacun se corrige ailleurs.
+ */
+export async function notificationDeTest(
+  abonnement: AbonnementPush | null,
+  options: {
+    readonly vapid: ConfigVapid | null
+    /** La clé publique que le BACK-OFFICE a donnée au navigateur. */
+    readonly clePubliqueBackoffice?: string | null
+    readonly restaurantId: string
+  },
+): Promise<{ ok: boolean; message: string }> {
+  const { vapid } = options
+  if (!vapid) {
+    return {
+      ok: false,
+      message:
+        'Le service de synchronisation n’a pas de clés VAPID : aucune alerte ne peut partir. ' +
+        'Ajoute VAPID_PUBLIC_KEY et VAPID_PRIVATE_KEY sur Railway (docs/notifications.md).',
+    }
+  }
+  const cleBo = options.clePubliqueBackoffice?.trim()
+  if (cleBo && cleBo !== vapid.clePublique) {
+    return {
+      ok: false,
+      message:
+        'Les clés ne forment pas une paire : la VAPID_PUBLIC_KEY du back-office (Vercel) ' +
+        'n’est pas celle du service (Railway). Mets la MÊME paire des deux côtés, ' +
+        'redéploie, puis désactive et réactive les alertes sur ce navigateur.',
+    }
+  }
+  if (!abonnement) {
+    return {
+      ok: false,
+      message:
+        'Ce navigateur n’est pas enregistré côté serveur pour cet établissement. ' +
+        'Désactive puis réactive les alertes.',
+    }
+  }
+
+  webpush.setVapidDetails(vapid.sujet, vapid.clePublique, vapid.clePrivee)
+  const r = await envoyerPushDetaille(abonnement, {
+    titre: 'Kaissi — notification de test',
+    corps: 'Si tu lis ceci, les alertes de rupture arriveront ici.',
+    url: `/${options.restaurantId}/stock`,
+  })
+  if (r.issue === 'envoye') {
+    return {
+      ok: true,
+      message:
+        'Notification envoyée. Si elle n’apparaît pas dans les secondes qui suivent, le blocage ' +
+        'est sur cet appareil : autorisation des notifications pour le navigateur dans les ' +
+        'réglages du système (Windows : Paramètres → Notifications ; mode « Ne pas déranger » coupé).',
+    }
+  }
+  if (r.issue === 'expire') {
+    return {
+      ok: false,
+      message:
+        'Le navigateur a révoqué cet abonnement. Désactive puis réactive les alertes.',
+    }
+  }
+  return {
+    ok: false,
+    message:
+      `Le service de notification a refusé l’envoi${r.statut ? ` (${r.statut})` : ''}. ` +
+      (r.statut === 403 || r.statut === 401
+        ? 'Les clés VAPID ne correspondent pas à celles qui ont créé cet abonnement : ' +
+          'désactive puis réactive les alertes sur ce navigateur. '
+        : '') +
+      (r.detail ? `Détail : ${r.detail}` : ''),
   }
 }
 

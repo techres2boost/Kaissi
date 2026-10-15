@@ -27,9 +27,20 @@
  *
  * ⚑ `compileSdkVersion` doit suivre `targetSdkVersion` : on ne peut pas
  *   VISER une API contre laquelle on ne compile pas.
+ *
+ * ── minSdk 24 (Android 7.0), exigé par Play ──────────────────────────────
+ *
+ * Refus constaté à la publication (versionCode 117) :
+ *
+ *     Play automatic protection requires a minimum SDK version of 24 or
+ *     higher. The uploaded App Bundle has a minimum SDK version of 23.
+ *
+ * Le bundle se CONSTRUIT très bien en 23 : seul le téléversement échoue,
+ * après vingt minutes de build. Android 6 ne concerne plus aucune tablette
+ * de caisse qu'on vendrait aujourd'hui.
  */
 ext {
-    minSdkVersion = 23
+    minSdkVersion = 24
     compileSdkVersion = 36
     targetSdkVersion = 36
     androidxActivityVersion = '1.9.2'

@@ -69,7 +69,7 @@ const LIGNES: readonly LigneComparatif[] = [
   },
 ]
 
-/** Les colonnes. L'essai n'en est pas une : il ouvre tout, et il est dit à côté. */
+/** Les colonnes : Gratuit et Payant, les deux seules formules proposées. */
 const COLONNES: readonly Plan[] = ['gratuit', 'pro']
 
 export function ComparatifFormules({ etat }: { etat: EtatAbonnement }) {
@@ -136,16 +136,6 @@ export function ComparatifFormules({ etat }: { etat: EtatAbonnement }) {
           </tbody>
         </table>
       </div>
-      {/*
-        Le rappel de l'essai sous le tableau, et pas dans une colonne : un
-        essai n'est pas une formule qu'on choisit, c'est un état temporaire
-        de celle qu'on a.
-      */}
-      <p className="indication">
-        L’<strong>essai</strong> ouvre tout ce que la colonne « Pro » ouvre, pendant
-        quatorze jours. À son terme, l’accès revient à la formule
-        « Gratuit » — aucune donnée n’est perdue, et la caisse ne s’arrête pas.
-      </p>
     </>
   )
 }

@@ -3,8 +3,8 @@
  *
  * ── Ce que cet écran fait, et ce qu'il ne fera jamais ─────────────────────
  *
- * Il DIT la formule en cours, ce qu'elle ouvre, et par où en changer. Il n'a
- * aucun bouton qui en change, et ce n'est pas un manque :
+ * Il DIT la formule en cours, ce qu'elle ouvre, et par où en changer. Le
+ * CLIENT n'a aucun bouton qui en change, et ce n'est pas un manque :
  *
  *   • le back-office n'utilise que la clé publique de Supabase, donc toutes
  *     ses écritures passent par RLS. La table `subscriptions` n'a AUCUNE
@@ -16,9 +16,12 @@
  *     formule sans encaisser serait un cadeau ; un bouton qui prétendrait
  *     encaisser sans le faire serait pire.
  *
- * La formule se change donc là où elle est décidée : chez l'éditeur, par
- * `pnpm sync:abonnement`, après que quelqu'un a payé. C'est le même chemin
- * que le tout premier accès (`pnpm sync:acces`), et pour la même raison.
+ * La formule se change donc là où elle est décidée : chez l'ÉDITEUR. Depuis
+ * octobre 2026, il le fait ici même — deux boutons, Gratuit et Payant,
+ * affichés aux seuls comptes listés dans `KAISSI_EDITEURS` (service de
+ * synchronisation), qui revérifie la liste à chaque appel et écrit avec ses
+ * propres privilèges. `pnpm sync:abonnement` reste la voie en ligne de
+ * commande.
  *
  * ── Aucun montant n'est affiché ───────────────────────────────────────────
  *
@@ -37,6 +40,8 @@ import { abonnementDe } from '../../../serveur/abonnement.js'
 import { libelleJournee } from '../../../serveur/journee.js'
 import { ComparatifFormules } from '../../../composants/ComparatifFormules.js'
 import { EDITEUR } from '../../../editeur.js'
+import { ChangerFormule } from '../../../composants/ChangerFormule.js'
+import { estEditeur } from './actions.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,13 +60,14 @@ export default async function PageAbonnement({
   ecranReserve(etablissement, 'gestion')
 
   const supabase = await supabaseServeur()
-  const [etat, ligne] = await Promise.all([
+  const [etat, ligne, editeur] = await Promise.all([
     abonnementDe(etablissement.organizationId),
     supabase
       .from('subscriptions')
       .select('started_at, trial_ends_at, note')
       .eq('organization_id', etablissement.organizationId)
       .maybeSingle(),
+    estEditeur(),
   ])
 
   return (
@@ -88,7 +94,7 @@ export default async function PageAbonnement({
                 : `Il vous reste ${etat.joursRestants} jours d’essai.`}
             </strong>{' '}
             Jusqu’au {jour((ligne.data?.trial_ends_at as string | null) ?? null)}, vous
-            avez tout ce que la formule « Pro » ouvre.
+            avez tout ce que la formule « Payant » ouvre.
           </p>
         )}
 
@@ -128,6 +134,19 @@ export default async function PageAbonnement({
         <h2>Ce que chaque formule ouvre</h2>
         <ComparatifFormules etat={etat} />
       </section>
+
+      {editeur && (
+        <section className="carte">
+          <h2>Changer la formule — éditeur</h2>
+          <p className="indication">
+            Vous voyez ces boutons parce que votre compte figure parmi les
+            éditeurs de Kaissi (variable <code>KAISSI_EDITEURS</code> du service).
+            Le client, lui, ne les voit pas. Le changement s’applique à toute
+            l’organisation, aussitôt ; la caisse n’est jamais concernée.
+          </p>
+          <ChangerFormule restaurant={restaurant} planActuel={etat.plan} />
+        </section>
+      )}
 
       <section className="carte">
         <h2>Changer de formule</h2>

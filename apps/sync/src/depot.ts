@@ -442,8 +442,32 @@ export interface DepotSync {
   /** Canaux de notification actifs pour un établissement. */
   abonnementsPush(restaurantId: string): Promise<readonly AbonnementPush[]>
 
+  /**
+   * Change la formule de l'organisation qui possède cet établissement.
+   * `null` si l'établissement n'existe pas. Réservé à l'ÉDITEUR : la route
+   * l'a vérifié avant d'appeler, la base n'a aucune politique d'écriture
+   * sur `subscriptions` (migration 0040).
+   */
+  changerFormule(
+    restaurantId: string,
+    plan: 'gratuit' | 'pro',
+    note: string,
+  ): Promise<{ organizationId: string } | null>
+
   /** Retire un canal que le navigateur a révoqué (404 ou 410). */
   supprimerAbonnement(endpoint: string): Promise<void>
+
+  /**
+   * L'abonnement de CE navigateur, s'il appartient bien à ce compte et à cet
+   * établissement — pour la notification de test. Le filtre sur le compte
+   * n'est pas décoratif : sans lui, un membre pourrait faire sonner le
+   * téléphone d'un collègue en connaissant son `endpoint`.
+   */
+  abonnementDuCompte(
+    authUserId: string,
+    restaurantId: string,
+    endpoint: string,
+  ): Promise<AbonnementPush | null>
 
   /**
    * Adresses de l'encadrement — `admin` et `gerant` seuls.

@@ -163,6 +163,18 @@ Trois conditions, et elles ne sont pas négociables :
 
 ## 4. Vérifier que ça marche vraiment
 
+### Le plus rapide : la notification de test
+
+1. `…railway.app/sante` doit afficher `"notifications":"configurees"`.
+2. Back-office → **Stock** : le bouton doit dire **« Alertes actives sur ce
+   navigateur »**. S'il dit encore « M'alerter… », ce navigateur n'est pas
+   abonné.
+3. **« Envoyer une notification de test »**. Elle part par le service, avec
+   ses clés, exactement comme une vraie alerte. Si elle n'arrive pas, le
+   message dit lequel des maillons manque : clés absentes de Railway, clé
+   publique de Vercel différente de celle de Railway, abonnement inconnu du
+   serveur, ou notifications coupées par le système de l'appareil.
+
 ### Le chemin court
 
 Vends le dernier exemplaire d'un produit suivi depuis la caisse, et

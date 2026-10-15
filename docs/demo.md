@@ -393,13 +393,26 @@ Prérequis, une fois pour toutes, par l'exploitant : lancer `pnpm sync:cles`
 `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`) et dans Vercel (`VAPID_PUBLIC_KEY`).
 Pour l'e-mail : `RESEND_API_KEY` et `URL_BACKOFFICE` dans Railway.
 
-1. **Stock** → **« M'alerter des ruptures sur ce navigateur »** → accepter.
-2. Mets un produit à zéro.
+Vérifie d'abord `…railway.app/sante` : il doit afficher
+`"notifications":"configurees"`.
 
-**Attendu** : dans le quart d'heure, une notification **« Rupture —
-‹produit› »** (et un e-mail aux gérants). Une seule fois par rupture. Trois
-ruptures d'un coup donnent **une** notification groupée. Un caissier ne
-reçoit rien.
+1. **Stock** → **« M'alerter des ruptures sur ce navigateur »** → accepter.
+   **Attendu** : le bouton devient **« Alertes actives sur ce navigateur —
+   désactiver »**. Tant que tu vois encore « M'alerter… », **ce navigateur
+   n'est pas abonné** et rien n'y arrivera.
+2. **« Envoyer une notification de test »**.
+   **Attendu** : une notification « Kaissi — notification de test » dans les
+   secondes qui suivent. Sinon, le message affiché dit **quoi corriger** :
+   clés absentes de Railway, clés différentes entre Vercel et Railway,
+   navigateur à réactiver, ou notifications coupées par Windows (Paramètres →
+   Notifications, mode « Ne pas déranger »).
+3. Mets un produit à zéro (ou vends-en jusqu'à zéro).
+
+**Attendu** : dans les secondes qui suivent la synchronisation, une
+notification **« Rupture — ‹produit› »** (et un e-mail aux gérants). Une seule
+fois par rupture : un produit **déjà en rupture** avant l'abonnement ne
+sonnera qu'à sa prochaine rupture, après une réception. Trois ruptures d'un
+coup donnent **une** notification groupée. Un caissier ne reçoit rien.
 
 ---
 
@@ -424,7 +437,12 @@ Menu **Articles → Liste d'articles** et **Catégories**.
 
 Menu **Articles → Modificateurs**.
 
-1. **Nouveau groupe** « Cuisson », obligatoires **1**, maximum **1**. Ajoute
+> **min** = combien de choix le caissier **doit** faire (0 = facultatif).
+> **max** = combien il **peut** en faire au plus (0 = autant qu'il veut).
+> Cuisson : min 1, max 1 → exactement un choix. Suppléments : min 0, max 0 →
+> facultatifs, sans limite.
+
+1. **Nouveau groupe** « Cuisson », min **1**, max **1**. Ajoute
    trois choix à `0,000` : Saignant, À point, Bien cuit.
 2. Rattache le groupe à un plat (le panneau de rattachement est ouvert tant
    qu'aucun article n'y est lié).
@@ -441,8 +459,12 @@ aussi de la caisse après synchronisation.
 Menu **Articles → Réductions**.
 
 1. Crée une réduction (pourcentage **ou** montant fixe).
-2. Renomme « Happy hour ».
-   **Attendu** : les ventes déjà faites gardent **l'ancien nom**.
+2. Sur « Happy hour » : change le nom **et** la valeur (ex. `15`) →
+   **Enregistrer**.
+   **Attendu** : la caisse propose la nouvelle valeur après synchronisation ;
+   les ventes déjà faites gardent **l'ancien nom et l'ancien montant**. Le
+   type (pourcentage ou montant) ne change pas : pour ça, archive et recrée.
+   Ce qu'une réduction a coûté se lit dans **Rapports → Réductions**.
 3. Archive une réduction.
    **Attendu** : elle disparaît de la caisse après synchronisation, et reste
    dans les rapports passés.
@@ -502,30 +524,33 @@ C'est le seul réglage qui change le **total** payé par le client.
 
 | Formule | Historique des rapports | Inventaire avancé |
 |---|---|---|
-| **Essai** (14 jours) | sans limite | ouvert |
 | **Gratuit** | 62 jours | fermé |
-| **Pro** | sans limite | ouvert |
+| **Payant** | sans limite | ouvert |
+
+Un restaurant qui s'inscrit démarre en **Gratuit**. Il n'y a plus d'essai.
 
 ### 9.1 Lire sa formule
 
 **Paramètres → Abonnement**.
 
-**Attendu** : la formule en cours (les établissements existants sont en
-**Pro**), et un tableau comparatif. **Aucun bouton pour changer de formule** :
-c'est l'éditeur qui la change.
+**Attendu** : la formule en cours et un tableau Gratuit / Payant. Un client
+(même administrateur de son restaurant) ne voit **aucun bouton** pour en
+changer.
 
-### 9.2 Changer de formule (côté éditeur)
+### 9.2 Changer de formule (éditeur)
 
-À la racine du dépôt, sur le poste qui a accès à la base (`apps/sync/.env`) :
+Une fois : dans **Railway**, variable `KAISSI_EDITEURS` = ton e-mail de
+connexion au back-office (plusieurs : séparés par des virgules), puis
+redéploie.
 
-```bash
-pnpm sync:abonnement                                    # voir les formules
-pnpm sync:abonnement --organisation <uuid> --formule gratuit
-pnpm sync:abonnement --organisation <uuid> --formule pro
-pnpm sync:abonnement --organisation <uuid> --formule essai --jours 30
-```
+**Paramètres → Abonnement** → bloc **« Changer la formule — éditeur »** →
+**Passer en Payant** / **Passer en Gratuit**.
 
-**Attendu** : effet au prochain chargement du back-office.
+**Attendu** : effet immédiat, sur toute l'organisation. Dans une fenêtre
+privée avec le compte du bar ou d'un gérant : le bloc n'apparaît pas.
+
+En ligne de commande (même effet) : `pnpm sync:abonnement --organisation
+<uuid> --formule gratuit|pro`, à la racine du dépôt.
 
 ### 9.3 Ce que « gratuit » ferme
 
@@ -542,9 +567,9 @@ Passe l'organisation en **gratuit**, puis :
 4. Encaisse une vente, hors ligne puis en ligne.
    **Attendu** : **rien ne change** à la caisse.
 
-Repasse en **pro** à la fin.
+Repasse en **Payant** à la fin.
 
-### 9.4 Inventaire avancé (formule pro ou essai)
+### 9.4 Inventaire avancé (formule Payant)
 
 **Articles → Inventaire avancé**.
 
@@ -563,12 +588,13 @@ Repasse en **pro** à la fin.
    **Attendu** : elle n'est plus proposée ; l'historique ne change pas.
 7. **Exporter → Valorisation (CSV)**.
 
-### 9.5 L'essai de 14 jours
+### 9.5 Un nouveau restaurant démarre en Gratuit
 
 Ouvre un nouveau restaurant **depuis la caisse** (§10.3), puis Paramètres →
 Abonnement sur ce nouveau compte.
 
-**Attendu** : formule **Essai**, **14 jours restants**, tout ouvert.
+**Attendu** : formule **Gratuit**, sans échéance, aucun bouton pour en
+changer.
 
 ---
 
@@ -609,8 +635,8 @@ Lac 2, sans rien du premier.
 
 - **Depuis la caisse** (APK ou web) : écran de mise en service → ouvrir un
   restaurant → e-mail, mot de passe, nom du restaurant. Le restaurant, le
-  compte administrateur et l'appairage sont créés d'un coup, avec l'essai de
-  14 jours. Le taux de TVA est posé à **0 %** : le régler en premier.
+  compte administrateur et l'appairage sont créés d'un coup, en formule
+  **Gratuit**. Le taux de TVA est posé à **0 %** : le régler en premier.
 - **Depuis le poste de l'exploitant** :
 
 ```bash
@@ -678,6 +704,9 @@ pnpm verifier:docs                              # aucun lien cassé dans docs/
 |---|---|
 | `/sante` affiche **« Not Found — The train has not arrived at the station »** | Le serveur ne tourne pas. Railway → Deployments : le dernier déploiement a-t-il échoué ? Vérifie dans Settings que **Root Directory** est la **racine** du dépôt (pas `apps/sync`), puis redéploie |
 | « Railpack failed to prepare the build » dans Railway | Même cause : Root Directory n'est pas la racine, Railway n'a pas trouvé `railway.json` |
+| Back-office lent : 1 à 2 s à chaque onglet ou filtre | Vercel → projet **kaissi-backoffice** → Settings → **Functions** → coche **Frankfurt (fra1)** seul, décoche Washington, puis redéploie. La base est à Francfort. Le projet **kaissi-pos** n'a pas de fonctions : sa région n'a aucun effet |
+| Publication Android refusée : « minimum SDK version of 24 » | Corrigé (minSdk 24). Pousser sur `main` relance la publication |
+| Alerte de rupture non reçue | §6.6 : vérifie que le bouton dit « Alertes actives », puis **notification de test** — son message dit quoi corriger |
 | « Failed to fetch » à la mise en service | Ouvre d'abord `/sante`. S'il répond `ok`, la variable `SYNC_ORIGINES` (Railway) doit contenir l'adresse **exacte** de la caisse, sans `/` final, puis redéployer |
 | Synchronisation : **« Erreur »** et « Erreur interne du serveur », opérations en attente qui ne baissent pas | Le serveur répond mais n'enregistre pas. Rien n'est perdu : les ventes restent dans la caisse. Signale-le avec le message affiché ; une fois le serveur corrigé, elles partent seules |
 | Synchronisation : **« Hors ligne »** | Aucune réponse du serveur : réseau coupé, ou serveur arrêté (`/sante`) |

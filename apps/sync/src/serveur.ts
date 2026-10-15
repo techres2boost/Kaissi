@@ -39,6 +39,11 @@ import {
   verifierMotDePasse,
 } from './admin-comptes.js'
 import { journal } from './journal.js'
+import {
+  configEmailDepuisEnvironnement,
+  configVapidDepuisEnvironnement,
+  notificationDeTest,
+} from './alertes.js'
 
 /**
  * Variables portées par le contexte de requête.
@@ -69,6 +74,22 @@ export interface OptionsServeur {
    * le chemin. Rien d'autre ne dépend d'elle.
    */
   readonly cleService?: string | null
+  /**
+   * Les comptes ÉDITEUR (Res2Boost) — adresses e-mail, en minuscules.
+   *
+   * Eux seuls changent la formule d'un client depuis le back-office. Ce
+   * n'est pas un rôle d'établissement : un `admin` de restaurant est le
+   * CLIENT, et lui laisser choisir « Payant » reviendrait à le lui offrir.
+   * Par défaut : la variable `KAISSI_EDITEURS` (séparées par des virgules).
+   */
+  readonly editeurs?: readonly string[]
+}
+
+function editeursDepuisEnvironnement(): string[] {
+  return (process.env['KAISSI_EDITEURS'] ?? '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
 }
 
 export function creerServeur({
@@ -77,7 +98,9 @@ export function creerServeur({
   auth = configAuthDepuisEnvironnement(),
   fetchAuth,
   cleService = cleServiceDepuisEnvironnement(),
+  editeurs = editeursDepuisEnvironnement(),
 }: OptionsServeur) {
+  const estEditeur = (email: string) => editeurs.includes(email.trim().toLowerCase())
   const service = new ServiceSync(depot)
   const app = new Hono<{ Variables: VariablesKaissi }>()
 
@@ -166,6 +189,10 @@ export function creerServeur({
       protocole: VERSION_PROTOCOLE,
       horodatage: new Date().toISOString(),
       base: 'joignable',
+      // Ce que les alertes de stock peuvent utiliser. Un BOOLÉEN, jamais une
+      // clé : « configurées » suffit à trancher « pourquoi rien ne sonne ».
+      notifications: configVapidDepuisEnvironnement() ? 'configurees' : 'non_configurees',
+      email: configEmailDepuisEnvironnement() ? 'configure' : 'non_configure',
     })
   })
 
@@ -916,6 +943,69 @@ export function creerServeur({
         email: cible.email,
         message: `Mot de passe changé. Communiquez-le à ${cible.email || 'l’intéressé'} de vive voix.`,
       }
+    })
+  })
+
+  // ── POST /admin/editeur ───────────────────────────────────────────────
+  // Le back-office demande s'il doit afficher les boutons de formule. La
+  // réponse n'ouvre rien : la route suivante revérifie, à chaque appel.
+  app.post('/admin/editeur', async (c) => {
+    return adminSupabase(c, async ({ appelant }) => ({ editeur: estEditeur(appelant.email) }))
+  })
+
+  // ── POST /admin/abonnement ────────────────────────────────────────────
+  // Passe un client en Gratuit ou en Payant. Réservé aux ÉDITEURS, relus ici
+  // et pas dans le navigateur : masquer un bouton n'interdit rien.
+  app.post('/admin/abonnement', async (c) => {
+    return adminSupabase(c, async ({ appelant, corps }) => {
+      if (!estEditeur(appelant.email)) {
+        throw new ErreurAuth(
+          'Seul l’éditeur de Kaissi change une formule. Contactez Res2Boost.',
+          401,
+        )
+      }
+      const restaurantId = String(corps['restaurantId'] ?? '')
+      const formule = corps['formule']
+      if (!UUID.test(restaurantId) || (formule !== 'gratuit' && formule !== 'pro')) {
+        throw new ErreurAuth('Établissement ou formule invalide (gratuit ou pro).', 401)
+      }
+      const fait = await depot.changerFormule(
+        restaurantId,
+        formule,
+        `Changée par ${appelant.email} depuis le back-office, le ${new Date().toISOString().slice(0, 10)}.`,
+      )
+      if (!fait) throw new ErreurAuth('Établissement introuvable.', 401)
+      return {
+        formule,
+        message:
+          formule === 'pro'
+            ? 'Formule Payant activée : historique complet et inventaire avancé ouverts.'
+            : 'Formule Gratuit : historique limité à 62 jours, inventaire avancé fermé. La caisse continue d’encaisser.',
+      }
+    })
+  })
+
+  // ── POST /admin/notification-test ─────────────────────────────────────
+  // Fait sonner CE navigateur, et dit en clair ce qui manque sinon. Le
+  // compte est relu en base : un membre ne teste que SES abonnements, dans
+  // un établissement où il a une appartenance active.
+  app.post('/admin/notification-test', async (c) => {
+    return adminSupabase(c, async ({ appelant, corps }) => {
+      const restaurantId = String(corps['restaurantId'] ?? '')
+      const endpoint = String(corps['endpoint'] ?? '')
+      if (!UUID.test(restaurantId) || !endpoint.startsWith('https://')) {
+        throw new ErreurAuth('Établissement ou abonnement invalide.', 401)
+      }
+      const role = await depot.roleDansEtablissement(appelant.userId, restaurantId)
+      if (role === null) {
+        throw new ErreurAuth("Vous n'êtes pas membre de cet établissement.", 401)
+      }
+      const abonnement = await depot.abonnementDuCompte(appelant.userId, restaurantId, endpoint)
+      return notificationDeTest(abonnement, {
+        vapid: configVapidDepuisEnvironnement(),
+        clePubliqueBackoffice: typeof corps['clePublique'] === 'string' ? corps['clePublique'] : null,
+        restaurantId,
+      })
     })
   })
 

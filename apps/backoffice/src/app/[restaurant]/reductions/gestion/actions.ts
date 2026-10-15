@@ -99,23 +99,44 @@ export async function creerReduction(
   })
 }
 
-export async function renommerReduction(
+/**
+ * Renomme une réduction ET change sa valeur — pas son type.
+ *
+ * Changer la valeur est sans danger pour l'historique : chaque vente porte,
+ * dans son événement `discount.applied`, le pourcentage ou le montant
+ * RÉELLEMENT appliqué, et son libellé recopié. Passer « Happy hour » de 10 à
+ * 15 % ne réécrit donc aucun ticket déjà remis ; les caisses proposent la
+ * nouvelle valeur après leur prochaine synchronisation.
+ *
+ * Le TYPE, lui, ne change pas : « 10 » voudrait dire 10 % avant et 10 TND
+ * après, sur la même ligne du rapport. Pour passer d'un pourcentage à un
+ * montant, on archive et on crée.
+ */
+export async function modifierReduction(
   restaurantId: string,
   reductionId: string,
+  type: 'pourcentage' | 'montant',
   _precedent: Resultat | null,
   donnees: FormData,
 ): Promise<Resultat> {
   return agir(restaurantId, async ({ supabase }) => {
     const nom = texteObligatoire(donnees, 'nom', 'Le nom de la réduction', 60)
+    const valeur =
+      type === 'pourcentage'
+        ? { value_bp: pourcentageEnBp(donnees, 'valeur') }
+        : { amount_millimes: montantMillimes(donnees, 'valeur', 'Le montant') }
     const { error } = await supabase
       .from('discounts')
-      .update({ name: nom })
+      .update({ name: nom, ...valeur })
       .eq('id', reductionId)
       .eq('restaurant_id', restaurantId)
+      // Le type est relu en base : un formulaire resté ouvert sur une
+      // ancienne version ne doit pas écrire un montant dans un pourcentage.
+      .eq('kind', type)
     if (error) throw new Error(error.message)
     return (
-      `Réduction renommée « ${nom} ». Les ventes déjà encaissées gardent ` +
-      'l’ancien nom : un rapport qui change quand on renomme un réglage ne serait plus un historique.'
+      `Réduction « ${nom} » enregistrée. Les caisses la proposeront ainsi à leur ` +
+      'prochaine synchronisation ; les ventes déjà encaissées gardent ce qui a été accordé.'
     )
   })
 }

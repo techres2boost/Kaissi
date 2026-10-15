@@ -65,6 +65,25 @@ async function agir(
   }
 }
 
+/**
+ * Le maximum ne descend pas sous le minimum — et le refus NOMME les valeurs.
+ *
+ * ⚑ PANNE DE LECTURE SIGNALÉE. Après l'envoi, React remet le formulaire à
+ *   ses valeurs enregistrées (1 et 1), mais le message d'erreur reste
+ *   affiché dessous. On lisait donc « min 1, max 1 » à côté de « le maximum
+ *   ne peut pas être inférieur au minimum » — une règle qui semblait fausse.
+ *   Citer les valeurs refusées dit de quel envoi il s'agit.
+ */
+function verifierBornes(min: number, max: number): void {
+  if (max !== 0 && max < min) {
+    throw new ErreurSaisie(
+      'max',
+      `Non enregistré : minimum ${min}, maximum ${max}. Le maximum ne peut pas ` +
+        'être inférieur au minimum. Laissez-le à 0 pour « sans limite ».',
+    )
+  }
+}
+
 /** Un entier de sélection, borné — 0 signifie « sans limite » pour le maximum. */
 function entier(donnees: FormData, champ: string, libelle: string, max = 20): number {
   const valeur = donnees.get(champ)
@@ -94,12 +113,7 @@ export async function creerGroupe(
      * min_select`), mais elle répondrait par un message que personne ne peut
      * lire. On le dit ici, dans les mots de l'écran.
      */
-    if (max !== 0 && max < min) {
-      throw new ErreurSaisie(
-        'max',
-        'Le maximum ne peut pas être inférieur au minimum. Laissez-le à 0 pour « sans limite ».',
-      )
-    }
+    verifierBornes(min, max)
 
     const { data: dernier } = await supabase
       .from('modifier_groups')
@@ -138,12 +152,7 @@ export async function modifierGroupe(
     const nom = texteObligatoire(donnees, 'nom', 'Le nom du groupe', 100)
     const min = entier(donnees, 'min', 'Le minimum')
     const max = entier(donnees, 'max', 'Le maximum')
-    if (max !== 0 && max < min) {
-      throw new ErreurSaisie(
-        'max',
-        'Le maximum ne peut pas être inférieur au minimum. Laissez-le à 0 pour « sans limite ».',
-      )
-    }
+    verifierBornes(min, max)
 
     const { error } = await supabase
       .from('modifier_groups')
