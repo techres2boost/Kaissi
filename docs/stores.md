@@ -1139,7 +1139,7 @@ La coupure Internet est la panne la plus fréquente, et la plus coûteuse : une
 caisse à l'arrêt, c'est une file d'attente et des clients qui repartent.
 
 Kaissi est installée SUR la tablette, pas sur un site web. Elle démarre,
-prend les commandes, encaisse et imprime sans aucune connexion. Dès que le
+prend les commandes et encaisse sans aucune connexion. Dès que le
 réseau revient, tout remonte automatiquement — sans double encaissement, sans
 vente perdue, sans rien à faire.
 
@@ -1147,7 +1147,7 @@ vente perdue, sans rien à faire.
 
 • Prise de commande sur plan de salle, ou en vente à emporter
 • Encaissement en espèces, carte ou chèque restaurant, avec calcul du rendu
-• Ticket client et bon de cuisine
+• Ticket client affiché à l'écran
 • Écran de préparation pour la cuisine et le bar
 • Suivi du stock, avec alerte de rupture qui prévient le gérant
 • Réductions justifiées et tracées, par motif
@@ -1784,7 +1784,8 @@ Kaissi is a point-of-sale application for restaurants in Tunisia.
 
 HOW TO TEST
 1. Launch the app. It opens offline — no network needed.
-2. Staff sign-in screen: pick "Salma Trabelsi", PIN 2468.
+2. On the welcome screen, tap "Découvrir sans compte" (try without an
+   account). Staff sign-in screen: pick "Salma Trabelsi", PIN 2468.
 3. Open the cash drawer with any amount, then take an order from
    the floor plan and cash it. A receipt is shown on screen.
 4. To test synchronisation: Sync screen → sign in with the demo
@@ -1849,6 +1850,115 @@ Les motifs de refus les plus fréquents, tous évitables :
 ---
 
 ## 4 quater. Les textes et les visuels de la fiche App Store
+
+### Les six champs qui bloquent « Ajouter pour la revue »
+
+App Store Connect refuse de lancer la revue tant que ces champs sont vides,
+et le message ne dit pas toujours où ils se trouvent :
+
+| Message d'Apple | Où | Quoi mettre |
+|---|---|---|
+| *You must upload a screenshot for 13-inch iPad displays* | Version → **Aperçus et captures d'écran** → onglet **iPad 13"** | `ressources-store/captures-apple/ipad-13/` — les 10 fichiers |
+| *You must upload a screenshot for iPhone with Dynamic Island (medium display)* | même section → onglet **iPhone 6,3"** | `ressources-store/captures-apple/iphone-6.3/` — les 10 fichiers. Le jeu `iphone-6.9/` va dans l'onglet 6,9", s'il est proposé |
+| *French — Description — This field is required* | Version → **Description** (localisation **Français**) | le texte ci-dessous, « Description App Store » |
+| *French — Keywords — This field is required* | Version → **Mots-clés** | `caisse,restaurant,snack,café,pos,encaissement,ticket,stock,tva,dinar,tunisie,addition,serveur` |
+| *Copyright — This field is required* | Version → **Copyright** | `2026 Res2Boost` |
+| *You must complete the Contact Information section* | Version → **Informations pour la revue** → **Coordonnées** | prénom, nom, téléphone **au format international** (`+216 …`), e-mail — d'une personne qui RÉPOND pendant la revue |
+
+> ⚠ **La langue de la fiche.** Les erreurs disent « French » : la langue
+> principale de l'app est le français, donc c'est la localisation française
+> qu'il faut remplir. Une description saisie dans une localisation anglaise
+> ajoutée par erreur ne lève pas l'erreur.
+
+**Les captures — une commande.** Elles se prennent dans l'application
+réelle, au pixel exact qu'Apple attend, et en JPEG (un PNG de navigateur
+porte un canal alpha, qu'Apple refuse) :
+
+```bash
+pnpm pos:build:web && pnpm --filter @kaissi/pos preview:web   # un terminal
+pnpm captures:apple                                           # un autre
+```
+
+| Dossier | Dimensions | Orientation |
+|---|---|---|
+| `iphone-6.3/` | 1206 × 2622 | portrait — un iPhone se tient à la main |
+| `iphone-6.9/` | 1320 × 2868 | portrait |
+| `ipad-13/` | 2752 × 2064 | **paysage** — une caisse est posée sur un comptoir |
+
+Dix écrans par format, dans l'ordre d'un service : plan de salle, prise de
+commande, options d'un article, remise nommée, encaissement, ticket client,
+commandes en cours, carte tenue depuis la caisse, synchronisation hors
+ligne, clôture. Le script relit les dimensions dans chaque fichier : ce
+qu'il écrit est téléversable tel quel.
+
+`outils/visuels-apple.html` reste là pour une image venue d'ailleurs : il
+propose les mêmes formats, en JPEG.
+
+> ⚠ **Les captures montrent la TVA de la base de démonstration** (19 % et
+> 7 %), parce qu'une caisse réelle l'affiche sur chaque commande. La fiche,
+> elle, n'affirme aucun taux. Si l'expert-comptable recommande de ne
+> montrer aucun taux, c'est la graine qu'il faut changer, puis relancer la
+> commande — pas retoucher les images.
+
+**Description App Store** — 4 000 caractères maximum. Elle diffère de celle
+de Play sur un point qui compte : **l'impression est éteinte dans cette
+version** (`IMPRESSION_ACTIVE`), donc la fiche ne promet pas qu'elle
+imprime. Un relecteur qui cherche une fonction annoncée et ne la trouve pas
+rejette (*Guideline 2.3.1 — Accurate Metadata*).
+
+```
+Kaissi est une caisse enregistreuse conçue pour les restaurants, les snacks et les cafés tunisiens.
+
+━━ ELLE NE S'ARRÊTE JAMAIS ━━
+
+La coupure Internet est la panne la plus fréquente, et la plus coûteuse : une caisse à l'arrêt, c'est une file d'attente et des clients qui repartent.
+
+Kaissi est installée SUR l'iPad ou l'iPhone, pas sur un site web. Elle démarre, prend les commandes et encaisse sans aucune connexion. Dès que le réseau revient, tout remonte automatiquement — sans double encaissement, sans vente perdue, sans rien à faire.
+
+━━ CE QU'ELLE FAIT ━━
+
+• Prise de commande sur plan de salle, ou en vente à emporter
+• Options et suppléments par article : cuisson, taille, garnitures
+• Encaissement en espèces, carte ou chèque restaurant, avec calcul du rendu
+• Ticket client affiché à l'écran
+• Écran de préparation pour la cuisine et le bar
+• Réductions nommées et tracées : happy hour, menu midi…
+• La carte se tient depuis la caisse : le gérant ajoute un article, une catégorie, une réduction ou des options, même sans réseau
+• Ouverture et clôture de caisse, avec écart constaté
+• Plusieurs appareils dans le même restaurant, synchronisés entre eux
+• Chaque employé prend son poste avec son code PIN : on sait qui a fait quoi
+
+━━ LE BACK-OFFICE ━━
+
+Depuis un navigateur, sur ordinateur ou téléphone :
+
+• Chiffre d'affaires du jour, de la semaine, du mois
+• Ventes par article, par catégorie, par employé, par moyen de paiement
+• Marges, sur le chiffre d'affaires hors taxe
+• Historique des tickets, avec le détail de chacun
+• Stock, réapprovisionnement et inventaire, avec alerte de rupture
+• Équipe, rôles et codes PIN
+• Exports CSV pour le comptable
+
+━━ PENSÉE POUR LA TUNISIE ━━
+
+• Dinar tunisien, avec ses TROIS décimales — 24,500 TND, pas 24,50
+• TVA paramétrable par article, plusieurs taux sur le même ticket
+• Droit de timbre paramétrable
+• Interface entièrement en français
+
+━━ VOS DONNÉES SONT À VOUS ━━
+
+Chaque restaurant est isolé des autres au niveau de la base de données. Chaque encaissement est tracé : qui, quand, quel montant. Une annulation n'efface jamais rien — elle s'ajoute à l'historique.
+
+━━ POUR COMMENCER ━━
+
+Kaissi s'installe avec accompagnement : nous paramétrons votre carte, vos taux de TVA et votre équipe avec vous.
+
+Res2Boost — contact@res2boost.com
+```
+
+*(≈ 2 300 caractères.)*
 
 ### Ce qui change par rapport à Play, et pourquoi ça change le texte
 
@@ -1949,9 +2059,8 @@ Kaissi encaisse même quand Internet tombe : l'application est installée sur la
 *(109 caractères.)* C'est le seul texte qu'on peut changer sans repasser par
 la revue — utile pour annoncer une nouveauté sans publier une version.
 
-**Description** — 4 000 caractères. **Reprenez celle du §3.6 telle quelle** :
-elle est écrite pour être lue, ce qui est exactement son rôle ici. Retirez la
-dernière ligne de contact si vous préférez la mettre dans l'URL de support.
+**Description** — 4 000 caractères : le texte « Description App Store »
+plus haut, prêt à coller.
 
 **URL de support** — **obligatoire**, et testée. Une page qui donne un e-mail
 et un téléphone suffit ; une URL morte fait rejeter la fiche.

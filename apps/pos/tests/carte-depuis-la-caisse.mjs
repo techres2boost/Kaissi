@@ -167,6 +167,28 @@ await etape('ce qui vient d’être créé est VENDABLE aussitôt, hors ligne', 
   }
 })
 
+await etape('la RÉDUCTION créée est proposée dans « Remise », sans redémarrer', async () => {
+  /*
+   * PANNE OBSERVÉE : la réduction était bien écrite, mais l'écran « Remise »
+   * lisait une liste chargée au démarrage de la caisse. Elle n'apparaissait
+   * qu'au redémarrage suivant — l'inverse exact de « vendable aussitôt ».
+   */
+  if (await page.$('.modale')) await page.keyboard.press('Escape')
+  await page.waitForSelector('.lignes li', { timeout: 10000 }).catch(async () => {
+    // Le groupe d'options attend peut-être un choix : on ajoute l'article
+    // d'une autre catégorie, sans options.
+    await page.click('.categories button:has-text("TEST Entrées")')
+    await page.click('.carte-produit:has-text("TEST Chorba")')
+    await page.waitForSelector('.lignes li', { timeout: 10000 })
+  })
+  await page.click('.actions-commande button:has-text("Remise")')
+  await page.waitForSelector('.modale', { timeout: 10000 })
+  const proposee = await page.$('.options.grand .nom-reduction:text-is("TEST Midi")')
+  if (!proposee) {
+    throw new Error('« TEST Midi » n’est pas proposée : la liste des réductions est figée au démarrage')
+  }
+})
+
 await nav.close()
 if (erreurs.length > 0) {
   console.log(`✗ erreurs de page :\n  ${erreurs.join('\n  ')}`)

@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Générateur d'assets Apple App Store</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#171a21; --border:#262b36; --text:#e8eaef;
+    --muted:#9aa1b2; --accent:#5da3ca; --accent-dark:#0f4d6e;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg); color:var(--text); padding:2rem 1rem 4rem;
+  }
+  .wrap{max-width:960px; margin:0 auto;}
+  h1{font-size:22px; font-weight:600; margin:0 0 4px;}
+  .sub{color:var(--muted); font-size:14px; margin:0 0 28px;}
+  .dropzone{
+    border:1.5px dashed #333a48; border-radius:14px; padding:32px; text-align:center;
+    cursor:pointer; transition:border-color .15s, background .15s; background:var(--card);
+  }
+  .dropzone.drag{border-color:var(--accent); background:#0f1a22;}
+  .dropzone p{margin:6px 0; color:var(--muted); font-size:14px;}
+  .dropzone strong{color:var(--text);}
+  input[type=file]{display:none;}
+  .section-title{font-size:13px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin:32px 0 12px;}
+  .presets{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+    gap:14px; margin:0 0 28px;
+  }
+  .preset{
+    background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px;
+  }
+  .preset h3{font-size:14px; margin:0 0 2px; font-weight:600;}
+  .preset .dim{font-size:12px; color:var(--muted); margin:0 0 12px;}
+  .preset label{font-size:12px; color:var(--muted); display:block; margin:8px 0 4px;}
+  select, input[type=color]{
+    width:100%; background:#0f1115; border:1px solid var(--border); color:var(--text);
+    border-radius:8px; padding:6px 8px; font-size:13px;
+  }
+  .row{display:flex; gap:8px; align-items:center;}
+  .row input[type=color]{width:40px; height:32px; padding:2px; flex:none;}
+  .preview{
+    margin-top:12px; border-radius:8px; overflow:hidden; border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center; background:repeating-conic-gradient(#20242e 0% 25%, #171a21 0% 50%) 50% / 16px 16px;
+    min-height:90px;
+  }
+  .preview canvas{max-width:100%; display:block;}
+  .dl{
+    margin-top:12px; width:100%; padding:9px; border-radius:8px; border:none;
+    background:var(--accent-dark); color:#fff; font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .dl:hover{background:var(--accent);}
+  .dl:disabled{background:#2a2f3a; color:#666; cursor:not-allowed;}
+  .thumbs{display:flex; gap:8px; flex-wrap:wrap; margin-top:16px;}
+  .thumb{
+    width:64px; height:64px; border-radius:8px; overflow:hidden; border:1px solid var(--border);
+    cursor:pointer; position:relative; flex:none;
+  }
+  .thumb.active{border-color:var(--accent);}
+  .thumb img{width:100%; height:100%; object-fit:cover;}
+  .footer-note{font-size:12px; color:var(--muted); margin-top:28px; line-height:1.6;}
+  .hint{font-size:11px; color:var(--muted); margin:6px 0 0;}
+  .preview canvas{cursor:grab;}
+  .preview canvas:active{cursor:grabbing;}
+  .badge{
+    display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px;
+    background:#0f4d6e33; color:var(--accent); margin-left:6px;
+  }
+  .badge.warn{background:#6e4d0f33; color:#d9a441;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Générateur d'assets Apple App Store</h1>
+  <p class="sub">Uploadez une image (logo, capture d'écran...) et générez automatiquement les formats requis par l'App Store Connect.</p>
+
+  <div class="dropzone" id="drop">
+    <p><strong>Cliquez ou glissez une image ici</strong></p>
+    <p>PNG ou JPG, idéalement carrée pour l'icône (min. 1024×1024)</p>
+    <input type="file" id="fileInput" accept="image/*" multiple>
+  </div>
+
+  <div class="thumbs" id="thumbs"></div>
+
+  <div class="section-title">Icône</div>
+  <div class="presets" id="presetsIcon"></div>
+
+  <div class="section-title">Captures d'écran iPhone</div>
+  <div class="presets" id="presetsIphone"></div>
+
+  <div class="section-title">Captures d'écran iPad</div>
+  <div class="presets" id="presetsIpad"></div>
+
+  <p class="footer-note">
+    Repères officiels (2026) : icône App Store = 1024×1024 PNG/JPEG aplati, <strong>sans canal alpha ni transparence</strong> — Apple applique lui-même les coins arrondis, n'en ajoutez pas.
+    Captures d'écran : App Store Connect EXIGE au moins une capture « iPhone with Dynamic Island (medium display) » = 6,3" (1206×2622 ou 1179×2556) et une capture iPad 13" (2064×2752, ou 2752×2064 en paysage). Jusqu'à 10 par format. Les captures sortent ici en <strong>JPEG</strong> : un PNG exporté par le navigateur porte toujours un canal alpha, ce qu'Apple refuse.
+    Pour Kaissi, ces formats sont déjà produits À PARTIR DE L'APPLICATION par <code>pnpm captures:apple</code> — cet outil ne sert que pour une image venue d'ailleurs.
+    Contrairement à Google Play, Apple n'utilise pas de "feature graphic" et n'exige pas de champ de couleur particulier au-delà de sRGB, sans transparence. Ces valeurs évoluent régulièrement — vérifiez toujours App Store Connect avant publication.
+  </p>
+</div>
+
+<script>
+const PRESETS_ICON = [
+  {id:'icon', name:"Icône de l'app", dim:'1024 × 1024 px · PNG', w:1024, h:1024, fmt:'png', fit:'cover', forceOpaqueBg:'#ffffff'},
+];
+
+const PRESETS_IPHONE = [
+  // JPEG pour toutes les captures : un PNG exporté par un <canvas> porte
+  // TOUJOURS un canal alpha, même entièrement opaque, et Apple écrit
+  // « Images can't include alpha channels ». Le JPEG n'en a pas.
+  {id:'iphone_6_3', name:'iPhone 6,3" — Dynamic Island moyen (EXIGÉ)', dim:'1206 × 2622 px · JPEG', w:1206, h:2622, fmt:'jpeg', fit:'cover'},
+  {id:'iphone_6_9', name:'iPhone 6,9" — Dynamic Island grand', dim:'1320 × 2868 px · JPEG', w:1320, h:2868, fmt:'jpeg', fit:'cover'},
+  {id:'iphone_6_5', name:'iPhone 6,5"', dim:'1242 × 2688 px · JPEG', w:1242, h:2688, fmt:'jpeg', fit:'cover'},
+  {id:'iphone_6_3_paysage', name:'iPhone 6,3" (paysage)', dim:'2622 × 1206 px · JPEG', w:2622, h:1206, fmt:'jpeg', fit:'cover'},
+  {id:'iphone_6_9_paysage', name:'iPhone 6,9" (paysage)', dim:'2868 × 1320 px · JPEG', w:2868, h:1320, fmt:'jpeg', fit:'cover'},
+];
+
+const PRESETS_IPAD = [
+  {id:'ipad_13_paysage', name:'iPad 13" paysage (EXIGÉ — une caisse est en paysage)', dim:'2752 × 2064 px · JPEG', w:2752, h:2064, fmt:'jpeg', fit:'cover'},
+  {id:'ipad_13', name:'iPad 13" portrait', dim:'2064 × 2752 px · JPEG', w:2064, h:2752, fmt:'jpeg', fit:'cover'},
+  {id:'ipad_12_9', name:'iPad 12,9" (ancien)', dim:'2048 × 2732 px · JPEG', w:2048, h:2732, fmt:'jpeg', fit:'cover'},
+];
+
+let images = []; // {img, url, name}
+let activeIndex = -1;
+
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const thumbsEl = document.getElementById('thumbs');
+const presetsIconEl = document.getElementById('presetsIcon');
+const presetsIphoneEl = document.getElementById('presetsIphone');
+const presetsIpadEl = document.getElementById('presetsIpad');
+
+drop.addEventListener('click', () => fileInput.click());
+['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('drag'); }));
+['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('drag'); }));
+drop.addEventListener('drop', e => handleFiles(e.dataTransfer.files));
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+function handleFiles(fileList){
+  const files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+  if(!files.length) return;
+  let loaded = 0;
+  files.forEach(file => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      images.push({img, url, name: file.name});
+      loaded++;
+      if(loaded === files.length){
+        activeIndex = images.length - 1;
+        renderThumbs();
+        redrawAll();
+      }
+    };
+    img.src = url;
+  });
+}
+
+function renderThumbs(){
+  thumbsEl.innerHTML = '';
+  images.forEach((im, i) => {
+    const d = document.createElement('div');
+    d.className = 'thumb' + (i === activeIndex ? ' active' : '');
+    d.innerHTML = `<img src="${im.url}" alt="${im.name}">`;
+    d.onclick = () => { activeIndex = i; renderThumbs(); redrawAll(); };
+    thumbsEl.appendChild(d);
+  });
+}
+
+function buildPresetCard(preset){
+  const card = document.createElement('div');
+  card.className = 'preset';
+  const noAlphaBadge = preset.forceOpaqueBg ? `<span class="badge warn">sans transparence</span>` : '';
+  card.innerHTML = `
+    <h3>${preset.name} <span class="badge">${preset.fmt.toUpperCase()}</span>${noAlphaBadge}</h3>
+    <p class="dim">${preset.dim}</p>
+    <label>Ajustement</label>
+    <select data-role="fit">
+      <option value="cover">Remplir (recadrer)</option>
+      <option value="contain">Adapter (fond de couleur)</option>
+    </select>
+    <div class="row" style="margin-top:8px;">
+      <input type="color" data-role="bg" value="${preset.forceOpaqueBg || '#e4e4e4'}">
+      <label style="margin:0; flex:1;">Couleur de fond ${preset.forceOpaqueBg ? '(toujours appliquée — pas de transparence)' : '(mode "Adapter")'}</label>
+    </div>
+    <label>Zoom / recadrage manuel</label>
+    <input type="range" data-role="zoom" min="1" max="3" step="0.01" value="1">
+    <div class="preview"><canvas data-role="canvas"></canvas></div>
+    <p class="hint">Glissez l'image dans le cadre pour la repositionner.</p>
+    <button class="dl" data-role="dl" disabled>Télécharger</button>
+  `;
+  card.querySelector('[data-role="fit"]').value = preset.fit;
+  const canvas = card.querySelector('[data-role="canvas"]');
+  const fitSel = card.querySelector('[data-role="fit"]');
+  const bgInput = card.querySelector('[data-role="bg"]');
+  const zoomInput = card.querySelector('[data-role="zoom"]');
+  const dlBtn = card.querySelector('[data-role="dl"]');
+
+  // pan offset in canvas pixels, kept per active image index
+  const panByImage = {};
+
+  function getPan(){
+    if(!panByImage[activeIndex]) panByImage[activeIndex] = {x:0, y:0};
+    return panByImage[activeIndex];
+  }
+
+  function draw(){
+    if(activeIndex < 0) return;
+    const {img} = images[activeIndex];
+    canvas.width = preset.w;
+    canvas.height = preset.h;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0,0,preset.w,preset.h);
+    const fit = fitSel.value;
+    const bg = bgInput.value;
+    const zoom = parseFloat(zoomInput.value);
+    const pan = getPan();
+
+    // Apple assets never carry transparency: always paint a background first.
+    ctx.fillStyle = bg;
+    ctx.fillRect(0,0,preset.w,preset.h);
+
+    const baseScale = fit === 'cover'
+      ? Math.max(preset.w / img.width, preset.h / img.height)
+      : Math.min(preset.w / img.width, preset.h / img.height);
+    const scale = baseScale * zoom;
+    const dw = img.width * scale;
+    const dh = img.height * scale;
+    const dx = (preset.w - dw) / 2 + pan.x;
+    const dy = (preset.h - dh) / 2 + pan.y;
+    ctx.drawImage(img, dx, dy, dw, dh);
+
+    canvas.style.width = Math.min(preset.w, 300) + 'px';
+    canvas.style.height = 'auto';
+    dlBtn.disabled = false;
+  }
+
+  fitSel.addEventListener('change', draw);
+  bgInput.addEventListener('input', draw);
+  zoomInput.addEventListener('input', draw);
+
+  // drag to pan
+  let dragging = false;
+  let lastX = 0, lastY = 0;
+
+  function startDrag(clientX, clientY){
+    dragging = true;
+    lastX = clientX;
+    lastY = clientY;
+  }
+  function moveDrag(clientX, clientY){
+    if(!dragging) return;
+    const rect = canvas.getBoundingClientRect();
+    const ratio = preset.w / rect.width;
+    const pan = getPan();
+    pan.x += (clientX - lastX) * ratio;
+    pan.y += (clientY - lastY) * ratio;
+    lastX = clientX;
+    lastY = clientY;
+    draw();
+  }
+  function endDrag(){ dragging = false; }
+
+  canvas.addEventListener('mousedown', e => startDrag(e.clientX, e.clientY));
+  window.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY));
+  window.addEventListener('mouseup', endDrag);
+  canvas.addEventListener('touchstart', e => {
+    const t = e.touches[0]; startDrag(t.clientX, t.clientY);
+  }, {passive:true});
+  canvas.addEventListener('touchmove', e => {
+    const t = e.touches[0]; moveDrag(t.clientX, t.clientY);
+  }, {passive:true});
+  canvas.addEventListener('touchend', endDrag);
+  dlBtn.addEventListener('click', () => {
+    // PNG export from canvas.toDataURL always has an alpha channel in the
+    // container, but since we always paint an opaque background first,
+    // there is no actual transparency in the pixel data — safe for Apple.
+    const mime = preset.fmt === 'jpeg' ? 'image/jpeg' : 'image/png';
+    const quality = preset.fmt === 'jpeg' ? 0.92 : undefined;
+    const link = document.createElement('a');
+    link.download = `${preset.id}.${preset.fmt === 'jpeg' ? 'jpg' : 'png'}`;
+    link.href = canvas.toDataURL(mime, quality);
+    link.click();
+  });
+
+  card._draw = draw;
+  return card;
+}
+
+const cardDraws = [];
+
+function buildGroup(container, presets){
+  presets.forEach(p => {
+    const card = buildPresetCard(p);
+    container.appendChild(card);
+    cardDraws.push(card._draw);
+  });
+}
+
+function buildAllCardsOnce(){
+  buildGroup(presetsIconEl, PRESETS_ICON);
+  buildGroup(presetsIphoneEl, PRESETS_IPHONE);
+  buildGroup(presetsIpadEl, PRESETS_IPAD);
+}
+
+function redrawAll(){
+  cardDraws.forEach(draw => draw());
+}
+
+buildAllCardsOnce();
+</script>
+</body>
+</html>

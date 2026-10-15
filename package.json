@@ -41,6 +41,7 @@
     "imprimante": "node apps/pos/scripts/imprimante-virtuelle.mjs",
     "visuels": "node outils/generer-visuels.mjs",
     "captures": "node outils/captures-store.mjs",
+    "captures:apple": "node outils/captures-apple.mjs",
     "lint:fix": "eslint . --fix",
     "mise-en-service": "pnpm --filter @kaissi/pos test:mise-en-service",
     "verifier:gradle": "pnpm --filter @kaissi/pos verifier:gradle",

@@ -118,7 +118,36 @@ export function FournisseurApp({ app, children }: Props) {
   })
   const [appairage, setAppairage] = useState<{ url: string; jeton: string } | null>(null)
 
+  /*
+   * Les réductions, relues À PART du reste du chargement — et c'est voulu.
+   *
+   * PANNE OBSERVÉE en préparant les captures de la fiche App Store : une
+   * réduction créée depuis l'écran « Carte » n'apparaissait pas dans
+   * « Remise » avant le redémarrage de la caisse. Le chargement initial ne
+   * dépend que de `app` — il construit la session et le moteur de
+   * synchronisation, qu'on ne veut surtout pas recréer à chaque
+   * `rafraichir()`. Les réductions y étaient donc figées au démarrage, alors
+   * que la règle de l'écran Carte est « vendable IMMÉDIATEMENT ».
+   *
+   * Même défaut pour une réduction créée au back-office : elle descendait
+   * par le catalogue, s'écrivait dans la base locale, et restait invisible.
+   * D'où le curseur du catalogue dans les dépendances.
+   */
+  const [reductionsFraiches, setReductionsFraiches] = useState<
+    readonly ReductionLocale[] | null
+  >(null)
+
   const impression = useMemo(() => new ServiceImpression(app.fileImpression), [app])
+
+  useEffect(() => {
+    let vivant = true
+    void app.catalogue.reductions().then((r) => {
+      if (vivant) setReductionsFraiches(r)
+    })
+    return () => {
+      vivant = false
+    }
+  }, [app, version, resumeSync.curseurCatalogue])
 
   /*
    * L'appairage, relu à chaque `rafraichir()`.
@@ -412,7 +441,7 @@ export function FournisseurApp({ app, children }: Props) {
             stations: donnees.stations,
             tables: donnees.tables,
             methodesPaiement: donnees.methodesPaiement,
-            reductions: donnees.reductions,
+            reductions: reductionsFraiches ?? donnees.reductions,
             employes: donnees.employes,
             employe,
             definirEmploye,
@@ -426,6 +455,7 @@ export function FournisseurApp({ app, children }: Props) {
     [
       app,
       donnees,
+      reductionsFraiches,
       session,
       impression,
       employe,

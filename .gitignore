@@ -75,3 +75,4 @@ supabase/.temp/
 # `pnpm captures`. Les versionner remplirait l'historique de binaires que
 # personne ne relit jamais.
 ressources-store/captures/
+ressources-store/captures-apple/
