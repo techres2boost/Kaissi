@@ -23,6 +23,13 @@ import { URL_SYNC_PAR_DEFAUT } from '../config.js'
 import { identifiantInstallation } from '../donnees/installation.js'
 import { expliquerEchecReseau } from '../donnees/diagnostic-reseau.js'
 import { estNatif } from '../donnees/sqlite.js'
+import {
+  dejaEnService,
+  motifDeRefus,
+  peutBasculer,
+  reinitialiserPourAutreEtablissement,
+} from '@kaissi/db-local'
+import { pinTropFaible } from '@kaissi/domain'
 
 export function FormulaireInscription({
   onInscrit,
@@ -31,23 +38,49 @@ export function FormulaireInscription({
   onInscrit: () => void
   onDejaUnCompte: () => void
 }) {
-  const { app, rafraichir } = useApp()
+  const { app } = useApp()
   const [nomRestaurant, setNomRestaurant] = useState('')
   const [nomGerant, setNomGerant] = useState('')
   const [email, setEmail] = useState('')
   const [motDePasse, setMotDePasse] = useState('')
+  const [pin, setPin] = useState('')
+  const [confirmationPin, setConfirmationPin] = useState('')
   const [etat, setEtat] = useState<'saisie' | 'envoi' | 'erreur'>('saisie')
   const [message, setMessage] = useState<string | null>(null)
   /** Non nul = c'est fait, et il reste une chose à dire avant de continuer. */
   const [aRegler, setARegler] = useState<string | null>(null)
 
+  const pinValide = /^\d{4,8}$/.test(pin) && pin === confirmationPin
   const pret =
-    nomRestaurant.trim().length >= 2 && email.trim() !== '' && motDePasse.length >= 8
+    nomRestaurant.trim().length >= 2 &&
+    email.trim() !== '' &&
+    motDePasse.length >= 8 &&
+    pinValide
 
   const inscrire = async () => {
     setEtat('envoi')
     setMessage(null)
     const base = ((await app.etat.lire('url_sync')) || URL_SYNC_PAR_DEFAUT).replace(/\/+$/, '')
+
+    if (pinTropFaible(pin)) {
+      setEtat('erreur')
+      setMessage(`« ${pin} » est trop facile à deviner. Choisissez un autre code.`)
+      return
+    }
+
+    /*
+     * Une caisse DÉJÀ en service avec des ventes en attente ne change pas de
+     * restaurant : ces ventes portent son identité actuelle, le serveur les
+     * refuserait ensuite, et un rejet ne se réessaie jamais. Même règle que
+     * l'appairage. Une caisse de démonstration, elle, n'a rien de
+     * récupérable : sa base sera vidée.
+     */
+    const attente = await app.journal.enAttente()
+    if (dejaEnService(await app.etat.lire('device_id')) && !peutBasculer(attente)) {
+      setEtat('erreur')
+      setMessage(motifDeRefus(attente))
+      return
+    }
 
     try {
       const installationId = await identifiantInstallation(app.etat)
@@ -67,6 +100,9 @@ export function FormulaireInscription({
           timezone: 'Africa/Tunis',
           installationId,
           libelle: 'Terminal',
+          // Le PIN de caisse du gérant : sans lui, la caisse n'aurait
+          // personne à qui ouvrir la prise de poste. Haché par le serveur.
+          pin,
         }),
         signal: AbortSignal.timeout(20_000),
       })
@@ -89,6 +125,18 @@ export function FormulaireInscription({
       }
 
       /*
+       * La base locale est VIDÉE avant d'adopter la nouvelle identité.
+       *
+       * PANNE SIGNALÉE : après « Ouvrir mon restaurant », la prise de poste
+       * proposait Ahmed, Karim et Salma — les employés de la graine de
+       * démonstration, rattachés à Snack Lac 1. La carte, les réductions et
+       * les tables de la démonstration restaient aussi. Le nouveau
+       * restaurant arrive par le premier pull : son gérant, avec le PIN
+       * qu'il vient de choisir, et sa carte.
+       */
+      await reinitialiserPourAutreEtablissement(app.base.adaptateur)
+
+      /*
        * L'identité arrive du SERVEUR et s'adopte en bloc — même geste qu'à
        * l'appairage. Sans le préfixe de tickets, deux terminaux émettraient
        * le même numéro et la seconde vente n'apparaîtrait jamais au
@@ -102,9 +150,18 @@ export function FormulaireInscription({
       if (corps.prefixe) await app.etat.ecrire('ticket_prefix', corps.prefixe)
       if (corps.employeId) await app.etat.ecrire('employe_appaireur', corps.employeId)
 
-      setARegler(corps.message ?? null)
+      /*
+       * PAS de `rafraichir()` ici — et c'était un défaut grave.
+       *
+       * Il faisait basculer l'application sur la prise de poste, ce qui
+       * DÉMONTAIT cet écran avant qu'on l'ait lu : l'avertissement du taux
+       * à 0 % ne s'affichait jamais, et surtout le bouton « Commencer »,
+       * qui RECHARGE la page, n'était jamais touché. La session gardait
+       * alors l'identité de la graine, et les ventes suivantes partaient
+       * signées par un appareil que le serveur refuse.
+       */
+      setARegler(corps.message ?? 'Votre restaurant est ouvert.')
       setEtat('saisie')
-      rafraichir()
     } catch (erreur) {
       setEtat('erreur')
       console.error('inscription', erreur)
@@ -207,6 +264,41 @@ export function FormulaireInscription({
       {/* Le minimum est dit AVANT le refus : le découvrir après la saisie
           fait recommencer, clavier ouvert, sur une tablette. */}
       <p className="aide">Huit caractères au moins.</p>
+
+      {/*
+        Le PIN de CAISSE, distinct du mot de passe : le mot de passe ouvre le
+        back-office, le PIN dit qui encaisse sur la tablette. Sans lui, la
+        caisse qu'on vient d'ouvrir n'aurait personne à qui ouvrir la prise
+        de poste.
+      */}
+      <label htmlFor="insc-pin">Votre code PIN de caisse</label>
+      <input
+        id="insc-pin"
+        type="password"
+        inputMode="numeric"
+        autoComplete="off"
+        maxLength={8}
+        value={pin}
+        onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+      />
+      <label htmlFor="insc-pin2">Confirmer le code PIN</label>
+      <input
+        id="insc-pin2"
+        type="password"
+        inputMode="numeric"
+        autoComplete="off"
+        maxLength={8}
+        value={confirmationPin}
+        onChange={(e) => setConfirmationPin(e.target.value.replace(/\D/g, ''))}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && pret && etat !== 'envoi') void inscrire()
+        }}
+      />
+      <p className="aide">
+        4 à 8 chiffres. C’est avec lui que vous ouvrirez la caisse — le mot de
+        passe, lui, sert au back-office.
+        {confirmationPin !== '' && pin !== confirmationPin && ' Les deux codes diffèrent.'}
+      </p>
 
       <button
         type="button"

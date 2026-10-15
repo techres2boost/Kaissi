@@ -141,3 +141,25 @@ describe('la migration locale 014', () => {
     expect(await compter('customers', [ancien('0801')])).toBe(1)
   })
 })
+
+describe('la graine ne revient JAMAIS sur une caisse en service', () => {
+  it('base vidée après inscription : pas de graine, l’identité reste celle du serveur', async () => {
+    db = adaptateurNode(':memory:')
+    await migrer(db)
+    const vrai = '01a0f000-0000-7000-8000-00000000beef'
+    await db.executer(
+      `INSERT INTO sync_state (cle, valeur) VALUES ('device_id', ?)
+         ON CONFLICT (cle) DO UPDATE SET valeur = excluded.valeur`,
+      [vrai],
+    )
+
+    expect(await installerGraine(db)).toBe(false)
+
+    const produits = await db.lireUne<{ n: number }>('SELECT count(*) AS n FROM products')
+    expect(produits?.n).toBe(0)
+    const id = await db.lireUne<{ valeur: string }>(
+      "SELECT valeur FROM sync_state WHERE cle = 'device_id'",
+    )
+    expect(id?.valeur).toBe(vrai)
+  })
+})

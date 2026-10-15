@@ -11,12 +11,27 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { sessionObligatoire } from '../serveur/session.js'
 import { BarreCompte } from '../composants/BarreCompte.js'
+import { estEditeur } from './[restaurant]/abonnement/actions.js'
 
 export default async function Accueil() {
   const session = await sessionObligatoire()
+  /*
+   * Les établissements FERMÉS à part.
+   *
+   * PANNE DE LECTURE SIGNALÉE : un établissement fermé depuis
+   * l'administration réapparaissait ici, identique aux autres — on croyait
+   * la fermeture ratée. On ne le CACHE pas (on ne cache pas à quelqu'un un
+   * restaurant dont il est responsable, et ses rapports restent
+   * consultables), on le range à part, avec ce qu'il est.
+   */
+  const ouverts = session.etablissements.filter((e) => !e.ferme)
+  const fermes = session.etablissements.filter((e) => e.ferme)
+  const [editeur] = await Promise.all([estEditeur()])
 
-  if (session.etablissements.length === 1) {
-    redirect(`/${session.etablissements[0]!.id}/journee`)
+  // Un seul établissement EN SERVICE : on y va directement — sauf pour
+  // l'éditeur, qui a un second écran à atteindre depuis ici.
+  if (ouverts.length === 1 && !editeur) {
+    redirect(`/${ouverts[0]!.id}/journee`)
   }
 
   return (
@@ -31,11 +46,18 @@ export default async function Accueil() {
           parce que c'est l'écran où l'on arrive quand on gère plusieurs
           établissements — donc l'endroit où l'on pense à en ouvrir un.
         */}
-        {session.etablissements.some((e) => e.administrateur) && (
-          <p>
-            <Link className="bouton discret" href="/administration">
-              🏢 Administration — ouvrir un établissement
-            </Link>
+        {(session.etablissements.some((e) => e.administrateur) || editeur) && (
+          <p style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {session.etablissements.some((e) => e.administrateur) && (
+              <Link className="bouton discret" href="/administration">
+                🏢 Administration — ouvrir un établissement
+              </Link>
+            )}
+            {editeur && (
+              <Link className="bouton discret" href="/editeur">
+                🧾 Éditeur — clients et formules
+              </Link>
+            )}
           </p>
         )}
 
@@ -54,7 +76,7 @@ export default async function Accueil() {
           </div>
         ) : (
           <div className="grille deux">
-            {session.etablissements.map((etablissement) => (
+            {ouverts.map((etablissement) => (
               <Link
                 key={etablissement.id}
                 href={`/${etablissement.id}/journee`}
@@ -72,6 +94,29 @@ export default async function Accueil() {
               </Link>
             ))}
           </div>
+        )}
+
+        {fermes.length > 0 && (
+          <section style={{ marginTop: '1.5rem' }}>
+            <h2>Établissements fermés</h2>
+            <p className="indication">
+              Aucune caisse ne peut y être mise en service. Leurs rapports restent
+              consultables ; on les rouvre depuis l’Administration.
+            </p>
+            <div className="grille deux">
+              {fermes.map((etablissement) => (
+                <Link
+                  key={etablissement.id}
+                  href={`/${etablissement.id}/ventes`}
+                  className="carte"
+                  style={{ textDecoration: 'none', color: 'inherit', display: 'block', opacity: 0.75 }}
+                >
+                  <h2 style={{ marginBottom: '0.35rem' }}>{etablissement.nom}</h2>
+                  <span className="etiquette inactif">fermé</span>
+                </Link>
+              ))}
+            </div>
+          </section>
         )}
       </main>
     </>

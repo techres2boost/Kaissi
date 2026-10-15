@@ -10,6 +10,7 @@
  */
 
 import { Hono, type Context } from 'hono'
+import { hacherPin, pinTropFaible, validerFormatPin, ErreurPin } from '@kaissi/domain'
 import { cors } from 'hono/cors'
 import type { AppareilAuthentifie, DepotSync } from './depot.js'
 import { jetonDepuisEntete, empreinteDe } from './jeton.js'
@@ -471,6 +472,32 @@ export function creerServeur({
         throw new ErreurAuth("L'identifiant d'installation doit être un UUID.", 401)
       }
 
+      /*
+       * Le PIN de caisse du gérant — vérifié AVANT de créer quoi que ce soit.
+       *
+       * PANNE SIGNALÉE : après « Ouvrir mon restaurant », la caisse n'avait
+       * personne à qui ouvrir la prise de poste. Le compte du gérant existait,
+       * mais sans PIN : il ne pouvait que se connecter au back-office.
+       * Facultatif pour les caisses antérieures, qui ne l'envoient pas — le
+       * PIN se pose alors au back-office (Employés).
+       */
+      let pinHash: string | null = null
+      if (donnees['pin'] !== undefined && donnees['pin'] !== null && donnees['pin'] !== '') {
+        const pin = typeof donnees['pin'] === 'string' ? donnees['pin'] : ''
+        try {
+          validerFormatPin(pin)
+        } catch (e) {
+          throw new ErreurAuth(e instanceof ErreurPin ? e.message : 'Code PIN invalide.', 401)
+        }
+        if (pinTropFaible(pin)) {
+          throw new ErreurAuth(
+            `« ${pin} » est trop facile à deviner (suite, répétition ou code courant). Choisissez-en un autre.`,
+            401,
+          )
+        }
+        pinHash = hacherPin(pin)
+      }
+
       const cleCompte = `inscription:${email}`
       const verdictCompte = parCompte.verifier(cleCompte)
       if (!verdictCompte.autorise) {
@@ -510,6 +537,7 @@ export function creerServeur({
         nomRestaurant,
         timezone,
         bascule,
+        pinHash,
       })
 
       /*
@@ -965,16 +993,20 @@ export function creerServeur({
         )
       }
       const restaurantId = String(corps['restaurantId'] ?? '')
+      const organizationId = String(corps['organizationId'] ?? '')
       const formule = corps['formule']
-      if (!UUID.test(restaurantId) || (formule !== 'gratuit' && formule !== 'pro')) {
-        throw new ErreurAuth('Établissement ou formule invalide (gratuit ou pro).', 401)
+      if (formule !== 'gratuit' && formule !== 'pro') {
+        throw new ErreurAuth('Formule invalide (gratuit ou pro).', 401)
       }
-      const fait = await depot.changerFormule(
-        restaurantId,
-        formule,
-        `Changée par ${appelant.email} depuis le back-office, le ${new Date().toISOString().slice(0, 10)}.`,
-      )
-      if (!fait) throw new ErreurAuth('Établissement introuvable.', 401)
+      const note = `Changée par ${appelant.email} depuis le back-office, le ${new Date().toISOString().slice(0, 10)}.`
+      // Par ORGANISATION depuis l'écran Éditeur (l'éditeur n'est membre
+      // d'aucun restaurant client), par ÉTABLISSEMENT depuis Abonnement.
+      const fait = UUID.test(organizationId)
+        ? await depot.changerFormuleOrganisation(organizationId, formule, note)
+        : UUID.test(restaurantId)
+          ? !!(await depot.changerFormule(restaurantId, formule, note))
+          : false
+      if (!fait) throw new ErreurAuth('Client introuvable.', 401)
       return {
         formule,
         message:
@@ -982,6 +1014,18 @@ export function creerServeur({
             ? 'Formule Payant activée : historique complet et inventaire avancé ouverts.'
             : 'Formule Gratuit : historique limité à 62 jours, inventaire avancé fermé. La caisse continue d’encaisser.',
       }
+    })
+  })
+
+  // ── POST /admin/editeur/clients ───────────────────────────────────────
+  // Tous les clients et leur formule. La SEULE lecture qui traverse les
+  // clients : réservée aux éditeurs, relus ici à chaque appel.
+  app.post('/admin/editeur/clients', async (c) => {
+    return adminSupabase(c, async ({ appelant }) => {
+      if (!estEditeur(appelant.email)) {
+        throw new ErreurAuth('Réservé à l’éditeur de Kaissi.', 401)
+      }
+      return { clients: await depot.listerClients() }
     })
   })
 

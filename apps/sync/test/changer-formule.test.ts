@@ -124,3 +124,28 @@ describe('POST /admin/abonnement', () => {
     expect(r.status).toBe(401)
   })
 })
+
+describe('l’écran Éditeur — tous les clients', () => {
+  it('liste les clients et leur formule — pour l’éditeur seulement', async () => {
+    const r = await appeler('/admin/editeur/clients', 'jeton-editeur', {})
+    expect(r.status).toBe(200)
+    const { clients } = (await r.json()) as {
+      clients: { organizationId: string; plan: string; etablissements: { nom: string }[] }[]
+    }
+    const demo = clients.find((c) => c.organizationId === DEMO_ORG)
+    expect(demo, 'l’organisation de démonstration doit figurer').toBeDefined()
+    expect(demo!.etablissements.length).toBeGreaterThan(0)
+
+    const refus = await appeler('/admin/editeur/clients', 'jeton-client', {})
+    expect(refus.status).toBe(401)
+  })
+
+  it('change la formule PAR ORGANISATION, sans être membre d’aucun restaurant', async () => {
+    const r = await appeler('/admin/abonnement', 'jeton-editeur', {
+      organizationId: DEMO_ORG,
+      formule: 'pro',
+    })
+    expect(r.status).toBe(200)
+    expect(await planActuel()).toBe('pro')
+  })
+})

@@ -1354,6 +1354,7 @@ export class DepotPostgres implements DepotSync {
     nomRestaurant: string
     timezone: string
     bascule: string
+    pinHash?: string | null
   }): Promise<{ organizationId: string; restaurantId: string; employeId: string }> {
     const client = await this.pool.connect()
     try {
@@ -1418,9 +1419,18 @@ export class DepotPostgres implements DepotSync {
        */
       await client.query(
         `insert into kaissi.users
-           (id, organization_id, auth_user_id, full_name, email, status)
-         values ($1, $2, $3, $4, $5, 'actif')`,
-        [employeId, organizationId, demande.authUserId, demande.nomGerant, demande.email],
+           (id, organization_id, auth_user_id, full_name, email, status, pin_hash)
+         values ($1, $2, $3, $4, $5, 'actif', $6)`,
+        [
+          employeId,
+          organizationId,
+          demande.authUserId,
+          demande.nomGerant,
+          demande.email,
+          // Le PIN choisi à l'inscription : sans lui, la caisse qui vient
+          // d'être rattachée n'a PERSONNE à qui ouvrir la prise de poste.
+          demande.pinHash ?? null,
+        ],
       )
 
       await client.query(
@@ -1919,6 +1929,53 @@ export class DepotPostgres implements DepotSync {
       [restaurantId, plan, note],
     )
     return rows[0] ? { organizationId: rows[0].organization_id } : null
+  }
+
+  async changerFormuleOrganisation(
+    organizationId: string,
+    plan: 'gratuit' | 'pro',
+    note: string,
+  ): Promise<boolean> {
+    const { rowCount } = await this.pool.query(
+      `insert into kaissi.subscriptions (organization_id, plan, trial_ends_at, note)
+       select o.id, $2::text, null, $3::text from kaissi.organizations o where o.id = $1::uuid
+       on conflict (organization_id) do update
+          set plan = excluded.plan,
+              trial_ends_at = null,
+              note = excluded.note,
+              updated_at = now()`,
+      [organizationId, plan, note],
+    )
+    return (rowCount ?? 0) > 0
+  }
+
+  async listerClients() {
+    const { rows } = await this.pool.query<{
+      id: string
+      name: string
+      plan: string | null
+      updated_at: string | null
+      note: string | null
+      etablissements: { nom: string; ferme: boolean }[] | null
+    }>(
+      `select o.id, o.name, s.plan, s.updated_at::text, s.note,
+              (select json_agg(json_build_object('nom', r.name, 'ferme', r.status = 'ferme')
+                               order by r.name)
+                 from kaissi.restaurants r
+                where r.organization_id = o.id) as etablissements
+         from kaissi.organizations o
+         left join kaissi.subscriptions s on s.organization_id = o.id
+        order by o.name`,
+    )
+    return rows.map((l) => ({
+      organizationId: l.id,
+      nom: l.name,
+      // Pas de ligne = gratuit : c'est la lecture que fait `etatAbonnement`.
+      plan: l.plan ?? 'gratuit',
+      depuis: l.updated_at,
+      note: l.note,
+      etablissements: l.etablissements ?? [],
+    }))
   }
 
   async abonnementDuCompte(

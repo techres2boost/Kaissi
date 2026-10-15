@@ -359,6 +359,8 @@ export interface DepotSync {
     nomRestaurant: string
     timezone: string
     bascule: string
+    /** Hachage Argon2id du PIN choisi à l'inscription — la caisse s'ouvre avec. */
+    pinHash?: string | null
   }): Promise<{ organizationId: string; restaurantId: string; employeId: string }>
 
   /** Compte d'authentification portant cette adresse, s'il existe. */
@@ -453,6 +455,29 @@ export interface DepotSync {
     plan: 'gratuit' | 'pro',
     note: string,
   ): Promise<{ organizationId: string } | null>
+
+  /** Même geste, par ORGANISATION : l'éditeur n'est membre d'aucun restaurant client. */
+  changerFormuleOrganisation(
+    organizationId: string,
+    plan: 'gratuit' | 'pro',
+    note: string,
+  ): Promise<boolean>
+
+  /**
+   * Tous les clients et leur formule — pour l'écran de l'ÉDITEUR. Lu avec
+   * le rôle privilégié du service : la route l'a réservé aux éditeurs avant
+   * d'appeler, et c'est la seule lecture transversale à tous les clients.
+   */
+  listerClients(): Promise<
+    readonly {
+      organizationId: string
+      nom: string
+      plan: string
+      depuis: string | null
+      note: string | null
+      etablissements: readonly { nom: string; ferme: boolean }[]
+    }[]
+  >
 
   /** Retire un canal que le navigateur a révoqué (404 ou 410). */
   supprimerAbonnement(endpoint: string): Promise<void>

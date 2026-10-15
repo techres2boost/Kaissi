@@ -158,6 +158,17 @@ jobs:
           # pour le voir ; il ne faudra plus.
           node apps/pos/tests/largeur-telephone.mjs
 
+      # L'inscription depuis la caisse, sur la cible WEB : sa base est
+      # persistée (IndexedDB). En dev, la base est en mémoire et le test
+      # passerait même sans la correction — c'est vérifié : il échoue si la
+      # base locale n'est pas vidée et si la graine revient au rechargement.
+      - name: Ouvrir un restaurant depuis la caisse — sans les employés de démonstration
+        run: |
+          pnpm --filter @kaissi/pos build:web
+          pnpm --filter @kaissi/pos preview:web --host 127.0.0.1 &
+          npx wait-on -t 60000 http://127.0.0.1:4173/
+          node apps/pos/tests/inscription-caisse.mjs
+
       # Le back-office n'avait AUCUN test de largeur : le même défaut s'y est
       # produit, découvert sur le même iPhone — « Se déconnecter » passait à
       # la ligne, à cheval sur l'adresse e-mail. Il rend les VRAIS composants

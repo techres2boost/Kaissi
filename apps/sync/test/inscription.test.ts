@@ -16,7 +16,7 @@
 
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { Client } from 'pg'
-import { uuidV7 } from '@kaissi/domain'
+import { uuidV7, verifierPin } from '@kaissi/domain'
 import { DepotPostgres } from '../src/depot-postgres.js'
 import { creerServeur } from '../src/serveur.js'
 import { URL_TEST } from './aide.js'
@@ -274,5 +274,35 @@ describe('POST /inscription', () => {
     )
     expect(apres[0].n).toBe(1)
     expect(membres[0].n).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('POST /inscription — le PIN de caisse du gérant', () => {
+  /*
+   * PANNE SIGNALÉE : après « Ouvrir mon restaurant », la caisse n'avait
+   * personne à qui ouvrir la prise de poste — le gérant avait un compte,
+   * pas de PIN. Elle affichait à la place les employés de démonstration.
+   */
+  it('le PIN choisi est HACHÉ et posé sur le gérant — jamais stocké en clair', async () => {
+    const { statut, corps } = await inscrire({ ...valide(), pin: '4826' })
+    expect(statut).toBe(200)
+
+    const { rows } = await client.query('select pin_hash from kaissi.users where id = $1', [
+      corps['employeId'],
+    ])
+    const hachage = rows[0].pin_hash as string
+    expect(hachage).toMatch(/^argon2id\$/)
+    expect(hachage).not.toContain('4826')
+    expect(verifierPin('4826', hachage)).toBe(true)
+  })
+
+  it('un PIN trop facile est refusé AVANT de créer quoi que ce soit', async () => {
+    const demande = { ...valide(), pin: '1234' }
+    const { statut } = await inscrire(demande)
+    expect(statut).toBe(401)
+    const { rows } = await client.query('select 1 from kaissi.users where email = $1', [
+      demande.email,
+    ])
+    expect(rows).toHaveLength(0)
   })
 })

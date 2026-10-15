@@ -130,6 +130,21 @@ export async function installerGraine(db: AdaptateurSqlite): Promise<boolean> {
   const deja = await db.lireUne<{ n: number }>('SELECT COUNT(*) AS n FROM products')
   if ((deja?.n ?? 0) > 0) return false
 
+  /*
+   * JAMAIS sur une caisse en service — même à carte vide.
+   *
+   * Une caisse qu'on vient d'inscrire ou de basculer vers un autre
+   * établissement a une base vidée : sa carte n'arrive qu'au premier pull.
+   * Redémarrée entre les deux, elle reposait la graine — et la graine RÉÉCRIT
+   * l'identité (`device_id`, `restaurant_id`) avec celle de la démonstration.
+   * La caisse redevenait « Snack Lac 1 », et ses ventes étaient signées par
+   * un appareil que le serveur refuse.
+   */
+  const appareil = await db.lireUne<{ valeur: string | null }>(
+    "SELECT valeur FROM sync_state WHERE cle = 'device_id'",
+  )
+  if (appareil?.valeur && appareil.valeur !== DEMO_DEVICE) return false
+
   const maintenant = new Date().toISOString()
 
   await db.transaction(async () => {

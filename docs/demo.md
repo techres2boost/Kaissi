@@ -116,6 +116,13 @@ Joue les étapes dans l'ordre : chaque ticket alimente un rapport précis du §4
 
 ### 3.1 Prise de poste
 
+> **Qui apparaît ici ?** Les employés **de l'établissement** qui ont un PIN —
+> pas le compte e-mail qui a mis la caisse en service. L'e-mail rattache la
+> **tablette** au restaurant, une fois ; ensuite chacun prend son poste avec
+> **son PIN**. Sur Snack Lac 1, Ahmed, Karim et Salma sont de vrais employés
+> de l'établissement (créés pour la démonstration). Un employé s'ajoute au
+> back-office : **Paramètres → Employés → Embaucher**, avec son PIN.
+
 Choisis **Salma**, PIN `2468`, ouvre la caisse avec un fond de **50**.
 
 **Attendu** : l'écran de la salle (menu ☰ → **Ventes**) avec les tables.
@@ -539,15 +546,27 @@ changer.
 
 ### 9.2 Changer de formule (éditeur)
 
-Une fois : dans **Railway**, variable `KAISSI_EDITEURS` = ton e-mail de
-connexion au back-office (plusieurs : séparés par des virgules), puis
-redéploie.
+L'**éditeur**, c'est Res2Boost : la personne qui vend Kaissi, pas un
+restaurant. Il n'existe pas de « compte administrateur du POS » à part : on
+déclare quels comptes du back-office sont éditeurs.
 
-**Paramètres → Abonnement** → bloc **« Changer la formule — éditeur »** →
-**Passer en Payant** / **Passer en Gratuit**.
+Une fois : dans **Railway** → service de synchronisation → **Variables** →
+`KAISSI_EDITEURS` = l'**e-mail avec lequel tu te connectes au back-office**
+(plusieurs : séparés par des virgules), puis redéploie. Pour la
+démonstration, c'est ton propre e-mail : tu es à la fois l'éditeur et
+l'administrateur de Snack Lac 1.
 
-**Attendu** : effet immédiat, sur toute l'organisation. Dans une fenêtre
-privée avec le compte du bar ou d'un gérant : le bloc n'apparaît pas.
+1. Accueil du back-office → **« 🧾 Éditeur — clients et formules »** (ou
+   `…/editeur`).
+   **Attendu** : **tous** les clients, leurs établissements, leur formule, et
+   deux boutons **Gratuit / Payant** par client — y compris des restaurants
+   dont tu n'es pas membre.
+2. Change la formule d'un client.
+   **Attendu** : effet immédiat sur toute son organisation.
+3. Le même bloc existe dans **Paramètres → Abonnement** d'un établissement
+   dont tu es membre.
+4. Dans une fenêtre privée avec le compte du bar ou d'un gérant : ni le
+   lien, ni le bloc ; `…/editeur` répond **introuvable**.
 
 En ligne de commande (même effet) : `pnpm sync:abonnement --organisation
 <uuid> --formule gratuit|pro`, à la racine du dépôt.
@@ -578,9 +597,13 @@ Repasse en **Payant** à la fin.
    **Attendu** : bandeau « article(s) sans coût d'achat saisi — le total est
    incomplet ».
 3. Crée un fournisseur **Sfax Primeurs** (contact, téléphone).
-4. **Stock** → Mouvement → Réception → tape « Sfax » dans Fournisseur.
-   **Attendu** : le nom est **proposé**. Après enregistrement, la fiche compte
-   **1 réception rattachée**.
+4. **Stock** → Mouvement → Réception → tape « Sfax » dans Fournisseur, et
+   **choisis** « Sfax Primeurs » dans la liste.
+   **Attendu** : le nom est **proposé**. Après enregistrement, retourne dans
+   **Articles → Inventaire avancé**, bloc **Fournisseurs** : sous « Sfax
+   Primeurs », **« 1 réception(s) rattachée(s) »**. Seul un nom **identique**
+   à une fiche est rattaché — « Aziza » tapé sans fiche reste un nom libre
+   dans l'historique, rattaché à rien.
 5. Saisis une réception avec un fournisseur **sans fiche**.
    **Attendu** : elle passe quand même. La fiche est une aide, jamais une
    obligation.
@@ -620,7 +643,9 @@ Lac 2, sans rien du premier.
 ### 10.2 Fermer puis supprimer un établissement
 
 1. **Fermer l'établissement** sur Snack Lac 2.
-   **Attendu** : il est rangé à part, avec sa date de fermeture. Une
+   **Attendu** : il est rangé à part, avec sa date de fermeture — dans
+   l'Administration **et** sur l'écran d'accueil « Vos établissements »
+   (section « Établissements fermés », étiquette **fermé**). Une
    **nouvelle** caisse ne peut plus s'y appairer ; une caisse **déjà
    appairée** continue d'envoyer ses ventes.
 2. **Rouvrir** : tout revient.
@@ -633,10 +658,14 @@ Lac 2, sans rien du premier.
 
 ### 10.3 Un nouveau client
 
-- **Depuis la caisse** (APK ou web) : écran de mise en service → ouvrir un
-  restaurant → e-mail, mot de passe, nom du restaurant. Le restaurant, le
-  compte administrateur et l'appairage sont créés d'un coup, en formule
-  **Gratuit**. Le taux de TVA est posé à **0 %** : le régler en premier.
+- **Depuis la caisse** (APK ou web) : accueil → **Créer un compte** → nom du
+  restaurant, votre nom, e-mail, mot de passe, et **votre code PIN de
+  caisse** (deux fois). Le restaurant, le compte administrateur et
+  l'appairage sont créés d'un coup, en formule **Gratuit**.
+  **Attendu** : l'écran **« C'est ouvert »** avec l'avertissement sur le
+  taux de TVA (posé à **0 %** : le régler en premier) → **Commencer** → la
+  prise de poste ne propose **que vous**, avec votre PIN. **Aucun** employé
+  de démonstration (Ahmed, Karim, Salma), ni la carte de Snack Lac 1.
 - **Depuis le poste de l'exploitant** :
 
 ```bash

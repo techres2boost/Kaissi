@@ -145,6 +145,9 @@ export default async function PageAbonnement({
             l’organisation, aussitôt ; la caisse n’est jamais concernée.
           </p>
           <ChangerFormule restaurant={restaurant} planActuel={etat.plan} />
+          <p className="indication">
+            <Link href="/editeur">Tous les clients et leur formule →</Link>
+          </p>
         </section>
       )}
 
