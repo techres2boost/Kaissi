@@ -76,3 +76,4 @@ supabase/.temp/
 # personne ne relit jamais.
 ressources-store/captures/
 ressources-store/captures-apple/
+ressources-store/*.zip
