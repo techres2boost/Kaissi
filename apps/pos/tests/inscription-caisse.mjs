@@ -81,26 +81,46 @@ await etape('inscription avec un PIN de caisse', async () => {
   if (demande?.pin !== '4826') throw new Error(`le PIN n’est pas parti au serveur : ${JSON.stringify(demande)}`)
 })
 
-const aucunEmployeDeDemo = async () => {
-  // D'abord PROUVER qu'on est sur la caisse rattachée — une absence de noms
-  // sur l'écran d'accueil ne prouverait rien.
+const prisePoste = async () => {
   await page.waitForSelector('text=Prise de poste', { timeout: 20000 })
   const texte = await page.textContent('body')
+  // Les employés de la DÉMONSTRATION ne doivent plus apparaître…
   for (const nom of ['Ahmed', 'Karim', 'Salma']) {
     if (texte.includes(nom)) throw new Error(`« ${nom} » (démonstration) est encore proposé`)
   }
+  // …et le GÉRANT qu'on vient de créer, SI : une caisse vide (« Aucun
+  // employé habilité ») serait un cul-de-sac — c'est la panne signalée.
+  if (!texte.includes('Fatma Ben Salah')) {
+    throw new Error('le gérant inscrit n’est PAS proposé — la caisse est vide')
+  }
 }
 
-await etape('les employés de démonstration ont disparu', async () => {
+await etape('la prise de poste propose le gérant, PAS la démonstration', async () => {
   await page.click('button:has-text("Commencer")')
   await page.waitForTimeout(1500)
-  await aucunEmployeDeDemo()
+  await prisePoste()
 })
 
-await etape('ils ne reviennent pas au rechargement', async () => {
+await etape('le gérant ouvre la caisse avec SON PIN — sans aucun pull', async () => {
+  // Seul employé : il est présélectionné, le pavé est déjà là. Sinon, on le
+  // choisit d'abord. Les deux chemins mènent au pavé.
+  if (!(await page.$('.pave'))) {
+    await page.click('text=Fatma Ben Salah')
+    await page.waitForSelector('.pave', { timeout: 10000 })
+  }
+  for (const c of '4826') await page.click(`.pave button:text-is("${c}")`)
+  await page.click('.pave .valider')
+  // Ouverture de caisse = PIN accepté, donc le hachage local est bon.
+  await page.waitForSelector('text=Ouverture de caisse', { timeout: 20000 })
+})
+
+await etape('la démonstration ne revient pas au rechargement (base persistée)', async () => {
   await page.reload({ waitUntil: 'networkidle' })
-  await page.waitForTimeout(2000)
-  await aucunEmployeDeDemo()
+  await page.waitForTimeout(3000)
+  const texte = await page.textContent('body')
+  for (const nom of ['Ahmed', 'Karim', 'Salma']) {
+    if (texte.includes(nom)) throw new Error(`« ${nom} » (démonstration) est revenu après rechargement`)
+  }
 })
 
 await nav.close()

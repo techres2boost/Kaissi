@@ -25,6 +25,7 @@ import {
   DEMO_ORG,
   DEMO_RESTO,
   GRAINE_SANS_EQUIVALENT_SERVEUR,
+  installerGerantLocal,
   installerGraine,
   retirerGraineSansEquivalentServeur,
 } from './graine.js'
@@ -161,5 +162,40 @@ describe('la graine ne revient JAMAIS sur une caisse en service', () => {
       "SELECT valeur FROM sync_state WHERE cle = 'device_id'",
     )
     expect(id?.valeur).toBe(vrai)
+  })
+})
+
+describe('installerGerantLocal — la caisse ouvre AVANT le premier pull', () => {
+  it('écrit le gérant actif, et le pull le remplace sous le même id (pas de doublon)', async () => {
+    db = adaptateurNode(':memory:')
+    await migrer(db)
+
+    const gerant = {
+      id: '01a0f000-0000-7000-8000-00000000ca11',
+      organizationId: '01a0f000-0000-7000-8000-00000000000a',
+      restaurantId: '01a0f000-0000-7000-8000-00000000000b',
+      nom: 'Fatma Ben Salah',
+      pinHache: 'argon2id$m=8192,t=3,p=1$c2VsLWxvY2Fs$aGFjaGUtbG9jYWw=',
+    }
+    await installerGerantLocal(db, gerant)
+
+    const l = await db.lireUne<{ n: number; role: string; actif: number; pin: string }>(
+      `SELECT count(*) AS n, max(role) AS role, max(is_active) AS actif, max(pin_hash) AS pin
+         FROM employees WHERE id = ?`,
+      [gerant.id],
+    )
+    expect(l?.n).toBe(1)
+    expect(l?.role).toBe('admin')
+    expect(l?.actif).toBe(1)
+    expect(l?.pin).toBe(gerant.pinHache)
+
+    // Le pull descend le MÊME id avec le hash du serveur : upsert, pas doublon.
+    await installerGerantLocal(db, { ...gerant, pinHache: 'argon2id$serveur' })
+    const apres = await db.lireUne<{ n: number; pin: string }>(
+      'SELECT count(*) AS n, max(pin_hash) AS pin FROM employees WHERE id = ?',
+      [gerant.id],
+    )
+    expect(apres?.n).toBe(1)
+    expect(apres?.pin).toBe('argon2id$serveur')
   })
 })

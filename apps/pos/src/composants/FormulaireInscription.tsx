@@ -25,11 +25,12 @@ import { expliquerEchecReseau } from '../donnees/diagnostic-reseau.js'
 import { estNatif } from '../donnees/sqlite.js'
 import {
   dejaEnService,
+  installerGerantLocal,
   motifDeRefus,
   peutBasculer,
   reinitialiserPourAutreEtablissement,
 } from '@kaissi/db-local'
-import { pinTropFaible } from '@kaissi/domain'
+import { hacherPin, pinTropFaible } from '@kaissi/domain'
 
 export function FormulaireInscription({
   onInscrit,
@@ -149,6 +150,26 @@ export function FormulaireInscription({
       if (corps.organizationId) await app.etat.ecrire('organization_id', corps.organizationId)
       if (corps.prefixe) await app.etat.ecrire('ticket_prefix', corps.prefixe)
       if (corps.employeId) await app.etat.ecrire('employe_appaireur', corps.employeId)
+
+      /*
+       * Le GÉRANT, écrit localement TOUT DE SUITE — sinon la caisse est vide.
+       *
+       * PANNE SIGNALÉE. La base vidée, le gérant ne descend qu'au PREMIER
+       * pull (par `change_log`). Entre les deux, la prise de poste affiche
+       * « Aucun employé habilité » : le restaurateur qui vient d'ouvrir son
+       * compte est bloqué sur sa propre caisse. On l'écrit ici, avec son PIN
+       * haché sur place ; le pull le réécrira sous le MÊME id (pas de
+       * doublon). La caisse ouvre à la seconde, en ligne comme hors ligne.
+       */
+      if (corps.employeId && corps.organizationId && corps.restaurantId) {
+        await installerGerantLocal(app.base.adaptateur, {
+          id: corps.employeId,
+          organizationId: corps.organizationId,
+          restaurantId: corps.restaurantId,
+          nom: nomGerant.trim() || email.trim().split('@')[0]!,
+          pinHache: hacherPin(pin),
+        })
+      }
 
       /*
        * PAS de `rafraichir()` ici — et c'était un défaut grave.

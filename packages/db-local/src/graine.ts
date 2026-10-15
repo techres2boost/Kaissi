@@ -126,6 +126,54 @@ export async function retirerGraineSansEquivalentServeur(db: AdaptateurSqlite): 
  * Installe la graine si — et seulement si — la base est vide.
  * Idempotent : rappeler cette fonction ne double jamais le catalogue.
  */
+/**
+ * Écrit le GÉRANT dans la base locale, à l'inscription depuis la caisse.
+ *
+ * ── Pourquoi c'est indispensable, et pas une commodité ────────────────────
+ *
+ * L'inscription vide la base locale (elle appartenait à la démonstration),
+ * puis adopte l'identité renvoyée par le serveur. Le gérant, lui, descend
+ * par `change_log` comme le reste du référentiel — mais au PREMIER pull
+ * seulement. Entre les deux, la caisse n'a AUCUN employé : la prise de poste
+ * affiche « Aucun employé habilité », et le restaurateur qui vient d'ouvrir
+ * son compte est bloqué sur sa propre caisse.
+ *
+ * On écrit donc le gérant tout de suite, avec son PIN. L'identité est connue
+ * (le serveur l'a renvoyée) ; la caisse est utilisable à la seconde, en ligne
+ * comme hors ligne. Au premier pull, le miroir retrouve CE MÊME `id` et fait
+ * un UPDATE (jamais un doublon) : il réécrit `pin_hash` avec le sien — le PIN
+ * reste le même, seul le sel change.
+ *
+ * Le hachage est fait ICI, sur la tablette : le PIN en clair ne quitte pas
+ * l'appareil pour revenir haché, et la vérification reste hors ligne.
+ */
+export async function installerGerantLocal(
+  db: AdaptateurSqlite,
+  gerant: {
+    id: string
+    organizationId: string
+    restaurantId: string
+    nom: string
+    pinHache: string
+  },
+): Promise<void> {
+  await db.executer(
+    `INSERT INTO employees
+       (id, organization_id, restaurant_id, full_name, role, pin_hash,
+        permissions, code, is_active)
+     VALUES (?, ?, ?, ?, 'admin', ?, '{}', NULL, 1)
+     ON CONFLICT (id) DO UPDATE SET
+       organization_id = excluded.organization_id,
+       restaurant_id   = excluded.restaurant_id,
+       full_name       = excluded.full_name,
+       role            = excluded.role,
+       pin_hash        = excluded.pin_hash,
+       is_active       = 1,
+       archived_at     = NULL`,
+    [gerant.id, gerant.organizationId, gerant.restaurantId, gerant.nom, gerant.pinHache],
+  )
+}
+
 export async function installerGraine(db: AdaptateurSqlite): Promise<boolean> {
   const deja = await db.lireUne<{ n: number }>('SELECT COUNT(*) AS n FROM products')
   if ((deja?.n ?? 0) > 0) return false
