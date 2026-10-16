@@ -153,6 +153,23 @@ export function rendreTicketClient(
     fragments.push(COMMANDES.gras(false))
   }
 
+  // Un ticket réédité après un remboursement le DIT, avec le motif : sans
+  // ces lignes, il affirmerait encaissée une somme qui ne l'est plus.
+  // `?? []` : un ticket construit par une version antérieure du domaine,
+  // resté en file d'impression, n'a pas ce champ.
+  const rendus = ticket.remboursements ?? []
+  if (rendus.length > 0) {
+    fragments.push(separateur(c) + LF)
+    for (const r of rendus) {
+      fragments.push(ligneAlignee('Remboursé', `-${mnt(r.montantMillimes)}`, c) + LF)
+      for (const morceau of replier(`  ${r.motif}`, c)) fragments.push(morceau + LF)
+    }
+    const net = ticket.totalMillimes - rendus.reduce<number>((t, r) => t + r.montantMillimes, 0)
+    fragments.push(COMMANDES.gras(true))
+    fragments.push(ligneAlignee('Net encaissé', mnt(net as typeof ticket.totalMillimes), c) + LF)
+    fragments.push(COMMANDES.gras(false))
+  }
+
   fragments.push(LF, COMMANDES.aligner('centre'))
   for (const l of ticket.piedDePage) {
     for (const morceau of replier(l, c)) fragments.push(morceau + LF)
@@ -254,6 +271,12 @@ export function rendreTicketShift(
   }
   if (r.sortiesMillimes > 0) {
     fragments.push(ligneAlignee('Sorties', `-${mnt(r.sortiesMillimes)}`, c) + LF)
+  }
+  // `?? 0` : un résumé produit avant le remboursement n'a pas ce champ.
+  if ((r.remboursementsEspecesMillimes ?? 0) > 0) {
+    fragments.push(
+      ligneAlignee('Remboursé en espèces', `-${mnt(r.remboursementsEspecesMillimes)}`, c) + LF,
+    )
   }
   fragments.push(COMMANDES.gras(true))
   fragments.push(ligneAlignee('ATTENDU EN CAISSE', mnt(r.attenduMillimes), c) + LF)

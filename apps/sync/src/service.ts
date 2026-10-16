@@ -74,12 +74,40 @@ function identifiantsMalFormes(m: MutationCatalogue): string | null {
   }
 }
 
-const TYPES_CONNUS = new Set([
+export const TYPES_CONNUS: ReadonlySet<string> = new Set([
   'order.opened', 'line.added', 'line.quantity_changed', 'line.voided',
   'line.note_set', 'discount.applied', 'discount.removed', 'service.set',
   'customer.attached', 'table.moved', 'order.sent', 'payment.recorded',
-  'payment.voided', 'order.closed', 'order.cancelled',
+  'payment.voided', 'order.closed', 'order.cancelled', 'refund.recorded',
 ])
+
+/**
+ * La forme d'un REMBOURSEMENT, vérifiée avant toute insertion.
+ *
+ * L'enveloppe ne suffit pas ici : ce payload finit dans des colonnes
+ * `uuid` et `bigint`. Un identifiant mal formé ferait échouer la
+ * projection — donc le push, donc tout ce qui suit dans l'outbox. On le
+ * refuse à l'entrée, avec un motif, plutôt que de bloquer une caisse.
+ */
+function validerRemboursement(e: EvenementCommande): string | null {
+  if (e.type !== 'refund.recorded') return null
+  const p = e.payload as EvenementCommande<'refund.recorded'>['payload']
+  if (!p || typeof p !== 'object') return 'Remboursement sans contenu.'
+  if (!estUuid(p.remboursementId)) return 'Identifiant de remboursement invalide.'
+  if (!estUuid(p.paiementId)) return 'Identifiant de paiement invalide.'
+  if (!Number.isSafeInteger(p.montantMillimes) || p.montantMillimes < 0) {
+    return 'Montant de remboursement invalide : un entier de millimes, jamais négatif.'
+  }
+  if (!Array.isArray(p.ligneIds) || p.ligneIds.some((id) => !estUuid(id))) {
+    return 'Lignes remboursées invalides.'
+  }
+  if (typeof p.motif !== 'string' || p.motif.trim() === '') {
+    return 'Un remboursement exige un motif.'
+  }
+  if (p.shiftId != null && !estUuid(p.shiftId)) return 'Service de caisse invalide.'
+  if (p.autorisePar != null && !estUuid(p.autorisePar)) return 'Autorisation invalide.'
+  return null
+}
 
 interface Refus {
   readonly code: CodeRejet
@@ -118,6 +146,8 @@ function validerForme(
       message: `Type d'événement « ${e.type} » inconnu de ce serveur.`,
     }
   }
+  const refusRemboursement = validerRemboursement(e)
+  if (refusRemboursement) return { code: 'charge_invalide', message: refusRemboursement }
   if (!Number.isSafeInteger(e.seqDevice) || e.seqDevice <= 0) {
     return { code: 'charge_invalide', message: 'Compteur local invalide.' }
   }

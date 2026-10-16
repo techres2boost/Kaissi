@@ -182,7 +182,7 @@ async function DetailTicket({
   // la même chaîne que la caisse. Chargé en parallèle du reste : il répond à
   // une autre question, et l'une ne doit pas attendre l'autre.
   const ticketPapier = await reconstruireTicket(restaurantId, orderId)
-  const [commandeRes, lignesRes, paiementsRes] = await Promise.all([
+  const [commandeRes, lignesRes, paiementsRes, remboursementsRes] = await Promise.all([
     supabase
       .from('orders')
       .select(
@@ -202,6 +202,14 @@ async function DetailTicket({
       .from('payments')
       .select('id, type, amount_millimes, change_millimes, voided_at, created_at')
       .eq('order_id', orderId),
+    // Les remboursements de CETTE vente — quel que soit le jour où l'argent
+    // a été rendu. Filtrés par commande, jamais par la période affichée.
+    supabase
+      .from('refunds')
+      .select('id, type, amount_millimes, reason, created_at')
+      .eq('order_id', orderId)
+      .eq('restaurant_id', restaurantId)
+      .order('created_at', { ascending: true }),
   ])
 
   const commande = commandeRes.data
@@ -215,6 +223,8 @@ async function DetailTicket({
 
   const lignes = lignesRes.data ?? []
   const paiements = paiementsRes.data ?? []
+  const remboursements = remboursementsRes.data ?? []
+  const rembourse = remboursements.reduce((t, r) => t + r.amount_millimes, 0)
 
   return (
     <section className="bloc detail-ticket">
@@ -368,6 +378,37 @@ async function DetailTicket({
                 ))}
               </tbody>
             </table>
+          )}
+
+          {remboursements.length > 0 && (
+            <>
+              <h3>Remboursements</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Le</th>
+                    <th>Motif</th>
+                    <th>Rendu en</th>
+                    <th className="nombre">Montant</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {remboursements.map((r) => (
+                    <tr key={r.id}>
+                      <td>{heure(r.created_at)}</td>
+                      <td>{r.reason}</td>
+                      <td>{r.type ? (LIBELLE_PAIEMENT[r.type] ?? r.type) : '—'}</td>
+                      <td className="nombre">− {formaterTND(montant(r.amount_millimes))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="indication">
+                Net encaissé : <strong>{formaterTND(montant(commande.total_millimes - rembourse))}</strong>.
+                La vente reste dans le chiffre d’affaires ; le remboursement apparaît à part, à la
+                date où l’argent a été rendu.
+              </p>
+            </>
           )}
         </div>
       </div>

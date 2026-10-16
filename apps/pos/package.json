@@ -30,6 +30,7 @@
     "test:persistance": "node tests/persistance-web.mjs",
     "test:inscription": "node tests/inscription-caisse.mjs",
     "test:carte": "node tests/carte-depuis-la-caisse.mjs",
+    "test:remboursement": "node tests/remboursement-caisse.mjs",
     "test": "vitest run",
     "verifier:gradle": "node scripts/verifier-gradle.mjs",
     "aab": "node scripts/aab.mjs",

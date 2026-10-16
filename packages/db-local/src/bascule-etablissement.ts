@@ -91,6 +91,7 @@ const TABLES_ACTIVITE = [
   'order_events',
   'order_items',
   'payments',
+  'refunds',
   'orders',
   'kitchen_sends',
   'cash_movements',

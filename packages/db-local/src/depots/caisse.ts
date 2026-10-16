@@ -45,6 +45,8 @@ export interface Recu {
   employe: string | null
   /** « Espèces », « Carte »… séparés par une virgule si la note est partagée. */
   paiements: string
+  /** L'argent déjà rendu sur ce ticket. 0 tant que rien ne l'a été. */
+  rembourseMillimes: number
   /**
    * Cette vente attend-elle encore d'être envoyée ?
    *
@@ -356,6 +358,26 @@ export function depotCaisse(db: AdaptateurSqlite) {
       }))
     },
 
+    /**
+     * L'argent rendu PENDANT ce service — quel que soit le jour de la vente.
+     *
+     * Lu par le service de caisse porté dans l'événement de remboursement,
+     * et non par celui de la commande : rembourser lundi une vente de
+     * samedi fait sortir l'argent du tiroir de lundi.
+     */
+    async remboursementsDe(
+      shiftId: string,
+    ): Promise<{ mode: ModePaiement; montantMillimes: Millimes }[]> {
+      const lignes = await db.lire<{ type: string; amount_millimes: number }>(
+        'SELECT type, amount_millimes FROM refunds WHERE shift_id = ?',
+        [shiftId],
+      )
+      return lignes.map((l) => ({
+        mode: l.type as ModePaiement,
+        montantMillimes: l.amount_millimes as Millimes,
+      }))
+    },
+
     async totauxDe(
       shiftId: string,
     ): Promise<{ nombreCommandes: number; chiffreAffairesMillimes: number }> {
@@ -497,6 +519,7 @@ export function depotCaisse(db: AdaptateurSqlite) {
         employe: string | null
         paiements: string | null
         en_attente: number
+        rembourse: number | null
       }>(
         `SELECT o.id, o.ticket_number, o.type, t.label AS table_label, o.status,
                 o.total_millimes,
@@ -507,7 +530,9 @@ export function depotCaisse(db: AdaptateurSqlite) {
                 (SELECT GROUP_CONCAT(DISTINCT p.type) FROM payments p
                   WHERE p.order_id = o.id AND p.voided_at IS NULL) AS paiements,
                 EXISTS (SELECT 1 FROM order_events ev
-                         WHERE ev.order_id = o.id AND ev.server_seq IS NULL) AS en_attente
+                         WHERE ev.order_id = o.id AND ev.server_seq IS NULL) AS en_attente,
+                (SELECT SUM(r.amount_millimes) FROM refunds r
+                  WHERE r.order_id = o.id) AS rembourse
          FROM orders o
          LEFT JOIN tables t ON t.id = o.table_id
          LEFT JOIN employees e ON e.id = o.opened_by
@@ -528,6 +553,7 @@ export function depotCaisse(db: AdaptateurSqlite) {
         employe: l.employe,
         paiements: l.paiements ?? '',
         enAttente: l.en_attente === 1,
+        rembourseMillimes: l.rembourse ?? 0,
       }))
     },
 

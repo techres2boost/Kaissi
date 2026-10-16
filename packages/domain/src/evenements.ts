@@ -32,6 +32,7 @@ export type TypeEvenement =
   | 'payment.voided'
   | 'order.closed'
   | 'order.cancelled'
+  | 'refund.recorded'
 
 export type TypeCommande = 'dine_in' | 'takeaway' | 'delivery'
 export type ModePaiement = 'cash' | 'card' | 'online' | 'other'
@@ -124,6 +125,32 @@ export interface ChargesUtiles {
   'payment.voided': { paiementId: Uuid; motif?: string; autorisePar?: Uuid }
   'order.closed': { totalMillimes: Millimes; closePar: Uuid }
   'order.cancelled': { motif: string; autorisePar: Uuid }
+  /**
+   * De l'argent RENDU au client, après encaissement.
+   *
+   * Un événement de plus, jamais une correction de la vente : le ticket reste
+   * encaissé, et le journal dit désormais aussi ce qui a été rendu, combien,
+   * pourquoi, et qui l'a autorisé.
+   *
+   * Le montant est calculé par `calculerRemboursement` — la même règle sur la
+   * tablette et au serveur. Il VOYAGE quand même dans l'événement : c'est la
+   * somme qui a quitté le tiroir, et elle ne doit pas changer si une règle
+   * évolue l'an prochain.
+   *
+   * `shiftId` aussi voyage : l'argent sort du tiroir OUVERT au moment du
+   * remboursement, qui n'est pas forcément celui de la vente. Le recalculer
+   * à la projection donnerait un autre service à chaque rejeu.
+   */
+  'refund.recorded': {
+    remboursementId: Uuid
+    paiementId: Uuid
+    mode: ModePaiement
+    montantMillimes: Millimes
+    ligneIds: Uuid[]
+    motif: string
+    shiftId?: Uuid | null
+    autorisePar?: Uuid
+  }
 }
 
 /** Enveloppe commune à tous les événements. */

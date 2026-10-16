@@ -106,10 +106,11 @@ export function EcranClotureShift({ shift, onFerme, onAnnuler }: PropsCloture) {
   useEffect(() => {
     let vivant = true
     void (async () => {
-      const [encaissements, mouvements, totaux] = await Promise.all([
+      const [encaissements, mouvements, totaux, remboursements] = await Promise.all([
         app.caisse.encaissementsDe(shift.id),
         app.caisse.mouvementsDe(shift.id),
         app.caisse.totauxDe(shift.id),
+        app.caisse.remboursementsDe(shift.id),
       ])
       if (!vivant) return
       setResume(
@@ -119,6 +120,7 @@ export function EcranClotureShift({ shift, onFerme, onAnnuler }: PropsCloture) {
           mouvements,
           nombreCommandes: totaux.nombreCommandes,
           chiffreAffairesMillimes: millimes(totaux.chiffreAffairesMillimes),
+          remboursements,
         }),
       )
     })()
@@ -217,6 +219,12 @@ export function EcranClotureShift({ shift, onFerme, onAnnuler }: PropsCloture) {
             <>
               <dt>Sorties d'espèces</dt>
               <dd>− {formaterTND(resume.sortiesMillimes)}</dd>
+            </>
+          )}
+          {resume.remboursementsEspecesMillimes > 0 && (
+            <>
+              <dt>Remboursé en espèces</dt>
+              <dd>− {formaterTND(resume.remboursementsEspecesMillimes)}</dd>
             </>
           )}
           <dt className="fort">Attendu en caisse</dt>

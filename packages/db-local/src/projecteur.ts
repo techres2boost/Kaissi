@@ -1,5 +1,5 @@
 /**
- * Projecteur — journal d'événements → tables `orders` / `order_items` / `payments`.
+ * Projecteur — journal d'événements → `orders` / `order_items` / `payments` / `refunds`.
  *
  * Le POS n'interroge JAMAIS le journal pour afficher une liste de commandes :
  * rejouer les événements de la journée à chaque rafraîchissement d'écran
@@ -213,6 +213,34 @@ export async function projeterCommande(
           contexte.shiftId ?? null,
           paiement.annule ? paiement.enregistreA : null,
           paiement.enregistreA,
+        ],
+      )
+    }
+
+    // Les remboursements, reconstruits comme les paiements. Leur service de
+    // caisse vient de l'événement, jamais de `contexte` : voir migration 016.
+    await db.executer('DELETE FROM refunds WHERE order_id = ?', [etat.id])
+    for (const r of etat.remboursements) {
+      await db.executer(
+        `INSERT INTO refunds (
+           id, order_id, organization_id, restaurant_id, payment_id, type,
+           amount_millimes, reason, items, shift_id, created_by, approved_by,
+           created_at
+         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [
+          r.id,
+          etat.id,
+          etat.organizationId,
+          etat.restaurantId,
+          r.paiementId,
+          r.mode,
+          r.montantMillimes,
+          r.motif,
+          JSON.stringify(r.ligneIds),
+          r.shiftId,
+          r.enregistrePar,
+          r.autorisePar,
+          r.enregistreA,
         ],
       )
     }

@@ -56,6 +56,12 @@ export interface TicketClient {
   readonly totalMillimes: Millimes
   readonly paiements: readonly { libelle: string; montantMillimes: Millimes }[]
   readonly renduMillimes: Millimes
+  /**
+   * L'argent rendu après encaissement. Un ticket RÉÉDITÉ après un
+   * remboursement doit le dire : sinon il affirme encaissée une somme qui
+   * ne l'est plus.
+   */
+  readonly remboursements: readonly { motif: string; montantMillimes: Millimes }[]
   readonly piedDePage: readonly string[]
 }
 
@@ -180,6 +186,10 @@ export function construireTicketClient(
     totalMillimes: totaux.totalMillimes,
     paiements,
     renduMillimes: Math.max(verse - totaux.totalMillimes, 0) as Millimes,
+    remboursements: etat.remboursements.map((r) => ({
+      motif: r.motif,
+      montantMillimes: r.montantMillimes,
+    })),
     piedDePage: contexte.piedDePage ?? ['Merci de votre visite !'],
   }
 }

@@ -1387,11 +1387,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: flex; flex-direction: column; gap: 0.5rem;
 }
 .liste-recus li {
-  display: grid; grid-template-columns: 1fr auto auto; gap: 0.75rem; align-items: center;
   background: var(--surface); border: 1px solid var(--bordure);
-  border-radius: var(--rayon); padding: 0.8rem 1rem; min-height: 60px;
+  border-radius: var(--rayon);
   box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
 }
+/* Toute la ligne s'ouvre : c'est elle qu'on vise, pas un lien en bout. */
+.liste-recus .ouvrir-recu {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 0.75rem; align-items: center;
+  inline-size: 100%; min-height: 60px; padding: 0.8rem 1rem;
+  background: none; border: 0; border-radius: var(--rayon);
+  color: inherit; font: inherit; text-align: start; cursor: pointer;
+}
+.liste-recus .ouvrir-recu:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .liste-recus .ref { display: flex; flex-direction: column; min-width: 0; }
 .liste-recus .ref small { color: var(--texte-2); font-size: 0.72rem; }
 .liste-recus .detail {
@@ -1424,6 +1431,29 @@ button { font: inherit; color: inherit; cursor: pointer; }
   border: 1px solid rgba(138, 106, 31, 0.4);
   white-space: nowrap;
 }
+
+/*
+ * « Remboursé » est neutre, ni rouge ni ambré : rien n'est en panne, rien
+ * n'attend. C'est un fait du ticket, qu'on doit voir avant de l'ouvrir.
+ */
+.badge.rembourse {
+  background: var(--surface-2); color: var(--texte-2);
+  border: 1px solid var(--bordure); white-space: nowrap;
+}
+
+/* Le choix des lignes à rembourser : une case, la désignation, ce qu'elle a coûté. */
+.lignes-remboursables { list-style: none; margin: 0 0 0.5rem; padding: 0; display: grid; gap: 0.4rem; }
+.lignes-remboursables label {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 0.75rem; align-items: center;
+  min-height: 52px; padding: 0.5rem 0.8rem;
+  border: 1px solid var(--bordure); border-radius: var(--rayon); background: var(--surface);
+}
+.lignes-remboursables input[type='checkbox'] { inline-size: 22px; block-size: 22px; }
+.lignes-remboursables .designation { min-width: 0; overflow-wrap: anywhere; }
+.lignes-remboursables .montant { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+/* Déjà rendue : barrée mais lisible, comme une ligne annulée — rien ne disparaît. */
+.lignes-remboursables li.deja { opacity: 0.6; }
+.lignes-remboursables li.deja .designation { text-decoration: line-through; }
 
 .charger-plus {
   margin: 0 1rem 1rem; padding: 0.8rem; min-height: 48px;

@@ -30,6 +30,7 @@ import { useEffect, useState } from 'react'
 import { formaterTND, libelleModePaiement, millimes } from '@kaissi/domain'
 import type { Recu } from '@kaissi/db-local'
 import { useApp } from '../etat/contexte.js'
+import { ModaleRecu } from '../composants/ModaleRecu.js'
 
 /** Bornée, comme la requête : un an de tickets ne tient pas dans une tablette. */
 const PAR_PAGE = 100
@@ -38,6 +39,8 @@ export function EcranRecus({ onRetour }: { readonly onRetour: () => void }) {
   const { app, version } = useApp()
   const [recus, setRecus] = useState<Recu[] | null>(null)
   const [limite, setLimite] = useState(PAR_PAGE)
+  // Le reçu ouvert : on le relit, on le rembourse.
+  const [ouvert, setOuvert] = useState<string | null>(null)
 
   useEffect(() => {
     let vivant = true
@@ -82,6 +85,11 @@ export function EcranRecus({ onRetour }: { readonly onRetour: () => void }) {
           <ul className="liste-recus">
             {recus.map((r) => (
               <li key={r.id} className={r.statut === 'annulee' ? 'annulee' : ''}>
+                {/*
+                  Toute la ligne est le bouton : sur une tablette, viser un
+                  petit « détail » en bout de ligne se rate une fois sur trois.
+                */}
+                <button type="button" className="ouvrir-recu" onClick={() => setOuvert(r.id)}>
                 <div className="ref">
                   <strong>{r.numeroTicket ?? '— sans numéro —'}</strong>
                   <small>
@@ -102,15 +110,23 @@ export function EcranRecus({ onRetour }: { readonly onRetour: () => void }) {
                     en-tête : c'est le montant qu'on compare au back-office,
                     et c'est donc là que l'explication de l'écart doit être.
                   */}
+                  {r.rembourseMillimes > 0 && (
+                    <span className="badge rembourse">
+                      remboursé {formaterTND(millimes(r.rembourseMillimes))}
+                    </span>
+                  )}
                   {r.enAttente && (
                     <span className="badge attente" title="Pas encore remontée au back-office">
                       en attente
                     </span>
                   )}
                 </div>
+                </button>
               </li>
             ))}
           </ul>
+
+          {ouvert && <ModaleRecu orderId={ouvert} onFermer={() => setOuvert(null)} />}
 
           {recus.length >= limite && (
             <button

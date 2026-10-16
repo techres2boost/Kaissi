@@ -58,9 +58,28 @@ export interface PaiementEtat {
   readonly enregistreA: string
 }
 
+/** De l'argent rendu au client, après encaissement. */
+export interface RemboursementEtat {
+  readonly id: Uuid
+  readonly paiementId: Uuid
+  readonly mode: ModePaiement
+  readonly montantMillimes: Millimes
+  readonly ligneIds: readonly Uuid[]
+  readonly motif: string
+  /** Le service de caisse d'où l'argent est sorti. */
+  readonly shiftId: Uuid | null
+  readonly autorisePar: Uuid | null
+  readonly enregistrePar: Uuid | null
+  readonly enregistreA: string
+  /** La caisse qui a rendu l'argent — pas forcément celle qui a vendu. */
+  readonly deviceId: Uuid
+}
+
 /** Type d'anomalie détectée pendant la réduction, à remonter au gérant. */
 export type TypeException =
   | 'double_cloture'
+  | 'double_remboursement'
+  | 'remboursement_hors_encaissement'
   | 'evenement_apres_cloture'
   | 'ligne_inconnue'
   | 'paiement_inconnu'
@@ -95,6 +114,8 @@ export interface EtatCommande {
   readonly clientNom: string | null
   readonly lignes: readonly LigneEtat[]
   readonly paiements: readonly PaiementEtat[]
+  /** Ce qui a été rendu au client après encaissement — jamais une correction de la vente. */
+  readonly remboursements: readonly RemboursementEtat[]
   readonly remiseGlobale: Remise | null
   readonly remiseGlobaleAutoriseePar: Uuid | null
   readonly service: { tauxBp: number; taxable: boolean; tauxTaxeId: Uuid | null } | null
@@ -143,6 +164,7 @@ function etatInitial(premier: EvenementCommande): EtatCommande {
     clientNom: null,
     lignes: [],
     paiements: [],
+    remboursements: [],
     remiseGlobale: null,
     remiseGlobaleAutoriseePar: null,
     service: null,
@@ -172,6 +194,8 @@ export function reduireEvenements(
   const ordreLignes: Uuid[] = []
   const paiements = new Map<Uuid, PaiementEtat>()
   const ordrePaiements: Uuid[] = []
+  const remboursements = new Map<Uuid, RemboursementEtat>()
+  const ordreRemboursements: Uuid[] = []
   const exceptions: ExceptionReduction[] = []
   let evenementCloture: EvenementCommande | null = null
   let ouvertureVue = false
@@ -197,8 +221,17 @@ export function reduireEvenements(
 
     // Après clôture ou annulation, seuls les événements administratifs
     // (annulation avec autorisation) restent recevables. Le reste est signalé.
+    //
+    // Le REMBOURSEMENT passe toujours : il ne modifie pas la vente, il dit
+    // que de l'argent a quitté le tiroir. L'ignorer ferait disparaître une
+    // somme bien réelle — c'est la réduction qui juge s'il était à sa place.
     const figee = etat.statut === 'close' || etat.statut === 'annulee'
-    if (figee && e.type !== 'order.cancelled' && e.type !== 'order.closed') {
+    if (
+      figee &&
+      e.type !== 'order.cancelled' &&
+      e.type !== 'order.closed' &&
+      e.type !== 'refund.recorded'
+    ) {
       signaler(
         'evenement_apres_cloture',
         e,
@@ -439,6 +472,57 @@ export function reduireEvenements(
         break
       }
 
+      case 'refund.recorded': {
+        const p = e.payload as import('./evenements.js').ChargesUtiles['refund.recorded']
+        if (remboursements.has(p.remboursementId)) break // idempotent
+
+        /*
+         * Rien n'est REFUSÉ ici : l'argent est déjà sorti du tiroir quand
+         * l'événement arrive. Ce qui n'est pas à sa place est SIGNALÉ, pour
+         * que le gérant le voie — le cas typique étant deux caisses hors
+         * ligne qui remboursent la même pizza.
+         */
+        if (etat.statut !== 'close') {
+          signaler(
+            'remboursement_hors_encaissement',
+            e,
+            `Remboursement sur une commande ${etat.statut} : seul un ticket encaissé se rembourse.`,
+          )
+        }
+        const dejaRendues = new Set<Uuid>()
+        for (const r of remboursements.values()) for (const id of r.ligneIds) dejaRendues.add(id)
+        const enDouble = p.ligneIds.filter((id) => dejaRendues.has(id))
+        if (enDouble.length > 0) {
+          const noms = enDouble.map((id) => lignes.get(id)?.designation ?? id)
+          signaler(
+            'double_remboursement',
+            e,
+            `Déjà remboursé une première fois : ${noms.join(', ')}. ` +
+              `Deux caisses ont probablement rendu la même ligne.`,
+          )
+        }
+        const inconnues = p.ligneIds.filter((id) => !lignes.has(id))
+        if (inconnues.length > 0) {
+          signaler('ligne_inconnue', e, `Remboursement d'une ligne absente : ${inconnues.join(', ')}`)
+        }
+
+        remboursements.set(p.remboursementId, {
+          id: p.remboursementId,
+          paiementId: p.paiementId,
+          mode: p.mode,
+          montantMillimes: p.montantMillimes,
+          ligneIds: [...p.ligneIds],
+          motif: p.motif,
+          shiftId: p.shiftId ?? null,
+          autorisePar: p.autorisePar ?? null,
+          enregistrePar: e.acteurId ?? null,
+          enregistreA: e.clientTs,
+          deviceId: e.deviceId,
+        })
+        ordreRemboursements.push(p.remboursementId)
+        break
+      }
+
       default: {
         // Protocole versionné : un appareil à jour peut recevoir un type
         // inconnu d'un appareil plus récent. On l'ignore SANS planter,
@@ -468,6 +552,7 @@ export function reduireEvenements(
     ...etat,
     lignes: ordreLignes.map((id) => lignes.get(id)!),
     paiements: ordrePaiements.map((id) => paiements.get(id)!),
+    remboursements: ordreRemboursements.map((id) => remboursements.get(id)!),
     nombreEvenements: ordonnes.length,
     exceptions,
   }

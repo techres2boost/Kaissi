@@ -160,6 +160,9 @@ jobs:
           # Tenir sa carte depuis la caisse (article, catégorie, réduction,
           # options), hors ligne, et le REFUS opposé à un serveur de salle.
           node apps/pos/tests/carte-depuis-la-caisse.mjs
+          # Rembourser un ticket payé : le PIN d'un gérant l'autorise, le
+          # ticket réédité le dit, et la clôture le déduit du tiroir.
+          node apps/pos/tests/remboursement-caisse.mjs
 
       # L'inscription depuis la caisse, sur la cible WEB : sa base est
       # persistée (IndexedDB). En dev, la base est en mémoire et le test

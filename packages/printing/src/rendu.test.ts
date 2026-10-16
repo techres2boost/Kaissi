@@ -65,6 +65,7 @@ const ticket: TicketClient = {
   totalMillimes: m(24_400),
   paiements: [{ libelle: 'Espèces', montantMillimes: m(24_400) }],
   renduMillimes: m(600),
+  remboursements: [],
   piedDePage: ['Merci de votre visite !'],
 }
 
@@ -146,6 +147,24 @@ describe('ticket client', () => {
     expect(texte).toContain('Escalope')
     expect(texte).toContain('champignons')
     for (const l of texte.split('\n')) expect(l.length).toBeLessThanOrEqual(32)
+  })
+
+  it('un ticket réédité après remboursement le DIT, avec le motif et le net', () => {
+    const texte = apercuTexte(
+      rendreTicketClient({
+        ...ticket,
+        remboursements: [{ motif: 'Pizza froide', montantMillimes: m(16_000) }],
+      }),
+    )
+    expect(texte).toMatch(/Remboursé\s+-16,000/)
+    expect(texte).toContain('Pizza froide')
+    expect(texte).toMatch(/Net encaissé\s+8,400/)
+  })
+
+  it('n affiche rien de plus tant que rien n a été rendu', () => {
+    const texte = apercuTexte(rendreTicketClient(ticket))
+    expect(texte).not.toContain('Remboursé')
+    expect(texte).not.toContain('Net encaissé')
   })
 
   it('affiche remises, service et timbre quand ils existent', () => {

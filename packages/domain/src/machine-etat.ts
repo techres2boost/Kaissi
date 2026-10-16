@@ -52,8 +52,9 @@ const TRANSITIONS: Readonly<Record<StatutCommande, readonly TypeEvenement[]>> = 
     'order.cancelled',
   ],
 
-  // Close : plus rien, sauf une annulation autorisée par un manager.
-  close: ['order.cancelled'],
+  // Close : plus rien, sauf une annulation autorisée par un manager — et le
+  // remboursement, qui ne modifie pas la vente : il s'y ajoute.
+  close: ['order.cancelled', 'refund.recorded'],
 
   // Annulée : terminal. Le journal reste, l'état ne bouge plus.
   annulee: [],

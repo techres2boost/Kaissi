@@ -467,8 +467,14 @@ export type Remboursement = {
   id: Uuid
   restaurant_id: Uuid
   payment_id: Uuid
+  /** Projection de `refund.recorded` (0045). Nul pour une ligne antérieure. */
+  order_id: Uuid | null
+  /** Rendu en espèces, sur carte… — 'cash' | 'card' | 'online' | 'other'. */
+  type: string | null
   amount_millimes: Millimes
   reason: string
+  approved_by: Uuid | null
+  created_by: Uuid | null
   created_at: Horodatage
 }
 

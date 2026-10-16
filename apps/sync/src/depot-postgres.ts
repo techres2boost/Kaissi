@@ -1077,7 +1077,11 @@ export class DepotPostgres implements DepotSync {
           )
           const refs = await arbitrerReferences(client, etat, {
             tables: [etat.tableId],
-            users: [etat.ouvertePar, etat.closePar],
+            users: [
+              etat.ouvertePar,
+              etat.closePar,
+              ...etat.remboursements.flatMap((r) => [r.enregistrePar, r.autorisePar]),
+            ],
             discounts: [
               etat.remiseGlobale?.reductionId,
               ...etat.lignes.map((l) => l.remise?.reductionId),
@@ -1212,6 +1216,14 @@ export class DepotPostgres implements DepotSync {
             position += 1
           }
 
+          /*
+           * Les remboursements AVANT les paiements : ils les référencent
+           * (`refunds.payment_id`, clé étrangère sans cascade, 0004).
+           * Dans l'ordre inverse, la PREMIÈRE reprojection d'un ticket déjà
+           * remboursé échouait — et avec elle le push, donc toutes les
+           * ventes suivantes de la caisse. Ils sont réinsérés plus bas.
+           */
+          await client.query('delete from kaissi.refunds where order_id = $1', [orderId])
           await client.query('delete from kaissi.payments where order_id = $1', [orderId])
           for (const p of etat.paiements) {
             await client.query(
@@ -1229,13 +1241,62 @@ export class DepotPostgres implements DepotSync {
             )
           }
 
+          /*
+           * Les remboursements, projetés comme les paiements (0045).
+           *
+           * Rien ici ne doit pouvoir faire échouer la projection : un
+           * remboursement qui ne s'insère pas bloquerait le push, donc les
+           * VENTES qui le suivent dans l'outbox. Ce qui ne trouve pas sa
+           * place est consigné dans `exceptions`, où le gérant le voit.
+           */
+          const anomaliesRemboursement: Record<string, unknown>[] = []
+          const paiementsProjetes = new Set(etat.paiements.map((p) => p.id))
+          for (const r of etat.remboursements) {
+            // Montant nul : rien n'a quitté le tiroir, et la contrainte de
+            // 0004 (montant > 0) refuserait la ligne.
+            if (r.montantMillimes <= 0) continue
+            const paiementId = paiementsProjetes.has(r.paiementId)
+              ? r.paiementId
+              : (etat.paiements[0]?.id ?? null)
+            if (paiementId === null) {
+              anomaliesRemboursement.push({
+                type: 'remboursement_sans_paiement',
+                eventId: r.id,
+                message: 'Remboursement sur une commande sans paiement : non projeté, à vérifier.',
+              })
+              continue
+            }
+            if (paiementId !== r.paiementId) {
+              anomaliesRemboursement.push({
+                type: 'remboursement_paiement_inconnu',
+                eventId: r.id,
+                message: `Paiement ${r.paiementId} absent : remboursement rattaché au premier paiement.`,
+              })
+            }
+            await client.query(
+              `insert into kaissi.refunds (
+                 id, organization_id, restaurant_id, payment_id, order_id, type,
+                 amount_millimes, reason, items, shift_id, device_id,
+                 created_by, approved_by, created_at
+               ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+              [
+                r.id, etat.organizationId, etat.restaurantId, paiementId, orderId, r.mode,
+                r.montantMillimes, r.motif, JSON.stringify(r.ligneIds), r.shiftId,
+                r.deviceId,
+                refs.garder('users', 'refunds.created_by', r.enregistrePar),
+                refs.garder('users', 'refunds.approved_by', r.autorisePar),
+                r.enregistreA,
+              ],
+            )
+          }
+
           // Les anomalies des lignes et des paiements n'étaient pas encore
           // connues à l'insertion de la commande : on les y ajoute, dans la
           // même transaction.
-          if (refs.anomalies.length > 0) {
+          if (refs.anomalies.length > 0 || anomaliesRemboursement.length > 0) {
             await client.query('update kaissi.orders set exceptions = $2 where id = $1', [
               orderId,
-              JSON.stringify([...exceptions, ...refs.anomalies]),
+              JSON.stringify([...exceptions, ...refs.anomalies, ...anomaliesRemboursement]),
             ])
           }
           await client.query('commit')

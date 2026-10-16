@@ -10,6 +10,7 @@
  *           − rendus de monnaie          (déjà déduits des encaissements)
  *           + entrées d'espèces
  *           − sorties, prélèvements, dépenses
+ *           − remboursements rendus en ESPÈCES pendant ce service
  *
  *   écart   = compté − attendu           ⚑ PEUT être négatif
  *
@@ -62,6 +63,11 @@ export interface ResumeShift {
   readonly autresMillimes: Millimes
   readonly entreesMillimes: Millimes
   readonly sortiesMillimes: Millimes
+  /**
+   * Espèces RENDUES à des clients pendant ce service — quel que soit le jour
+   * de la vente remboursée. C'est le tiroir d'aujourd'hui qui a donné l'argent.
+   */
+  readonly remboursementsEspecesMillimes: Millimes
   /** Ce que le tiroir DEVRAIT contenir. */
   readonly attenduMillimes: Millimes
   /** Ce que l'employé a compté, `null` tant que le shift est ouvert. */
@@ -83,6 +89,11 @@ export interface EntreeResumeShift {
   readonly nombreCommandes: number
   /** Chiffre d'affaires TTC des commandes encaissées sur ce shift. */
   readonly chiffreAffairesMillimes: Millimes
+  /**
+   * L'argent rendu pendant ce service. Facultatif : un appelant antérieur au
+   * remboursement n'en a pas, et zéro est alors la vérité.
+   */
+  readonly remboursements?: readonly { readonly mode: ModePaiement; readonly montantMillimes: Millimes }[]
 }
 
 export function resumerShift(entree: EntreeResumeShift): ResumeShift {
@@ -105,8 +116,14 @@ export function resumerShift(entree: EntreeResumeShift): ResumeShift {
     entree.mouvements.filter((m) => SORTIES.includes(m.type)).map((m) => m.montantMillimes),
   )
 
+  // Seul ce qui est rendu en ESPÈCES sort du tiroir : un remboursement sur
+  // carte passe par le terminal de la banque, pas par la caisse.
+  const rembourse = sommer(
+    (entree.remboursements ?? []).filter((r) => r.mode === 'cash').map((r) => r.montantMillimes),
+  )
+
   const attendu = millimes(
-    entree.shift.fondDeCaisseMillimes + especes + entrees - sorties,
+    entree.shift.fondDeCaisseMillimes + especes + entrees - sorties - rembourse,
   )
   const compte = entree.shift.compteMillimes
 
@@ -117,6 +134,7 @@ export function resumerShift(entree: EntreeResumeShift): ResumeShift {
     autresMillimes: autres,
     entreesMillimes: entrees,
     sortiesMillimes: sorties,
+    remboursementsEspecesMillimes: rembourse,
     attenduMillimes: attendu,
     compteMillimes: compte,
     // L'écart PEUT être négatif : aucune borne à zéro, c'est tout son intérêt.

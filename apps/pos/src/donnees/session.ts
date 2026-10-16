@@ -15,6 +15,11 @@
 import {
   autoriser,
   autoriserRemise,
+  calculerRemboursement,
+  calculerTotaux,
+  configEffective,
+  ErreurRemboursement,
+  paiementARembourser,
   construireTicketClient,
   configEtablissement,
   construireTicketCuisine,
@@ -558,6 +563,88 @@ export class SessionCaisse {
       orderId,
       'order.cancelled',
       { motif, autorisePar: autorisePar.id },
+      acteur,
+    )
+    return this.appliquer(orderId, [e])
+  }
+
+  // ── Remboursement ─────────────────────────────────────────────────────
+
+  /**
+   * Rend de l'argent au client sur un ticket DÉJÀ encaissé.
+   *
+   * Un événement de plus, jamais une correction : le ticket reste encaissé,
+   * et le journal dit désormais ce qui a été rendu. Le montant vient de
+   * `calculerRemboursement` — la règle du domaine, celle que le serveur
+   * applique aussi. L'écran ne calcule rien lui-même.
+   *
+   * Opération d'encadrement : c'est celui qui AUTORISE qui doit en avoir le
+   * droit. Un caissier peut la déclencher, un gérant pose son PIN, et son
+   * nom reste dans le journal.
+   */
+  async rembourser(
+    acteur: Employe | null,
+    orderId: string,
+    demande: { readonly ligneIds: readonly string[]; readonly mode: ModePaiement; readonly motif: string },
+    autorisePar?: Employe,
+  ): Promise<EtatCommande> {
+    if (!acteur) throw new RefusOperation('Aucun employé identifié sur ce terminal.', false)
+    this.garde(autorisePar ?? acteur, 'paiement.rembourser')
+    if (demande.motif.trim() === '') {
+      throw new RefusOperation(
+        'Un remboursement exige un motif : « remboursé par Ahmed » n’explique rien, ' +
+          '« pizza froide » explique tout.',
+        false,
+      )
+    }
+
+    const etat = await this.etatDe(orderId)
+    this.gardeTransition(etat, 'refund.recorded')
+
+    const totaux = calculerTotaux({
+      lignes: etat.lignes,
+      remiseGlobale: etat.remiseGlobale ?? undefined,
+      config: configEffective(this.config, etat),
+    })
+    let montant: Millimes
+    try {
+      montant = calculerRemboursement(etat, totaux, demande.ligneIds).montantMillimes
+    } catch (erreur) {
+      if (erreur instanceof ErreurRemboursement) throw new RefusOperation(erreur.message, false)
+      throw erreur
+    }
+
+    const paiement = paiementARembourser(etat, demande.mode)
+    if (!paiement) {
+      throw new RefusOperation('Ce ticket ne porte aucun paiement : il n’y a rien à rendre.', false)
+    }
+
+    /*
+     * Des espèces rendues sortent d'un tiroir — il faut qu'il soit OUVERT.
+     * Sans service en cours, l'argent quitterait une caisse que personne ne
+     * compte, et l'écart de la prochaine clôture serait inexplicable.
+     */
+    const shiftId = (await this.contexte.etat.lire('shift_courant')) || null
+    if (demande.mode === 'cash' && !shiftId) {
+      throw new RefusOperation(
+        'Ouvrez la caisse avant de rendre des espèces : l’argent doit sortir d’un tiroir qu’on comptera.',
+        false,
+      )
+    }
+
+    const e = await this.evenement(
+      orderId,
+      'refund.recorded',
+      {
+        remboursementId: uuidV7(),
+        paiementId: paiement.paiementId,
+        mode: demande.mode,
+        montantMillimes: montant,
+        ligneIds: [...demande.ligneIds],
+        motif: demande.motif.trim(),
+        shiftId,
+        ...(autorisePar ? { autorisePar: autorisePar.id } : {}),
+      },
       acteur,
     )
     return this.appliquer(orderId, [e])
