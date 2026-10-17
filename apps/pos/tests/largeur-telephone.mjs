@@ -289,8 +289,59 @@ for (const appareil of APPAREILS) {
 
   await page.click('.categories button:has-text("Boissons")')
   await page.click('.carte-produit:has-text("Coca-Cola 33cl")')
+  // Ticket REPLIÉ : la ligne n'est pas à l'écran, le résumé dit qu'elle est là.
+  await page.waitForFunction(
+    () => /1/.test(document.querySelector('.resume-chiffres .compte')?.textContent ?? ''),
+    null,
+    { timeout: 10000 },
+  )
+  await mesurer('commande avec une ligne — ticket replié')
+
+  /*
+   * ── La CARTE doit dominer — la panne vue en démonstration ──────────────
+   *
+   * Empilé sous la grille en hauteur `auto`, le ticket prenait les deux
+   * tiers d'un iPhone dès la première ligne : la carte tombait à UNE rangée
+   * d'articles. Aucun test de largeur ne le voyait — rien ne débordait. On
+   * mesure donc la HAUTEUR : au moins la moitié de l'écran pour la grille,
+   * avec une ligne au ticket, et les deux gestes de chaque commande
+   * (« Cuisine », « Encaisser ») visibles sans rien déplier.
+   */
+  const place = await page.evaluate(() => {
+    const grille = document.querySelector('.grille-produits')?.getBoundingClientRect()
+    const visible = (sel) => {
+      const el = document.querySelector(sel)
+      if (!el) return false
+      const r = el.getBoundingClientRect()
+      return r.width > 0 && r.height > 0 && r.bottom <= window.innerHeight + 1
+    }
+    return {
+      grille: Math.round(grille?.height ?? 0),
+      ecran: window.innerHeight,
+      encaisser: visible('.actions-rapides .principal'),
+      cuisine: visible('.actions-rapides .secondaire'),
+    }
+  })
+  if (place.grille < place.ecran * 0.5) {
+    echecs++
+    console.log(
+      `  ✗ commande — la carte n'a que ${place.grille} px sur ${place.ecran} : ` +
+        'le ticket l’écrase, le caissier doit faire défiler pour chaque article',
+    )
+  } else {
+    console.log(`  ✓ commande — la carte garde ${place.grille} px sur ${place.ecran}`)
+  }
+  if (!place.encaisser || !place.cuisine) {
+    echecs++
+    console.log('  ✗ commande — « Cuisine » ou « Encaisser » n’est pas visible ticket replié')
+  } else {
+    console.log('  ✓ commande — « Cuisine » et « Encaisser » visibles sans déplier')
+  }
+
+  // Déplié : le ticket complet, ses lignes et ses quatre boutons.
+  await page.click('.ouvrir-ticket')
   await page.waitForSelector('.lignes li:has-text("Coca-Cola")', { timeout: 10000 })
-  await mesurer('commande avec une ligne')
+  await mesurer('commande avec une ligne — ticket déplié')
 
   await page.click('.actions-commande .principal')
   await page.waitForSelector('.paiement', { timeout: 10000 })

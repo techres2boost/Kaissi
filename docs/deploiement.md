@@ -258,6 +258,40 @@ Le `Dockerfile` fourni à la racine d'`apps/sync` couvre les deux plateformes.
 local et gardent tout dans leur outbox. Au retour du serveur, elles
 rattrapent seules. C'est exactement ce que le banc à trois appareils vérifie.
 
+### 2.4 L'ordre d'un déploiement : la BASE avant le CODE
+
+Railway redéploie le service **tout seul** à chaque push sur `main`. Les
+migrations Supabase, elles, s'appliquent **à la main**. Si le code part avant
+sa migration, chaque vente reçue échoue.
+
+C'est arrivé (octobre 2026) : le remboursement exigeait la migration 0045,
+le code est parti sans elle, et pendant la démonstration plus rien n'arrivait
+ni en cuisine, ni au bar, ni au back-office. Rien n'était perdu — les ventes
+attendaient dans les caisses et dans le journal — mais tout était invisible.
+
+**La règle :**
+
+1. Une migration nouvelle dans `supabase/migrations/` ? **D'abord** Supabase →
+   SQL Editor → coller le fichier → Run.
+2. **Ensuite** seulement, pousser le code sur `main`.
+
+**Les garde-fous, depuis :**
+
+- Au démarrage, le service sonde le schéma (`apps/sync/src/schema-requis.ts`,
+  une sonde par migration) et imprime en gros celles qui manquent.
+- `/sante` répond alors **503 `schema_incomplet`** : Railway, dont la sonde de
+  déploiement est `/sante`, **garde l'ancienne version en service** au lieu de
+  la remplacer.
+- Si une vente arrive malgré tout, la caisse reçoit un **503 qui nomme la
+  migration** (« la base de données du serveur n'est pas à jour : une
+  migration manque (0045) ») — lisible dans ☰ → Synchronisation — et
+  réessaie seule. Dès la migration appliquée, tout remonte sans rien
+  ressaisir.
+- La CI refuse une migration sans sa sonde (`test/schema-requis.test.ts`).
+
+Vérifier à tout moment : `curl https://<ton-service>/sante`. Un `"etat":"ok"`
+dit que la base a tout ce que le code attend.
+
 ---
 
 ## 3. Back-office — Vercel
@@ -470,6 +504,31 @@ perdues** : elles repartiront après un nouvel appairage.
 
 ## 6. Superviser le parc
 
+**L'écran d'abord** : back-office → accueil → **📈 Surveillance du service**
+(réservé aux comptes de `KAISSI_EDITEURS`). Il se rafraîchit toutes les
+15 secondes et dit en phrases ce qui franchit un seuil :
+
+| Ce qu'il mesure | Seuil d'alerte | Pourquoi |
+|---|---|---|
+| Envois de ventes en échec (15 min) | > 1 % | Rien n'arrive au back-office |
+| Envoi des ventes, 95e centile | > 2 s | La caisse attend |
+| Processeur du service | > 80 % d'un cœur | Plus de marge pour un pic |
+| Retard de la boucle d'événements | > 200 ms | Chaque requête attend |
+| Connexions PostgreSQL | > 80 % du maximum | Prochaine étape : refus |
+| Requêtes en attente d'une connexion du pool | > 0 | Le pool (10) est saturé |
+| Cache de la base | < 95 % | La base lit le disque |
+| Ventes sans projection | > 0 | Invisibles au back-office |
+| Opérations rejetées (24 h) | > 0 | Une décision du gérant attend |
+| Caisses muettes depuis 24 h | > 0 | Une tablette ne synchronise plus |
+| Migrations manquantes | ≥ 1 | Toutes les ventes échouent (§ 2.4) |
+
+Ce que l'écran ne montre pas : l'historique au-delà d'une heure (les mesures
+vivent en mémoire du service et repartent de zéro au redémarrage) et le
+back-office lui-même — Railway et Vercel ont leurs propres graphiques pour
+le long terme.
+
+En SQL, l'état appareil par appareil :
+
 ```sql
 select label, last_seen_at, retard_evenements, operations_refusees
 from kaissi.etat_appareils
@@ -542,6 +601,7 @@ Avant le premier vrai client :
 | Symptôme | Où regarder |
 |---|---|
 | La tablette ne synchronise pas | Bandeau → **⇅** → état et dernier message du serveur |
+| Plus rien n'arrive en cuisine ni au back-office, « ↑↓ N » ne descend pas | ☰ → Synchronisation : « la base de données du serveur n'est pas à jour » → appliquer la migration nommée (§ 2.4) |
 | « Action requise » | L'appareil est révoqué, ou le protocole est trop ancien |
 | Opérations refusées > 0 | Écran de synchronisation, section « Opérations refusées » |
 | Le serveur ne répond pas | `curl https://TON-DOMAINE/sante`, puis les journaux Railway |

@@ -185,6 +185,12 @@ export type CodeErreur =
   | 'requete_invalide'
   | 'erreur_serveur'
   /**
+   * Le code du service attend une migration que la base n'a pas
+   * (`schema-requis.ts`). 503 : la caisse réessaie seule, et la vente part
+   * dès que la migration est appliquée.
+   */
+  | 'base_non_a_jour'
+  /**
    * Trop de tentatives — sur les IDENTIFIANTS seulement.
    *
    * Jamais rendu par `/sync/*` : une caisse qui rattrape trois semaines hors

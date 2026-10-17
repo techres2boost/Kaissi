@@ -69,6 +69,21 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
   const [remiseOuverte, setRemiseOuverte] = useState(false)
   const [nouvelArticle, setNouvelArticle] = useState(false)
   const [clientOuvert, setClientOuvert] = useState(false)
+  /*
+   * Sur TÉLÉPHONE seulement, le ticket se replie en une barre.
+   *
+   * Empilé sous la carte, il prenait tout l'écran dès la première ligne :
+   * en-tête, lignes, totaux, quatre boutons — et la grille d'articles
+   * tombait à une rangée qu'il fallait faire défiler pour trouver un plat.
+   * Vu sur un iPhone, en démonstration. La carte est ce qu'on touche
+   * vingt fois par commande ; le détail du ticket, une fois, avant
+   * d'encaisser. Replié, il garde ce qui sert à chaque geste : combien
+   * d'articles, quel total, « Cuisine » et « Encaisser ».
+   *
+   * Sur tablette (au-delà de 900 px), cet état n'a aucun effet : le ticket
+   * est une colonne, toujours ouverte (styles.css, `.resume-ticket`).
+   */
+  const [ticketDeplie, setTicketDeplie] = useState(false)
   /**
    * Bons de cuisine qui viennent de partir, affichés tant que l'impression
    * est éteinte. La cuisine les voit de son côté au back-office ; cet aperçu
@@ -237,6 +252,10 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
     )
   const modifiable = etat ? estModifiable(etat.statut) : false
   const nonEnvoyees = lignesActives.length > 0
+  const nombreArticles = lignesActives.reduce((somme, l) => somme + l.quantite, 0)
+  const titreTicket = etat?.tableId
+    ? t('Table {numero}', { numero: tables.find((elt) => elt.id === etat.tableId)?.label ?? '?' })
+    : t('À emporter')
 
   return (
     <div className="commande">
@@ -314,13 +333,56 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
         </div>
       </section>
 
-      <aside className="ticket" aria-label={t('Commande en cours')}>
+      <aside
+        className={`ticket ${ticketDeplie ? 'deplie' : 'replie'}`}
+        aria-label={t('Commande en cours')}
+      >
+        {/*
+          La barre du téléphone — masquée sur tablette. Toucher le résumé
+          déplie le ticket ; le toucher encore le replie. Le compte change
+          à chaque article ajouté : c'est l'accusé de réception du geste,
+          sans avoir à ouvrir quoi que ce soit.
+        */}
+        <div className="resume-ticket">
+          <button type="button" className="retour" onClick={onRetour}>{t('‹ Salle')}</button>
+          <button
+            type="button"
+            className="ouvrir-ticket"
+            aria-expanded={ticketDeplie}
+            onClick={() => setTicketDeplie((v) => !v)}
+          >
+            <span className="resume-titre">
+              {titreTicket} <small>{etat?.numeroTicket}</small>
+            </span>
+            <span className="resume-chiffres">
+              <span key={nombreArticles} className="compte">
+                {t('{n} article(s)', { n: nombreArticles })}
+              </span>
+              {' · '}
+              <span className="montant">{formaterTND(totaux?.totalMillimes ?? millimes(0))}</span>
+            </span>
+            <span className="chevron" aria-hidden="true">{ticketDeplie ? '▾' : '▴'}</span>
+          </button>
+        </div>
+        <div className="actions-rapides">
+          <button
+            type="button"
+            className="secondaire"
+            disabled={!modifiable || !nonEnvoyees}
+            onClick={() => void envoyerCuisine()}
+          >{t('Cuisine')}</button>
+          <button
+            type="button"
+            className="principal"
+            disabled={!modifiable || lignesActives.length === 0}
+            onClick={() => onEncaisser(orderId)}
+          >{t('Encaisser')}</button>
+        </div>
+
         <header className="entete-ticket">
           <button type="button" className="retour" onClick={onRetour}>{t('‹ Salle')}</button>
           <div className="titre">
-            {etat?.tableId
-              ? t('Table {numero}', { numero: tables.find((elt) => elt.id === etat.tableId)?.label ?? '?' })
-              : t('À emporter')}
+            {titreTicket}
             <small>{etat?.numeroTicket}</small>
           </div>
         </header>

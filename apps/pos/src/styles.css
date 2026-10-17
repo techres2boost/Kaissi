@@ -1081,7 +1081,78 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ── Commande ────────────────────────────────────────────────────────────── */
 .commande { height: 100%; display: grid; grid-template-columns: 1fr 23rem; }
-@media (max-width: 900px) { .commande { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } }
+
+/*
+ * ── Sur tablette, le résumé n'existe pas ──────────────────────────────────
+ * Le ticket est une colonne, toujours ouverte : la barre du téléphone n'y
+ * ajouterait qu'un doublon de « Cuisine » et « Encaisser ».
+ */
+.resume-ticket, .actions-rapides { display: none; }
+
+/*
+ * ── Sur téléphone, la CARTE domine ────────────────────────────────────────
+ *
+ * PANNE OBSERVÉE en démonstration, sur un iPhone : la grille était empilée
+ * au-dessus d'un ticket en hauteur `auto` — en-tête, lignes, totaux, quatre
+ * boutons. Dès la première ligne, le ticket prenait les deux tiers de
+ * l'écran et la carte tombait à UNE rangée d'articles, qu'il fallait faire
+ * défiler pour chaque plat.
+ *
+ * Le ticket se replie donc en une barre basse (résumé + « Cuisine » +
+ * « Encaisser »), et `minmax(0, 1fr)` donne TOUT le reste à la carte. Déplié,
+ * il monte en feuille, plafonné à 70 % de la hauteur : on voit toujours le
+ * haut de la carte, et donc qu'on peut y revenir.
+ *
+ * `tests/largeur-telephone.mjs` exige, ticket replié avec une ligne, que la
+ * grille garde au moins la moitié de la hauteur de l'écran.
+ */
+@media (max-width: 900px) {
+  .commande { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+
+  .commande .ticket {
+    border-inline-start: none;
+    border-top: 1px solid var(--bordure);
+    box-shadow: 0 -12px 28px -22px rgba(27, 31, 28, 0.5);
+    padding: 0.5rem 0.75rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
+    gap: 0.5rem;
+  }
+  .commande .ticket.deplie { max-height: 70vh; max-height: 70dvh; }
+
+  .resume-ticket { display: flex; gap: 0.5rem; align-items: stretch; }
+  .resume-ticket .retour { flex: 0 0 auto; min-height: 48px; }
+  .ouvrir-ticket {
+    flex: 1 1 auto; min-width: 0;
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 0.5rem;
+    align-items: center; text-align: start;
+    min-height: 48px; padding: 0.35rem 0.6rem;
+    background: var(--surface-2); border: 1px solid var(--bordure); border-radius: var(--rayon);
+  }
+  .ouvrir-ticket .resume-titre,
+  .ouvrir-ticket .resume-chiffres {
+    grid-column: 1; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ouvrir-ticket .resume-titre { font-weight: 700; font-size: 0.85rem; }
+  .ouvrir-ticket .resume-titre small { color: var(--texte-2); font-weight: 400; font-size: 0.7rem; }
+  .ouvrir-ticket .resume-chiffres { font-size: 0.85rem; color: var(--texte-2); font-variant-numeric: tabular-nums; }
+  .ouvrir-ticket .resume-chiffres .montant { color: var(--accent); font-weight: 700; }
+  .ouvrir-ticket .chevron { grid-column: 2; grid-row: 1 / span 2; color: var(--texte-2); }
+
+  .actions-rapides { display: grid; grid-template-columns: 1fr 1.6fr; gap: 0.5rem; }
+  .actions-rapides button { min-height: 48px; }
+
+  /* Replié : le résumé et les deux gestes, rien d'autre. */
+  .ticket.replie > :not(.resume-ticket):not(.actions-rapides) { display: none; }
+  /* Déplié : le ticket complet sous le résumé, qui sert de poignée. */
+  .ticket.deplie > .actions-rapides,
+  .ticket.deplie > .entete-ticket { display: none; }
+}
+
+/* Le compte qui change à chaque article : un battement, pas une animation. */
+@media (prefers-reduced-motion: no-preference) {
+  .resume-chiffres .compte { display: inline-block; animation: battement 0.35s ease-out; }
+  @keyframes battement { 0% { transform: scale(1.25); color: var(--accent); } 100% { transform: scale(1); } }
+}
 
 .entete-ticket { display: flex; flex-direction: column; gap: 0.2rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--bordure); }
 .entete-ticket .titre { font-weight: 700; display: flex; justify-content: space-between; align-items: baseline; }

@@ -1015,3 +1015,67 @@ ventes déjà remontées restent dans les rapports.
 > changement de restaurant, ne révoque pas : fais-le depuis la tablette
 > (Synchronisation → « Ré-appairer — ou changer d'établissement »), elle
 > garde son identité et vide d'abord ses ventes en attente.
+
+## 19. Sur téléphone, la carte d'abord — et la surveillance du service
+
+### 19.1 Si plus rien n'arrive en cuisine ni au back-office
+
+Symptôme vu en démonstration : une commande saisie, rien en cuisine, rien au
+bar, rien au back-office, et le bandeau de la caisse qui garde « ↑↓ 2 ».
+
+1. Sur la caisse : ☰ → **Synchronisation**. Si le message dit « la base de
+   données du serveur n'est pas à jour : une migration manque (00XX) »,
+   c'est cela.
+2. Supabase → **SQL Editor** → coller `supabase/migrations/00XX_….sql` →
+   **Run**.
+3. Attendre un cycle (ou toucher « Synchroniser maintenant »).
+
+**Attendu** : « ↑↓ » retombe à 0, les ventes apparaissent en cuisine et au
+back-office **sans rien ressaisir**. Rien n'était perdu : elles attendaient
+dans la caisse et dans le journal du serveur. L'ordre à tenir pour la suite
+est dans `docs/deploiement.md` § 2.4 : la migration **avant** le code.
+
+### 19.2 La prise de commande sur un téléphone
+
+1. Ouvre une table sur un iPhone (ou un écran de moins de 900 px).
+2. Touche deux articles.
+
+**Attendu** : la carte occupe l'écran. En bas, une barre : « ‹ Salle »,
+« Table 1 · 2 article(s) · 33,000 TND », et dessous **Cuisine** et
+**Encaisser**. Le compte d'articles bat à chaque ajout — c'est l'accusé de
+réception du geste.
+
+3. Touche la barre du milieu.
+
+**Attendu** : le ticket complet monte (lignes, − / + / Retirer, totaux,
+Remise, Client). Il s'arrête à 70 % de l'écran : le haut de la carte reste
+visible. Retouche la barre pour le replier.
+
+Sur tablette (plus de 900 px), rien ne change : le ticket reste une colonne.
+
+### 19.3 Surveiller le service
+
+Réservé aux comptes listés dans `KAISSI_EDITEURS` (variable du service de
+synchronisation sur Railway).
+
+1. Back-office → accueil → **📈 Surveillance du service**.
+
+**Attendu** : un bandeau vert « Aucun seuil franchi », puis les tuiles —
+envoi des ventes (95e centile), erreurs serveur, processeur, mémoire,
+réactivité, latence et connexions de la base, cache, commandes reçues dans
+l'heure, caisses en ligne — et les tableaux par route, base, processus,
+requêtes par minute et erreurs récentes. L'écran se rafraîchit seul toutes
+les 15 secondes.
+
+2. Encaisse une vente sur une caisse, attends 15 secondes.
+
+**Attendu** : « Commandes reçues » et la ligne `push` du tableau des routes
+augmentent.
+
+Un compte client qui tape `/editeur/surveillance` à la main obtient une page
+inexistante : ces chiffres traversent tous les restaurants.
+
+### 19.4 Charge et sécurité
+
+Les résultats mesurés, les quatre défauts que ces tests ont trouvés et
+corrigés, et comment les relancer : `docs/charge-et-securite.md`.

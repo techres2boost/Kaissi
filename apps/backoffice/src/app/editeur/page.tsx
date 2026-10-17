@@ -6,6 +6,7 @@
  * client n'a pas à apprendre qu'un écran transversal existe.
  */
 
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { sessionObligatoire } from '../../serveur/session.js'
 import { BarreCompte } from '../../composants/BarreCompte.js'
@@ -32,6 +33,9 @@ export default async function PageEditeur() {
       <main className="enveloppe">
         <h1>{t('Clients et formules')}</h1>
         <p className="sous-titre">{t('Écran de l’éditeur. Changer une formule s’applique à toute l’organisation du client, aussitôt. La caisse n’est jamais concernée.')}</p>
+        <p>
+          <Link className="bouton discret" href="/editeur/surveillance">{t('Surveillance du service ›')}</Link>
+        </p>
 
         <section className="carte">
           <div className="tableau-defilant">

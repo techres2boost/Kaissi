@@ -54,7 +54,10 @@ export default async function Accueil() {
               <Link className="bouton discret" href="/administration">{t('🏢 Administration — ouvrir un établissement')}</Link>
             )}
             {editeur && (
-              <Link className="bouton discret" href="/editeur">{t('🧾 Éditeur — clients et formules')}</Link>
+              <>
+                <Link className="bouton discret" href="/editeur">{t('🧾 Éditeur — clients et formules')}</Link>
+                <Link className="bouton discret" href="/editeur/surveillance">{t('📈 Surveillance du service')}</Link>
+              </>
             )}
           </p>
         )}

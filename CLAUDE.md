@@ -602,6 +602,10 @@ pnpm pos:aab        # ou pnpm pos:apk pour un APK signé, installable
 #   c'est GitHub qui l'appelle.
 pnpm pos:version [--monter]
 
+# Charge (100 commandes/h ×800, retour d'Internet, 1→50 caisses) et audit de
+# sécurité, contre un vrai PostgreSQL. Résultats : docs/charge-et-securite.md
+pnpm --filter @kaissi/sync test:charge     # KAISSI_CHARGE=lourd pour ×5
+
 # Le plugin Java d'impression compile — un JDK suffit, aucun SDK Android
 pnpm verifier:natif
 
@@ -735,6 +739,21 @@ révélait autre chose.
   caisse ni écart. Un serveur antérieur répond 404 : le moteur avale l'erreur et
   réessaie au cycle suivant. Rien de ce qui n'est pas une vente ne doit pouvoir
   mettre le cycle en échec, ni le bandeau en « bloqué ».
+- **Une connexion tenue n'en demande jamais une seconde.** Sous
+  `this.pool.connect()` ou `sousIdentite()`, tout passe par CE client — jamais
+  par `this.pool.query()` ni par une méthode du dépôt qui y recourt. Dix
+  envois simultanés tenant chacun une connexion et attendant une seconde, sur
+  un pool de dix : plus aucune vente ne remonte, sans erreur. Trouvé par
+  `test/charge.test.ts` (palier à 25 caisses) dans la reprojection.
+- **Une commande incalculable n'arrête pas le lot.** `ErreurCalcul` est isolée
+  par commande dans `reprojeter()` : la vente attend dans le journal, les
+  autres passent. Sans cela, une seule vente fautive gelait la caisse à
+  jamais (`test/securite.test.ts`).
+- **La migration AVANT le code.** Railway redéploie seul depuis `main` ; les
+  migrations Supabase s'appliquent à la main. Chaque migration a sa sonde
+  dans `apps/sync/src/schema-requis.ts` — la CI l'exige — et `/sante` répond
+  503 `schema_incomplet` tant qu'il en manque une, ce qui empêche Railway de
+  basculer le trafic. Vu en production avec 0045 : plus rien ne remontait.
 - **Le service emprunte le rôle `kaissi_device`** et pose son contexte en
   variables de session : tout passe par RLS. Un défaut de filtrage applicatif
   ne peut pas provoquer de fuite entre restaurants.

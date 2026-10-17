@@ -11,6 +11,7 @@ import { pathToFileURL } from 'node:url'
 import { DepotPostgres } from './depot-postgres.js'
 import { creerServeur } from './serveur.js'
 import { formaterErreurBase } from './diagnostic-base.js'
+import { avertissementDemarrage } from './schema-requis.js'
 import { configurationPg, hoteDe } from './connexion.js'
 import { planifierReparation, INTERVALLE_DEFAUT_MINUTES } from './reparation.js'
 import {
@@ -192,6 +193,15 @@ export async function demarrer(): Promise<void> {
     await depot.fermer().catch(() => {})
     process.exit(1)
   }
+
+  /*
+   * Le schéma attendu par CE code — on ne s'arrête PAS s'il manque une
+   * migration : `/sante` répond alors 503 et c'est Railway qui refuse de
+   * basculer le trafic. S'arrêter ici ferait boucler le redémarrage, et un
+   * service qui boucle ne dit plus rien à personne.
+   */
+  const absentes = await depot.migrationsManquantes().catch(() => [])
+  if (absentes.length > 0) console.error(avertissementDemarrage(absentes))
 
   const app = creerServeur({ depot, origines })
 

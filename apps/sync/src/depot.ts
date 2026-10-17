@@ -10,6 +10,8 @@
 
 import type { EvenementCommande, MutationCatalogue } from '@kaissi/domain'
 import type { ChangementCatalogue, ShiftSynchronise } from './protocole.js'
+import type { SondeMigration } from './schema-requis.js'
+import type { MesuresBase } from './surveillance.js'
 
 export interface AppareilAuthentifie {
   readonly deviceId: string
@@ -124,6 +126,15 @@ export interface DepotSync {
    * rendre.
    */
   verifier(): Promise<void>
+
+  /**
+   * Les migrations dont ce code dépend et que la base n'a pas
+   * (`schema-requis.ts`). Facultative : un dépôt de test n'a pas de schéma.
+   */
+  migrationsManquantes?(): Promise<SondeMigration[]>
+
+  /** Les mesures de l'écran Surveillance (`surveillance.ts`). Facultative. */
+  mesuresBase?(): Promise<MesuresBase>
 
   /**
    * Établissements où cet utilisateur a le droit d'enrôler un terminal.

@@ -233,6 +233,7 @@ export const AR_CAISSE: Readonly<Record<string, string>> = {
   "refusé": "مرفوض",
   "+ Nouvel article": "+ منتج جديد",
   "Commande en cours": "الطلب الجاري",
+  "{n} article(s)": "{n} منتج",
   "Table {numero}": "الطاولة {numero}",
   "À emporter": "للأخذ",
   "Touchez un produit pour l'ajouter.": "المس منتجًا لإضافته.",

@@ -17,6 +17,7 @@
 import { Pool, type PoolClient } from 'pg'
 import {
   calculerTotaux,
+  ErreurCalcul,
   configEffective,
   configEtablissement,
   reduireEvenements,
@@ -40,6 +41,8 @@ import type { ChangementCatalogue, ShiftSynchronise } from './protocole.js'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { ReglageSsl } from './ssl.js'
 import { journal } from './journal.js'
+import { manquantes, requeteSondes, type SondeMigration } from './schema-requis.js'
+import type { MesuresBase } from './surveillance.js'
 
 /**
  * Ne garde que les identifiants réellement au format UUID.
@@ -92,6 +95,7 @@ export interface OptionsDepot {
 export class DepotPostgres implements DepotSync {
   private readonly pool: Pool
   private readonly surCarteModifiee: ((restaurantId: string) => void) | null
+  private readonly maxPool: number
 
   constructor(options: OptionsDepot) {
     this.surCarteModifiee = options.surCarteModifiee ?? null
@@ -107,7 +111,7 @@ export class DepotPostgres implements DepotSync {
             user: options.user,
             password: options.password,
           }),
-      max: options.max ?? 10,
+      max: (this.maxPool = options.max ?? 10),
       ssl:
         options.ssl === false
           ? false
@@ -117,6 +121,16 @@ export class DepotPostgres implements DepotSync {
       // Une requête de sync qui dépasse dix secondes est une requête cassée :
       // mieux vaut la couper que laisser la connexion occupée.
       statement_timeout: 10_000,
+      /*
+       * Et ATTENDRE une connexion ne dure pas plus de quinze secondes.
+       *
+       * Sans ce plafond, `pg` attend une connexion libre indéfiniment : le
+       * test de charge a montré une reprojection qui, en demandant une
+       * seconde connexion, bloquait le service ENTIER sans une erreur. La
+       * cause est corrigée ; ce plafond garantit que la prochaine du même
+       * genre rende un 500 — que la caisse réessaie — au lieu d'un silence.
+       */
+      connectionTimeoutMillis: 15_000,
     })
   }
 
@@ -135,6 +149,115 @@ export class DepotPostgres implements DepotSync {
     } finally {
       client.release()
     }
+  }
+
+  /** Une seule requête, un booléen par migration sondée. */
+  async migrationsManquantes(): Promise<SondeMigration[]> {
+    const { rows } = await this.pool.query<{ presentes: boolean[] }>(requeteSondes())
+    return manquantes(rows[0]?.presentes ?? [])
+  }
+
+  /**
+   * Les mesures de l'écran Surveillance — base, pool, et activité.
+   *
+   * Une seule connexion, une transaction en LECTURE SEULE plafonnée à trois
+   * secondes : la surveillance ne doit jamais devenir la requête lente
+   * qu'elle est censée signaler. Les compteurs d'activité parcourent
+   * `order_events` sans index sur l'heure de réception — c'est le prix
+   * d'une table qu'on ne veut pas alourdir d'un index de plus pour un écran
+   * que seul l'éditeur ouvre.
+   */
+  async mesuresBase(): Promise<MesuresBase> {
+    const debut = performance.now()
+    const client = await this.pool.connect()
+    let mesures: MesuresBase
+    try {
+      await client.query('select 1')
+      const latenceMs = Math.round(performance.now() - debut)
+      await client.query('begin read only')
+      await client.query("set local statement_timeout = '3s'")
+      const { rows: [b] } = await client.query<Record<string, string | null>>(
+        `select pg_database_size(current_database())::bigint as taille,
+                current_setting('max_connections')::int as max_conn,
+                (select count(*) from pg_stat_activity where datname = current_database()) as connexions,
+                (select count(*) from pg_stat_activity
+                  where datname = current_database() and state = 'active') as actives,
+                (select count(*) from pg_stat_activity
+                  where datname = current_database() and wait_event_type = 'Lock') as verrous,
+                (select coalesce(extract(epoch from max(now() - query_start)), 0)
+                   from pg_stat_activity
+                  where datname = current_database() and state = 'active'
+                    and pid <> pg_backend_pid()) as plus_longue,
+                d.blks_hit, d.blks_read, d.xact_commit, d.xact_rollback, d.deadlocks
+           from pg_stat_database d where d.datname = current_database()`,
+      )
+      const { rows: tables } = await client.query<{ nom: string; taille: string; lignes: string }>(
+        `select c.relname as nom, pg_total_relation_size(c.oid) as taille,
+                greatest(c.reltuples, 0)::bigint as lignes
+           from pg_class c join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'kaissi' and c.relkind = 'r'
+          order by pg_total_relation_size(c.oid) desc limit 8`,
+      )
+      const { rows: [m] } = await client.query<Record<string, string>>(
+        `select
+           (select count(*) from kaissi.order_events
+             where server_received_at > now() - interval '1 hour') as ev1h,
+           (select count(*) from kaissi.order_events
+             where server_received_at > now() - interval '24 hours') as ev24h,
+           (select count(distinct order_id) from kaissi.order_events
+             where server_received_at > now() - interval '1 hour') as cmd1h,
+           (select count(*) from kaissi.sync_mutations
+             where status = 'rejete' and received_at > now() - interval '24 hours') as rejets,
+           (select count(*) from kaissi.devices where revoked_at is null and type = 'pos') as caisses,
+           (select count(*) from kaissi.devices where revoked_at is null and type = 'pos'
+               and last_seen_at > now() - interval '15 minutes') as vues,
+           (select count(*) from kaissi.devices where revoked_at is null and type = 'pos'
+               and (last_seen_at is null or last_seen_at < now() - interval '24 hours')) as muettes`,
+      )
+      await client.query('commit')
+      const n = (v: string | null | undefined) => Number(v ?? 0)
+      const lues = n(b?.['blks_hit']) + n(b?.['blks_read'])
+      mesures = {
+        latenceMs,
+        tailleOctets: n(b?.['taille']),
+        connexions: n(b?.['connexions']),
+        connexionsActives: n(b?.['actives']),
+        connexionsMax: n(b?.['max_conn']),
+        attentesVerrou: n(b?.['verrous']),
+        requetePlusLongueSecondes: Math.round(n(b?.['plus_longue']) * 10) / 10,
+        cachePourcent: lues > 0 ? Math.round((n(b?.['blks_hit']) / lues) * 1000) / 10 : null,
+        validations: n(b?.['xact_commit']),
+        annulations: n(b?.['xact_rollback']),
+        interblocages: n(b?.['deadlocks']),
+        tables: tables.map((t) => ({ nom: t.nom, tailleOctets: n(t.taille), lignesEstimees: n(t.lignes) })),
+        pool: {
+          total: this.pool.totalCount,
+          libres: this.pool.idleCount,
+          enAttente: this.pool.waitingCount,
+          max: this.maxPool,
+        },
+        metier: {
+          evenements1h: n(m?.['ev1h']),
+          evenements24h: n(m?.['ev24h']),
+          commandes1h: n(m?.['cmd1h']),
+          rejets24h: n(m?.['rejets']),
+          caisses: n(m?.['caisses']),
+          caissesVues15min: n(m?.['vues']),
+          caissesMuettes24h: n(m?.['muettes']),
+          projectionsManquantes: 0,
+        },
+      }
+    } catch (erreur) {
+      await client.query('rollback').catch(() => undefined)
+      throw erreur
+    } finally {
+      client.release()
+    }
+    // Hors de la connexion tenue ci-dessus : une seconde connexion demandée
+    // pendant qu'on en garde une, c'est l'interblocage de pool que le test de
+    // charge a trouvé dans la reprojection.
+    const orphelines = await this.projectionsOrphelines(20_000, 1_000)
+    return { ...mesures, metier: { ...mesures.metier, projectionsManquantes: orphelines.length } }
   }
 
   /**
@@ -1019,6 +1142,8 @@ export class DepotPostgres implements DepotSync {
     if (orderIds.length === 0) return
     const client = await this.pool.connect()
     const produitsTouches = new Set<string>()
+    /** Posé sous la connexion, lu une fois celle-ci rendue (voir plus bas). */
+    let annonce: { carteChangee: boolean } | null = null
     try {
       const config = await chargerConfig(client, restaurantId)
       for (const orderId of orderIds) {
@@ -1032,27 +1157,60 @@ export class DepotPostgres implements DepotSync {
         )
         if (rows.length === 0) continue
 
-        const etat = reduireEvenements(rows.map(versEvenement))
-        const totaux = calculerTotaux({
-          lignes: etat.lignes,
-          remiseGlobale: etat.remiseGlobale ?? undefined,
-          /*
-           * ⚑ Ici passait `config` TEL QUEL — et c'était un écart de caisse
-           *   en attente.
-           *
-           *   Une commande peut porter son propre service (`service.set`) :
-           *   un serveur retire le service sur une commande à emporter, ou
-           *   l'ajoute sur une table. Le projecteur LOCAL l'appliquait ; la
-           *   reprojection serveur, non. La tablette imprimait donc un ticket
-           *   avec service, le back-office affichait la même vente sans, et
-           *   rien n'échouait nulle part — juste deux chiffres qui ne se
-           *   rejoignaient jamais.
-           *
-           *   `configEffective` est la SEULE copie de cette résolution
-           *   (RÈGLE 7), et les deux projecteurs l'appellent.
-           */
-          config: configEffective(config, etat),
-        })
+        /*
+         * ── Une commande qu'on ne sait pas calculer ne bloque pas les autres
+         *
+         * Trouvé par l'audit de sécurité (test/securite.test.ts) : une ligne
+         * portant un taux de TVA que le serveur ne connaît pas faisait lever
+         * `calculerTotaux` — et la reprojection ENTIÈRE échouait. Le push
+         * répondait 500, la caisse renvoyait le même lot, qui échouait encore :
+         * une seule vente fautive gelait toutes les suivantes de cette caisse,
+         * pour toujours. Exactement la panne « plus rien ne remonte ».
+         *
+         * Le calcul reste refusé — choisir un taux de repli serait une règle
+         * fiscale, et elle n'appartient pas à la projection (voir
+         * reference-inconnue-du-serveur.test.ts). Mais il est refusé POUR
+         * CETTE COMMANDE : ses événements sont dans le journal, rien n'est
+         * perdu, elle est journalisée et comptée « sans projection » par
+         * l'écran Surveillance, et le balayage de réparation la reprendra dès
+         * que le référentiel sera corrigé. Les autres ventes passent.
+         *
+         * Seule `ErreurCalcul` est isolée : une erreur de base (connexion
+         * coupée, verrou) reste fatale au lot, pour que la caisse réessaie.
+         */
+        let etat: ReturnType<typeof reduireEvenements>
+        let totaux: ReturnType<typeof calculerTotaux>
+        try {
+          etat = reduireEvenements(rows.map(versEvenement))
+          totaux = calculerTotaux({
+            lignes: etat.lignes,
+            remiseGlobale: etat.remiseGlobale ?? undefined,
+            /*
+             * ⚑ Ici passait `config` TEL QUEL — et c'était un écart de caisse
+             *   en attente.
+             *
+             *   Une commande peut porter son propre service (`service.set`) :
+             *   un serveur retire le service sur une commande à emporter, ou
+             *   l'ajoute sur une table. Le projecteur LOCAL l'appliquait ; la
+             *   reprojection serveur, non. La tablette imprimait donc un ticket
+             *   avec service, le back-office affichait la même vente sans, et
+             *   rien n'échouait nulle part — juste deux chiffres qui ne se
+             *   rejoignaient jamais.
+             *
+             *   `configEffective` est la SEULE copie de cette résolution
+             *   (RÈGLE 7), et les deux projecteurs l'appellent.
+             */
+            config: configEffective(config, etat),
+          })
+        } catch (erreur) {
+          if (!(erreur instanceof ErreurCalcul)) throw erreur
+          journal.erreur('commande non projetable — les autres ventes du lot passent', {
+            restaurantId,
+            orderId,
+            erreur,
+          })
+          continue
+        }
 
         await client.query('begin')
         try {
@@ -1376,22 +1534,7 @@ export class DepotPostgres implements DepotSync {
            * HORS de la transaction, et sans jamais la faire échouer : perdre
            * une vente pour une notification serait absurde.
            */
-          try {
-            const aAnnoncer =
-              carteChangee ||
-              (
-                await this.produitsEnAlerte(1, {
-                  restaurantId,
-                  produits: [...produitsTouches],
-                })
-              ).length > 0
-            if (aAnnoncer) this.surCarteModifiee?.(restaurantId)
-          } catch (erreur) {
-            journal.avertissement('signal de carte modifiée non délivré', {
-              restaurantId,
-              erreur,
-            })
-          }
+          annonce = { carteChangee }
         } catch (erreur) {
           journal.avertissement('rupture automatique non appliquée', {
             restaurantId,
@@ -1402,6 +1545,36 @@ export class DepotPostgres implements DepotSync {
       }
     } finally {
       client.release()
+    }
+
+    /*
+     * ⚑ APRÈS `client.release()`, jamais avant.
+     *
+     * PANNE TROUVÉE PAR LE TEST DE CHARGE (test/charge.test.ts, palier à 25
+     * caisses). Cette question passait par `this.pool` alors que la
+     * connexion de la reprojection était encore tenue : chaque push occupait
+     * UNE connexion et en attendait une SECONDE. Avec dix envois simultanés
+     * — le pool en compte dix — les dix attendaient la connexion d'un autre,
+     * et plus aucune vente ne remontait, sans erreur ni délai : PostgreSQL ne
+     * voit pas cet interblocage, il est dans notre processus.
+     */
+    if (annonce) {
+      try {
+        const aAnnoncer =
+          annonce.carteChangee ||
+          (
+            await this.produitsEnAlerte(1, {
+              restaurantId,
+              produits: [...produitsTouches],
+            })
+          ).length > 0
+        if (aAnnoncer) this.surCarteModifiee?.(restaurantId)
+      } catch (erreur) {
+        journal.avertissement('signal de carte modifiée non délivré', {
+          restaurantId,
+          erreur,
+        })
+      }
     }
   }
 

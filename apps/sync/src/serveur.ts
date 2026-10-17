@@ -12,6 +12,7 @@
 import { Hono, type Context } from 'hono'
 import { hacherPin, pinTropFaible, validerFormatPin, ErreurPin } from '@kaissi/domain'
 import { cors } from 'hono/cors'
+import { bodyLimit } from 'hono/body-limit'
 import type { AppareilAuthentifie, DepotSync } from './depot.js'
 import { jetonDepuisEntete, empreinteDe } from './jeton.js'
 import {
@@ -40,6 +41,12 @@ import {
   verifierMotDePasse,
 } from './admin-comptes.js'
 import { journal } from './journal.js'
+import { Metriques, evaluerAlertes } from './surveillance.js'
+import {
+  estSchemaEnRetard,
+  messageSchemaEnRetard,
+  type SondeMigration,
+} from './schema-requis.js'
 import {
   configEmailDepuisEnvironnement,
   configVapidDepuisEnvironnement,
@@ -84,6 +91,8 @@ export interface OptionsServeur {
    * Par défaut : la variable `KAISSI_EDITEURS` (séparées par des virgules).
    */
   readonly editeurs?: readonly string[]
+  /** Injectable pour les tests ; par défaut, une instance par serveur. */
+  readonly metriques?: Metriques
 }
 
 function editeursDepuisEnvironnement(): string[] {
@@ -100,6 +109,7 @@ export function creerServeur({
   fetchAuth,
   cleService = cleServiceDepuisEnvironnement(),
   editeurs = editeursDepuisEnvironnement(),
+  metriques = new Metriques(),
 }: OptionsServeur) {
   const estEditeur = (email: string) => editeurs.includes(email.trim().toLowerCase())
   const service = new ServiceSync(depot)
@@ -140,6 +150,44 @@ export function creerServeur({
   app.use('*', corsKaissi)
 
   /*
+   * Chaque requête est chronométrée — route, statut, durée, rien d'autre.
+   * C'est ce que lit l'écran Surveillance (`POST /admin/surveillance`) :
+   * « 2 % des ventes échouent » ou « le push met 3 s » n'existent nulle part
+   * ailleurs, l'hébergeur ne voit que le CPU.
+   */
+  metriques.demarrer()
+  app.use('*', async (c, next) => {
+    const debut = performance.now()
+    await next()
+    metriques.enregistrer(c.req.path, c.res.status, performance.now() - debut)
+  })
+
+  /*
+   * ── Taille des corps de requête, AVANT toute lecture ───────────────────
+   *
+   * `/appairage`, `/inscription` et `/admin/*` lisent leur JSON avant de
+   * savoir qui appelle : sans plafond, cinq cents mégaoctets envoyés par
+   * n'importe qui seraient chargés en mémoire, et le service de TOUTES les
+   * caisses tomberait. Trouvé par l'audit de sécurité (test/securite.test.ts).
+   *
+   * 5 Mo pour `/sync/*` : un lot plein (500 événements, TAILLE_LOT_MAX) pèse
+   * environ 300 ko — dix-sept fois moins. 1 Mo pour le reste, qui ne
+   * transporte que des formulaires.
+   */
+  const tropVolumineux = (c: Context) => {
+    const corps: ReponseErreur = {
+      erreur: 'requete_invalide',
+      message: 'Requête trop volumineuse.',
+    }
+    return c.json(corps, 413)
+  }
+  const limiteSync = bodyLimit({ maxSize: 5 * 1024 * 1024, onError: tropVolumineux })
+  const limiteAutres = bodyLimit({ maxSize: 1024 * 1024, onError: tropVolumineux })
+  app.use('*', (c, next) =>
+    (c.req.path.startsWith('/sync/') ? limiteSync : limiteAutres)(c, next),
+  )
+
+  /*
    * Limitation de débit — sur les identifiants SEULEMENT.
    *
    * Deux limiteurs, deux dimensions, parce qu'ils arrêtent deux attaques
@@ -165,6 +213,55 @@ export function creerServeur({
     return c.json(corps, 429)
   }
 
+  /*
+   * L'état du schéma, relu au plus une fois par minute.
+   *
+   * `/sante` est sondé par l'hébergeur toutes les quelques secondes : seize
+   * sondes à chaque appel ne coûteraient rien de grave, mais ne servent à
+   * rien non plus — une migration ne s'applique pas toutes les secondes.
+   * Une erreur de schéma en pleine requête, elle, force la relecture : c'est
+   * à ce moment qu'on veut le numéro exact.
+   */
+  let schema: { manquantes: SondeMigration[]; lu: number } | null = null
+  const etatSchema = async (forcer = false): Promise<SondeMigration[]> => {
+    if (!depot.migrationsManquantes) return []
+    if (!forcer && schema && Date.now() - schema.lu < 60_000) return schema.manquantes
+    try {
+      schema = { manquantes: await depot.migrationsManquantes(), lu: Date.now() }
+    } catch {
+      // Base injoignable : `verifier()` le dit déjà, mieux que nous.
+      return schema?.manquantes ?? []
+    }
+    return schema.manquantes
+  }
+
+  /**
+   * Toutes les routes `/sync` et d'enrôlement passent par ici.
+   *
+   * Une colonne inconnue n'est pas une « erreur interne » : c'est un
+   * déploiement à moitié fait, et la caisse doit pouvoir le DIRE — c'est
+   * son écran Synchronisation que le gérant regarde, pas nos journaux.
+   * 503 et non 500 : la caisse réessaie seule, et la vente partira dès que
+   * la migration sera appliquée.
+   */
+  const repondreErreur = async (c: ContexteKaissi, erreur: unknown) => {
+    if (!(erreur instanceof ErreurSync)) {
+      metriques.noterErreur(
+        c.req.path,
+        estSchemaEnRetard(erreur) ? 503 : 500,
+        erreur instanceof Error ? erreur.message : String(erreur),
+      )
+    }
+    if (!estSchemaEnRetard(erreur)) return reponseErreur(c, erreur)
+    const migrations = (await etatSchema(true)).map((m) => m.migration)
+    journal.erreur('schéma en retard sur le code', { erreur, migrationsManquantes: migrations })
+    const corps: ReponseErreur = {
+      erreur: 'base_non_a_jour',
+      message: messageSchemaEnRetard(migrations),
+    }
+    return c.json(corps, 503)
+  }
+
   // ── Santé ────────────────────────────────────────────────────────────
   // Sans authentification : c'est ce que sonde l'hébergeur.
   // `/sante` joint la BASE, pas seulement le processus. Un contrôle de santé
@@ -181,6 +278,28 @@ export function creerServeur({
           protocole: VERSION_PROTOCOLE,
           horodatage: new Date().toISOString(),
           base: erreur instanceof Error ? erreur.message : String(erreur),
+        },
+        503,
+      )
+    }
+    /*
+     * Schéma en retard sur le code : 503, et c'est voulu.
+     *
+     * Railway sonde `/sante` avant de basculer le trafic vers un nouveau
+     * déploiement. Répondre 503 ici, c'est refuser qu'un code qui exige une
+     * migration absente remplace un code qui fonctionne — exactement la
+     * panne du remboursement (0045), où chaque vente répondait 500.
+     */
+    const absentes = await etatSchema()
+    if (absentes.length > 0) {
+      return c.json(
+        {
+          etat: 'schema_incomplet',
+          protocole: VERSION_PROTOCOLE,
+          horodatage: new Date().toISOString(),
+          base: 'joignable',
+          migrationsManquantes: absentes.map((m) => ({ migration: m.migration, objet: m.objet })),
+          message: messageSchemaEnRetard(absentes.map((m) => m.migration)),
         },
         503,
       )
@@ -394,7 +513,7 @@ export function creerServeur({
         const corps: ReponseErreur = { erreur: 'identifiants_refuses', message: erreur.message }
         return c.json(corps, erreur.statut)
       }
-      return reponseErreur(c, erreur)
+      return repondreErreur(c, erreur)
     }
   })
 
@@ -581,7 +700,7 @@ export function creerServeur({
         const corps: ReponseErreur = { erreur: 'inscription_refusee', message: erreur.message }
         return c.json(corps, erreur.statut)
       }
-      return reponseErreur(c, erreur)
+      return repondreErreur(c, erreur)
     }
   })
 
@@ -1029,6 +1148,38 @@ export function creerServeur({
     })
   })
 
+  // ── POST /admin/surveillance ──────────────────────────────────────────
+  // L'état du service : processus, base, ventes, caisses — et les SEUILS
+  // franchis, en phrases. Réservé aux éditeurs, comme la liste des clients :
+  // ces chiffres traversent tous les restaurants.
+  app.post('/admin/surveillance', async (c) => {
+    return adminSupabase(c, async ({ appelant }) => {
+      if (!estEditeur(appelant.email)) {
+        throw new ErreurAuth('Réservé à l’éditeur de Kaissi.', 401)
+      }
+      // Un point de processus FRAIS : sans lui, le premier appel après un
+      // redémarrage rendrait un historique vide pendant dix secondes.
+      metriques.echantillonnerProcessus()
+      const instantane = metriques.instantane()
+      let base = null
+      let erreurBase: string | null = null
+      try {
+        base = depot.mesuresBase ? await depot.mesuresBase() : null
+      } catch (erreur) {
+        erreurBase = erreur instanceof Error ? erreur.message : String(erreur)
+      }
+      const migrations = (await etatSchema(true)).map((m) => m.migration)
+      return {
+        horodatage: new Date().toISOString(),
+        ...instantane,
+        base,
+        erreurBase,
+        migrationsManquantes: migrations,
+        alertes: evaluerAlertes(instantane, base, migrations),
+      }
+    })
+  })
+
   // ── POST /admin/notification-test ─────────────────────────────────────
   // Fait sonner CE navigateur, et dit en clair ce qui manque sinon. Le
   // compte est relu en base : un membre ne teste que SES abonnements, dans
@@ -1132,6 +1283,7 @@ export function creerServeur({
         erreur: 'erreur_serveur',
         message: erreur instanceof Error ? erreur.message : 'Échec inattendu.',
       }
+      metriques.noterErreur(c.req.path, 500, corps.message)
       return c.json(corps, 500)
     }
   }
@@ -1168,7 +1320,7 @@ export function creerServeur({
     try {
       return c.json(await service.push(appareil, corps as never))
     } catch (erreur) {
-      return reponseErreur(c, erreur)
+      return repondreErreur(c, erreur)
     }
   })
 
@@ -1195,7 +1347,7 @@ export function creerServeur({
     try {
       return c.json(await service.catalogue(appareil, corps as never))
     } catch (erreur) {
-      return reponseErreur(c, erreur)
+      return repondreErreur(c, erreur)
     }
   })
 
@@ -1214,7 +1366,7 @@ export function creerServeur({
     try {
       return c.json(await service.shifts(appareil, corps as never))
     } catch (erreur) {
-      return reponseErreur(c, erreur)
+      return repondreErreur(c, erreur)
     }
   })
 
@@ -1236,7 +1388,7 @@ export function creerServeur({
         }),
       )
     } catch (erreur) {
-      return reponseErreur(c, erreur)
+      return repondreErreur(c, erreur)
     }
   })
 
