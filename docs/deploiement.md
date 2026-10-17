@@ -289,6 +289,10 @@ attendaient dans les caisses et dans le journal — mais tout était invisible.
   ressaisir.
 - La CI refuse une migration sans sa sonde (`test/schema-requis.test.ts`).
 
+Vérifier depuis Supabase, sans dépendre du service : SQL Editor → coller
+`supabase/verifier-migrations.sql` → Run. **Aucune ligne** = rien ne manque ;
+sinon, une ligne par migration à appliquer.
+
 Vérifier à tout moment : `curl https://<ton-service>/sante`. Un `"etat":"ok"`
 dit que la base a tout ce que le code attend.
 
