@@ -1542,6 +1542,27 @@ button.danger-plein:disabled { opacity: 0.55; cursor: not-allowed; }
   .chargement-page > div, .chargement-cartes > div { animation: none; }
 }
 
+/* ── Paramètres → Caisses ───────────────────────────────────────────────
+   Une liste de terminaux, pas un tableau : chaque ligne porte un nom qu'on
+   renomme, un état, et un bouton qu'on ne veut pas toucher par erreur. */
+.liste-caisses { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.75rem; }
+.liste-caisses > li {
+  border: 1px solid var(--bordure); border-radius: var(--rayon);
+  padding: 0.75rem 0.9rem; background: var(--panneau);
+}
+.caisse-entete { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.caisse-nom { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 600; }
+.caisse-details { margin-top: 0.2rem; font-size: 0.85rem; }
+.caisse-actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.6rem;
+}
+.caisse-actions form { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+/* Le champ ne prend pas la ligne entière : il vit DANS une rangée d'actions. */
+.caisse-actions input[name='libelle'] { flex: 1 1 10rem; min-width: 0; width: auto; }
+/* Une caisse révoquée reste lisible, mais cesse d'attirer l'œil. */
+.caisse-revoquee { opacity: 0.72; }
+
+
 /* ── L'arabe : police et sens de lecture ─────────────────────────────────
    La mise en page s'écrit en propriétés LOGIQUES (`margin-inline-start`,
    `text-align: start`) : elle se retourne d'elle-même quand `<html dir>`

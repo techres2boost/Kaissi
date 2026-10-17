@@ -23,6 +23,7 @@ import {
   LifeBuoy,
   Printer,
   ReceiptText,
+  TabletSmartphone,
   Tag,
   Ticket,
   Truck,
@@ -204,6 +205,15 @@ const GROUPES = [
        * caisses rien ne s'imprime encore : l'écran le dit en toutes lettres.
        */
       { chemin: 'imprimantes', libelle: aTraduire('Imprimantes cuisine'), icone: Printer, gestionnaire: true },
+      /*
+       * « Caisses » avec les imprimantes : ce sont les deux écrans du
+       * MATÉRIEL — les tablettes d'un côté, ce qu'elles font sortir de
+       * l'autre. C'est aussi ici qu'on révoque une caisse perdue, et le
+       * ranger sous « Employés » aurait entretenu la confusion que l'écran
+       * passe son temps à défaire : un compte et une caisse sont deux
+       * identités distinctes.
+       */
+      { chemin: 'caisses', libelle: aTraduire('Caisses'), icone: TabletSmartphone, gestionnaire: true },
       /*
        * « Options de restauration » APRÈS les taxes, et ce n'est pas anodin :
        * le service et le timbre s'ajoutent APRÈS elles dans l'ordre figé de

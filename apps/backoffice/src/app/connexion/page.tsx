@@ -7,7 +7,7 @@ import { ChoixLangue, useT } from '../../i18n/client.js'
 export default function PageConnexion({
   searchParams,
 }: {
-  searchParams: Promise<{ suite?: string }>
+  searchParams: Promise<{ suite?: string; email?: string }>
 }) {
   const t = useT()
   const params = use(searchParams)
@@ -32,7 +32,22 @@ export default function PageConnexion({
 
         <div className="champ">
           <label htmlFor="email">{t('E-mail')}</label>
-          <input id="email" name="email" type="email" autoComplete="username" required autoFocus />
+          {/*
+            `defaultValue` et non `value` : le champ reste MODIFIABLE. La
+            caisse passe `?email=` quand on touche son bouton « Back-office »
+            (elle retient l'adresse qui l'a mise en service) — c'est une
+            commodité, pas une session : le mot de passe reste à saisir, et
+            une adresse n'ouvre rien à elle seule.
+          */}
+          <input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="username"
+            required
+            autoFocus={!params.email}
+            defaultValue={params.email ?? ''}
+          />
         </div>
 
         <div className="champ">

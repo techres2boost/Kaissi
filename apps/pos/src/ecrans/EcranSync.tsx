@@ -84,6 +84,12 @@ export function EcranSync() {
     recuA: null,
     employes: 0,
   })
+  /*
+   * Le COMPTE qui a mis cette caisse en service — l'adresse, jamais le mot
+   * de passe. Elle répond à la question qu'on se pose devant la tablette :
+   * « avec quel compte j'ouvre le back-office ? ».
+   */
+  const [compteEmail, setCompteEmail] = useState<string | null>(null)
 
   useEffect(() => {
     let vivant = true
@@ -100,7 +106,9 @@ export function EcranSync() {
       }>(`SELECT * FROM outbox WHERE status = 'rejete' ORDER BY created_at DESC LIMIT 50`)
       const recuA = await app.etat.lire('catalogue_applique_a')
       const employes = await app.employes.actifs()
+      const compte = await app.etat.lire('compte_email')
       if (!vivant) return
+      setCompteEmail(compte || null)
       setCatalogue({ recuA: recuA || null, employes: employes.length })
       setEnAttente(lot)
       setRejets(
@@ -233,7 +241,21 @@ export function EcranSync() {
         <dl>
           <dt>{t('Identifiant')}</dt>
           <dd className="mono">{identite.deviceId || '—'}</dd>
+          {/*
+            Le COMPTE, à côté de l'appareil — et pas confondu avec lui.
+            Ce sont deux identités distinctes : l'appareil porte un jeton
+            révocable, le compte ouvre le back-office. Les afficher ensemble
+            est la seule façon de faire comprendre qu'une caisse ne « se
+            déconnecte » pas d'un compte : elle se révoque, au back-office.
+          */}
+          <dt>{t('Compte du back-office')}</dt>
+          <dd className="mono">{compteEmail ?? '—'}</dd>
         </dl>
+        {compteEmail ? (
+          <p className="note">{t('Cette caisse a été mise en service avec')}{' '}<strong>{compteEmail}</strong>{t('. C’est avec CE compte que le back-office montre ses ventes — un autre compte ouvrirait un autre établissement. Le mot de passe, lui, n’est jamais conservé ici.')}</p>
+        ) : (
+          <p className="note">{t('Cette caisse a été mise en service par une version antérieure, qui ne retenait pas l’adresse du compte. Elle apparaîtra au prochain ré-appairage.')}</p>
+        )}
         <p className="note">{t('Le serveur fait autorité : au démarrage, le terminal adopte automatiquement l’identité que son jeton désigne. Si des ventes sont refusées pour « appareil étranger », c’est que cette adoption n’a pas encore eu lieu — relancez l’application, ou ré-appairez ci-dessous.')}</p>
         <p>
           <button type="button" onClick={() => void oublierAppairage()}>{t('Ré-appairer — ou changer d’établissement')}</button>
@@ -583,6 +605,16 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
        * une vente ne doit pouvoir faire échouer un appairage.
        */
       if (corps.employeId) await app.etat.ecrire('employe_appaireur', corps.employeId)
+      /*
+       * L'ADRESSE du compte qui a mis cette caisse en service.
+       *
+       * Elle n'ouvre rien — le mot de passe n'est jamais conservé — et ne
+       * sert qu'à répondre à une question qu'on se pose devant la tablette :
+       * « avec quel compte j'ouvre le back-office ? ». Sans elle, un gérant
+       * qui a deux adresses essaie la mauvaise et conclut que le back-office
+       * ne montre pas ses ventes.
+       */
+      await app.etat.ecrire('compte_email', email.trim())
 
       // Le device_id est lu UNE fois au montage du contexte, puis figé dans la
       // session de caisse. S'il vient de changer, un simple rafraîchir ne

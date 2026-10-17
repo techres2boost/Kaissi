@@ -151,6 +151,9 @@ export function FormulaireInscription({
       if (corps.organizationId) await app.etat.ecrire('organization_id', corps.organizationId)
       if (corps.prefixe) await app.etat.ecrire('ticket_prefix', corps.prefixe)
       if (corps.employeId) await app.etat.ecrire('employe_appaireur', corps.employeId)
+      // Le compte qu'on vient de CRÉER : c'est avec lui qu'on ouvrira le
+      // back-office, et la tablette est le seul endroit où il est écrit.
+      await app.etat.ecrire('compte_email', email.trim())
 
       /*
        * Le GÉRANT, écrit localement TOUT DE SUITE — sinon la caisse est vide.

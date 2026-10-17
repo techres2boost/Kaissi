@@ -2914,6 +2914,49 @@ dire. Pour débloquer, une seule fois :
 > automatique suivante, et un AAB téléversé à la main consomme un
 > `versionCode` que la CI croyait libre.
 
+#### Les deux erreurs du brouillon, et ce qu'elles veulent dire
+
+En cliquant **Next** sur une version créée à la main, Play répond :
+
+```
+You can't rollout this release because it doesn't allow any existing
+users to upgrade to the newly added app bundles.
+This release does not add or remove any app bundles.
+```
+
+Les deux disent la **même** chose, et ce n'est pas une panne : *cette
+version ne contient aucun bundle nouveau*. Le bundle que l'écran affiche
+sous « Included » (124, par exemple) est **déjà publié** sur cette piste —
+Codemagic l'y a promu. Il n'y a donc rien à déployer, et Play refuse de
+créer une version vide.
+
+**La réponse est de la jeter**, pas de la compléter : *Discard draft
+release*, en haut à droite. La piste garde la version déjà en ligne, et le
+prochain push sur `main` y publiera la suivante.
+
+> Même message avec un bundle **plus ancien** que celui déjà en ligne :
+> « doesn't allow any existing users to upgrade » signifie alors qu'aucun
+> appareil ne peut *monter* vers ce bundle. On ne redescend pas une
+> version ; on en publie une nouvelle, avec un `versionCode` supérieur.
+
+#### Les testeurs doivent-ils désinstaller et réinstaller ?
+
+**Non, dans le cas normal.** Une mise à jour s'installe par-dessus, et les
+données locales de la caisse sont conservées — c'est voulu : une mise à jour
+ne doit jamais effacer les ventes d'un restaurant.
+
+Il faut réinstaller dans **trois** cas seulement :
+
+| Cas | Pourquoi | Ce qu'il faut faire |
+|---|---|---|
+| L'application a été installée par un **APK** (`pnpm pos:apk`, envoyé à la main) | Play App Signing re-signe l'AAB avec sa propre clé : la signature diffère de l'APK local, et Android refuse la mise à jour (« App not installed ») | Désinstaller, puis installer depuis Play |
+| Le testeur n'était **pas** dans la liste de la piste | Play ne lui propose rien ; l'application qu'il a vient d'ailleurs | L'ajouter aux testeurs, ouvrir le lien d'inscription, puis installer depuis Play |
+| La tablette est restée sur un **très vieux** build | Rien ne l'empêche de monter, mais il vaut mieux vérifier le commit (☰ → Diagnostic) après la mise à jour | Mettre à jour normalement |
+
+> ⚠ Avant toute désinstallation sur une caisse **en service** : ☰ →
+> **Synchronisation** → « En attente » doit valoir **0**. Désinstaller
+> emporte la base locale, donc les ventes pas encore remontées.
+
 ### iOS — TestFlight
 
 1. App Store Connect → Kaissi → **TestFlight** : le build de Codemagic doit

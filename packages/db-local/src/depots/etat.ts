@@ -86,6 +86,21 @@ export type CleEtat =
    */
   | 'dernier_employe'
   | 'employe_appaireur'
+  /*
+   * L'ADRESSE du compte qui a mis cette caisse en service.
+   *
+   * Elle n'ouvre rien : le mot de passe n'est jamais conservé, et une
+   * adresse seule n'accorde aucun droit. Elle répond à la seule question
+   * qu'on se pose devant la tablette — « avec quel compte j'ouvre le
+   * back-office ? ». Un gérant qui a deux adresses essayait la mauvaise, ne
+   * voyait pas ses ventes, et concluait que la synchronisation était en
+   * panne.
+   *
+   * Elle sert aussi à pré-remplir le champ e-mail quand le bouton
+   * « Back-office » ouvre le navigateur. Ce n'est PAS une session
+   * partagée : le mot de passe reste à saisir.
+   */
+  | 'compte_email'
 
 export function depotEtat(db: AdaptateurSqlite) {
   return {

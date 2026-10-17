@@ -96,11 +96,16 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
    * caisse déjà en démonstration, à chaque lancement.
    */
   const [demoAcceptee, setDemoAcceptee] = useState<boolean | undefined>(undefined)
+  /** L'adresse du compte qui a mis cette caisse en service — voir plus bas. */
+  const [compteEmail, setCompteEmail] = useState<string | null>(null)
 
   useEffect(() => {
     let vivant = true
     void app.app.etat.lire('accueil_demo_accepte').then((v) => {
       if (vivant) setDemoAcceptee(v === '1')
+    })
+    void app.app.etat.lire('compte_email').then((v) => {
+      if (vivant) setCompteEmail(v || null)
     })
     return () => {
       vivant = false
@@ -122,7 +127,22 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
       setBackOfficeHorsLigne(true)
       return
     }
-    window.open(URL_BACKOFFICE, '_blank', 'noopener,noreferrer')
+    /*
+     * L'adresse du compte est passée en paramètre, et RIEN d'autre.
+     *
+     * Le back-office pré-remplit alors son champ e-mail : le gérant qui a
+     * deux adresses n'essaie plus la mauvaise, et ne conclut plus que ses
+     * ventes manquent. Ce n'est PAS une session partagée — le mot de passe
+     * reste à saisir, et une adresse n'ouvre rien à elle seule. Faire
+     * voyager un jeton de session dans une URL le laisserait dans
+     * l'historique du navigateur et dans les journaux du serveur.
+     */
+    const cible = new URL(URL_BACKOFFICE)
+    if (compteEmail) {
+      cible.pathname = '/connexion'
+      cible.searchParams.set('email', compteEmail)
+    }
+    window.open(cible.toString(), '_blank', 'noopener,noreferrer')
   }
 
   useEffect(() => {

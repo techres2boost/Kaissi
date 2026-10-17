@@ -397,6 +397,22 @@ Un serveur en salle change cinq fois par service ; la tablette reste
 authentifiée en continu. Confondre les deux mène soit à des reconnexions
 permanentes, soit à une traçabilité inexistante.
 
+**Se déconnecter du back-office ne déconnecte AUCUNE caisse** — et ce n'est
+pas un oubli. Une caisse qui s'arrêterait parce qu'un gérant a fermé son
+navigateur, c'est le service qui s'arrête. La tablette ne porte d'ailleurs
+aucune session d'utilisateur : son jeton d'appareil n'est l'identité de
+personne. Le geste équivalent est la RÉVOCATION, au back-office
+(`Paramètres → Caisses`) : le gérant seul sait qu'une tablette est perdue,
+et celui qui tient une tablette volée n'appuierait jamais sur un bouton
+« se déconnecter ». Elle est définitive (index unique partiel sur
+`revoked_at is null`), et perd les ventes encore dans l'outbox — l'écran
+impose donc de vider la caisse d'abord.
+
+La caisse retient en revanche l'ADRESSE du compte qui l'a mise en service
+(`compte_email`), pour répondre à « avec quel compte j'ouvre le
+back-office ? » et pré-remplir le champ e-mail. Jamais le mot de passe,
+jamais un jeton de session : une adresse n'ouvre rien.
+
 **La caisse porte le nom de qui l'a FERMÉE.** `shifts.user_id` dit qui a
 ouvert, `shifts.closed_by` (migration 0027) qui a COMPTÉ. Devant un écart, le
 nom qui compte est celui de la personne qui a vu les billets ; afficher celui

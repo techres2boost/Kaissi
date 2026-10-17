@@ -31,6 +31,7 @@ Durée : environ 2 heures pour tout.
 15. [Ce qui n'existe pas encore](#15-ce-qui-nexiste-pas-encore)
 16. [La caisse et le back-office en arabe](#16-la-caisse-et-le-back-office-en-arabe)
 17. [Mettre à jour les téléphones de test](#17-mettre-à-jour-les-téléphones-de-test)
+18. [Comptes, caisses, employés : qui se déconnecte de quoi](#18-comptes-caisses-employés--qui-se-déconnecte-de-quoi)
 
 ---
 
@@ -554,6 +555,7 @@ l'administrateur.
 | **Taxes** | ajoute un taux, change le taux par défaut | ⚠ un restaurant ouvert depuis la caisse démarre à **0 %** : c'est le premier réglage à faire, avec un expert-comptable |
 | **Modes de paiement** | ajoute « Flouci », type *En ligne* | proposé à la caisse ; le dernier mode actif refuse d'être archivé |
 | **Reçu** | saisis adresse, téléphone, identifiant fiscal, pied de page | l'aperçu fait 42 caractères de large, comme un ticket de 80 mm ; les tickets suivants portent ces lignes |
+| **Caisses** | regarde la liste des tablettes appairées, renomme-en une, puis **Révoque** une caisse de test | la colonne « dernière synchronisation » répond à « mes ventes sont-elles parties ? » sans toucher la tablette. La révocation demande une confirmation qui NOMME la caisse ; la tablette révoquée affiche « appareil révoqué » au cycle suivant et n'encaisse plus en remontant — mais encaisse toujours en local |
 | **Imprimantes cuisine** | saisis une adresse IP pour un poste | l'écran rappelle que **rien ne s'imprime** dans cette version ; il refuse `http://…` et `ip:port` |
 | **Options de restauration** | voir ci-dessous | |
 | **Fonctionnalités** | lis la page | ce qui marche, ce qui est éteint, ce qui n'existe pas, avec **tes** chiffres ; aucun interrupteur |
@@ -753,6 +755,7 @@ pnpm sync:nouveau-client \
 | Embaucher caissier, serveur, cuisine, bar | ✓ | ✓ | — | — | — |
 | **Nommer un gérant ou un administrateur** | ✓ | — | — | — | — |
 | Écran de préparation | ✓ | ✓ | — | — | ✓ (son poste) |
+| Révoquer une caisse (Paramètres → Caisses) | ✓ | ✓ | — | — | — |
 | Établissements (ouvrir, fermer, supprimer) | ✓ | — | — | — | — |
 
 Sur la caisse, admin et gérant ont exactement les mêmes droits. Les refus du
@@ -807,6 +810,9 @@ pnpm verifier:docs                              # aucun lien cassé dans docs/
 | Synchronisation : **« Hors ligne »** | Aucune réponse du serveur : réseau coupé, ou serveur arrêté (`/sante`) |
 | Chaque réduction apparaît **deux fois** sur la caisse | Caisse mise en service avec une version antérieure : mets l'application à jour, les réductions de démonstration disparaissent au démarrage |
 | La caisse affiche « Non appairé » | §2 |
+| **« Les e-mails ne sont pas les mêmes » entre la caisse et le back-office** | La caisse retient l'adresse qui l'a mise en service : ☰ → **Synchronisation** → « Compte du back-office ». C'est avec CE compte que le back-office montre ses ventes. Le bouton **Back-office** de la caisse pré-remplit ce même e-mail |
+| **Comment « déconnecter » une caisse ?** | Elle ne se déconnecte pas, elle se **révoque** : back-office → **Paramètres → Caisses**. Videz-la d'abord (Synchronisation → 0 en attente) : c'est définitif |
+| La caisse affiche **« Cet appareil a été révoqué »** | Quelqu'un l'a révoquée au back-office. Ré-appairez-la : ☰ → Synchronisation → e-mail et mot de passe. Elle recevra un **nouveau** préfixe de tickets |
 | iPhone : **« CreateConnection: Connection kaissi already exists »** après un changement de langue ou une inscription | Corrigé. Mettre à jour depuis TestFlight (§17). Rien n'est perdu ; en attendant, fermer et rouvrir l'application |
 | Play Console : **« Promote release → Closed testing – Alpha » grisé** | Un brouillon (Draft) traîne sur la piste Alpha : le supprimer (`stores.md` §4 duodecies). Codemagic promeut ensuite chaque build en Alpha tout seul |
 | iPhone : **« Démarrage impossible — Échec de la migration locale 14 … near "id": syntax error »** | Corrigé. Installe le build TestFlight suivant (§17). Rien n'est perdu : la base est restée en version 13 |
@@ -949,3 +955,63 @@ L'essentiel :
 4. **Encore « Snack Lac 1 »** : c'est la démonstration, gardée par la mise à
    jour. Badge **« À appairer »** → e-mail et mot de passe → **Effacer et
    mettre en service**.
+
+---
+
+## 18. Comptes, caisses, employés : qui se déconnecte de quoi
+
+Trois identités, jamais confondues — et c'est ce qui fait qu'une caisse ne
+s'arrête pas quand un navigateur se ferme.
+
+| Identité | Où elle vit | Comment on la retire |
+|---|---|---|
+| **Compte** (e-mail + mot de passe) | Back-office, dans un navigateur | **Se déconnecter**, en bas de la colonne. Ne touche **aucune** caisse |
+| **Caisse** (jeton d'appareil) | La tablette, appairée une fois | **Paramètres → Caisses → Révoquer**, au back-office |
+| **Employé** (code PIN) | La tablette, à chaque service | **Verrouiller la caisse**, menu ☰ |
+
+### 18.1 Le compte est le même des deux côtés
+
+Quand tu crées ton restaurant **depuis la caisse** (accueil → *Créer un
+compte*), le serveur crée un compte Supabase avec **l'e-mail et le mot de
+passe que tu viens de saisir**. C'est le même compte qui ouvre le
+back-office : il n'y en a pas deux.
+
+- Pour le vérifier sur la tablette : ☰ → **Synchronisation** → **Compte du
+  back-office**. L'adresse y est écrite ; le mot de passe, lui, n'est jamais
+  conservé.
+- Le bouton **Back-office** de la caisse ouvre la page de connexion avec
+  **cet e-mail déjà rempli**. Il reste à taper le mot de passe.
+
+**Attendu** : si le back-office ne montre pas tes ventes, compare les deux
+adresses — un autre compte ouvre un autre établissement.
+
+### 18.2 Pourquoi se déconnecter du back-office ne déconnecte pas la caisse
+
+Ce n'est pas un oubli, c'est la règle qui tient tout le produit : une caisse
+qui s'arrêterait parce qu'un gérant a fermé son navigateur au bureau, c'est
+le service qui s'arrête. La tablette ne porte d'ailleurs **aucune session
+d'utilisateur** — elle porte un jeton d'appareil, qui n'est l'identité de
+personne.
+
+Et un bouton « se déconnecter » sur la tablette ne protégerait rien : celui
+qui tient une tablette volée ne va pas appuyer dessus. Ce qui protège, c'est
+la révocation **à distance**, décidée par le gérant.
+
+### 18.3 Révoquer une caisse
+
+1. Back-office → **Paramètres → Caisses**.
+2. Regarde **dernière synchronisation** : une caisse muette depuis trois
+   jours a probablement des ventes en attente.
+3. Sur la tablette : ☰ → **Synchronisation** → « En attente » doit valoir
+   **0**.
+4. **Révoquer** → la confirmation nomme la caisse.
+
+**Attendu** : au cycle suivant, la tablette affiche « Cet appareil a été
+révoqué », **continue d'encaisser en local**, et ne remonte plus rien. Les
+ventes déjà remontées restent dans les rapports.
+
+> ⚠ C'est **définitif**. Remettre la tablette en service créera une
+> **nouvelle** caisse, avec un nouveau préfixe de tickets. Pour un simple
+> changement de restaurant, ne révoque pas : fais-le depuis la tablette
+> (Synchronisation → « Ré-appairer — ou changer d'établissement »), elle
+> garde son identité et vide d'abord ses ventes en attente.

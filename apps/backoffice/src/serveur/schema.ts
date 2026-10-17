@@ -139,6 +139,30 @@ export type Utilisateur = {
   updated_at: Horodatage
 }
 
+/**
+ * Une CAISSE appairée — un appareil, pas un utilisateur (migration 0002).
+ *
+ * Son jeton est long et révocable ; `token_hash` n'est jamais lu d'ici (le
+ * back-office n'a aucune raison de le voir, et la clé publique ne le
+ * demande pas). Révoquer, c'est poser `revoked_at` : la tablette ne
+ * synchronise plus, et ses ventes DÉJÀ remontées restent intactes.
+ */
+export type Appareil = {
+  id: Uuid
+  organization_id: Uuid
+  restaurant_id: Uuid
+  label: string
+  /** `pos` | `kds` | `printer` | `backoffice`. */
+  type: string
+  /** « P2 » → P2-000431. Unique par établissement, tant qu'il n'est pas révoqué. */
+  ticket_prefix: string
+  app_version: string | null
+  /** Dernier contact avec le serveur de synchronisation. */
+  last_seen_at: Horodatage | null
+  created_at: Horodatage
+  revoked_at: Horodatage | null
+}
+
 export type Appartenance = {
   id: Uuid
   organization_id: Uuid
@@ -709,6 +733,7 @@ export type Database = {
           },
         ]
       >
+      devices: Table<Appareil>
       categories: Table<Categorie>
       stations: Table<Station>
       modifier_groups: Table<GroupeModificateurs>
