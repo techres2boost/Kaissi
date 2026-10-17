@@ -289,7 +289,13 @@ attendaient dans les caisses et dans le journal — mais tout était invisible.
   ressaisir.
 - La CI refuse une migration sans sa sonde (`test/schema-requis.test.ts`).
 
-Vérifier depuis Supabase, sans dépendre du service : SQL Editor → coller
+**En panne, le chemin le plus court** : SQL Editor → coller
+`supabase/reparer-production.sql` → Run. Il applique la 0045 et répond en une
+ligne s'il reste une migration à passer. Il ne touche aucune vente et se
+rejoue sans dommage (`apps/sync/test/reparation-production.test.ts` le met à
+l'épreuve sur une base ramenée à l'état de la production).
+
+Vérifier sans rien appliquer : SQL Editor → coller
 `supabase/verifier-migrations.sql` → Run. **Aucune ligne** = rien ne manque ;
 sinon, une ligne par migration à appliquer.
 

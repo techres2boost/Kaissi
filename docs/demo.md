@@ -1026,8 +1026,9 @@ bar, rien au back-office, et le bandeau de la caisse qui garde « ↑↓ 2 ».
 1. Sur la caisse : ☰ → **Synchronisation**. Si le message dit « la base de
    données du serveur n'est pas à jour : une migration manque (00XX) »,
    c'est cela.
-2. Supabase → **SQL Editor** → coller `supabase/migrations/00XX_….sql` →
-   **Run**.
+2. Supabase → **SQL Editor** → coller `supabase/reparer-production.sql` →
+   **Run**. Il applique la migration et dit, en une ligne, s'il en reste
+   d'autres à passer.
 3. Attendre un cycle (ou toucher « Synchroniser maintenant »).
 
 **Attendu** : « ↑↓ » retombe à 0, les ventes apparaissent en cuisine et au
