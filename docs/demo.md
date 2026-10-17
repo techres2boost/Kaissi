@@ -807,6 +807,8 @@ pnpm verifier:docs                              # aucun lien cassé dans docs/
 | Synchronisation : **« Hors ligne »** | Aucune réponse du serveur : réseau coupé, ou serveur arrêté (`/sante`) |
 | Chaque réduction apparaît **deux fois** sur la caisse | Caisse mise en service avec une version antérieure : mets l'application à jour, les réductions de démonstration disparaissent au démarrage |
 | La caisse affiche « Non appairé » | §2 |
+| iPhone : **« CreateConnection: Connection kaissi already exists »** après un changement de langue ou une inscription | Corrigé. Mettre à jour depuis TestFlight (§17). Rien n'est perdu ; en attendant, fermer et rouvrir l'application |
+| Play Console : **« Promote release → Closed testing – Alpha » grisé** | Un brouillon (Draft) traîne sur la piste Alpha : le supprimer (`stores.md` §4 duodecies). Codemagic promeut ensuite chaque build en Alpha tout seul |
 | iPhone : **« Démarrage impossible — Échec de la migration locale 14 … near "id": syntax error »** | Corrigé. Installe le build TestFlight suivant (§17). Rien n'est perdu : la base est restée en version 13 |
 | Le téléphone montre toujours **Snack Lac 1, Ahmed, Karim, Salma** au lieu de ton restaurant | C'est la **démonstration**, gardée par la mise à jour. Badge **« À appairer »** → e-mail et mot de passe → **Effacer et mettre en service** (§17) |
 | Codemagic a construit, mais le téléphone a toujours l'ancienne version | §17 : le téléphone suit-il la bonne **piste** (Android) ? le build est-il sorti de *Processing* (iPhone) ? |
@@ -937,11 +939,11 @@ L'essentiel :
 
 1. **Quelle version tourne ?** Caisse → ☰ → **Diagnostic** → ligne
    **Commit**, à comparer au commit du build Codemagic.
-2. **Android** : le compte Gmail du téléphone doit être testeur de la piste
-   **Internal testing** (celle que Codemagic publie, 121 et suivantes) — pas
-   seulement de *Closed testing — Alpha*, figée à 103. Ouvrir le lien
-   d'inscription sur le téléphone, puis Play Store → Gérer les applis →
-   Mettre à jour.
+2. **Android** : Codemagic publie chaque build en interne **et le promeut en
+   test fermé Alpha**. Une seule fois : supprimer le brouillon (Draft) qui
+   bloque la piste Alpha — c'est lui qui grise « Promote release ». Le compte
+   Gmail du téléphone doit être testeur d'Alpha ; après la vérification de
+   Google (quelques heures), Play Store → Gérer les applis → Mettre à jour.
 3. **iPhone** : attendre que le build quitte *Processing* dans App Store
    Connect, puis TestFlight → Kaissi → **Mettre à jour**.
 4. **Encore « Snack Lac 1 »** : c'est la démonstration, gardée par la mise à

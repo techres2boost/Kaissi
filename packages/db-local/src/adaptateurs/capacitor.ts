@@ -132,3 +132,56 @@ export function adaptateurCapacitor(db: ConnexionCapacitor): AdaptateurSqlite {
     },
   }
 }
+
+/**
+ * La part de `SQLiteConnection` (le gestionnaire JavaScript du greffon) qui
+ * sert à OBTENIR une connexion. Structurelle, pour la même raison que
+ * `ConnexionCapacitor` : testable sans iPhone.
+ */
+export interface GestionnaireConnexions<C> {
+  checkConnectionsConsistency(): Promise<{ result?: boolean }>
+  isConnection(base: string, lectureSeule: boolean): Promise<{ result?: boolean }>
+  retrieveConnection(base: string, lectureSeule: boolean): Promise<C>
+  createConnection(
+    base: string,
+    chiffree: boolean,
+    mode: string,
+    version: number,
+    lectureSeule: boolean,
+  ): Promise<C>
+}
+
+/**
+ * Obtient LA connexion à la base, y compris après un rechargement de la page.
+ *
+ * ── La panne : « CreateConnection: Connection kaissi already exists » ─────
+ *
+ * Le greffon tient DEUX registres de connexions : un dictionnaire côté
+ * JavaScript, et un côté natif. Un `window.location.reload()` — changer de
+ * langue, finir une inscription, changer d'établissement — vide le premier
+ * et laisse le second intact : la partie native survit à la WebView. Or
+ * `isConnection()` ne consulte QUE le dictionnaire JavaScript. Il répondait
+ * « non », on demandait une création, et le natif la refusait. La caisse
+ * affichait « Démarrage impossible » ; fermée et rouverte (natif neuf), elle
+ * repartait — jusqu'au rechargement suivant.
+ *
+ * `checkConnectionsConsistency()` est le remède prévu par le greffon : il
+ * confronte les deux registres et, quand le JavaScript n'en connaît aucune,
+ * ferme celles que le natif gardait. La création qui suit part d'un état
+ * propre. Si le JavaScript connaît déjà la connexion (second appel dans la
+ * même page), les deux registres concordent et on la réutilise.
+ */
+export async function obtenirConnexionCapacitor<C>(
+  gestionnaire: GestionnaireConnexions<C>,
+  base: string,
+): Promise<C> {
+  try {
+    await gestionnaire.checkConnectionsConsistency()
+  } catch {
+    // Rien à réconcilier (greffon à peine initialisé) : la création décidera.
+  }
+  if ((await gestionnaire.isConnection(base, false)).result === true) {
+    return gestionnaire.retrieveConnection(base, false)
+  }
+  return gestionnaire.createConnection(base, false, 'no-encryption', 1, false)
+}

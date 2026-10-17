@@ -469,6 +469,13 @@ passe donc tout script par `aplatirScript()` — une instruction par ligne —
 et `adaptateurs/ios.test.ts` rejoue le prétraitement d'iOS sur toutes les
 migrations. Ne contourne jamais cet aplatissement.
 
+Second piège du même greffon : il tient un registre de connexions côté
+JavaScript ET côté natif, et un `location.reload()` (langue, inscription)
+ne vide que le premier. On n'ouvre donc la base que par
+`obtenirConnexionCapacitor()`, qui réconcilie les deux avant de créer —
+sinon « Connection kaissi already exists » à chaque rechargement
+(`adaptateurs/rechargement.test.ts`).
+
 ---
 
 ## Arborescence
@@ -559,8 +566,9 @@ pnpm pos:aab        # ou pnpm pos:apk pour un APK signé, installable
 # Un numéro refusé ne se récupère jamais — on monte.
 #
 # ⚑ PUBLIER EST AUTOMATIQUE. Un push sur `main` construit les deux plateformes
-#   et publie — piste INTERNE de Play, TestFlight interne chez Apple. Jamais la
-#   production, jamais la revue : ce sont des testeurs nommés qui reçoivent.
+#   et publie — piste INTERNE de Play, promue aussitôt en TEST FERMÉ (alpha),
+#   TestFlight interne chez Apple. Jamais la production : ce sont des testeurs
+#   nommés qui reçoivent.
 #
 #   Le versionCode Android est DEMANDÉ à Play par la CI, jamais supposé : deux
 #   corrections poussées le même jour portent la même version, donc le même

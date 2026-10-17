@@ -2875,9 +2875,44 @@ faut que le compte Google DU TÉLÉPHONE soit testeur INTERNE :
    test interne** (étape 2 → « Download it on Google Play »).
 5. Vérifie l'étape 0 : le commit doit correspondre.
 
-> Inutile de toucher à la piste Alpha : elle ne bouge plus. Si tu veux que les
-> testeurs Alpha reçoivent aussi les nouvelles versions, *Internal testing* →
-> la version → **Promote release → Closed testing (Alpha)**.
+### Android — le test FERMÉ (Alpha), celui qui compte
+
+Depuis le commit qui ajoute `release_promotion` à `codemagic.yaml`, chaque
+build part en interne **puis est promu en Alpha** dans le même envoi. Plus
+rien à promouvoir à la main — à une condition : **aucun brouillon** ne doit
+traîner sur ces pistes.
+
+**« Promote release → Closed testing – Alpha » est grisé.** C'est la même
+cause : la piste Alpha porte une version **Draft** (le tableau de bord
+l'affiche : « Closed testing – Alpha · Draft »). Play refuse deux versions en
+préparation sur une même piste, donc il désactive la promotion — sans le
+dire. Pour débloquer, une seule fois :
+
+1. *Test and release → Testing → Closed testing* → piste **Alpha** → onglet
+   **Releases** → la version marquée **Draft** → **Discard release** (ou
+   « Supprimer la version »). Ce qui est déjà publié sur Alpha (103) n'est
+   pas touché.
+2. Même chose sur *Internal testing* si une « Untitled release · Draft » y
+   traîne : elle naît d'un clic sur **Create new release**. Ne la complète
+   pas, supprime-la (**Discard**).
+3. Puis, au choix :
+   - **attendre le prochain build Codemagic** : il publiera en interne et
+     promouvra en Alpha tout seul ;
+   - **ou promouvoir 123 tout de suite** : *Internal testing* → version
+     0.1.2 (123) → **Promote release → Closed testing → Alpha** → le bouton
+     n'est plus grisé → **Save** → **Review release** → **Start rollout to
+     Closed testing**.
+4. Une version en test fermé passe par une **vérification de Google**
+   (*Publishing overview* : « In review »), en général de quelques heures.
+   Elle n'arrive chez les testeurs Alpha qu'ensuite.
+5. Sur le téléphone : le compte Gmail doit être dans la liste de testeurs
+   d'**Alpha** (onglet *Testers* de la piste), avoir ouvert le lien
+   d'inscription, puis Play Store → Gérer les applis → Mettre à jour.
+
+> Ne crée jamais de version à la main (« Create new release ») sur une
+> piste que Codemagic alimente : le brouillon bloque la publication
+> automatique suivante, et un AAB téléversé à la main consomme un
+> `versionCode` que la CI croyait libre.
 
 ### iOS — TestFlight
 
@@ -2893,6 +2928,23 @@ faut que le compte Google DU TÉLÉPHONE soit testeur INTERNE :
    s'installe pas toute seule, sauf si « Mises à jour automatiques » est activé
    dans la fiche de l'application dans TestFlight.
 4. Vérifie l'étape 0.
+
+### « CreateConnection: Connection kaissi already exists » sur iPhone
+
+Corrigé. Le greffon SQLite tient deux registres de connexions, un en
+JavaScript et un natif. Un rechargement de la page — **changer de langue**,
+**finir une inscription**, changer d'établissement — vide le premier et
+laisse le second ouvert. L'ancienne ouverture ne consultait que le registre
+JavaScript, redemandait une création, et le natif la refusait : « Démarrage
+impossible ». Fermer et rouvrir l'application remettait le natif à zéro, d'où
+le « ça remarche » — jusqu'au rechargement suivant.
+
+L'ouverture réconcilie désormais les deux registres
+(`checkConnectionsConsistency`) avant de créer la connexion :
+`obtenirConnexionCapacitor` dans `packages/db-local`, couvert par
+`adaptateurs/rechargement.test.ts`, qui reproduit la panne puis enchaîne
+trois rechargements. Aucune donnée n'était perdue : la base n'était
+simplement pas rouverte.
 
 ### « Démarrage impossible — Échec de la migration locale 14 » sur iPhone
 

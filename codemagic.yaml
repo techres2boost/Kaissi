@@ -276,6 +276,20 @@ workflows:
         # drapeau ne compte que si la même configuration servait un jour une
         # piste plus large.
         changes_not_sent_for_review: false
+        # ── Puis promue en TEST FERMÉ (alpha), dans le même envoi ─────────
+        #
+        # C'est la piste qui compte : les testeurs du restaurant y sont
+        # inscrits, et c'est elle qui ouvre la production à un compte
+        # développeur personnel (12 testeurs × 14 jours). La piste interne
+        # reste le premier palier ; l'alpha la suit sans un clic.
+        #
+        # ⚠ Une promotion échoue si la piste alpha porte déjà un BROUILLON
+        #   (« Draft ») créé à la main dans la console : Play n'accepte pas
+        #   deux versions en préparation sur une même piste. Le supprimer
+        #   une fois suffit — docs/stores.md §4 duodecies.
+        release_promotion:
+          track: alpha
+          promote_as_draft: false
 
   # ─────────────────────────────────────────────────────────────────────────
   # iOS — App Store Connect (IPA signé)

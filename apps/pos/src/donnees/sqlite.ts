@@ -21,6 +21,7 @@
 
 import {
   adaptateurCapacitor,
+  obtenirConnexionCapacitor,
   preparerConnexionCapacitor,
   type AdaptateurSqlite,
 } from '@kaissi/db-local'
@@ -128,13 +129,12 @@ async function ouvrirConnexionNative(): Promise<AdaptateurSqlite> {
   const { CapacitorSQLite, SQLiteConnection } = await import('@capacitor-community/sqlite')
   const connexion = new SQLiteConnection(CapacitorSQLite)
 
-  // Réutilise une connexion existante après un rechargement à chaud.
-  const dejaOuverte = (await connexion.isConnection(NOM_BASE, false)).result === true
-  const db = dejaOuverte
-    ? await connexion.retrieveConnection(NOM_BASE, false)
-    : await connexion.createConnection(NOM_BASE, false, 'no-encryption', 1, false)
+  // Après un `location.reload()` (langue, inscription), le registre NATIF
+  // garde la connexion que le registre JavaScript a oubliée : voir
+  // `obtenirConnexionCapacitor`, et son test de rechargement.
+  const db = await obtenirConnexionCapacitor(connexion, NOM_BASE)
 
-  await db.open()
+  if (!(await db.isDBOpen()).result) await db.open()
   await preparerConnexionCapacitor(db)
 
   const adaptateur = adaptateurCapacitor(db)
