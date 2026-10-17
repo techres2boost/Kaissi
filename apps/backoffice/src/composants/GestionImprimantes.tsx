@@ -14,6 +14,7 @@ import Link from 'next/link'
 import { Printer, PrinterCheck, TriangleAlert } from 'lucide-react'
 import { definirImprimante, type Resultat } from '../app/[restaurant]/imprimantes/actions.js'
 import { PORT_PAR_DEFAUT } from '../app/[restaurant]/imprimantes/port.js'
+import { useT } from '../i18n/client.js'
 
 export interface PosteImprimante {
   id: string
@@ -41,6 +42,7 @@ function LignePoste({
   poste: PosteImprimante
   modifiable: boolean
 }) {
+  const t = useT()
   const [resultat, action] = useActionState(
     definirImprimante.bind(null, restaurantId, poste.id),
     null as Resultat | null,
@@ -58,8 +60,8 @@ function LignePoste({
         <input
           name="hote"
           defaultValue={poste.hote ?? ''}
-          aria-label={`Adresse de l’imprimante de ${poste.nom}`}
-          placeholder="aucune — ex. 192.168.1.50"
+          aria-label={t('Adresse de l’imprimante de {nom}', { nom: poste.nom })}
+          placeholder={t('aucune — ex. 192.168.1.50')}
           maxLength={253}
           inputMode="url"
           autoComplete="off"
@@ -68,11 +70,11 @@ function LignePoste({
         />
 
         <span className="champ-taux">
-          <span className="detail">port</span>
+          <span className="detail">{t('port')}</span>
           <input
             name="port"
             defaultValue={String(poste.port || PORT_PAR_DEFAUT)}
-            aria-label={`Port de l’imprimante de ${poste.nom}`}
+            aria-label={t('Port de l’imprimante de {nom}', { nom: poste.nom })}
             inputMode="numeric"
             maxLength={5}
             disabled={!modifiable}
@@ -80,43 +82,33 @@ function LignePoste({
         </span>
 
         {modifiable && (
-          <button type="submit" className="discret">
-            Enregistrer
-          </button>
+          <button type="submit" className="discret">{t('Enregistrer')}</button>
         )}
       </form>
 
       <p className="indication">
         {poste.rattachements === 0 ? (
           <>
-            <TriangleAlert size={14} strokeWidth={2} aria-hidden="true" /> Aucune
-            catégorie ne prépare ici : ce poste ne recevra jamais rien, avec ou
-            sans imprimante.{' '}
-            <Link href={{ pathname: `/${restaurantId}/categories` }}>
-              Lui rattacher une catégorie
-            </Link>
+            <TriangleAlert size={14} strokeWidth={2} aria-hidden="true" />{' '}{t('Aucune catégorie ne prépare ici : ce poste ne recevra jamais rien, avec ou sans imprimante.')}{' '}
+            <Link href={{ pathname: `/${restaurantId}/categories` }}>{t('Lui rattacher une catégorie')}</Link>
             .
           </>
         ) : poste.hote === null ? (
           <>
-            {poste.rattachements} rattachement(s), aucune imprimante : les bons
-            de ce poste se lisent à l’écran de{' '}
-            <Link href={{ pathname: `/${restaurantId}/preparation` }}>
-              préparation
-            </Link>
+            {poste.rattachements}{' '}{t('rattachement(s), aucune imprimante : les bons de ce poste se lisent à l’écran de')}{' '}
+            <Link href={{ pathname: `/${restaurantId}/preparation` }}>{t('préparation')}</Link>
             .
           </>
         ) : (
           <>
-            {poste.rattachements} rattachement(s).
-            {poste.ticketClient &&
-              ' C’est aussi cette imprimante qui sortira le TICKET CLIENT — voir la note ci-dessous.'}
+            {poste.rattachements}{' '}{t('rattachement(s).')}{poste.ticketClient &&
+              t(' C’est aussi cette imprimante qui sortira le TICKET CLIENT — voir la note ci-dessous.')}
           </>
         )}
       </p>
 
-      {resultat?.erreur && <p className="message erreur">{resultat.erreur}</p>}
-      {resultat?.succes && <p className="message succes">{resultat.succes}</p>}
+      {resultat?.erreur && <p className="message erreur">{t.m(resultat.erreur)}</p>}
+      {resultat?.succes && <p className="message succes">{t.m(resultat.succes)}</p>}
     </li>
   )
 }
@@ -130,15 +122,13 @@ export function GestionImprimantes({
   modifiable: boolean
   postes: PosteImprimante[]
 }) {
+  const t = useT()
   if (postes.length === 0) {
     return (
       <div className="message avertissement">
         <TriangleAlert size={16} strokeWidth={2} aria-hidden="true" />{' '}
-        <strong>Aucun poste de préparation.</strong> Une imprimante se règle SUR
-        un poste — créez-en un dans{' '}
-        <Link href={{ pathname: `/${restaurantId}/categories` }}>Catégories</Link>,
-        puis revenez ici.
-      </div>
+        <strong>{t('Aucun poste de préparation.')}</strong>{' '}{t('Une imprimante se règle SUR un poste — créez-en un dans')}{' '}
+        <Link href={{ pathname: `/${restaurantId}/categories` }}>{t('Catégories')}</Link>{t(', puis revenez ici.')}</div>
     )
   }
 
@@ -166,23 +156,17 @@ export function GestionImprimantes({
         cuisine et cherche un réglage qui n'existe pas.
       */}
       <div className="carte note-imprimantes">
-        <h2>Le ticket client n’a pas de poste à lui</h2>
-        <p>
-          La caisse l’envoie au <strong>premier poste de cette liste qui porte
-          une adresse</strong>
+        <h2>{t('Le ticket client n’a pas de poste à lui')}</h2>
+        <p>{t('La caisse l’envoie au')}{' '}<strong>{t('premier poste de cette liste qui porte une adresse')}</strong>
           {avecTicket ? (
             <>
-              {' '}— aujourd’hui <strong>{avecTicket.nom}</strong>
+              {' '}{t('— aujourd’hui')}{' '}<strong>{avecTicket.nom}</strong>
             </>
           ) : (
-            <> — aujourd’hui aucun, puisqu’aucun poste n’en porte</>
-          )}
-          . Pour qu’il sorte au comptoir, créez un poste « Caisse » et
-          donnez-lui une adresse avant les autres.
-        </p>
-        <p className="indication">
-          L’ordre est celui des postes dans{' '}
-          <Link href={{ pathname: `/${restaurantId}/categories` }}>Catégories</Link>.
+            <>{' '}{t('— aujourd’hui aucun, puisqu’aucun poste n’en porte')}</>
+          )}{t('. Pour qu’il sorte au comptoir, créez un poste « Caisse » et donnez-lui une adresse avant les autres.')}</p>
+        <p className="indication">{t('L’ordre est celui des postes dans')}{' '}
+          <Link href={{ pathname: `/${restaurantId}/categories` }}>{t('Catégories')}</Link>.
         </p>
       </div>
     </>

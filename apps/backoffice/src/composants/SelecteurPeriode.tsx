@@ -13,6 +13,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useTransition } from 'react'
 import { destinationSure } from '../serveur/redirection.js'
 import { Calendrier } from './Calendrier.js'
+import { useT } from '../i18n/client.js'
 
 /** Décale une journée « AAAA-MM-JJ » de n jours, en UTC pour rester stable. */
 function decaler(journee: string, jours: number): string {
@@ -31,6 +32,7 @@ export function SelecteurPeriode({
   /** La journée COMMERCIALE en cours — pas `new Date()` du navigateur. */
   aujourdhui: string
 }) {
+  const t = useT()
   const router = useRouter()
   const chemin = usePathname()
   const parametres = useSearchParams()
@@ -48,11 +50,11 @@ export function SelecteurPeriode({
   }
 
   const raccourcis: { libelle: string; du: string; au: string }[] = [
-    { libelle: "Aujourd'hui", du: aujourdhui, au: aujourdhui },
-    { libelle: 'Hier', du: decaler(aujourdhui, -1), au: decaler(aujourdhui, -1) },
-    { libelle: '7 derniers jours', du: decaler(aujourdhui, -6), au: aujourdhui },
-    { libelle: '30 derniers jours', du: decaler(aujourdhui, -29), au: aujourdhui },
-    { libelle: 'Ce mois', du: `${aujourdhui.slice(0, 7)}-01`, au: aujourdhui },
+    { libelle: t('Aujourd\'hui'), du: aujourdhui, au: aujourdhui },
+    { libelle: t('Hier'), du: decaler(aujourdhui, -1), au: decaler(aujourdhui, -1) },
+    { libelle: t('7 derniers jours'), du: decaler(aujourdhui, -6), au: aujourdhui },
+    { libelle: t('30 derniers jours'), du: decaler(aujourdhui, -29), au: aujourdhui },
+    { libelle: t('Ce mois'), du: `${aujourdhui.slice(0, 7)}-01`, au: aujourdhui },
   ]
 
   return (

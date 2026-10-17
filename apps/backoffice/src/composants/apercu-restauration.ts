@@ -16,6 +16,7 @@
  */
 
 import type { TotauxCommande } from '@kaissi/domain'
+import { aTraduire } from '@kaissi/i18n'
 
 export interface LigneApercu {
   readonly libelle: string
@@ -39,7 +40,7 @@ export function lignesApercu(
 ): LigneApercu[] {
   const lignes: LigneApercu[] = [
     {
-      libelle: 'Articles',
+      libelle: aTraduire('Articles'),
       montantMillimes: totaux.baseApresRemisesMillimes,
       dont: false,
     },
@@ -55,14 +56,14 @@ export function lignesApercu(
    */
   const taxeArticles = totaux.taxeExclusiveMillimes - taxeServiceAjoutee(totaux, service)
   if (taxeArticles > 0) {
-    lignes.push({ libelle: 'Taxes', montantMillimes: taxeArticles, dont: false })
+    lignes.push({ libelle: aTraduire('Taxes'), montantMillimes: taxeArticles, dont: false })
   }
 
   if (totaux.serviceMillimes > 0) {
-    lignes.push({ libelle: 'Service', montantMillimes: totaux.serviceMillimes, dont: false })
+    lignes.push({ libelle: aTraduire('Service'), montantMillimes: totaux.serviceMillimes, dont: false })
 
     if (totaux.taxeServiceMillimes > 0) {
-      const nom = service.nomTaux ?? 'Taxe'
+      const nom = service.nomTaux ?? aTraduire('Taxe')
       lignes.push(
         service.taxeComprise
           ? {
@@ -81,7 +82,7 @@ export function lignesApercu(
 
   if (totaux.timbreFiscalMillimes > 0) {
     lignes.push({
-      libelle: 'Timbre',
+      libelle: aTraduire('Timbre'),
       montantMillimes: totaux.timbreFiscalMillimes,
       dont: false,
     })
@@ -101,5 +102,5 @@ function taxeServiceAjoutee(
 
 /** La somme des lignes qui S'ADDITIONNENT — celles qui ne sont pas des « dont ». */
 export function sommeApercu(lignes: readonly LigneApercu[]): number {
-  return lignes.reduce((t, l) => (l.dont ? t : t + l.montantMillimes), 0)
+  return lignes.reduce((elt, l) => (l.dont ? elt : elt + l.montantMillimes), 0)
 }

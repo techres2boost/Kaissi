@@ -6,6 +6,7 @@
  */
 
 import { useEffect, type ReactNode } from 'react'
+import { t } from '../i18n.js'
 
 interface Props {
   readonly titre: string
@@ -34,7 +35,7 @@ export function Modale({ titre, sousTitre, onFermer, children, pied, large }: Pr
             {sousTitre && <p className="sous-titre">{sousTitre}</p>}
           </div>
           {onFermer && (
-            <button type="button" className="fermer" onClick={onFermer} aria-label="Fermer">
+            <button type="button" className="fermer" onClick={onFermer} aria-label={t('Fermer')}>
               ✕
             </button>
           )}

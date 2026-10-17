@@ -31,6 +31,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react'
 import { enFrancais, grilleDuMois, versDate, JOURS, MOIS } from './dates.js'
+import { useT } from '../i18n/client.js'
 
 export function Calendrier({
   du,
@@ -44,6 +45,7 @@ export function Calendrier({
   aujourdhui: string
   onChoisir: (du: string, au: string) => void
 }) {
+  const t = useT()
   const [ouvert, setOuvert] = useState(false)
   /** Le mois affiché, ancré sur le début de la période en cours. */
   const [ancre, setAncre] = useState(() => versDate(du))
@@ -128,18 +130,18 @@ export function Calendrier({
       </button>
 
       {ouvert && (
-        <div className="calendrier-panneau" id={idPanneau} role="dialog" aria-label="Choisir une période">
+        <div className="calendrier-panneau" id={idPanneau} role="dialog" aria-label={t('Choisir une période')}>
           <div className="calendrier-entete">
-            <button type="button" onClick={moisPrecedent} aria-label="Mois précédent">
+            <button type="button" onClick={moisPrecedent} aria-label={t('Mois précédent')}>
               ‹
             </button>
             <strong>
-              {MOIS[mois]} {annee}
+              {t(MOIS[mois] ?? '')} {annee}
             </strong>
             <button
               type="button"
               onClick={moisSuivant}
-              aria-label="Mois suivant"
+              aria-label={t('Mois suivant')}
               disabled={!suivantPossible}
             >
               ›
@@ -148,8 +150,8 @@ export function Calendrier({
 
           <p className="calendrier-consigne">
             {debut === null
-              ? 'Cliquez le premier jour de la période.'
-              : `Depuis le ${enFrancais(debut)} — cliquez le dernier jour.`}
+              ? t('Cliquez le premier jour de la période.')
+              : t('Depuis le {valeur} — cliquez le dernier jour.', { valeur: enFrancais(debut) })}
           </p>
 
           <div className="calendrier-grille" role="grid">
@@ -157,7 +159,7 @@ export function Calendrier({
               // Deux « M » et deux « J » dans la semaine : la lettre seule ne
               // suffit pas à un lecteur d'écran, la clé non plus.
               <span key={`${j}-${i}`} className="calendrier-jour-entete" aria-hidden="true">
-                {j}
+                {t(j)}
               </span>
             ))}
             {cases.map((journee) => {

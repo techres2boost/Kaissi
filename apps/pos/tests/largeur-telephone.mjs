@@ -58,8 +58,14 @@ const nav = await chromium.launch(
 
 let echecs = 0
 
+/*
+ * Les DEUX langues. L'arabe n'a ni les mêmes longueurs de mots ni le même
+ * sens d'écriture : un écran qui tient en français peut déborder en arabe —
+ * et dans ce cas, il déborde par la GAUCHE.
+ */
+for (const langue of ['fr', 'ar'])
 for (const appareil of APPAREILS) {
-  console.log(`\n▸ ${appareil.nom}`)
+  console.log(`\n▸ ${appareil.nom} — ${langue === 'ar' ? 'arabe' : 'français'}`)
   const page = await nav.newPage({
     viewport: { width: appareil.width, height: appareil.height },
     // Sans cela, Chromium rend en « desktop » et les points de bascule
@@ -112,7 +118,8 @@ for (const appareil of APPAREILS) {
         for (const el of document.querySelectorAll('body *')) {
           const r = el.getBoundingClientRect()
           if (r.width === 0 && r.height === 0) continue
-          if (r.right > fenetre + tolerance) {
+          // De droite à gauche, ce qui dépasse sort par la GAUCHE.
+          if (r.right > fenetre + tolerance || r.left < -tolerance) {
             coupables.push({ selecteur: nommer(el), droite: Math.round(r.right) })
           }
         }
@@ -177,6 +184,13 @@ for (const appareil of APPAREILS) {
       }
     })
 
+  await page.addInitScript((l) => {
+    try {
+      window.localStorage.setItem('kaissi.langue', l)
+    } catch {
+      // Stockage refusé : la caisse reste en français, et le test le verra.
+    }
+  }, langue)
   await page.goto(URL_POS, { waitUntil: 'networkidle' })
 
   // Caisse neuve : l'accueil d'abord (voir parcours-caisse.mjs).
@@ -232,7 +246,7 @@ for (const appareil of APPAREILS) {
   }
 
   await page.click('.lien-discret')
-  await page.waitForSelector('text=Prise de poste', { timeout: 20000 })
+  await page.waitForSelector('.liste-employes', { timeout: 20000 })
   await mesurer('prise de poste')
 
   /*
@@ -247,7 +261,7 @@ for (const appareil of APPAREILS) {
 
   for (const c of '1357') await page.click(`.pave button:has-text("${c}")`)
   await page.click('.pave .valider')
-  await page.waitForSelector('text=Ouverture de caisse', { timeout: 20000 })
+  await page.waitForSelector('.ouverture-caisse', { timeout: 20000 })
   await mesurer('ouverture de caisse')
 
   for (const c of ['5', '0']) await page.click(`.pave button:text-is("${c}")`)
@@ -278,7 +292,7 @@ for (const appareil of APPAREILS) {
   await page.waitForSelector('.lignes li:has-text("Coca-Cola")', { timeout: 10000 })
   await mesurer('commande avec une ligne')
 
-  await page.click('.actions-commande button:has-text("Encaisser")')
+  await page.click('.actions-commande .principal')
   await page.waitForSelector('.paiement', { timeout: 10000 })
   await mesurer('encaissement')
 
@@ -286,14 +300,14 @@ for (const appareil of APPAREILS) {
   // table, employé, articles, mode de paiement, montant, badges. C'est celle
   // qui déborde en premier quand on ajoute une colonne.
   await page.click('.ouvrir-tiroir')
-  await page.click('.tiroir-lien:has-text("Reçus")')
+  await page.click('.tiroir-lien[data-cle="recus"]')
   await page.waitForSelector('.recus', { timeout: 10000 })
   await mesurer('reçus')
 
   // Les périodes affichent huit chiffres côte à côte : c'est la grille la
   // plus serrée de l'application, celle qui déborde en premier.
   await page.click('.ouvrir-tiroir')
-  await page.click('.tiroir-lien:has-text("Périodes de travail")')
+  await page.click('.tiroir-lien[data-cle="periodes"]')
   await page.waitForSelector('.periodes', { timeout: 10000 })
   await mesurer('périodes de travail')
 
@@ -305,11 +319,11 @@ for (const appareil of APPAREILS) {
    * Ouvert avec le GÉRANT : un caissier ne voit pas cette entrée.
    */
   await page.click('.ouvrir-tiroir')
-  await page.click('.tiroir-lien:has-text("Carte")')
+  await page.click('.tiroir-lien[data-cle="carte"]')
   await page.waitForSelector('.ecran-carte', { timeout: 10000 })
   await mesurer('carte')
 
-  await page.click('button:has-text("Nouveau groupe")')
+  await page.click('button[data-cle="modificateur"]')
   await page.waitForSelector('#mod-nom', { timeout: 10000 })
   await mesurer('carte — nouveau groupe d’options')
   await page.click('.modale .fermer')
@@ -329,4 +343,4 @@ if (echecs > 0) {
   process.exit(1)
 }
 
-console.log('\n✓ Aucun débordement horizontal sur les deux appareils.\n')
+console.log('\n✓ Aucun débordement horizontal sur les deux appareils, en français comme en arabe.\n')

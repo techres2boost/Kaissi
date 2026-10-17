@@ -39,6 +39,7 @@ import {
 } from '../../../composants/GestionFournisseurs.js'
 import { TableauValorisation, type LigneValorisee } from '../../../composants/TableauValorisation.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,6 +48,7 @@ export default async function PageInventaire({
 }: {
   params: Promise<{ restaurant: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
@@ -56,30 +58,20 @@ export default async function PageInventaire({
   if (!moduleOuvert(abonnement, 'inventaire_avance')) {
     return (
       <>
-        <h1>Inventaire avancé</h1>
-        <p className="sous-titre">
-          Ce module n’est pas ouvert avec la formule «&nbsp;{abonnement.nom}&nbsp;».
-        </p>
+        <h1>{t('Inventaire avancé')}</h1>
+        <p className="sous-titre">{t('Ce module n’est pas ouvert avec la formule « {nom} ».', { nom: t(abonnement.nom) })}</p>
 
         <section className="carte">
           <h2>
-            <Lock size={18} strokeWidth={1.9} aria-hidden="true" /> Ce qu’il ajoute
-          </h2>
+            <Lock size={18} strokeWidth={1.9} aria-hidden="true" />{' '}{t('Ce qu’il ajoute')}</h2>
           <ul>
             <li>
-              <strong>La valeur d’achat de votre stock</strong>, calculée au coût
-              d’achat de chaque article — le chiffre qu’un comptable demande, et
-              qu’aucun rapport de vente ne donne.
-            </li>
+              <strong>{t('La valeur d’achat de votre stock')}</strong>{t(', calculée au coût d’achat de chaque article — le chiffre qu’un comptable demande, et qu’aucun rapport de vente ne donne.')}</li>
             <li>
-              <strong>Des fiches fournisseurs</strong>, pour rattacher une
-              réception à qui l’a livrée sans retaper son nom.
-            </li>
+              <strong>{t('Des fiches fournisseurs')}</strong>{t(', pour rattacher une réception à qui l’a livrée sans retaper son nom.')}</li>
           </ul>
           <p>
-            <Link href={{ pathname: `/${restaurant}/abonnement` }}>
-              Voir les formules
-            </Link>
+            <Link href={{ pathname: `/${restaurant}/abonnement` }}>{t('Voir les formules')}</Link>
           </p>
         </section>
 
@@ -89,14 +81,8 @@ export default async function PageInventaire({
           retire d'autre — et la réponse est : rien de ce qui compte.
         */}
         <div className="message info">
-          <strong>Le stock, lui, reste entier.</strong> Comptages, mouvements,
-          seuils d’alerte et retrait automatique de la carte continuent de
-          fonctionner dans{' '}
-          <Link href={{ pathname: `/${restaurant}/stock` }}>Stock</Link>, quelle
-          que soit votre formule — et la caisse encaisse hors ligne comme
-          toujours. Ce module ajoute une lecture comptable, il ne conditionne
-          aucun geste de service.
-        </div>
+          <strong>{t('Le stock, lui, reste entier.')}</strong>{' '}{t('Comptages, mouvements, seuils d’alerte et retrait automatique de la carte continuent de fonctionner dans')}{' '}
+          <Link href={{ pathname: `/${restaurant}/stock` }}>{t('Stock')}</Link>{t(', quelle que soit votre formule — et la caisse encaisse hors ligne comme toujours. Ce module ajoute une lecture comptable, il ne conditionne aucun geste de service.')}</div>
       </>
     )
   }
@@ -176,20 +162,16 @@ export default async function PageInventaire({
 
   return (
     <>
-      <h1>Inventaire avancé</h1>
-      <p className="sous-titre">
-        Ce que votre stock vaut, et chez qui vous l’achetez.
-      </p>
+      <h1>{t('Inventaire avancé')}</h1>
+      <p className="sous-titre">{t('Ce que votre stock vaut, et chez qui vous l’achetez.')}</p>
 
-      {erreur && <p className="message erreur">Lecture impossible : {erreur.message}</p>}
+      {erreur && <p className="message erreur">{t('Lecture impossible :')}{' '}{erreur.message}</p>}
 
       <section className="bloc">
         <h2>
-          <Package size={18} strokeWidth={1.9} aria-hidden="true" /> Valeur d’achat
-          du stock
-        </h2>
+          <Package size={18} strokeWidth={1.9} aria-hidden="true" />{' '}{t('Valeur d’achat du stock')}</h2>
         <p className="sous-titre">
-          {lignes.length} article(s) suivi(s) —{' '}
+          {lignes.length}{' '}{t('article(s) suivi(s) —')}{' '}
           <strong>{formaterTND(montant(valorisation.valeurMillimes))}</strong>
         </p>
 
@@ -202,14 +184,9 @@ export default async function PageInventaire({
         {valorisation.lignesSansCout > 0 && (
           <p className="message avertissement" role="status">
             <strong>
-              {valorisation.lignesSansCout} article(s) sans coût d’achat saisi.
-            </strong>{' '}
-            Ils comptent pour zéro dans le total ci-dessus, qui est donc{' '}
-            <strong>incomplet</strong> — un coût non saisi n’est pas un coût nul.
-            Saisissez-les dans{' '}
-            <Link href={{ pathname: `/${restaurant}/catalogue` }}>
-              la liste d’articles
-            </Link>
+              {valorisation.lignesSansCout}{' '}{t('article(s) sans coût d’achat saisi.')}</strong>{' '}{t('Ils comptent pour zéro dans le total ci-dessus, qui est donc')}{' '}
+            <strong>{t('incomplet')}</strong>{' '}{t('— un coût non saisi n’est pas un coût nul. Saisissez-les dans')}{' '}
+            <Link href={{ pathname: `/${restaurant}/catalogue` }}>{t('la liste d’articles')}</Link>
             .
           </p>
         )}
@@ -217,13 +194,7 @@ export default async function PageInventaire({
         {valorisation.lignesNegatives > 0 && (
           <p className="message avertissement" role="status">
             <strong>
-              {valorisation.lignesNegatives} article(s) en quantité négative.
-            </strong>{' '}
-            Ils <strong>retirent</strong> de la valeur. Une quantité négative est
-            le signal normal d’une réception non saisie, ou d’un comptage de
-            référence à refaire — elle n’est pas bornée à zéro, parce que la
-            borner ferait paraître juste un stock faux.
-          </p>
+              {valorisation.lignesNegatives}{' '}{t('article(s) en quantité négative.')}</strong>{' '}{t('Ils')}{' '}<strong>{t('retirent')}</strong>{' '}{t('de la valeur. Une quantité négative est le signal normal d’une réception non saisie, ou d’un comptage de référence à refaire — elle n’est pas bornée à zéro, parce que la borner ferait paraître juste un stock faux.')}</p>
         )}
 
         {/*
@@ -233,7 +204,7 @@ export default async function PageInventaire({
         */}
         <BoutonsExport
           restaurantId={restaurant}
-          exports={[{ quoi: 'valorisation', libelle: 'Valorisation (CSV)' }]}
+          exports={[{ quoi: 'valorisation', libelle: t('Valorisation (CSV)') }]}
         />
 
         <TableauValorisation lignes={lignes} />
@@ -241,21 +212,12 @@ export default async function PageInventaire({
 
       <section className="bloc">
         <h2>
-          <Truck size={18} strokeWidth={1.9} aria-hidden="true" /> Fournisseurs
-        </h2>
-        <p className="sous-titre">
-          Un carnet, pas un portail d’achats. Une réception se saisit toujours
-          avec un nom libre dans{' '}
-          <Link href={{ pathname: `/${restaurant}/stock` }}>Stock</Link> — ces
-          fiches évitent seulement de le retaper, et rattachent la réception
-          quand le nom correspond.
-        </p>
+          <Truck size={18} strokeWidth={1.9} aria-hidden="true" />{' '}{t('Fournisseurs')}</h2>
+        <p className="sous-titre">{t('Un carnet, pas un portail d’achats. Une réception se saisit toujours avec un nom libre dans')}{' '}
+          <Link href={{ pathname: `/${restaurant}/stock` }}>{t('Stock')}</Link>{' '}{t('— ces fiches évitent seulement de le retaper, et rattachent la réception quand le nom correspond.')}</p>
 
         {!etablissement.gestionnaire && (
-          <p className="sous-titre">
-            Consultation seule : le rôle «&nbsp;{etablissement.role}&nbsp;» ne
-            modifie pas les fiches fournisseurs.
-          </p>
+          <p className="sous-titre">{t('Consultation seule : le rôle «')}{' '}{etablissement.role}{' '}{t('» ne modifie pas les fiches fournisseurs.')}</p>
         )}
 
         <GestionFournisseurs

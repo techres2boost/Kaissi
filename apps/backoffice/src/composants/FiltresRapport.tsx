@@ -20,6 +20,7 @@ import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useTransition } from 'react'
 import { destinationSure } from '../serveur/redirection.js'
 import { Calendrier } from './Calendrier.js'
+import { useT } from '../i18n/client.js'
 
 /** Décale une journée « AAAA-MM-JJ » de n jours, en UTC pour rester stable. */
 function decaler(journee: string, jours: number): string {
@@ -53,6 +54,7 @@ export function FiltresRapport({
   employeId: string | null
   employes: readonly EmployeFiltre[]
 }) {
+  const t = useT()
   const router = useRouter()
   const chemin = usePathname()
   const parametres = useSearchParams()
@@ -71,11 +73,11 @@ export function FiltresRapport({
   }
 
   const raccourcis = [
-    { libelle: "Aujourd'hui", du: aujourdhui, au: aujourdhui },
-    { libelle: 'Hier', du: decaler(aujourdhui, -1), au: decaler(aujourdhui, -1) },
-    { libelle: '7 derniers jours', du: decaler(aujourdhui, -6), au: aujourdhui },
-    { libelle: '30 derniers jours', du: decaler(aujourdhui, -29), au: aujourdhui },
-    { libelle: 'Ce mois', du: `${aujourdhui.slice(0, 7)}-01`, au: aujourdhui },
+    { libelle: t('Aujourd\'hui'), du: aujourdhui, au: aujourdhui },
+    { libelle: t('Hier'), du: decaler(aujourdhui, -1), au: decaler(aujourdhui, -1) },
+    { libelle: t('7 derniers jours'), du: decaler(aujourdhui, -6), au: aujourdhui },
+    { libelle: t('30 derniers jours'), du: decaler(aujourdhui, -29), au: aujourdhui },
+    { libelle: t('Ce mois'), du: `${aujourdhui.slice(0, 7)}-01`, au: aujourdhui },
   ]
 
   const horaireNeutre = heureDebut === 0 && heureFin === 23
@@ -115,34 +117,28 @@ export function FiltresRapport({
           🕐
           <select
             value={heureDebut}
-            aria-label="Heure de début"
+            aria-label={t('Heure de début')}
             onChange={(e) => aller({ h: `${e.target.value}-${Math.max(Number(e.target.value), heureFin)}` })}
           >
             {HEURES.map((h) => (
               <option key={h} value={h}>
-                {String(h).padStart(2, '0')} h
-              </option>
+                {String(h).padStart(2, '0')}{' '}{t('h')}</option>
             ))}
           </select>
         </label>
-        <label>
-          à
-          <select
+        <label>{t('à')}<select
             value={heureFin}
-            aria-label="Heure de fin (incluse)"
+            aria-label={t('Heure de fin (incluse)')}
             onChange={(e) => aller({ h: `${Math.min(heureDebut, Number(e.target.value))}-${e.target.value}` })}
           >
             {HEURES.map((h) => (
               <option key={h} value={h}>
-                {String(h).padStart(2, '0')} h 59
-              </option>
+                {String(h).padStart(2, '0')}{' '}{t('h 59')}</option>
             ))}
           </select>
         </label>
         {!horaireNeutre && (
-          <button type="button" className="discret" onClick={() => aller({ h: null })}>
-            Toute la journée
-          </button>
+          <button type="button" className="discret" onClick={() => aller({ h: null })}>{t('Toute la journée')}</button>
         )}
 
         {employes.length > 0 && (
@@ -150,10 +146,10 @@ export function FiltresRapport({
             👤
             <select
               value={employeId ?? ''}
-              aria-label="Employé"
+              aria-label={t('Employé')}
               onChange={(e) => aller({ employe: e.target.value || null })}
             >
-              <option value="">Tous les employés</option>
+              <option value="">{t('Tous les employés')}</option>
               {employes.map((e) => (
                 <option key={e.id} value={e.id}>
                   {e.nom}

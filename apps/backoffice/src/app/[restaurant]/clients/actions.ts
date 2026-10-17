@@ -31,6 +31,7 @@ import { ErreurSaisie, texteFacultatif, texteObligatoire } from '../../../serveu
  * chez elles, elles sont testables sans monter de serveur.
  */
 import { analyserCsv, comparerTelephone } from '../../../serveur/clients-csv.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export interface Resultat {
   erreur?: string
@@ -183,6 +184,7 @@ export async function importerClients(
   _precedent: BilanImport | null,
   donnees: FormData,
 ): Promise<BilanImport> {
+  const t = await traduction()
   try {
     const { etablissement } = await etablissementObligatoire(restaurantId)
     exigerGestionnaire(etablissement)
@@ -275,10 +277,13 @@ export async function importerClients(
       ajoutes: aInserer.length,
       doublons,
       refuses: refuses.slice(0, 20),
+      // Le bilan est assemblé de morceaux qui n'existent que selon le cas :
+      // il est donc traduit ICI, morceau par morceau, et non reconnu après
+      // coup par son modèle comme les autres messages.
       succes:
-        `${aInserer.length} client(s) ajouté(s)` +
-        (doublons > 0 ? `, ${doublons} déjà connu(s) et laissé(s) intact(s)` : '') +
-        (refuses.length > 0 ? `, ${refuses.length} ligne(s) refusée(s)` : '') +
+        t('{n} client(s) ajouté(s)', { n: aInserer.length }) +
+        (doublons > 0 ? t(', {n} déjà connu(s) et laissé(s) intact(s)', { n: doublons }) : '') +
+        (refuses.length > 0 ? t(', {n} ligne(s) refusée(s)', { n: refuses.length }) : '') +
         '.',
     }
   } catch (erreur) {

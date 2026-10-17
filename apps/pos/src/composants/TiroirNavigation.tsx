@@ -37,6 +37,8 @@ import {
   X,
 } from 'lucide-react'
 import type { Vue } from '../navigation.js'
+import { t } from '../i18n.js'
+import { ChoixLangue } from './ChoixLangue.js'
 
 export interface EntreeTiroir {
   readonly cle: string
@@ -107,6 +109,9 @@ export function TiroirNavigation({
         key={e.cle}
         type="button"
         className="tiroir-lien"
+        // Clé stable, indépendante de la langue — c'est elle que visent les
+        // parcours de test, pas un libellé qui se traduit.
+        data-cle={e.cle}
         data-actif={e.vues?.includes(vue) ?? false}
         onClick={() => {
           /*
@@ -135,7 +140,7 @@ export function TiroirNavigation({
 
       <nav
         className="tiroir"
-        aria-label="Navigation"
+        aria-label={t('Navigation')}
         ref={panneau}
       >
         <div className="tiroir-entete">
@@ -147,7 +152,7 @@ export function TiroirNavigation({
             type="button"
             className="tiroir-fermer"
             onClick={onFermer}
-            aria-label="Fermer le menu"
+            aria-label={t('Fermer le menu')}
           >
             <X size={20} strokeWidth={2} aria-hidden="true" />
           </button>
@@ -158,6 +163,15 @@ export function TiroirNavigation({
         {sortantes.length > 0 && (
           <div className="tiroir-liste tiroir-sortantes">{sortantes.map(rendre)}</div>
         )}
+
+        {/*
+          La langue de ce terminal, juste au-dessus de « Verrouiller » : un
+          réglage qu'on cherche une fois, pas une destination.
+        */}
+        <div className="tiroir-langue">
+          <span>{t('Langue')}</span>
+          <ChoixLangue />
+        </div>
 
         {/*
           Verrouiller en BAS, et séparé : c'est le geste qui rend la caisse à
@@ -173,7 +187,7 @@ export function TiroirNavigation({
           }}
         >
           <Lock size={17} strokeWidth={1.9} aria-hidden="true" />
-          <span>Verrouiller la caisse</span>
+          <span>{t('Verrouiller la caisse')}</span>
         </button>
       </nav>
     </>

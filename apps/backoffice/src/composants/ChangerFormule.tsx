@@ -9,6 +9,7 @@
 
 import { useState, useTransition } from 'react'
 import { changerFormule, type ResultatFormule } from '../app/[restaurant]/abonnement/actions.js'
+import { useT } from '../i18n/client.js'
 
 export function ChangerFormule({
   restaurant,
@@ -17,6 +18,7 @@ export function ChangerFormule({
   restaurant: string
   planActuel: string
 }) {
+  const t = useT()
   const [resultat, setResultat] = useState<ResultatFormule>({})
   const [enCours, demarrer] = useTransition()
 
@@ -33,20 +35,16 @@ export function ChangerFormule({
           className={planActuel === 'gratuit' ? 'discret' : undefined}
           disabled={enCours || planActuel === 'gratuit'}
           onClick={() => choisir('gratuit')}
-        >
-          Passer en Gratuit
-        </button>
+        >{t('Passer en Gratuit')}</button>
         <button
           type="button"
           className={planActuel === 'pro' ? 'discret' : 'principal'}
           disabled={enCours || planActuel === 'pro'}
           onClick={() => choisir('pro')}
-        >
-          Passer en Payant
-        </button>
+        >{t('Passer en Payant')}</button>
       </div>
-      {resultat.erreur && <p className="message erreur">{resultat.erreur}</p>}
-      {resultat.succes && <p className="message succes">{resultat.succes}</p>}
+      {resultat.erreur && <p className="message erreur">{t.m(resultat.erreur)}</p>}
+      {resultat.succes && <p className="message succes">{t.m(resultat.succes)}</p>}
     </div>
   )
 }

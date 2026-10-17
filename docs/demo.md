@@ -29,6 +29,8 @@ Durée : environ 2 heures pour tout.
 13. [Si quelque chose ne marche pas](#13-si-quelque-chose-ne-marche-pas)
 14. [Remettre la démo à zéro](#14-remettre-la-démo-à-zéro)
 15. [Ce qui n'existe pas encore](#15-ce-qui-nexiste-pas-encore)
+16. [La caisse et le back-office en arabe](#16-la-caisse-et-le-back-office-en-arabe)
+17. [Mettre à jour les téléphones de test](#17-mettre-à-jour-les-téléphones-de-test)
 
 ---
 
@@ -241,6 +243,34 @@ back-office.
 | **Diagnostic** | quatre phrases : la carte, les ventes, Internet, l'envoi au bureau |
 | **Back-office** | ouvre le back-office dans le navigateur. **Hors ligne**, il explique qu'il faut du réseau, et rappelle que la caisse continue |
 
+### 3.9 bis Rembourser un ticket payé
+
+Le **ticket 1** est payé. Le client revient : son plat était froid.
+
+1. Menu ☰ → **Reçus** → touche le ticket 1 → **Rembourser…**
+2. Coche la ligne à rendre (ou **Tout le ticket**), choisis le mode
+   (**Espèces**), le motif (« Plat froid » ou un motif écrit).
+3. **Rembourser** : la caisse demande le **PIN d'un gérant** — Salma est
+   caissière, elle ne peut pas l'autoriser seule. Ahmed pose `1357`.
+
+**Attendu** :
+
+- le reçu réédité porte une ligne **« Remboursé »** avec le montant, le
+  motif, et le nom de qui l'a **autorisé** ;
+- la ligne rendue ne peut plus l'être une seconde fois (« déjà remboursé ») ;
+- rien n'est effacé : la vente reste dans le chiffre d'affaires, le
+  remboursement s'ajoute **à part**, à la date où l'argent a été rendu ;
+- hors ligne, c'est pareil : le remboursement part avec la synchronisation
+  suivante.
+
+Au back-office (§4) : **Reçus** → ticket 1 montre le remboursement et le
+« Net encaissé » ; le **Récapitulatif des ventes** a une ligne
+« Remboursements » non nulle.
+
+> Un remboursement **par carte** se fait sur le terminal de la banque : Kaissi
+> l'enregistre, le tiroir n'est pas concerné. En **espèces**, il sort du tiroir
+> — c'est ce que la clôture va vérifier.
+
 ### 3.10 Clôturer la caisse
 
 Encaisse d'abord le **ticket 3** (table 8) par carte. Puis menu ☰ →
@@ -249,7 +279,8 @@ coupure par coupure.
 
 **Attendu** : la caisse calcule l'**attendu**, affiche l'**écart** (compté −
 attendu), qui peut être négatif. Fais volontairement une erreur de 2 dinars
-pour le voir.
+pour le voir. Le remboursement en espèces du §3.9 bis est **déduit** de
+l'attendu : l'argent rendu est sorti du tiroir.
 
 ### 3.11 Synchroniser
 
@@ -741,7 +772,8 @@ pnpm typecheck              # types de tout le projet
 pnpm lint
 
 pnpm --filter @kaissi/backoffice test           # back-office, dont : aucun écran sans contrôle de rôle
-pnpm --filter @kaissi/backoffice test:largeur   # aucun écran ne déborde sur téléphone
+pnpm --filter @kaissi/backoffice test:largeur   # aucun écran ne déborde sur téléphone, en français PUIS en arabe
+pnpm --filter @kaissi/i18n test                 # toute phrase affichée a sa traduction arabe
 
 pnpm db:test                                    # base PostgreSQL jetable + migrations
 pnpm --filter @kaissi/sync test                 # synchronisation, dont :
@@ -752,6 +784,8 @@ pnpm db:test:stop
 pnpm pos:build                                  # vérifie que la caisse ne dépend d'aucun réseau
 pnpm --filter @kaissi/pos test:parcours         # une journée de service jouée dans un navigateur
 pnpm --filter @kaissi/pos test:carte            # la carte tenue depuis la caisse, hors ligne
+pnpm --filter @kaissi/pos test:remboursement    # rembourser : PIN du gérant, ticket réédité, tiroir
+pnpm --filter @kaissi/pos test:largeur          # 390 et 320 px, en français PUIS en arabe
 pnpm verifier:docs                              # aucun lien cassé dans docs/
 ```
 
@@ -773,6 +807,10 @@ pnpm verifier:docs                              # aucun lien cassé dans docs/
 | Synchronisation : **« Hors ligne »** | Aucune réponse du serveur : réseau coupé, ou serveur arrêté (`/sante`) |
 | Chaque réduction apparaît **deux fois** sur la caisse | Caisse mise en service avec une version antérieure : mets l'application à jour, les réductions de démonstration disparaissent au démarrage |
 | La caisse affiche « Non appairé » | §2 |
+| iPhone : **« Démarrage impossible — Échec de la migration locale 14 … near "id": syntax error »** | Corrigé. Installe le build TestFlight suivant (§17). Rien n'est perdu : la base est restée en version 13 |
+| Le téléphone montre toujours **Snack Lac 1, Ahmed, Karim, Salma** au lieu de ton restaurant | C'est la **démonstration**, gardée par la mise à jour. Badge **« À appairer »** → e-mail et mot de passe → **Effacer et mettre en service** (§17) |
+| Codemagic a construit, mais le téléphone a toujours l'ancienne version | §17 : le téléphone suit-il la bonne **piste** (Android) ? le build est-il sorti de *Processing* (iPhone) ? |
+| Une phrase reste en français dans l'interface arabe | Le nom d'un plat, d'un employé, d'une catégorie : normal, c'est une donnée. Un libellé de l'application : signale-le avec une capture |
 | Opérations refusées « signé par un autre appareil » | Synchronisation → bas de page → « Abandonner ces opérations d'un ancien appairage », puis recharger (Ctrl+Maj+R) |
 | Le back-office est vide ou le stock ne bouge pas | La caisse n'est pas « À jour » : synchronise |
 | Le CA est inférieur au total des tickets | Normal : le CA est hors taxe, les tickets sont TTC |
@@ -830,8 +868,82 @@ dans le navigateur, puis refais le §2.
 
 | Quoi | Où en est-on |
 |---|---|
-| **Rembourser** un ticket déjà payé | Les rapports savent l'afficher (ligne « Remboursements », à 0), mais aucun écran n'en crée. Une erreur se corrige avant l'encaissement : annuler la ligne ou la commande |
+| Rembourser **une partie** de la quantité d'une ligne (1 pizza sur 3) | Une ligne se rembourse entière. Pour une partie, annuler la ligne avant l'encaissement |
+| **Ticket imprimé en arabe** | Le ticket reste en français : l'imprimante thermique (CP858) n'a pas de caractères arabes, et ses mentions fiscales ⚠ sont à valider par un expert-comptable |
+| **Exports CSV en arabe** | Les en-têtes de colonnes restent en français : ils sont lus par un tableur ou un comptable, et l'import de clients attend `nom`, `telephone`… |
 | **Impression** des tickets et bons | Écrite et testée, mais éteinte dans cette version : tout s'affiche à l'écran, la cuisine lit **Préparation**. Achat, branchement, mise en route et test sans imprimante : [`imprimante.md`](imprimante.md) |
 | **Programme de fidélité** | Pas construit |
 | **Facturation de l'abonnement** (échéances, prélèvement) | Pas construite : la formule se lit, elle se change par `pnpm sync:abonnement` |
 | **Chat d'assistance** | Pas construit : le contact se fait par e-mail |
+
+---
+
+## 16. La caisse et le back-office en arabe
+
+Deux réglages indépendants : la langue d'une **tablette** n'est pas celle du
+back-office du gérant. Une caissière qui lit l'arabe et un gérant qui
+travaille en français partagent le même restaurant sans se gêner.
+
+### 16.1 Sur la caisse
+
+1. Écran d'accueil ou de prise de poste : bouton **العربية** en haut à droite.
+   Ou, une fois en poste : menu ☰ → **Langue** → **العربية**.
+2. La caisse se recharge (une seconde, sans réseau).
+
+**Attendu** :
+
+- tout s'écrit de **droite à gauche** : le menu s'ouvre à droite, les
+  boutons « Retour » sont à droite, les montants restent lisibles
+  (« 24,500 TND » ne se retourne jamais) ;
+- les rôles sont traduits (مدير، أمين الصندوق، نادل), les heures restent sur
+  24 h, les mois sont les mois tunisiens (جانفي، فيفري، أوت…) ;
+- les **noms** que tu as saisis (plats, catégories, employés) restent tels
+  quels : ce sont tes données ;
+- le **ticket** reste en français (§15) ;
+- le bouton **Français** ramène la caisse en français. Le choix est retenu
+  au redémarrage, sur cette tablette seulement.
+
+Joue le ticket 1 du §3.2 en arabe : mêmes montants, même TVA, mêmes rapports.
+
+### 16.2 Au back-office
+
+1. Page de connexion : bouton **العربية** sous le formulaire. Une fois
+   connecté : en bas de la colonne de gauche, au-dessus de « Se déconnecter »
+   (sur téléphone : menu ☰ en haut).
+2. La page se recharge en arabe.
+
+**Attendu** : la colonne de navigation passe **à droite**, les tableaux se
+lisent de droite à gauche, les montants et pourcentages restent alignés et
+lisibles. Les rapports, l'écran Journée, les paramètres, les messages
+(« تمّ الحفظ. », erreurs de saisie) sont en arabe. Les graphiques gardent
+leur axe du temps de gauche à droite, comme dans les tableaux de bord arabes.
+
+Le choix est retenu par ce **navigateur** (un cookie), pour un an.
+
+> **Les traductions** suivent la terminologie fiscale tunisienne en arabe —
+> الأداء على القيمة المضافة (TVA), المعرف الجبائي (matricule fiscal), معلوم
+> الطابع الجبائي (droit de timbre), رقم المعاملات (chiffre d'affaires),
+> الحريف (le client). Le glossaire complet est en tête de
+> `packages/i18n/src/ar.ts`. ⚠ Comme en français, les libellés fiscaux
+> présentés à un client restent à valider par un expert-comptable.
+
+---
+
+## 17. Mettre à jour les téléphones de test
+
+Le guide complet, clic par clic, est
+dans [`stores.md` §4 duodecies](stores.md#4-duodecies-mettre-à-jour-son-téléphone-de-test--pas-à-pas).
+L'essentiel :
+
+1. **Quelle version tourne ?** Caisse → ☰ → **Diagnostic** → ligne
+   **Commit**, à comparer au commit du build Codemagic.
+2. **Android** : le compte Gmail du téléphone doit être testeur de la piste
+   **Internal testing** (celle que Codemagic publie, 121 et suivantes) — pas
+   seulement de *Closed testing — Alpha*, figée à 103. Ouvrir le lien
+   d'inscription sur le téléphone, puis Play Store → Gérer les applis →
+   Mettre à jour.
+3. **iPhone** : attendre que le build quitte *Processing* dans App Store
+   Connect, puis TestFlight → Kaissi → **Mettre à jour**.
+4. **Encore « Snack Lac 1 »** : c'est la démonstration, gardée par la mise à
+   jour. Badge **« À appairer »** → e-mail et mot de passe → **Effacer et
+   mettre en service**.

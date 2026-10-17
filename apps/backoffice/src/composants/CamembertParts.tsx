@@ -43,6 +43,7 @@
  */
 
 import { formaterPourcentage, formaterTND, millimes } from '@kaissi/domain'
+import { useT } from '../i18n/client.js'
 
 const TEINTES = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d4699a', '#7a6ff0'] as const
 const MAX_PARTS = 6
@@ -54,6 +55,7 @@ export interface Part {
 }
 
 export function CamembertParts({ parts }: { parts: readonly Part[] }) {
+  const t = useT()
   const classees = [...parts].sort((a, b) => b.valeurMillimes - a.valeurMillimes)
   const retenues = classees.slice(0, MAX_PARTS - 1)
   const reste = classees.slice(MAX_PARTS - 1)
@@ -63,25 +65,23 @@ export function CamembertParts({ parts }: { parts: readonly Part[] }) {
           ...retenues,
           {
             cle: '__autres',
-            libelle: `Autres (${reste.length})`,
-            valeurMillimes: reste.reduce((t, p) => t + p.valeurMillimes, 0),
+            libelle: t('Autres ({length})', { length: reste.length }),
+            valeurMillimes: reste.reduce((elt, p) => elt + p.valeurMillimes, 0),
           },
         ]
       : retenues
 
-  const total = affichees.reduce((t, p) => t + p.valeurMillimes, 0)
+  const total = affichees.reduce((elt, p) => elt + p.valeurMillimes, 0)
   if (total <= 0) {
-    return <p className="vide">Aucune vente à répartir sur cette période.</p>
+    return <p className="vide">{t('Aucune vente à répartir sur cette période.')}</p>
   }
 
   // Un seul segment : le cercle entier n'apprend rien qu'un nombre ne dise
   // mieux. C'est l'anti-motif du camembert à deux parts, en pire.
   if (affichees.length === 1) {
     return (
-      <p className="indication">
-        Un seul article sur cette période — {affichees[0]!.libelle},{' '}
-        {formaterTND(millimes(total))}. Une part unique ne se compare à rien.
-      </p>
+      <p className="indication">{t('Un seul article sur cette période —')}{' '}{affichees[0]!.libelle},{' '}
+        {formaterTND(millimes(total))}{t('. Une part unique ne se compare à rien.')}</p>
     )
   }
 
@@ -106,7 +106,7 @@ export function CamembertParts({ parts }: { parts: readonly Part[] }) {
 
   return (
     <div className="camembert">
-      <svg viewBox="0 0 200 200" role="img" aria-label="Répartition du chiffre d’affaires">
+      <svg viewBox="0 0 200 200" role="img" aria-label={t('Répartition du chiffre d’affaires')}>
         {segments.map((s) => (
           <path key={s.cle} d={s.chemin} fill={s.teinte} className="part">
             <title>

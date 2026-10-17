@@ -1,4 +1,5 @@
 'use client'
+import { useT } from '../i18n/client.js'
 
 /**
  * Le dernier filet : une erreur dans la mise en page RACINE.
@@ -28,6 +29,7 @@ export default function ErreurGlobale({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  const t = useT()
   return (
     <html lang="fr">
       <body
@@ -40,15 +42,10 @@ export default function ErreurGlobale({
         }}
       >
         <main style={{ maxWidth: '34rem', margin: '0 auto' }}>
-          <h1 style={{ fontSize: '1.4rem' }}>Kaissi n’a pas pu démarrer</h1>
+          <h1 style={{ fontSize: '1.4rem' }}>{t('Kaissi n’a pas pu démarrer')}</h1>
           <p>
-            <strong>Vos données sont intactes.</strong> C’est l’application qui
-            n’a pas pu s’afficher — rien n’a été modifié.
-          </p>
-          <p>
-            La caisse, elle, continue de fonctionner : elle ne dépend pas de cet
-            écran.
-          </p>
+            <strong>{t('Vos données sont intactes.')}</strong>{' '}{t('C’est l’application qui n’a pas pu s’afficher — rien n’a été modifié.')}</p>
+          <p>{t('La caisse, elle, continue de fonctionner : elle ne dépend pas de cet écran.')}</p>
           <button
             type="button"
             onClick={() => reset()}
@@ -61,12 +58,9 @@ export default function ErreurGlobale({
               fontSize: '1rem',
               cursor: 'pointer',
             }}
-          >
-            Réessayer
-          </button>
+          >{t('Réessayer')}</button>
           {error.digest && (
-            <p style={{ color: '#414D48', fontSize: '0.85rem', marginTop: '1.5rem' }}>
-              Code à communiquer au support : <code>{error.digest}</code>
+            <p style={{ color: '#414D48', fontSize: '0.85rem', marginTop: '1.5rem' }}>{t('Code à communiquer au support :')}{' '}<code>{error.digest}</code>
             </p>
           )}
         </main>

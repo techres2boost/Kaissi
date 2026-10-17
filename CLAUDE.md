@@ -434,6 +434,43 @@ Ce n'est pas un `server.url` : aucun code ne vient de cette adresse.
 
 ---
 
+### Deux langues : le français est la CLÉ, l'arabe une traduction
+
+`packages/i18n`, partagé à l'identique par la caisse et le back-office —
+comme les totaux. On écrit `t('Encaisser')`, jamais une clé abstraite : le
+code reste en français (règle 8). La caisse lit sa langue dans l'APPAREIL
+(`localStorage`, un réglage par tablette) ; le back-office dans un COOKIE,
+parce qu'il est rendu par le serveur et doit naître dans le bon sens.
+
+- Composant serveur : `const t = await traduction()` (ou `use(traduction())`
+  s'il est synchrone) ; composant client : `const t = useT()`. Un message
+  renvoyé par une action serveur s'affiche par `t.m(message)`, qui le
+  reconnaît par son MODÈLE (`Taux « {nom} » créé.`).
+- Une liste écrite hors composant se marque `aTraduire('…')` et se traduit à
+  l'affichage.
+- ⚑ `packages/i18n/src/couverture.test.ts` fait échouer la CI sur un texte
+  JSX resté en dur, une phrase sans traduction, ou des `{marques}` qui
+  diffèrent. Une phrase ajoutée s'ajoute aussi dans `ar/caisse.ts` ou
+  `ar/backoffice.ts`, avec ses `{marques}`.
+- Les DONNÉES (plats, employés) ne se traduisent pas ; le TICKET imprimé et
+  les exports CSV restent en français (CP858 n'a pas d'arabe ; un comptable
+  lit les colonnes). Montants et heures sont isolés (FSI/PDI) : un numéro ne
+  se retourne jamais en arabe.
+- La mise en page s'écrit en propriétés LOGIQUES (`margin-inline-start`,
+  `text-align: start`) : elle se retourne seule en `dir="rtl"`.
+
+### Le greffon SQLite d'iOS réécrit le SQL — l'adaptateur l'aplatit
+
+`@capacitor-community/sqlite` retire, sur iOS, les « \n » d'un script qui
+contient `DELETE FROM` sans les remplacer par une espace : `discounts\n WHERE`
+devenait `discountsWHERE`, et la migration locale 14 cassait l'iPhone au
+démarrage quand Android l'exécutait sans broncher. `adaptateurCapacitor`
+passe donc tout script par `aplatirScript()` — une instruction par ligne —
+et `adaptateurs/ios.test.ts` rejoue le prétraitement d'iOS sur toutes les
+migrations. Ne contourne jamais cet aplatissement.
+
+---
+
 ## Arborescence
 
 ```

@@ -434,14 +434,14 @@ export async function GET(
       return reponseCsv(
         versCsv(
           ['Ticket', 'Encaissé le', 'Vendeur', 'Couverts', 'Articles', 'Total TTC', 'Total (TND)'],
-          ventes.tickets.map((t) => [
-            t.numero ?? t.id,
-            horodatage(t.closeA, fiche.timezone),
-            t.vendeur,
-            t.couverts,
-            t.nombreArticles,
-            tnd(t.totalMillimes),
-            brut(t.totalMillimes),
+          ventes.tickets.map((elt) => [
+            elt.numero ?? elt.id,
+            horodatage(elt.closeA, fiche.timezone),
+            elt.vendeur,
+            elt.couverts,
+            elt.nombreArticles,
+            tnd(elt.totalMillimes),
+            brut(elt.totalMillimes),
           ]),
         ),
         nom('tickets'),

@@ -1,5 +1,9 @@
+import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
-import { Inter, Sora } from 'next/font/google'
+import { IBM_Plex_Sans_Arabic, Inter, Sora } from 'next/font/google'
+import { direction } from '@kaissi/i18n'
+import { FournisseurLangue } from '../i18n/client.js'
+import { langueCourante, traduction } from '../i18n/serveur.js'
 import './styles.css'
 
 /*
@@ -29,6 +33,22 @@ const inter = Inter({
 })
 
 /*
+ * L'arabe a sa propre police : Inter et Sora n'ont aucun glyphe arabe, et le
+ * navigateur retomberait sur la police du système — Tahoma sur un poste,
+ * Noto sur un autre, des chasses différentes partout. IBM Plex Sans Arabic
+ * est dessinée pour l'écran, lisible en petit corps, et sous licence libre
+ * (OFL). Chargée seulement pour une page en arabe : la classe n'est posée
+ * qu'alors, et `next/font` ne précharge que ce qui est utilisé.
+ */
+const arabe = IBM_Plex_Sans_Arabic({
+  subsets: ['arabic'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+  variable: '--police-arabe',
+  preload: false,
+})
+
+/*
  * Les fonctions serveur tournent À CÔTÉ de la base — Francfort.
  *
  * PANNE DE PERFORMANCE SIGNALÉE : 1 à 2 secondes à chaque onglet et à chaque
@@ -44,15 +64,28 @@ const inter = Inter({
  */
 export const preferredRegion = 'fra1'
 
-export const metadata = {
-  title: 'Kaissi — Back-office',
-  description: 'Administration et rapports — Res2Boost',
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await traduction()
+  return {
+    title: t('Kaissi — Back-office'),
+    description: t('Administration et rapports — Res2Boost'),
+  }
 }
 
-export default function RacineLayout({ children }: { children: ReactNode }) {
+/*
+ * La langue et le SENS de la page sont posés ici, sur `<html>`, au premier
+ * octet : rendus par le serveur, ils arrivent avec la page. Posés plus tard
+ * par un script, l'écran s'afficherait de gauche à droite puis se
+ * retournerait sous les yeux du gérant.
+ */
+export default async function RacineLayout({ children }: { children: ReactNode }) {
+  const langue = await langueCourante()
+  const polices = [sora.variable, inter.variable, langue === 'ar' ? arabe.variable : ''].filter(Boolean).join(' ')
   return (
-    <html lang="fr" className={`${sora.variable} ${inter.variable}`}>
-      <body>{children}</body>
+    <html lang={langue} dir={direction(langue)} className={polices}>
+      <body>
+        <FournisseurLangue langue={langue}>{children}</FournisseurLangue>
+      </body>
     </html>
   )
 }

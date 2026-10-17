@@ -167,7 +167,7 @@ body::before {
  * pleine largeur : le coin menthe passe derrière la colonne opaque, c'est
  * moins joli et rien d'autre. Une dégradation qu'on peut se permettre.
  */
-body:has(.laterale)::before { inset: 0 0 0 var(--laterale); }
+body:has(.laterale)::before { inset-block: 0; inset-inline: var(--laterale) 0; }
 
 a { color: var(--accent); }
 
@@ -204,7 +204,7 @@ a { color: var(--accent); }
 }
 
 /* La colonne est en `fixed` : le contenu se décale, il ne passe pas dessous. */
-.laterale ~ .enveloppe { margin-left: var(--laterale); }
+.laterale ~ .enveloppe { margin-inline-start: var(--laterale); }
 /* Après la barre du haut, le contenu reprend une respiration normale. */
 .barre + .enveloppe { padding-top: 1.5rem; }
 
@@ -224,7 +224,7 @@ a { color: var(--accent); }
  */
 .laterale {
   position: fixed;
-  inset: 0 auto 0 0;
+  inset-block: 0; inset-inline: 0 auto;
   width: var(--laterale);
   display: flex;
   flex-direction: column;
@@ -232,7 +232,7 @@ a { color: var(--accent); }
   padding: 1rem 0.75rem;
   /* Le dégradé de DF, à l'identique. */
   background: linear-gradient(180deg, #0b2016 0%, #0f2e1f 55%, #123725 100%);
-  border-right: 1px solid rgba(126, 198, 148, 0.12);
+  border-inline-end: 1px solid rgba(126, 198, 148, 0.12);
   overflow-y: auto;
   z-index: 20;
 
@@ -291,7 +291,7 @@ a { color: var(--accent); }
  */
 .barre .droite {
   display: flex; align-items: center; gap: 0.75rem;
-  margin-left: auto; min-width: 0;
+  margin-inline-start: auto; min-width: 0;
 }
 .barre .droite .etiquette {
   min-width: 0;
@@ -328,7 +328,7 @@ a { color: var(--accent); }
  */
 .laterale-etablissement .detail {
   display: inline-block;
-  margin-left: 0.4rem;
+  margin-inline-start: 0.4rem;
   font-size: 0.66rem;
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -375,7 +375,7 @@ a { color: var(--accent); }
 .laterale nav a::before {
   content: '';
   position: absolute;
-  left: 0; top: 50%;
+  inset-inline-start: 0; top: 50%;
   height: 62%; width: 3px;
   border-radius: 0 4px 4px 0;
   background: linear-gradient(180deg, var(--orange-clair), var(--orange));
@@ -463,7 +463,7 @@ a { color: var(--accent); }
      sur un téléphone où aucune colonne ne l'explique. */
   body:has(.laterale)::before { inset: 0; }
 
-  .laterale ~ .enveloppe { margin-left: 0; }
+  .laterale ~ .enveloppe { margin-inline-start: 0; }
 
   /* Le tiroir commence SOUS la barre du haut. Elle est `sticky` et passe
      au-dessus (z-index 25 contre 20) : sans ce dégagement, elle recouvrait
@@ -483,7 +483,7 @@ a { color: var(--accent); }
     width: 100%; padding: 0.7rem 1rem;
     background: linear-gradient(180deg, #0b2016 0%, #0f2e1f 55%, #123725 100%);
     border: 0; border-bottom: 1px solid rgba(126, 198, 148, 0.12);
-    color: #F6F3EA; font: inherit; text-align: left; cursor: pointer;
+    color: #F6F3EA; font: inherit; text-align: start; cursor: pointer;
   }
 
   .voile {
@@ -529,11 +529,11 @@ h2 { font-family: var(--titre); font-weight: 600; font-size: 1.05rem; margin: 0 
 
 /* ── Tableaux ──────────────────────────────────────────────────────────── */
 table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--bordure); }
+th, td { text-align: start; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--bordure); }
 th { color: var(--attenue); font-weight: 600; font-size: 0.8rem; text-transform: uppercase;
      letter-spacing: 0.04em; }
 tbody tr:last-child td { border-bottom: none; }
-.nombre { text-align: right; font-variant-numeric: tabular-nums; }
+.nombre { text-align: end; font-variant-numeric: tabular-nums; }
 .total-ligne td { font-weight: 800; font-size: 1.05rem; border-top: 2px solid var(--bordure); }
 
 /*
@@ -670,14 +670,14 @@ li.note { font-style: italic; margin: 0; }
 .bon {
   display: flex; flex-direction: column; gap: 0.7rem;
   background: var(--panneau); border: 1px solid var(--bordure);
-  border-left: 5px solid var(--accent);
+  border-inline-start: 5px solid var(--accent);
   border-radius: var(--rayon); padding: 0.9rem 1rem;
   box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
 }
 /* L'attente est la seule urgence : elle change la couleur du bon entier,
    pas seulement celle d'un chiffre qu'on ne regarde pas. */
-.bon.tard { border-left-color: var(--or); }
-.bon.tres-tard { border-left-color: var(--danger); }
+.bon.tard { border-inline-start-color: var(--or); }
+.bon.tres-tard { border-inline-start-color: var(--danger); }
 /*
  * ── Un bon PRÊT ──────────────────────────────────────────────────────────
  *
@@ -691,7 +691,7 @@ li.note { font-style: italic; margin: 0; }
  * cinquante la nuance de fond entre deux cartes se voit moins qu'un signe.
  */
 .bon.prete {
-  border-left-color: var(--succes);
+  border-inline-start-color: var(--succes);
   background: var(--fond-succes);
   box-shadow: none;
 }
@@ -743,7 +743,7 @@ li.note { font-style: italic; margin: 0; }
   background: var(--accent); color: var(--sur-accent); border-color: var(--accent); font-weight: 650;
 }
 .periode-bornes {
-  display: flex; gap: 0.75rem; align-items: center; margin-left: auto;
+  display: flex; gap: 0.75rem; align-items: center; margin-inline-start: auto;
   /* Trois filtres de plus (heures, employé) : sur un écran étroit ils
      passent à la ligne au lieu de pousser les raccourcis hors de vue. */
   flex-wrap: wrap;
@@ -765,7 +765,7 @@ li.note { font-style: italic; margin: 0; }
   padding: 0.4rem 0.75rem; font-size: 0.9rem; font-variant-numeric: tabular-nums;
 }
 .calendrier-panneau {
-  position: absolute; z-index: 30; top: calc(100% + 0.4rem); right: 0;
+  position: absolute; z-index: 30; top: calc(100% + 0.4rem); inset-inline-end: 0;
   width: 19rem; padding: 0.75rem;
   background: var(--panneau); border: 1px solid var(--bordure);
   border-radius: var(--rayon); box-shadow: 0 12px 32px rgba(27, 31, 28, 0.14);
@@ -809,12 +809,12 @@ li.note { font-style: italic; margin: 0; }
   display: flex; flex-direction: column; gap: 0.2rem;
   padding: 0.9rem 1rem;
   background: var(--panneau); border: 1px solid var(--bordure);
-  border-left: 4px solid var(--bordure); border-radius: var(--rayon);
+  border-inline-start: 4px solid var(--bordure); border-radius: var(--rayon);
   box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
 }
-.kpi.fort { border-left-color: var(--accent); }
-.kpi.alerte { border-left-color: var(--danger); }
-.kpi.attention { border-left-color: var(--or); }
+.kpi.fort { border-inline-start-color: var(--accent); }
+.kpi.alerte { border-inline-start-color: var(--danger); }
+.kpi.attention { border-inline-start-color: var(--or); }
 .kpi-libelle { color: var(--attenue); font-size: 0.8rem; text-transform: uppercase;
                letter-spacing: 0.03em; }
 .kpi-valeur {
@@ -827,7 +827,7 @@ li.note { font-style: italic; margin: 0; }
 
 .lignes-chiffres { display: grid; grid-template-columns: 1fr auto; gap: 0.4rem 1rem; margin: 0; }
 .lignes-chiffres dt { color: var(--attenue); }
-.lignes-chiffres dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.lignes-chiffres dd { margin: 0; text-align: end; font-variant-numeric: tabular-nums; }
 .lignes-chiffres .fort { font-weight: 700; color: var(--texte); }
 .lignes-chiffres .attention { color: var(--or); }
 
@@ -837,7 +837,7 @@ li.note { font-style: italic; margin: 0; }
 .detail-ticket .detail-entete {
   display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
 }
-.detail-ticket { border-left: 4px solid var(--accent); }
+.detail-ticket { border-inline-start: 4px solid var(--accent); }
 
 /* ── Stock ────────────────────────────────────────────────────────────────── */
 .etiquette.etat-rupture { background: var(--fond-danger); color: var(--danger); }
@@ -1077,7 +1077,7 @@ th .tri:hover { color: var(--texte); }
 }
 /* La recherche pousse tout ce qui suit à droite : les actions restent
    groupées à gauche, où on les cherche. */
-.recherche-clients { display: flex; gap: 0.4rem; margin-left: auto; }
+.recherche-clients { display: flex; gap: 0.4rem; margin-inline-start: auto; }
 .recherche-clients input { width: auto; min-width: 14rem; }
 .discret.actif {
   background: var(--accent); color: var(--sur-accent); border-color: var(--accent);
@@ -1172,7 +1172,7 @@ th .tri:hover { color: var(--texte); }
 .ligne-paiement input[name='nom'],
 .ligne-imprimante input[name='hote'] { flex: 1 1 12rem; min-width: 0; }
 .champ-taux { display: inline-flex; align-items: center; gap: 0.3rem; }
-.champ-taux input { width: 5rem; text-align: right; }
+.champ-taux input { width: 5rem; text-align: end; }
 
 /*
  * Le `<select>` du type de paiement, ramené à sa largeur utile.
@@ -1207,7 +1207,7 @@ th .tri:hover { color: var(--texte); }
  * infobulle — alors qu'il faut s'y arrêter.
  */
 .panneau-suppression {
-  display: grid; gap: 0.5rem; justify-items: stretch; text-align: left;
+  display: grid; gap: 0.5rem; justify-items: stretch; text-align: start;
   width: 100%; max-width: 34rem;
   border: 1px solid var(--danger); border-radius: var(--rayon);
   background: var(--fond-danger); padding: 0.9rem;
@@ -1343,7 +1343,7 @@ button.danger-plein:disabled { opacity: 0.55; cursor: not-allowed; }
 .apercu-restauration h2 { margin: 0 0 0.75rem; font-size: 1.05rem; }
 .tableau-apercu { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
 .tableau-apercu td { padding: 0.35rem 0; }
-.tableau-apercu td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.tableau-apercu td:last-child { text-align: end; font-variant-numeric: tabular-nums; }
 /*
  * Le TOTAL se détache : c'est le chiffre que le gérant compare à celui qu'il
  * avait avant de toucher au réglage. Noyé dans la liste, il oblige à relire
@@ -1357,7 +1357,7 @@ button.danger-plein:disabled { opacity: 0.55; cursor: not-allowed; }
 .tableau-apercu .apercu-dont td {
   color: var(--attenue); font-size: 0.85rem; padding-top: 0;
 }
-.tableau-apercu .apercu-dont td:first-child { padding-left: 1rem; }
+.tableau-apercu .apercu-dont td:first-child { padding-inline-start: 1rem; }
 
 .tableau-apercu .apercu-total td {
   border-top: 1px solid var(--bordure); padding-top: 0.5rem;
@@ -1380,10 +1380,10 @@ button.danger-plein:disabled { opacity: 0.55; cursor: not-allowed; }
  * la colonne, sans avoir à fixer chaque ligne. Et il double l'étiquette, qui
  * porte déjà le mot ET une icône — la couleur n'est jamais le seul signal.
  */
-.liste-fonctionnalites > li.etat-active { border-left: 3px solid var(--succes); }
-.liste-fonctionnalites > li.etat-structurelle { border-left: 3px solid var(--accent); }
-.liste-fonctionnalites > li.etat-eteinte { border-left: 3px solid var(--or); }
-.liste-fonctionnalites > li.etat-absente { border-left: 3px solid var(--bordure); }
+.liste-fonctionnalites > li.etat-active { border-inline-start: 3px solid var(--succes); }
+.liste-fonctionnalites > li.etat-structurelle { border-inline-start: 3px solid var(--accent); }
+.liste-fonctionnalites > li.etat-eteinte { border-inline-start: 3px solid var(--or); }
+.liste-fonctionnalites > li.etat-absente { border-inline-start: 3px solid var(--bordure); }
 
 .fonctionnalite-entete {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem;
@@ -1452,7 +1452,7 @@ button.danger-plein:disabled { opacity: 0.55; cursor: not-allowed; }
   vertical-align: top;
 }
 .comparatif-formules thead th { text-align: center; white-space: nowrap; }
-.comparatif-formules thead th:first-child { text-align: left; }
+.comparatif-formules thead th:first-child { text-align: start; }
 .comparatif-formules thead th .etiquette { display: block; margin-top: 0.2rem; }
 /*
  * Les en-têtes de LIGNE reprennent le texte courant.
@@ -1466,7 +1466,7 @@ button.danger-plein:disabled { opacity: 0.55; cursor: not-allowed; }
 .comparatif-formules tbody th {
   text-transform: none; letter-spacing: normal;
   font-size: 0.95rem; color: var(--texte);
-  text-align: left; font-weight: 600;
+  text-align: start; font-weight: 600;
   /* La colonne d'explication prend la place qui reste, sans jamais forcer
      la table plus large que l'écran — d'où le `min-width: 0` implicite d'une
      largeur en pourcentage plutôt qu'en `rem`. */
@@ -1541,3 +1541,58 @@ button.danger-plein:disabled { opacity: 0.55; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) {
   .chargement-page > div, .chargement-cartes > div { animation: none; }
 }
+
+/* ── L'arabe : police et sens de lecture ─────────────────────────────────
+   La mise en page s'écrit en propriétés LOGIQUES (`margin-inline-start`,
+   `text-align: start`) : elle se retourne d'elle-même quand `<html dir>`
+   vaut `rtl`. Ne restent ici que ce que le CSS logique ne sait pas dire —
+   un déplacement horizontal, un dégradé orienté, un arrondi asymétrique. */
+:root[lang='ar'] {
+  --corps: var(--police-arabe), 'IBM Plex Sans Arabic', 'Noto Sans Arabic', Tahoma, var(--police-corps), sans-serif;
+  --titre: var(--police-arabe), 'IBM Plex Sans Arabic', 'Noto Sans Arabic', Tahoma, var(--police-titre), sans-serif;
+}
+/* L'arabe n'a pas de capitales et ses ligatures se cassent à l'espacement :
+   l'interlettrage serré des titres latins le rendrait illisible. */
+:root[lang='ar'] h1, :root[lang='ar'] h2 { letter-spacing: 0; }
+
+:root[dir='rtl'] .laterale nav a::before { border-radius: 4px 0 0 4px; }
+:root[dir='rtl'] .laterale nav a:hover { transform: translateX(-3px); }
+:root[dir='rtl'] .laterale nav a::after {
+  background: linear-gradient(270deg, rgba(196, 86, 43, 0.18), transparent 72%);
+}
+:root[dir='rtl'] .laterale nav a[aria-current='page'] {
+  background: linear-gradient(270deg, rgba(196, 86, 43, 0.2), rgba(196, 86, 43, 0.04) 78%);
+}
+@keyframes laterale-entree-rtl {
+  from { opacity: 0; transform: translateX(14px); }
+  to { opacity: 1; transform: none; }
+}
+:root[dir='rtl'] .laterale nav a { animation-name: laterale-entree-rtl; }
+@media (max-width: 60rem) {
+  :root[dir='rtl'] .laterale { transform: translateX(100%); }
+  :root[dir='rtl'] .laterale.ouverte { transform: translateX(0); }
+}
+
+/* Une donnée saisie en français (le nom d'un plat, d'un employé) dans une
+   page en arabe : chaque cellule prend le sens de son PREMIER caractère
+   fort, au lieu que l'algorithme bidirectionnel retourne « Pizza 4 fromages »
+   en « fromages 4 Pizza ». */
+:root[dir='rtl'] :is(td, th, dd, dt, li, p, label, strong, span, a, button, option) {
+  unicode-bidi: plaintext;
+}
+/* Un montant, un nombre, une heure se lisent de gauche à droite dans les
+   deux langues : « −18,000 TND » ne doit jamais devenir « TND 18,000− ». */
+:root[dir='rtl'] :is(.nombre, input[type='number'], input[type='time'], input[type='date']) {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+:root[dir='rtl'] :is(.kpi-valeur, .montant) { unicode-bidi: plaintext; }
+:root[dir='rtl'] td.nombre, :root[dir='rtl'] th.nombre { text-align: left; }
+/* Les graphiques gardent leur axe du temps de gauche à droite : c'est la
+   convention des tableaux de bord arabes, et les étiquettes SVG (ancrées en
+   `start`/`end`) se retourneraient sinon. */
+:root[dir='rtl'] svg { direction: ltr; }
+
+/* Le bouton de langue : une icône et le nom de l'AUTRE langue. */
+.choix-langue { display: inline-flex; align-items: center; gap: 0.35rem; }
+.choix-langue[lang='ar'] { font-family: var(--police-arabe), 'IBM Plex Sans Arabic', 'Noto Sans Arabic', Tahoma, sans-serif; }

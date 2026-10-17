@@ -26,6 +26,7 @@ import {
   modifierFournisseur,
   type Resultat,
 } from '../app/[restaurant]/inventaire/actions.js'
+import { useT } from '../i18n/client.js'
 
 export interface Fournisseur {
   id: string
@@ -47,6 +48,7 @@ function LigneFournisseur({
   fournisseur: Fournisseur
   modifiable: boolean
 }) {
+  const t = useT()
   const [resultat, action] = useActionState(
     modifierFournisseur.bind(null, restaurantId, fournisseur.id),
     null as Resultat | null,
@@ -69,7 +71,7 @@ function LigneFournisseur({
         <input
           name="nom"
           defaultValue={fournisseur.nom}
-          aria-label="Nom du fournisseur"
+          aria-label={t('Nom du fournisseur')}
           maxLength={120}
           required
           disabled={!modifiable}
@@ -77,16 +79,16 @@ function LigneFournisseur({
         <input
           name="contact"
           defaultValue={fournisseur.contact ?? ''}
-          aria-label={`Personne à joindre chez ${fournisseur.nom}`}
-          placeholder="personne à joindre"
+          aria-label={t('Personne à joindre chez {nom}', { nom: fournisseur.nom })}
+          placeholder={t('personne à joindre')}
           maxLength={120}
           disabled={!modifiable}
         />
         <input
           name="telephone"
           defaultValue={fournisseur.telephone ?? ''}
-          aria-label={`Téléphone de ${fournisseur.nom}`}
-          placeholder="téléphone"
+          aria-label={t('Téléphone de {nom}', { nom: fournisseur.nom })}
+          placeholder={t('téléphone')}
           maxLength={40}
           inputMode="tel"
           disabled={!modifiable}
@@ -100,23 +102,21 @@ function LigneFournisseur({
         <input
           name="note"
           defaultValue={fournisseur.note ?? ''}
-          aria-label={`Note sur ${fournisseur.nom}`}
-          placeholder="note (livraisons le mardi, facture à 30 jours…)"
+          aria-label={t('Note sur {nom}', { nom: fournisseur.nom })}
+          placeholder={t('note (livraisons le mardi, facture à 30 jours…)')}
           maxLength={500}
           disabled={!modifiable}
         />
         {modifiable && (
-          <button type="submit" className="discret">
-            Enregistrer
-          </button>
+          <button type="submit" className="discret">{t('Enregistrer')}</button>
         )}
       </form>
 
       <p className="indication">
         {fournisseur.receptions === 0
-          ? 'Aucune réception rattachée pour l’instant.'
-          : `${fournisseur.receptions} réception(s) rattachée(s).`}
-        {fournisseur.archive && ' Archivé : il n’est plus proposé à la saisie.'}
+          ? t('Aucune réception rattachée pour l’instant.')
+          : t('{receptions} réception(s) rattachée(s).', { receptions: fournisseur.receptions })}
+        {fournisseur.archive && t(' Archivé : il n’est plus proposé à la saisie.')}
       </p>
 
       {modifiable && (
@@ -135,21 +135,19 @@ function LigneFournisseur({
           >
             {fournisseur.archive ? (
               <>
-                <ArchiveRestore size={15} strokeWidth={1.9} aria-hidden="true" /> Réactiver
-              </>
+                <ArchiveRestore size={15} strokeWidth={1.9} aria-hidden="true" />{' '}{t('Réactiver')}</>
             ) : (
               <>
-                <Archive size={15} strokeWidth={1.9} aria-hidden="true" /> Archiver
-              </>
+                <Archive size={15} strokeWidth={1.9} aria-hidden="true" />{' '}{t('Archiver')}</>
             )}
           </button>
         </div>
       )}
 
-      {resultat?.erreur && <p className="message erreur">{resultat.erreur}</p>}
-      {resultat?.succes && <p className="message succes">{resultat.succes}</p>}
-      {archivage?.erreur && <p className="message erreur">{archivage.erreur}</p>}
-      {archivage?.succes && <p className="message succes">{archivage.succes}</p>}
+      {resultat?.erreur && <p className="message erreur">{t.m(resultat.erreur)}</p>}
+      {resultat?.succes && <p className="message succes">{t.m(resultat.succes)}</p>}
+      {archivage?.erreur && <p className="message erreur">{t.m(archivage.erreur)}</p>}
+      {archivage?.succes && <p className="message succes">{t.m(archivage.succes)}</p>}
     </li>
   )
 }
@@ -163,6 +161,7 @@ export function GestionFournisseurs({
   modifiable: boolean
   fournisseurs: Fournisseur[]
 }) {
+  const t = useT()
   const [resultat, action] = useActionState(
     creerFournisseur.bind(null, restaurantId),
     null as Resultat | null,
@@ -176,23 +175,19 @@ export function GestionFournisseurs({
       {modifiable && (
         <form action={action} className="carte-groupe">
           <div className="ligne-imprimante">
-            <input name="nom" placeholder="Sfax Primeurs" maxLength={120} required />
-            <input name="contact" placeholder="personne à joindre" maxLength={120} />
-            <input name="telephone" placeholder="téléphone" maxLength={40} inputMode="tel" />
+            <input name="nom" placeholder={t('Sfax Primeurs')} maxLength={120} required />
+            <input name="contact" placeholder={t('personne à joindre')} maxLength={120} />
+            <input name="telephone" placeholder={t('téléphone')} maxLength={40} inputMode="tel" />
             <button type="submit" className="principal">
-              <Plus size={15} strokeWidth={2} aria-hidden="true" /> Ajouter
-            </button>
+              <Plus size={15} strokeWidth={2} aria-hidden="true" />{' '}{t('Ajouter')}</button>
           </div>
-          {resultat?.erreur && <p className="message erreur">{resultat.erreur}</p>}
-          {resultat?.succes && <p className="message succes">{resultat.succes}</p>}
+          {resultat?.erreur && <p className="message erreur">{t.m(resultat.erreur)}</p>}
+          {resultat?.succes && <p className="message succes">{t.m(resultat.succes)}</p>}
         </form>
       )}
 
       {actifs.length === 0 ? (
-        <p className="vide">
-          Aucun fournisseur enregistré. Les réceptions continuent de s’enregistrer
-          avec un nom libre — une fiche ne sert qu’à ne plus le retaper.
-        </p>
+        <p className="vide">{t('Aucun fournisseur enregistré. Les réceptions continuent de s’enregistrer avec un nom libre — une fiche ne sert qu’à ne plus le retaper.')}</p>
       ) : (
         <ul className="liste-taux">
           {actifs.map((f) => (
@@ -208,7 +203,7 @@ export function GestionFournisseurs({
 
       {archives.length > 0 && (
         <details className="rattachement">
-          <summary>{archives.length} fiche(s) archivée(s)</summary>
+          <summary>{archives.length}{' '}{t('fiche(s) archivée(s)')}</summary>
           <ul className="liste-taux">
             {archives.map((f) => (
               <LigneFournisseur
@@ -223,11 +218,7 @@ export function GestionFournisseurs({
       )}
 
       <p className="indication">
-        <UserRound size={14} strokeWidth={2} aria-hidden="true" /> La personne à
-        joindre et le <Phone size={14} strokeWidth={2} aria-hidden="true" />{' '}
-        téléphone ne servent qu’ici : Kaissi n’envoie rien à un fournisseur, et
-        ne passe aucune commande. C’est un carnet, pas un portail d’achats.
-      </p>
+        <UserRound size={14} strokeWidth={2} aria-hidden="true" />{' '}{t('La personne à joindre et le')}{' '}<Phone size={14} strokeWidth={2} aria-hidden="true" />{' '}{t('téléphone ne servent qu’ici : Kaissi n’envoie rien à un fournisseur, et ne passe aucune commande. C’est un carnet, pas un portail d’achats.')}</p>
     </>
   )
 }

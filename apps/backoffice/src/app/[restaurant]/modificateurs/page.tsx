@@ -14,6 +14,7 @@ import {
   type ArticleSimple,
   type GroupeModificateurs,
 } from '../../../composants/GestionModificateurs.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +23,7 @@ export default async function PageModificateurs({
 }: {
   params: Promise<{ restaurant: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
@@ -65,7 +67,7 @@ export default async function PageModificateurs({
   const articles: ArticleSimple[] = (produitsRes.data ?? []).map((p) => ({
     id: p.id as string,
     nom: p.name as string,
-    categorieNom: nomCategorie.get((p.category_id as string | null) ?? '') ?? 'Sans catégorie',
+    categorieNom: nomCategorie.get((p.category_id as string | null) ?? '') ?? t('Sans catégorie'),
   }))
 
   /*
@@ -108,28 +110,21 @@ export default async function PageModificateurs({
 
   return (
     <>
-      <h1>Modificateurs</h1>
-      <p className="sous-titre">
-        Les choix qu’on propose au caissier quand il touche un article :
-        la cuisson d’une viande, les suppléments d’une pizza. Ils s’ajoutent au
-        prix de la ligne et figurent sur le{' '}
-        <Link href={{ pathname: `/${restaurant}/preparation` }}>bon de préparation</Link>.
+      <h1>{t('Modificateurs')}</h1>
+      <p className="sous-titre">{t('Les choix qu’on propose au caissier quand il touche un article : la cuisson d’une viande, les suppléments d’une pizza. Ils s’ajoutent au prix de la ligne et figurent sur le')}{' '}
+        <Link href={{ pathname: `/${restaurant}/preparation` }}>{t('bon de préparation')}</Link>.
       </p>
 
-      {erreur && <p className="message erreur">Lecture impossible : {erreur.message}</p>}
+      {erreur && <p className="message erreur">{t('Lecture impossible :')}{' '}{erreur.message}</p>}
 
       {!etablissement.gestionnaire && (
-        <p className="sous-titre">
-          Consultation seule : le rôle « {etablissement.role} » ne modifie pas la
-          carte.
-        </p>
+        <p className="sous-titre">{t('Consultation seule : le rôle «')}{' '}{etablissement.role}{' '}{t('» ne modifie pas la carte.')}</p>
       )}
 
       {articles.length === 0 && (
         <div className="message avertissement">
-          <strong>Aucun article.</strong> Un modificateur se rattache à des
-          articles — créez-en d’abord dans{' '}
-          <Link href={{ pathname: `/${restaurant}/catalogue` }}>Liste d’articles</Link>.
+          <strong>{t('Aucun article.')}</strong>{' '}{t('Un modificateur se rattache à des articles — créez-en d’abord dans')}{' '}
+          <Link href={{ pathname: `/${restaurant}/catalogue` }}>{t('Liste d’articles')}</Link>.
         </div>
       )}
 

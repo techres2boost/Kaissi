@@ -15,6 +15,8 @@ import { chargerAgregats } from '../../../serveur/agregats.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
 import { SelecteurPeriode } from '../../../composants/SelecteurPeriode.js'
 import { AvertissementFormule } from '../../../composants/AvertissementFormule.js'
+import { traduction } from '../../../i18n/serveur.js'
+import { use } from 'react'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +27,7 @@ export default async function PageTableauBord({
   params: Promise<{ restaurant: string }>
   searchParams: Promise<{ du?: string; au?: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { du, au } = await searchParams
   const { etablissement } = await etablissementObligatoire(restaurant)
@@ -45,8 +48,8 @@ export default async function PageTableauBord({
   if (agregats.erreur) {
     return (
       <section className="bloc">
-        <h1>Tableau de bord</h1>
-        <p className="message erreur">Lecture impossible : {agregats.erreur}</p>
+        <h1>{t('Tableau de bord')}</h1>
+        <p className="message erreur">{t('Lecture impossible :')}{' '}{t.m(agregats.erreur)}</p>
       </section>
     )
   }
@@ -58,11 +61,11 @@ export default async function PageTableauBord({
   return (
     <>
       <header className="entete-rapport">
-        <h1>Tableau de bord</h1>
+        <h1>{t('Tableau de bord')}</h1>
         <p className="sous-titre">
           {periode.du === periode.au
-            ? libelleJournee(periode.du)
-            : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
+            ? libelleJournee(periode.du, t.locale)
+            : t('Du {valeur} au {valeur2}', { valeur: libelleJournee(periode.du, t.locale), valeur2: libelleJournee(periode.au, t.locale) })}
         </p>
       </header>
 
@@ -74,102 +77,94 @@ export default async function PageTableauBord({
           regarde septembre et on télécharge la semaine en cours. */}
       <BoutonsExport
         restaurantId={restaurant}
-        exports={[{ quoi: 'ventes', libelle: 'Résumé' }, { quoi: 'articles', libelle: 'Par article' }, { quoi: 'categories', libelle: 'Par catégorie' }]}
+        exports={[{ quoi: 'ventes', libelle: t('Résumé') }, { quoi: 'articles', libelle: t('Par article') }, { quoi: 'categories', libelle: t('Par catégorie') }]}
         du={periode.du}
         au={periode.au}
       />
 
       {periode.tronquee && (
-        <p className="message avertissement">
-          Période ramenée à 92 jours. Au-delà, ce n’est plus un rapport de
-          gestion mais un export comptable.
-        </p>
+        <p className="message avertissement">{t('Période ramenée à 92 jours. Au-delà, ce n’est plus un rapport de gestion mais un export comptable.')}</p>
       )}
 
       <div className="cartes-kpi">
         <Kpi
-          libelle="Chiffre d'affaires"
+          libelle={t('Chiffre d\'affaires')}
           valeur={formaterTND(i.caNetMillimes)}
-          aide="Hors taxe, après remises — la grandeur comparable au coût d'achat."
+          aide={t('Hors taxe, après remises — la grandeur comparable au coût d\'achat.')}
           fort
         />
-        <Kpi libelle="Tickets" valeur={String(i.nombreTickets)} aide="Commandes encaissées." />
+        <Kpi libelle={t('Tickets')} valeur={String(i.nombreTickets)} aide={t('Commandes encaissées.')} />
         <Kpi
-          libelle="Panier moyen"
+          libelle={t('Panier moyen')}
           valeur={i.panierMoyenMillimes === null ? '—' : formaterTND(i.panierMoyenMillimes)}
-          aide="CA ÷ nombre de tickets."
+          aide={t('CA ÷ nombre de tickets.')}
         />
         <Kpi
-          libelle="Coût total"
+          libelle={t('Coût total')}
           valeur={formaterTND(i.coutMillimes)}
-          aide="Somme des coûts d'achat des articles vendus."
+          aide={t('Somme des coûts d\'achat des articles vendus.')}
         />
         <Kpi
-          libelle="Marge brute"
+          libelle={t('Marge brute')}
           valeur={formaterTND(i.marge.margeMillimes)}
-          aide="Chiffre d'affaires − coût d'achat."
+          aide={t('Chiffre d\'affaires − coût d\'achat.')}
           negatif={i.marge.margeMillimes < 0}
           fort
         />
         <Kpi
-          libelle="Marge %"
+          libelle={t('Marge %')}
           valeur={i.marge.margeBp === null ? '—' : `${formaterPourcentage(i.marge.margeBp)} %`}
-          aide="Marge rapportée au chiffre d'affaires."
+          aide={t('Marge rapportée au chiffre d\'affaires.')}
           negatif={(i.marge.margeBp ?? 0) < 0}
         />
       </div>
 
       {i.lignesSansCout > 0 && (
         <p className="message avertissement">
-          <strong>{i.lignesSansCout} ligne(s) vendue(s) sans coût d’achat saisi.</strong> Le
-          coût total est donc sous-estimé, et la marge d’autant surestimée.{' '}
-          <Link href={`/${restaurant}/catalogue`}>Renseigner les coûts au catalogue</Link>.
+          <strong>{i.lignesSansCout}{' '}{t('ligne(s) vendue(s) sans coût d’achat saisi.')}</strong>{' '}{t('Le coût total est donc sous-estimé, et la marge d’autant surestimée.')}{' '}
+          <Link href={`/${restaurant}/catalogue`}>{t('Renseigner les coûts au catalogue')}</Link>.
         </p>
       )}
 
       <div className="grille deux">
         <section className="bloc">
-          <h2>Remises et remboursements</h2>
+          <h2>{t('Remises et remboursements')}</h2>
           <dl className="lignes-chiffres">
-            <dt>Chiffre d’affaires brut</dt>
+            <dt>{t('Chiffre d’affaires brut')}</dt>
             <dd>{formaterTND(i.caBrutMillimes)}</dd>
-            <dt>Remises accordées</dt>
+            <dt>{t('Remises accordées')}</dt>
             <dd className={i.remisesMillimes > 0 ? 'attention' : ''}>
               − {formaterTND(i.remisesMillimes)}
             </dd>
-            <dt className="fort">Chiffre d’affaires net</dt>
+            <dt className="fort">{t('Chiffre d’affaires net')}</dt>
             <dd className="fort">{formaterTND(i.caNetMillimes)}</dd>
-            <dt>Remboursements</dt>
+            <dt>{t('Remboursements')}</dt>
             <dd className={i.remboursementsMillimes > 0 ? 'attention' : ''}>
               {formaterTND(i.remboursementsMillimes)}
             </dd>
           </dl>
-          <p className="indication">
-            Les remboursements sont des montants TTC portés sur un encaissement.
-            Ils sont présentés à part du CA, qui est hors taxe : les additionner
-            fausserait la marge d’un point de TVA.
-          </p>
+          <p className="indication">{t('Les remboursements sont des montants TTC portés sur un encaissement. Ils sont présentés à part du CA, qui est hors taxe : les additionner fausserait la marge d’un point de TVA.')}</p>
         </section>
 
         <section className="bloc">
-          <h2>Volume</h2>
+          <h2>{t('Volume')}</h2>
           <dl className="lignes-chiffres">
-            <dt>Articles vendus</dt>
+            <dt>{t('Articles vendus')}</dt>
             <dd>{i.articlesVendus}</dd>
-            <dt>Références différentes</dt>
+            <dt>{t('Références différentes')}</dt>
             <dd>{parProduit.length}</dd>
-            <dt>Catégories actives</dt>
+            <dt>{t('Catégories actives')}</dt>
             <dd>{parCategorie.length}</dd>
           </dl>
         </section>
       </div>
 
       <section className="bloc">
-        <h2>Meilleures ventes</h2>
+        <h2>{t('Meilleures ventes')}</h2>
         {parProduit.length === 0 ? (
-          <p className="vide">Aucune vente sur cette période.</p>
+          <p className="vide">{t('Aucune vente sur cette période.')}</p>
         ) : (
-          <TableauVentilation lignes={parProduit.slice(0, 10)} entete="Produit" />
+          <TableauVentilation lignes={parProduit.slice(0, 10)} entete={t('Produit')} />
         )}
         <p style={{ marginTop: '0.75rem' }}>
           <Link
@@ -177,9 +172,7 @@ export default async function PageTableauBord({
               pathname: `/${restaurant}/ventes`,
               query: { du: periode.du, au: periode.au },
             }}
-          >
-            Voir toutes les ventilations →
-          </Link>
+          >{t('Voir toutes les ventilations →')}</Link>
         </p>
       </section>
     </>
@@ -230,17 +223,18 @@ function TableauVentilation({
   }[]
   entete: string
 }) {
+  const t = use(traduction())
   return (
     <table>
       <thead>
         <tr>
           <th>{entete}</th>
-          <th className="nombre">Qté</th>
-          <th className="nombre">CA</th>
-          <th className="nombre">Part</th>
-          <th className="nombre">Coût</th>
-          <th className="nombre">Marge</th>
-          <th className="nombre">Marge %</th>
+          <th className="nombre">{t('Qté')}</th>
+          <th className="nombre">{t('CA')}</th>
+          <th className="nombre">{t('Part')}</th>
+          <th className="nombre">{t('Coût')}</th>
+          <th className="nombre">{t('Marge')}</th>
+          <th className="nombre">{t('Marge %')}</th>
         </tr>
       </thead>
       <tbody>

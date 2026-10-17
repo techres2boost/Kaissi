@@ -42,12 +42,13 @@ import { ComparatifFormules } from '../../../composants/ComparatifFormules.js'
 import { EDITEUR } from '../../../editeur.js'
 import { ChangerFormule } from '../../../composants/ChangerFormule.js'
 import { estEditeur } from './actions.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
 /** « 2026-09-15T…Z » → « 15 septembre 2026 ». Nul rendu par un tiret. */
-function jour(horodatage: string | null): string {
-  return horodatage ? libelleJournee(horodatage.slice(0, 10)) : '—'
+function jour(horodatage: string | null, locale: 'fr-FR' | 'ar-TN'): string {
+  return horodatage ? libelleJournee(horodatage.slice(0, 10), locale) : '—'
 }
 
 export default async function PageAbonnement({
@@ -55,6 +56,7 @@ export default async function PageAbonnement({
 }: {
   params: Promise<{ restaurant: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
@@ -72,17 +74,13 @@ export default async function PageAbonnement({
 
   return (
     <>
-      <h1>Abonnement</h1>
-      <p className="sous-titre">
-        La formule de votre compte, et ce qu’elle ouvre. Elle est portée par{' '}
-        <strong>l’organisation</strong>, pas par l’établissement : ouvrir un
-        second restaurant ne recommence pas un essai, et ne double rien.
-      </p>
+      <h1>{t('Abonnement')}</h1>
+      <p className="sous-titre">{t('La formule de votre compte, et ce qu’elle ouvre. Elle est portée par')}{' '}
+        <strong>{t('l’organisation')}</strong>{t(', pas par l’établissement : ouvrir un second restaurant ne recommence pas un essai, et ne double rien.')}</p>
 
       <section className="carte">
-        <h2>
-          Formule en cours : {etat.nom}
-          {etat.essaiExpire && <span className="etiquette inactif">essai terminé</span>}
+        <h2>{t('Formule en cours :')}{' '}{t(etat.nom)}
+          {etat.essaiExpire && <span className="etiquette inactif">{t('essai terminé')}</span>}
         </h2>
 
         {etat.enEssai && (
@@ -90,35 +88,30 @@ export default async function PageAbonnement({
             <CalendarClock size={17} strokeWidth={1.75} aria-hidden="true" />{' '}
             <strong>
               {etat.joursRestants === 1
-                ? 'Il vous reste 1 jour d’essai.'
-                : `Il vous reste ${etat.joursRestants} jours d’essai.`}
-            </strong>{' '}
-            Jusqu’au {jour((ligne.data?.trial_ends_at as string | null) ?? null)}, vous
-            avez tout ce que la formule « Payant » ouvre.
-          </p>
+                ? t('Il vous reste 1 jour d’essai.')
+                : t('Il vous reste {joursRestants} jours d’essai.', { joursRestants: etat.joursRestants ?? 0 })}
+            </strong>{' '}{t('Jusqu’au')}{' '}{jour((ligne.data?.trial_ends_at as string | null) ?? null, t.locale)}{t(', vous avez tout ce que la formule « Payant » ouvre.')}</p>
         )}
 
         {etat.essaiExpire && (
           <p className="message avertissement" role="status">
-            <strong>Votre essai s’est terminé le{' '}
-            {jour((ligne.data?.trial_ends_at as string | null) ?? null)}.</strong> Vous
-            avez désormais les droits de la formule « Gratuit ». Rien n’a été perdu :
-            vos ventes, vos articles et vos employés sont intacts, et{' '}
-            <strong>votre caisse encaisse exactement comme avant</strong>.
+            <strong>{t('Votre essai s’est terminé le')}{' '}
+            {jour((ligne.data?.trial_ends_at as string | null) ?? null, t.locale)}.</strong>{' '}{t('Vous avez désormais les droits de la formule « Gratuit ». Rien n’a été perdu : vos ventes, vos articles et vos employés sont intacts, et')}{' '}
+            <strong>{t('votre caisse encaisse exactement comme avant')}</strong>.
           </p>
         )}
 
         <dl className="lignes-chiffres">
-          <dt>Depuis le</dt>
-          <dd>{jour((ligne.data?.started_at as string | null) ?? null)}</dd>
-          <dt>Historique consultable</dt>
+          <dt>{t('Depuis le')}</dt>
+          <dd>{jour((ligne.data?.started_at as string | null) ?? null, t.locale)}</dd>
+          <dt>{t('Historique consultable')}</dt>
           <dd>
             {etat.joursHistorique === null
-              ? 'Sans limite'
-              : `${etat.joursHistorique} derniers jours`}
+              ? t('Sans limite')
+              : t('{joursHistorique} derniers jours', { joursHistorique: etat.joursHistorique })}
           </dd>
-          <dt>Inventaire avancé</dt>
-          <dd>{etat.modules.includes('inventaire_avance') ? 'Ouvert' : 'Fermé'}</dd>
+          <dt>{t('Inventaire avancé')}</dt>
+          <dd>{etat.modules.includes('inventaire_avance') ? t('Ouvert') : t('Fermé')}</dd>
         </dl>
 
         {/*
@@ -131,50 +124,33 @@ export default async function PageAbonnement({
       </section>
 
       <section className="bloc">
-        <h2>Ce que chaque formule ouvre</h2>
+        <h2>{t('Ce que chaque formule ouvre')}</h2>
         <ComparatifFormules etat={etat} />
       </section>
 
       {editeur && (
         <section className="carte">
-          <h2>Changer la formule — éditeur</h2>
-          <p className="indication">
-            Vous voyez ces boutons parce que votre compte figure parmi les
-            éditeurs de Kaissi (variable <code>KAISSI_EDITEURS</code> du service).
-            Le client, lui, ne les voit pas. Le changement s’applique à toute
-            l’organisation, aussitôt ; la caisse n’est jamais concernée.
-          </p>
+          <h2>{t('Changer la formule — éditeur')}</h2>
+          <p className="indication">{t('Vous voyez ces boutons parce que votre compte figure parmi les éditeurs de Kaissi (variable')}{' '}<code>{t('KAISSI_EDITEURS')}</code>{' '}{t('du service). Le client, lui, ne les voit pas. Le changement s’applique à toute l’organisation, aussitôt ; la caisse n’est jamais concernée.')}</p>
           <ChangerFormule restaurant={restaurant} planActuel={etat.plan} />
           <p className="indication">
-            <Link href="/editeur">Tous les clients et leur formule →</Link>
+            <Link href="/editeur">{t('Tous les clients et leur formule →')}</Link>
           </p>
         </section>
       )}
 
       <section className="carte">
-        <h2>Changer de formule</h2>
-        <p>
-          Écrivez à{' '}
-          <a href={`mailto:${EDITEUR.contact}`}>{EDITEUR.contact}</a> en indiquant
-          le nom de votre établissement. Le changement prend effet dès qu’il est
-          enregistré : rien à réinstaller, aucune tablette à toucher, et{' '}
-          <strong>aucune interruption de service</strong>.
+        <h2>{t('Changer de formule')}</h2>
+        <p>{t('Écrivez à')}{' '}
+          <a href={`mailto:${EDITEUR.contact}`}>{EDITEUR.contact}</a>{' '}{t('en indiquant le nom de votre établissement. Le changement prend effet dès qu’il est enregistré : rien à réinstaller, aucune tablette à toucher, et')}{' '}
+          <strong>{t('aucune interruption de service')}</strong>.
         </p>
-        <p className="indication">
-          Il n’y a volontairement <strong>aucun bouton</strong> sur cette page.
-          Kaissi ne conserve aucun moyen de paiement et ne prélève rien tout
-          seul — un abonnement se règle avec quelqu’un, pas avec un formulaire.
-        </p>
+        <p className="indication">{t('Il n’y a volontairement')}{' '}<strong>{t('aucun bouton')}</strong>{' '}{t('sur cette page. Kaissi ne conserve aucun moyen de paiement et ne prélève rien tout seul — un abonnement se règle avec quelqu’un, pas avec un formulaire.')}</p>
       </section>
 
       <div className="message info">
-        <strong>Une formule ne touche jamais à la caisse.</strong> Quelle que
-        soit la vôtre, et même expirée, la tablette ouvre, encaisse hors ligne
-        et se synchronise. Ce qu’un abonnement peut fermer, ce sont des écrans
-        de gestion — des rapports longs, l’inventaire avancé. Jamais une vente.{' '}
-        <Link href={{ pathname: `/${restaurant}/fonctionnalites` }}>
-          Voir tout ce que Kaissi fait
-        </Link>
+        <strong>{t('Une formule ne touche jamais à la caisse.')}</strong>{' '}{t('Quelle que soit la vôtre, et même expirée, la tablette ouvre, encaisse hors ligne et se synchronise. Ce qu’un abonnement peut fermer, ce sont des écrans de gestion — des rapports longs, l’inventaire avancé. Jamais une vente.')}{' '}
+        <Link href={{ pathname: `/${restaurant}/fonctionnalites` }}>{t('Voir tout ce que Kaissi fait')}</Link>
         .
       </div>
     </>

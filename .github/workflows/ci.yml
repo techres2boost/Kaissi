@@ -39,6 +39,12 @@ jobs:
         run: pnpm --filter @kaissi/db-local test
       - name: Tests du rendu ESC/POS
         run: pnpm --filter @kaissi/printing test
+      # Toute phrase affichée par la caisse ou le back-office a sa traduction
+      # arabe, et aucun texte n'est resté écrit en dur dans le JSX. Un écran
+      # à moitié traduit n'échoue nulle part ailleurs : c'est le caissier
+      # qui le découvrirait.
+      - name: Traduction arabe complète
+        run: pnpm --filter @kaissi/i18n test
 
   types:
     name: Vérification des types

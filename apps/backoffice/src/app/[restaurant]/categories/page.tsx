@@ -12,6 +12,7 @@ import { formaterTND, millimes } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { GestionCategories } from '../../../composants/GestionCategories.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,7 @@ export default async function PageCategories({
 }: {
   params: Promise<{ restaurant: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
@@ -72,11 +74,11 @@ export default async function PageCategories({
 
   return (
     <>
-      <h1>Catégories</h1>
+      <h1>{t('Catégories')}</h1>
       <p className="sous-titre">
         {etablissement.gestionnaire
-          ? 'Ranger la carte, et dire quel poste prépare quoi. Les tablettes reçoivent la modification à leur prochaine synchronisation.'
-          : `Consultation seule : le rôle « ${etablissement.role} » ne modifie pas la carte.`}
+          ? t('Ranger la carte, et dire quel poste prépare quoi. Les tablettes reçoivent la modification à leur prochaine synchronisation.')
+          : t('Consultation seule : le rôle « {role} » ne modifie pas la carte.', { role: etablissement.role })}
       </p>
 
       <GestionCategories

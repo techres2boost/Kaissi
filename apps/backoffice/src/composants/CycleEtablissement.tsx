@@ -25,6 +25,7 @@ import {
   supprimerEtablissement,
 } from '../app/administration/actions.js'
 import type { Resultat } from '../app/administration/fuseaux.js'
+import { useT } from '../i18n/client.js'
 
 export interface EtablissementCycle {
   id: string
@@ -45,6 +46,7 @@ interface Obstacles {
 }
 
 export function CycleEtablissement({ etablissement }: { etablissement: EtablissementCycle }) {
+  const t = useT()
   const [enCours, demarrer] = useTransition()
   const [retour, setRetour] = useState<Resultat | null>(null)
   const [obstacles, setObstacles] = useState<Obstacles | null>(null)
@@ -76,12 +78,10 @@ export function CycleEtablissement({ etablissement }: { etablissement: Etablisse
         >
           {etablissement.ferme ? (
             <>
-              <ArchiveRestore size={15} strokeWidth={1.9} aria-hidden="true" /> Rouvrir
-            </>
+              <ArchiveRestore size={15} strokeWidth={1.9} aria-hidden="true" />{' '}{t('Rouvrir')}</>
           ) : (
             <>
-              <Archive size={15} strokeWidth={1.9} aria-hidden="true" /> Fermer
-            </>
+              <Archive size={15} strokeWidth={1.9} aria-hidden="true" />{' '}{t('Fermer')}</>
           )}
         </button>
 
@@ -118,58 +118,39 @@ export function CycleEtablissement({ etablissement }: { etablissement: Etablisse
               })
             }}
           >
-            <Trash2 size={15} strokeWidth={1.9} aria-hidden="true" /> Supprimer…
-          </button>
+            <Trash2 size={15} strokeWidth={1.9} aria-hidden="true" />{' '}{t('Supprimer…')}</button>
         )}
       </div>
 
       {panneau && (
         <div className="panneau-suppression">
-          {erreurObstacles && <p className="message erreur">{erreurObstacles}</p>}
+          {erreurObstacles && <p className="message erreur">{t.m(erreurObstacles)}</p>}
 
           {obstacles === null && !erreurObstacles && (
-            <p className="indication">Vérification en cours…</p>
+            <p className="indication">{t('Vérification en cours…')}</p>
           )}
 
           {obstacles !== null && !etablissement.supprimable && (
             <p className="message avertissement">
               <TriangleAlert size={15} strokeWidth={2} aria-hidden="true" />{' '}
-              <strong>C’est le seul établissement que vous administrez.</strong>{' '}
-              Le supprimer vous laisserait un compte qui n’ouvre sur rien, et
-              sans moyen d’en rouvrir un : l’ouverture exige un établissement
-              modèle.
-            </p>
+              <strong>{t('C’est le seul établissement que vous administrez.')}</strong>{' '}{t('Le supprimer vous laisserait un compte qui n’ouvre sur rien, et sans moyen d’en rouvrir un : l’ouverture exige un établissement modèle.')}</p>
           )}
 
           {obstacles !== null && etablissement.supprimable && bloque && (
             <div className="message avertissement">
               <TriangleAlert size={15} strokeWidth={2} aria-hidden="true" />{' '}
-              <strong>Cet établissement ne peut pas être supprimé.</strong> Il
-              porte {obstacles.ventes} vente(s), {obstacles.services} service(s)
-              de caisse et {obstacles.audit} entrée(s) de journal d’audit. Ce
-              sont des écritures comptables : elles ne se suppriment pas.
-              <br />
-              <strong>Fermez-le</strong> — il disparaît de l’exploitation,
-              aucune nouvelle caisse ne peut y être mise en service, et ses
-              données restent consultables.
-            </div>
+              <strong>{t('Cet établissement ne peut pas être supprimé.')}</strong>{' '}{t('Il porte')}{' '}{obstacles.ventes}{' '}{t('vente(s),')}{' '}{obstacles.services}{' '}{t('service(s) de caisse et')}{' '}{obstacles.audit}{' '}{t('entrée(s) de journal d’audit. Ce sont des écritures comptables : elles ne se suppriment pas.')}<br />
+              <strong>{t('Fermez-le')}</strong>{' '}{t('— il disparaît de l’exploitation, aucune nouvelle caisse ne peut y être mise en service, et ses données restent consultables.')}</div>
           )}
 
           {obstacles !== null && etablissement.supprimable && !bloque && (
             <>
               <p className="message avertissement">
                 <TriangleAlert size={15} strokeWidth={2} aria-hidden="true" />{' '}
-                <strong>Suppression définitive.</strong> Cet établissement n’a
-                jamais rien encaissé. Seront supprimés : sa carte, ses
-                catégories, ses postes, ses taux de taxe, ses modes de paiement
-                {obstacles.appareils > 0
-                  ? `, et ses ${obstacles.appareils} appareil(s) appairé(s)`
-                  : ''}
-                . C’est irréversible.
-              </p>
-              <label htmlFor={`conf-${etablissement.id}`}>
-                Retapez <strong>{etablissement.nom}</strong> pour confirmer
-              </label>
+                <strong>{t('Suppression définitive.')}</strong>{' '}{t('Cet établissement n’a jamais rien encaissé. Seront supprimés : sa carte, ses catégories, ses postes, ses taux de taxe, ses modes de paiement')}{obstacles.appareils > 0
+                  ? t(', et ses {appareils} appareil(s) appairé(s)', { appareils: obstacles.appareils })
+                  : ''}{t('. C’est irréversible.')}</p>
+              <label htmlFor={`conf-${etablissement.id}`}>{t('Retapez')}{' '}<strong>{etablissement.nom}</strong>{' '}{t('pour confirmer')}</label>
               <input
                 id={`conf-${etablissement.id}`}
                 value={confirmation}
@@ -182,10 +163,7 @@ export function CycleEtablissement({ etablissement }: { etablissement: Etablisse
                   Retaper plutôt que cocher : on coche par réflexe, on ne
                   retape pas un nom par réflexe — et le retaper oblige à lire
                   LEQUEL on supprime.
-                */}
-                Un nom à retaper plutôt qu’une case à cocher : cela oblige à
-                lire lequel des établissements va disparaître.
-              </p>
+                */}{t('Un nom à retaper plutôt qu’une case à cocher : cela oblige à lire lequel des établissements va disparaître.')}</p>
               <button
                 type="button"
                 className="danger-plein"
@@ -197,9 +175,7 @@ export function CycleEtablissement({ etablissement }: { etablissement: Etablisse
                     )
                   })
                 }
-              >
-                Supprimer définitivement
-              </button>
+              >{t('Supprimer définitivement')}</button>
             </>
           )}
 
@@ -211,14 +187,12 @@ export function CycleEtablissement({ etablissement }: { etablissement: Etablisse
               setObstacles(null)
               setConfirmation('')
             }}
-          >
-            Annuler
-          </button>
+          >{t('Annuler')}</button>
         </div>
       )}
 
-      {retour?.erreur && <p className="message erreur">{retour.erreur}</p>}
-      {retour?.succes && <p className="message succes">{retour.succes}</p>}
+      {retour?.erreur && <p className="message erreur">{t.m(retour.erreur)}</p>}
+      {retour?.succes && <p className="message succes">{t.m(retour.succes)}</p>}
     </div>
   )
 }

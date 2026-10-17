@@ -34,6 +34,7 @@ import {
 import type { CategorieLocale, TauxTaxeLocal } from '@kaissi/db-local'
 import { Modale } from './Modale.js'
 import { useApp } from '../etat/contexte.js'
+import { t, tm } from '../i18n.js'
 
 interface Props {
   readonly employe: Employe
@@ -60,12 +61,12 @@ export function ModaleNouvelArticle({
   const [enCours, setEnCours] = useState(false)
 
   if (taux === null) {
-    void app.catalogue.tauxTaxes().then((t) => {
-      setTaux(t)
+    void app.catalogue.tauxTaxes().then((elt) => {
+      setTaux(elt)
       // Le taux PAR DÉFAUT de l'établissement, s'il en a un. Sans lui, le
       // gérant doit choisir un taux de TVA en plein service — c'est
       // exactement la question qu'il ne veut pas se poser maintenant.
-      setTauxId((actuel) => actuel ?? t.find((x) => x.parDefaut)?.id ?? t[0]?.id ?? null)
+      setTauxId((actuel) => actuel ?? elt.find((x) => x.parDefaut)?.id ?? elt[0]?.id ?? null)
     })
   }
 
@@ -80,11 +81,11 @@ export function ModaleNouvelArticle({
   async function creer() {
     setErreur(null)
     if (!tauxId) {
-      setErreur('Aucun taux de TVA n’est défini pour cet établissement.')
+      setErreur(t('Aucun taux de TVA n’est défini pour cet établissement.'))
       return
     }
     if (millimesSaisis === null) {
-      setErreur('Le prix n’est pas un montant lisible. Exemple : 14,500')
+      setErreur(t('Le prix n’est pas un montant lisible. Exemple : 14,500'))
       return
     }
 
@@ -110,7 +111,7 @@ export function ModaleNouvelArticle({
     // qui reviendrait une heure plus tard, sur un article déjà vendu.
     const verdict = validerMutationCatalogue(mutation)
     if (!verdict.valide) {
-      setErreur(verdict.motif ?? 'Saisie invalide.')
+      setErreur(verdict.motif ? tm(verdict.motif) : t('Saisie invalide.'))
       return
     }
 
@@ -121,7 +122,7 @@ export function ModaleNouvelArticle({
       await onCree(mutation.nom.trim())
       onFerme()
     } catch (e) {
-      setErreur(e instanceof Error ? e.message : String(e))
+      setErreur(e instanceof Error ? tm(e.message) : String(e))
     } finally {
       setEnCours(false)
     }
@@ -137,50 +138,44 @@ export function ModaleNouvelArticle({
    */
   if (!peutModifierCatalogue(employe.role)) {
     return (
-      <Modale titre="Nouvel article" onFermer={onFerme}>
-        <p className="vide">
-          Seul un gérant ou un administrateur peut ajouter un article à la carte.
-        </p>
+      <Modale titre={t('Nouvel article')} onFermer={onFerme}>
+        <p className="vide">{t('Seul un gérant ou un administrateur peut ajouter un article à la carte.')}</p>
       </Modale>
     )
   }
 
   return (
     <Modale
-      titre="Nouvel article"
-      sousTitre="Il sera vendable immédiatement, et remontera au back-office dès que la caisse aura du réseau."
+      titre={t('Nouvel article')}
+      sousTitre={t('Il sera vendable immédiatement, et remontera au back-office dès que la caisse aura du réseau.')}
       onFermer={onFerme}
       pied={
         <>
-          <button type="button" onClick={onFerme}>
-            Annuler
-          </button>
+          <button type="button" onClick={onFerme}>{t('Annuler')}</button>
           <button
             type="button"
             className="principal"
             disabled={enCours || nom.trim() === '' || millimesSaisis === null}
             onClick={() => void creer()}
-          >
-            Ajouter à la carte
-          </button>
+          >{t('Ajouter à la carte')}</button>
         </>
       }
     >
       <div className="formulaire-article">
         <label>
-          <span>Nom</span>
+          <span>{t('Nom')}</span>
           <input
             type="text"
             value={nom}
             maxLength={200}
             autoFocus
-            placeholder="Ojja merguez"
+            placeholder={t('Ojja merguez')}
             onChange={(e) => setNom(e.target.value)}
           />
         </label>
 
         <label>
-          <span>Prix (TND)</span>
+          <span>{t('Prix (TND)')}</span>
           <input
             // `inputMode="decimal"` et non `type="number"` : sur Android, le
             // second refuse la virgule dans certaines locales — et la virgule
@@ -193,18 +188,18 @@ export function ModaleNouvelArticle({
           />
           <small>
             {millimesSaisis === null
-              ? 'Montant illisible'
-              : `soit ${formaterTND(millimesSaisis)}`}
+              ? t('Montant illisible')
+              : t('soit {montant}', { montant: formaterTND(millimesSaisis) })}
           </small>
         </label>
 
         <label>
-          <span>Catégorie</span>
+          <span>{t('Catégorie')}</span>
           <select
             value={categorieId ?? ''}
             onChange={(e) => setCategorieId(e.target.value || null)}
           >
-            <option value="">— sans catégorie —</option>
+            <option value="">{t('— sans catégorie —')}</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.nom}
@@ -217,18 +212,16 @@ export function ModaleNouvelArticle({
             préparation — et cela ne se voit qu'en plein service.
           */}
           {categorieId === null && (
-            <small className="avertissement">
-              Sans catégorie, il n’apparaîtra sur aucun écran de cuisine ni de bar.
-            </small>
+            <small className="avertissement">{t('Sans catégorie, il n’apparaîtra sur aucun écran de cuisine ni de bar.')}</small>
           )}
         </label>
 
         <label>
-          <span>TVA</span>
+          <span>{t('TVA')}</span>
           <select value={tauxId ?? ''} onChange={(e) => setTauxId(e.target.value || null)}>
-            {(taux ?? []).map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.nom}
+            {(taux ?? []).map((elt) => (
+              <option key={elt.id} value={elt.id}>
+                {elt.nom}
               </option>
             ))}
           </select>

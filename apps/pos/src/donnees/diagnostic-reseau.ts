@@ -1,3 +1,4 @@
+import { t } from '../i18n.js'
 /**
  * Traduction des échecs d'appel au serveur de synchronisation.
  *
@@ -30,26 +31,22 @@ export function expliquerEchecReseau(
     hote = analysee.hostname
     protocole = analysee.protocol
   } catch {
-    return `Adresse invalide. Attendu : http://10.0.2.2:8787 ou https://…`
+    return t('Adresse invalide. Attendu : http://10.0.2.2:8787 ou https://…')
   }
 
   // La confusion la plus fréquente sur émulateur : « localhost » désigne la
   // TABLETTE, jamais le PC. Rien dans le message d'origine ne le dit.
   if (estBoucleLocale(hote)) {
-    return (
-      `Serveur injoignable — « ${hote} » désigne la tablette elle-même, ` +
-      `pas ton PC. Depuis un émulateur Android, la machine hôte s'appelle ` +
-      `10.0.2.2. Sur une vraie tablette, mets l'adresse du PC sur le Wi-Fi ` +
-      `(192.168.…). — ${origine}`
+    return t(
+      "Serveur injoignable — « {hote} » désigne la tablette elle-même, pas ton PC. Depuis un émulateur Android, la machine hôte s'appelle 10.0.2.2. Sur une vraie tablette, mets l'adresse du PC sur le Wi-Fi (192.168.…). — {origine}",
+      { hote, origine },
     )
   }
 
   if (protocole === 'http:') {
-    return (
-      `Serveur injoignable. Vérifie que « pnpm sync:dev » tourne et affiche ` +
-      `« connexion vérifiée », et que le pare-feu Windows laisse passer le ` +
-      `port. En HTTP, seule l'adresse de développement 10.0.2.2 est ` +
-      `autorisée ; en production, l'API doit être en HTTPS. — ${origine}`
+    return t(
+      "Serveur injoignable. Vérifie que « pnpm sync:dev » tourne et affiche « connexion vérifiée », et que le pare-feu Windows laisse passer le port. En HTTP, seule l'adresse de développement 10.0.2.2 est autorisée ; en production, l'API doit être en HTTPS. — {origine}",
+      { origine },
     )
   }
 
@@ -72,24 +69,18 @@ export function expliquerEchecReseau(
    *      applique pas — l'évoquer là enverrait chercher au mauvais endroit.
    */
   if (natif) {
-    return (
-      `Serveur injoignable. Ouvre « ${sante} » dans un navigateur : il doit ` +
-      `afficher « etat : ok ». Sinon, le serveur est éteint ou en cours de ` +
-      `redéploiement — la caisse, elle, continue d'encaisser. — ${origine}`
+    return t(
+      "Serveur injoignable. Ouvre « {sante} » dans un navigateur : il doit afficher « etat : ok ». Sinon, le serveur est éteint ou en cours de redéploiement — la caisse, elle, continue d'encaisser. — {origine}",
+      { sante, origine },
     )
   }
 
   const moi =
     typeof window !== 'undefined' && window.location?.origin
       ? window.location.origin
-      : "l'adresse de ce POS"
-  return (
-    `Serveur injoignable depuis ce navigateur. Deux causes possibles :\n` +
-    `1. Le serveur ne répond pas. Ouvre « ${sante} » : il doit afficher ` +
-    `« etat : ok ». Sinon, il est éteint ou en redéploiement (sur Railway, ` +
-    `regarde le dernier déploiement).\n` +
-    `2. Si « /sante » répond bien, le serveur refuse ce POS (CORS) : la ` +
-    `variable SYNC_ORIGINES doit CONTENIR « ${moi} », sans barre oblique ` +
-    `finale, puis redéploie. — ${origine}`
+      : t("l'adresse de ce POS")
+  return t(
+    'Serveur injoignable depuis ce navigateur. Deux causes possibles :\n1. Le serveur ne répond pas. Ouvre « {sante} » : il doit afficher « etat : ok ». Sinon, il est éteint ou en redéploiement (sur Railway, regarde le dernier déploiement).\n2. Si « /sante » répond bien, le serveur refuse ce POS (CORS) : la variable SYNC_ORIGINES doit CONTENIR « {moi} », sans barre oblique finale, puis redéploie. — {origine}',
+    { sante, moi, origine },
   )
 }

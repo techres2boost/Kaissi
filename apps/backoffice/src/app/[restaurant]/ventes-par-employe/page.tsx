@@ -33,6 +33,7 @@ import {
   TopCinq,
 } from '../../../composants/RapportVentilation.js'
 import { TableauRapport } from '../../../composants/TableauRapport.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,6 +44,7 @@ export default async function PageVentesParEmploye({
   params: Promise<{ restaurant: string }>
   searchParams: Promise<Record<string, string | undefined>>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const recherche = await searchParams
   const { etablissement } = await etablissementObligatoire(restaurant)
@@ -54,8 +56,8 @@ export default async function PageVentesParEmploye({
   if (agregats.erreur) {
     return (
       <section className="bloc">
-        <h1>Ventes par employé</h1>
-        <p className="message erreur">Lecture impossible : {agregats.erreur}</p>
+        <h1>{t('Ventes par employé')}</h1>
+        <p className="message erreur">{t('Lecture impossible :')}{' '}{t.m(agregats.erreur)}</p>
       </section>
     )
   }
@@ -76,11 +78,11 @@ export default async function PageVentesParEmploye({
   return (
     <>
       <header className="entete-rapport">
-        <h1>Ventes par employé</h1>
+        <h1>{t('Ventes par employé')}</h1>
         <p className="sous-titre">
           {periode.du === periode.au
-            ? libelleJournee(periode.du)
-            : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
+            ? libelleJournee(periode.du, t.locale)
+            : t('Du {valeur} au {valeur2}', { valeur: libelleJournee(periode.du, t.locale), valeur2: libelleJournee(periode.au, t.locale) })}
         </p>
       </header>
 
@@ -99,40 +101,40 @@ export default async function PageVentesParEmploye({
       <BandeauIndicateurs
         indicateurs={[
           {
-            libelle: 'Tickets',
+            libelle: t('Tickets'),
             valeurMillimes: i.nombreTickets * 1000,
             precedentMillimes: p.nombreTickets * 1000,
             detail:
               i.panierMoyenMillimes === null
-                ? 'aucune vente'
-                : `panier moyen ${(i.panierMoyenMillimes / 1000).toFixed(3)} TND`,
+                ? t('aucune vente')
+                : t('panier moyen {valeur} TND', { valeur: (i.panierMoyenMillimes / 1000).toFixed(3) }),
           },
-          { libelle: 'Ventes brutes', valeurMillimes: i.caBrutMillimes, precedentMillimes: p.caBrutMillimes },
+          { libelle: t('Ventes brutes'), valeurMillimes: i.caBrutMillimes, precedentMillimes: p.caBrutMillimes },
           {
-            libelle: 'Réductions',
+            libelle: t('Réductions'),
             valeurMillimes: i.remisesMillimes,
             precedentMillimes: p.remisesMillimes,
             hausseDefavorable: true,
-            aide: 'À rapprocher du plafond de remise du rôle : une remise systématique se voit ici.',
+            aide: t('À rapprocher du plafond de remise du rôle : une remise systématique se voit ici.'),
           },
-          { libelle: 'Ventes nettes', valeurMillimes: i.caNetMillimes, precedentMillimes: p.caNetMillimes },
+          { libelle: t('Ventes nettes'), valeurMillimes: i.caNetMillimes, precedentMillimes: p.caNetMillimes },
           {
-            libelle: 'Marge brute',
+            libelle: t('Marge brute'),
             valeurMillimes: i.marge.margeMillimes,
             precedentMillimes: p.marge.margeMillimes,
             detail:
               i.marge.margeBp === null
-                ? 'coût non saisi'
-                : `${formaterPourcentage(i.marge.margeBp)} % du CA net`,
+                ? t('coût non saisi')
+                : t('{valeur} % du CA net', { valeur: formaterPourcentage(i.marge.margeBp) }),
           },
         ]}
       />
 
-      <TopCinq lignes={parEmploye} entete="Employés" />
+      <TopCinq lignes={parEmploye} entete={t('Employés')} />
 
       <section className="bloc">
         <GraphiqueSerie
-          titre="Ventes par employé"
+          titre={t('Ventes par employé')}
           journees={agregats.parJournee}
           parts={parEmploye.map((e) => ({
             cle: e.cle,
@@ -149,13 +151,13 @@ export default async function PageVentesParEmploye({
             valeur: ticketsPar.get(l.cle) ?? 0,
           },
         }))}
-        colonnes={colonnesVentilation('Employé', [
-          { cle: 'tickets', titre: 'Tickets', nombre: true },
+        colonnes={colonnesVentilation(t('Employé'), [
+          { cle: 'tickets', titre: t('Tickets'), nombre: true },
         ])}
         actions={
           <BoutonsExport
             restaurantId={restaurant}
-            exports={[{ quoi: 'employes', libelle: 'Exporter' }]}
+            exports={[{ quoi: 'employes', libelle: t('Exporter') }]}
             du={periode.du}
             au={periode.au}
           />

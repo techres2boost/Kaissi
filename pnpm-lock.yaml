@@ -47,6 +47,9 @@ importers:
       '@kaissi/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@kaissi/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@kaissi/printing':
         specifier: workspace:*
         version: link:../../packages/printing
@@ -111,6 +114,9 @@ importers:
       '@kaissi/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@kaissi/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
       '@kaissi/printing':
         specifier: workspace:*
         version: link:../../packages/printing
@@ -208,6 +214,21 @@ importers:
         specifier: ^1.7.1
         version: 1.8.0
     devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@22.20.1)(vite@6.4.3(@types/node@22.20.1))
+
+  packages/i18n:
+    devDependencies:
+      '@kaissi/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.20.1
       typescript:
         specifier: ^5.7.3
         version: 5.9.3

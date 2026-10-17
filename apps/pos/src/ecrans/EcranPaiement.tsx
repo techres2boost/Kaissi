@@ -28,6 +28,7 @@ import { Modale } from '../composants/Modale.js'
 import { PaveNumerique } from '../composants/PaveNumerique.js'
 import { TicketEcran } from '../composants/TicketEcran.js'
 import { IMPRESSION_ACTIVE } from '../config.js'
+import { t, tm } from '../i18n.js'
 
 interface Props {
   readonly orderId: string
@@ -120,7 +121,7 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
       app.rafraichir()
     } catch (e) {
       setMessage(
-        e instanceof RefusOperation || e instanceof Error ? e.message : String(e),
+        e instanceof RefusOperation || e instanceof Error ? tm(e.message) : String(e),
       )
     } finally {
       setEnCours(false)
@@ -131,7 +132,7 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
     if (!totaux) return
     setEnCours(true)
     try {
-      const libelleTable = tables.find((t) => t.id === etat?.tableId)?.label ?? null
+      const libelleTable = tables.find((elt) => elt.id === etat?.tableId)?.label ?? null
       const imprimante = [...stations.values()].find((s) => s.hote) ?? null
       const especes = (etat?.paiements ?? []).some((p) => !p.annule && p.mode === 'cash')
       const { ticket } = await session.cloturer(employe, orderId, {
@@ -151,7 +152,7 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
         setTicketEmis(rendreTicketClient(ticket, { ouvrirTiroir: false }))
       }
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : String(e))
+      setMessage(e instanceof Error ? tm(e.message) : String(e))
     } finally {
       setEnCours(false)
     }
@@ -171,12 +172,10 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
   return (
     <div className="paiement">
       <section className="colonne-recap">
-        <button type="button" className="retour" onClick={onRetour}>
-          ‹ Commande
-        </button>
+        <button type="button" className="retour" onClick={onRetour}>{t('‹ Commande')}</button>
 
         <div className="bloc-total">
-          <span className="libelle">Total à payer</span>
+          <span className="libelle">{t('Total à payer')}</span>
           <span className="valeur">{formaterTND(totaux.totalMillimes)}</span>
         </div>
 
@@ -184,7 +183,7 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
           <ul className="paiements-faits">
             {paiementsVivants.map((p) => (
               <li key={p.id}>
-                <span>{methodesPaiement.find((m) => m.id === p.methodeId)?.nom ?? p.mode}</span>
+                <span>{tm(methodesPaiement.find((m) => m.id === p.methodeId)?.nom ?? p.mode)}</span>
                 <span>{formaterTND(p.montantMillimes)}</span>
               </li>
             ))}
@@ -193,7 +192,7 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
 
         <div className={`bloc-reste ${encaissement.solde ? 'solde' : ''}`}>
           <span className="libelle">
-            {encaissement.solde ? 'Monnaie à rendre' : 'Reste à payer'}
+            {encaissement.solde ? t('Monnaie à rendre') : t('Reste à payer')}
           </span>
           <span className="valeur">
             {formaterTND(encaissement.solde ? aRendre : encaissement.resteDuMillimes)}
@@ -207,7 +206,7 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
             disabled={enCours}
             onClick={() => void cloturer()}
           >
-            {enCours ? 'Clôture…' : IMPRESSION_ACTIVE ? 'Encaisser et imprimer' : 'Encaisser'}
+            {enCours ? t('Clôture…') : IMPRESSION_ACTIVE ? t('Encaisser et imprimer') : t('Encaisser')}
           </button>
         )}
       </section>
@@ -221,7 +220,7 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
               className={methodeId === m.id ? 'actif' : ''}
               onClick={() => setMethodeId(m.id)}
             >
-              {m.nom}
+              {tm(m.nom)}
             </button>
           ))}
         </div>
@@ -244,7 +243,7 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
             )}
 
             <div className="montant-saisi">
-              <span className="libelle">Montant reçu</span>
+              <span className="libelle">{t('Montant reçu')}</span>
               <span className="valeur">{formaterTND(montantSaisi)}</span>
             </div>
 
@@ -253,7 +252,7 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
               onChange={setSaisie}
               decimale
               onValider={() => void enregistrer(montantSaisi, montantSaisi)}
-              libelleValider="Encaisser"
+              libelleValider={t('Encaisser')}
               validerActif={!enCours && montantSaisi > 0}
             />
           </>
@@ -261,21 +260,16 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
       </section>
 
       {message && (
-        <Modale titre="Opération refusée" onFermer={() => setMessage(null)}>
+        <Modale titre={t('Opération refusée')} onFermer={() => setMessage(null)}>
           <p>{message}</p>
         </Modale>
       )}
 
       {ticketEmis && (
-        <Modale titre="Ticket client" onFermer={onTermine}>
+        <Modale titre={t('Ticket client')} onFermer={onTermine}>
           <TicketEcran charge={ticketEmis} />
-          <p className="aide">
-            La vente est enregistrée. Montrez ce ticket au client, ou fermez
-            simplement cette fenêtre.
-          </p>
-          <button type="button" className="principal grand" onClick={onTermine}>
-            Terminer
-          </button>
+          <p className="aide">{t('La vente est enregistrée. Montrez ce ticket au client, ou fermez simplement cette fenêtre.')}</p>
+          <button type="button" className="principal grand" onClick={onTermine}>{t('Terminer')}</button>
         </Modale>
       )}
     </div>

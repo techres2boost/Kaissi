@@ -11,6 +11,7 @@ import Link from 'next/link'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { OptionsRestauration } from '../../../composants/OptionsRestauration.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,7 @@ export default async function PageRestauration({
 }: {
   params: Promise<{ restaurant: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
@@ -44,21 +46,14 @@ export default async function PageRestauration({
 
   return (
     <>
-      <h1>Options de restauration</h1>
-      <p className="sous-titre">
-        Les frais de service et le droit de timbre. Ce sont les deux seuls
-        réglages de cette rubrique — avec les{' '}
-        <Link href={{ pathname: `/${restaurant}/taxes` }}>taxes</Link> — qui
-        changent le montant que le client paie.
-      </p>
+      <h1>{t('Options de restauration')}</h1>
+      <p className="sous-titre">{t('Les frais de service et le droit de timbre. Ce sont les deux seuls réglages de cette rubrique — avec les')}{' '}
+        <Link href={{ pathname: `/${restaurant}/taxes` }}>{t('taxes')}</Link>{' '}{t('— qui changent le montant que le client paie.')}</p>
 
-      {erreur && <p className="message erreur">Lecture impossible : {erreur.message}</p>}
+      {erreur && <p className="message erreur">{t('Lecture impossible :')}{' '}{erreur.message}</p>}
 
       {!etablissement.gestionnaire && (
-        <p className="sous-titre">
-          Consultation seule : le rôle « {etablissement.role} » ne modifie pas
-          les options de restauration.
-        </p>
+        <p className="sous-titre">{t('Consultation seule : le rôle «')}{' '}{etablissement.role}{' '}{t('» ne modifie pas les options de restauration.')}</p>
       )}
 
       <OptionsRestauration
@@ -70,28 +65,18 @@ export default async function PageRestauration({
           serviceTauxTaxeId: (etabRes.data?.service_tax_rate_id as string | null) ?? null,
           timbreMillimes: Number(etabRes.data?.stamp_duty_millimes ?? 0),
         }}
-        taux={(tauxRes.data ?? []).map((t) => ({
-          id: t.id as string,
-          nom: t.name as string,
-          tauxBp: (t.rate_bp as number) ?? 0,
-          incluse: Boolean(t.is_included),
+        taux={(tauxRes.data ?? []).map((elt) => ({
+          id: elt.id as string,
+          nom: elt.name as string,
+          tauxBp: (elt.rate_bp as number) ?? 0,
+          incluse: Boolean(elt.is_included),
         }))}
       />
 
       <div className="carte note-imprimantes">
-        <h2>Ce qui se passe quand vous enregistrez</h2>
-        <p>
-          Le réglage descend aux caisses par le <strong>catalogue</strong>,
-          exactement comme un changement de prix — aucune ressaisie sur les
-          tablettes, et rien à redémarrer. Une caisse hors ligne l’appliquera à
-          sa prochaine synchronisation.
-        </p>
-        <p>
-          Les ventes <strong>déjà encaissées ne bougent pas</strong> : chaque
-          commande porte le total calculé au moment de la vente. Un rapport qui
-          changerait parce qu’on modifie un réglage ne serait plus un
-          historique.
-        </p>
+        <h2>{t('Ce qui se passe quand vous enregistrez')}</h2>
+        <p>{t('Le réglage descend aux caisses par le')}{' '}<strong>{t('catalogue')}</strong>{t(', exactement comme un changement de prix — aucune ressaisie sur les tablettes, et rien à redémarrer. Une caisse hors ligne l’appliquera à sa prochaine synchronisation.')}</p>
+        <p>{t('Les ventes')}{' '}<strong>{t('déjà encaissées ne bougent pas')}</strong>{' '}{t(': chaque commande porte le total calculé au moment de la vente. Un rapport qui changerait parce qu’on modifie un réglage ne serait plus un historique.')}</p>
       </div>
     </>
   )

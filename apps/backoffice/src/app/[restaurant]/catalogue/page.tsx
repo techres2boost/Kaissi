@@ -12,12 +12,14 @@ import { formaterPourcentage, formaterTND, millimes } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { EditeurCatalogue } from '../../../composants/EditeurCatalogue.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export default async function PageCatalogue({
   params,
 }: {
   params: Promise<{ restaurant: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
@@ -80,21 +82,17 @@ export default async function PageCatalogue({
 
   return (
     <>
-      <h1>Liste d’articles</h1>
+      <h1>{t('Liste d’articles')}</h1>
       <p className="sous-titre">
         {etablissement.gestionnaire
-          ? 'Une modification part vers les tablettes à leur prochaine synchronisation — pas instantanément.'
-          : `Consultation seule : le rôle « ${etablissement.role} » ne modifie pas le catalogue.`}
+          ? t('Une modification part vers les tablettes à leur prochaine synchronisation — pas instantanément.')
+          : t('Consultation seule : le rôle « {role} » ne modifie pas le catalogue.', { role: etablissement.role })}
       </p>
 
-      {error ? <p className="message erreur">Lecture impossible : {error.message}</p> : null}
+      {error ? <p className="message erreur">{t('Lecture impossible :')}{' '}{error.message}</p> : null}
 
       {(taux ?? []).length === 0 && (
-        <p className="message avertissement">
-          Aucun taux de TVA n&apos;est configuré. Un produit ne peut pas exister sans taux —
-          créez-en un avant d&apos;ajouter des produits. ⚠ Les taux applicables à la
-          restauration doivent être confirmés par un expert-comptable tunisien.
-        </p>
+        <p className="message avertissement">{t('Aucun taux de TVA n\'est configuré. Un produit ne peut pas exister sans taux — créez-en un avant d\'ajouter des produits. ⚠ Les taux applicables à la restauration doivent être confirmés par un expert-comptable tunisien.')}</p>
       )}
 
       <EditeurCatalogue
@@ -111,13 +109,13 @@ export default async function PageCatalogue({
           nom: s.name as string,
           position: (s.position as number) ?? 0,
         }))}
-        taux={(taux ?? []).map((t) => ({
-          id: t.id as string,
-          nom: t.name as string,
-          libelle: `${t.name} — ${formaterPourcentage(t.rate_bp as number)} %${
-            t.is_included ? ' (incluse)' : ' (hors taxe)'
+        taux={(taux ?? []).map((elt) => ({
+          id: elt.id as string,
+          nom: elt.name as string,
+          libelle: `${elt.name} — ${formaterPourcentage(elt.rate_bp as number)} %${
+            elt.is_included ? ' (incluse)' : t(' (hors taxe)')
           }`,
-          defaut: Boolean(t.is_default),
+          defaut: Boolean(elt.is_default),
         }))}
         produits={(produits ?? []).map((p) => ({
           id: p.id as string,

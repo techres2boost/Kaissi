@@ -35,6 +35,7 @@ import {
 // définitions du « jour » dans un même produit garantissent deux chiffres
 // différents pour la même soirée.
 import { journeeCourante, journeeDecalee } from './journee.js'
+import { aTraduire } from '@kaissi/i18n'
 
 /** Une ligne vendue, telle que les rapports la lisent. */
 export interface LigneVendue {
@@ -165,7 +166,7 @@ function ventiler(
     groupes.set(cle, groupe)
   }
 
-  const total = lignes.reduce((t, l) => t + l.netMillimes, 0)
+  const total = lignes.reduce((elt, l) => elt + l.netMillimes, 0)
 
   return [...groupes.entries()]
     .map(([cle, groupe]) => {
@@ -176,7 +177,7 @@ function ventiler(
       return {
         cle,
         libelle: groupe.libelle,
-        quantite: groupe.lignes.reduce((t, l) => t + l.quantite, 0),
+        quantite: groupe.lignes.reduce((elt, l) => elt + l.quantite, 0),
         marge: calculerMarge(net, cout),
         part: total === 0 ? 0 : Math.round((net / total) * 10000),
         brutMillimes: sommeMillimes(groupe.lignes.map((l) => l.brutMillimes)),
@@ -202,7 +203,7 @@ export function ventilerParProduit(lignes: readonly LigneVendue[]): Ventilation[
 export function ventilerParCategorie(lignes: readonly LigneVendue[]): Ventilation[] {
   return ventiler(lignes, (l) => ({
     cle: l.categorieId ?? 'sans-categorie',
-    libelle: l.categorieNom ?? 'Sans catégorie',
+    libelle: l.categorieNom ?? aTraduire('Sans catégorie'),
   }))
 }
 
@@ -266,7 +267,7 @@ export function ventilerParReduction(
     // doit pas faire disparaître ce qu'elle a coûté.
     const identifiant = cle ?? (libelle ? `libelle:${libelle}` : 'sans-motif')
     const groupe = groupes.get(identifiant) ?? {
-      libelle: libelle ?? 'Sans motif',
+      libelle: libelle ?? aTraduire('Sans motif'),
       montants: [],
       ventes: new Set<string>(),
     }
@@ -419,9 +420,9 @@ function lundiDe(journee: string): string {
   return date.toISOString().slice(0, 10)
 }
 
-function libelleCourt(journee: string): string {
+function libelleCourt(journee: string, locale: string): string {
   const [a, m, j] = journee.split('-').map(Number)
-  return new Intl.DateTimeFormat('fr-FR', {
+  return new Intl.DateTimeFormat(locale, {
     day: 'numeric',
     month: 'short',
     timeZone: 'UTC',
@@ -445,11 +446,13 @@ function libelleCourt(journee: string): string {
 export function agregerSerie(
   journees: readonly JourneeCA[],
   granularite: Granularite,
+  /** La langue des étiquettes : « 3 sept. » ou « 3 سبتمبر ». */
+  locale: 'fr-FR' | 'ar-TN' = 'fr-FR',
 ): PointSerie[] {
   if (granularite === 'jours') {
     return journees.map((j) => ({
       cle: j.journee,
-      libelle: libelleCourt(j.journee),
+      libelle: libelleCourt(j.journee, locale),
       caMillimes: j.caMillimes,
       tickets: j.tickets,
     }))
@@ -471,8 +474,8 @@ export function agregerSerie(
       cle,
       libelle:
         granularite === 'semaines'
-          ? `${libelleCourt(seau.premiere)} – ${libelleCourt(seau.derniere)}`
-          : new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+          ? `${libelleCourt(seau.premiere, locale)} – ${libelleCourt(seau.derniere, locale)}`
+          : new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' })
               .format(new Date(`${cle}-01T00:00:00Z`)),
       caMillimes: sommeMillimes(seau.total),
       tickets: seau.tickets,

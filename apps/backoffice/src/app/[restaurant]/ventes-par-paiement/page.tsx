@@ -25,6 +25,7 @@ import { FiltresRapport } from '../../../composants/FiltresRapport.js'
 import { GraphiqueSerie } from '../../../composants/GraphiqueSerie.js'
 import { TableauRapport } from '../../../composants/TableauRapport.js'
 import { celluleMontant } from '../../../composants/RapportVentilation.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +36,7 @@ export default async function PageVentesParPaiement({
   params: Promise<{ restaurant: string }>
   searchParams: Promise<Record<string, string | undefined>>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const recherche = await searchParams
   const { etablissement } = await etablissementObligatoire(restaurant)
@@ -46,27 +48,27 @@ export default async function PageVentesParPaiement({
   if (agregats.erreur) {
     return (
       <section className="bloc">
-        <h1>Ventes par mode de paiement</h1>
-        <p className="message erreur">Lecture impossible : {agregats.erreur}</p>
+        <h1>{t('Ventes par mode de paiement')}</h1>
+        <p className="message erreur">{t('Lecture impossible :')}{' '}{t.m(agregats.erreur)}</p>
       </section>
     )
   }
 
   const paiements = agregats.parPaiement
   const paiementsPrecedents = agregatsPrecedent.parPaiement
-  const total = paiements.reduce((t, p) => t + p.montantMillimes, 0)
-  const totalPrecedent = paiementsPrecedents.reduce((t, p) => t + p.montantMillimes, 0)
-  const transactions = paiements.reduce((t, p) => t + p.nombre, 0)
+  const total = paiements.reduce((elt, p) => elt + p.montantMillimes, 0)
+  const totalPrecedent = paiementsPrecedents.reduce((elt, p) => elt + p.montantMillimes, 0)
+  const transactions = paiements.reduce((elt, p) => elt + p.nombre, 0)
   const i = agregats.indicateurs
 
   return (
     <>
       <header className="entete-rapport">
-        <h1>Ventes par mode de paiement</h1>
+        <h1>{t('Ventes par mode de paiement')}</h1>
         <p className="sous-titre">
           {periode.du === periode.au
-            ? libelleJournee(periode.du)
-            : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
+            ? libelleJournee(periode.du, t.locale)
+            : t('Du {valeur} au {valeur2}', { valeur: libelleJournee(periode.du, t.locale), valeur2: libelleJournee(periode.au, t.locale) })}
         </p>
       </header>
 
@@ -85,21 +87,21 @@ export default async function PageVentesParPaiement({
       <BandeauIndicateurs
         indicateurs={[
           {
-            libelle: 'Encaissé (TTC)',
+            libelle: t('Encaissé (TTC)'),
             valeurMillimes: total,
             precedentMillimes: totalPrecedent,
             detail: `${transactions} transaction(s)`,
-            aide: 'Argent réellement entré en caisse, taxes et service compris.',
+            aide: t('Argent réellement entré en caisse, taxes et service compris.'),
           },
           ...paiements.slice(0, 3).map((p) => ({
-            libelle: p.libelle,
+            libelle: t.paiement(p.type),
             valeurMillimes: p.montantMillimes,
             precedentMillimes:
               paiementsPrecedents.find((x) => x.type === p.type)?.montantMillimes ?? null,
             detail: `${p.nombre} transaction(s)`,
           })),
           {
-            libelle: 'Remboursements',
+            libelle: t('Remboursements'),
             valeurMillimes: i.remboursementsMillimes,
             precedentMillimes: null,
             hausseDefavorable: true,
@@ -107,19 +109,16 @@ export default async function PageVentesParPaiement({
         ]}
       />
 
-      <p className="message avertissement">
-        Ces montants sont <strong>TTC</strong> : ils ne s’additionnent pas au chiffre
-        d’affaires net des autres écrans, qui est hors taxe et après remises. Le
-        total ci-dessus doit en revanche coller à l’écran <strong>Journée</strong>.
+      <p className="message avertissement">{t('Ces montants sont')}{' '}<strong>{t('TTC')}</strong>{' '}{t(': ils ne s’additionnent pas au chiffre d’affaires net des autres écrans, qui est hors taxe et après remises. Le total ci-dessus doit en revanche coller à l’écran')}{' '}<strong>{t('Journée')}</strong>.
       </p>
 
       <section className="bloc">
         <GraphiqueSerie
-          titre="Encaissements"
+          titre={t('Encaissements')}
           journees={agregats.parJournee}
           parts={paiements.map((p) => ({
             cle: p.type,
-            libelle: p.libelle,
+            libelle: t.paiement(p.type),
             valeurMillimes: p.montantMillimes,
           }))}
         />
@@ -129,7 +128,7 @@ export default async function PageVentesParPaiement({
         lignes={paiements.map((p) => ({
           cle: p.type,
           cellules: {
-            moyen: { texte: p.libelle },
+            moyen: { texte: t.paiement(p.type) },
             nombre: { texte: String(p.nombre), valeur: p.nombre },
             montant: celluleMontant(p.montantMillimes),
             part: {
@@ -149,17 +148,17 @@ export default async function PageVentesParPaiement({
         actions={
           <BoutonsExport
             restaurantId={restaurant}
-            exports={[{ quoi: 'paiements', libelle: 'Exporter' }]}
+            exports={[{ quoi: 'paiements', libelle: t('Exporter') }]}
             du={periode.du}
             au={periode.au}
           />
         }
         colonnes={[
-          { cle: 'moyen', titre: 'Mode de paiement' },
-          { cle: 'nombre', titre: 'Transactions', nombre: true },
-          { cle: 'montant', titre: 'Montant encaissé', nombre: true },
-          { cle: 'part', titre: 'Part', nombre: true },
-          { cle: 'moyenne', titre: 'Ticket moyen', nombre: true, secondaire: true },
+          { cle: 'moyen', titre: t('Mode de paiement') },
+          { cle: 'nombre', titre: t('Transactions'), nombre: true },
+          { cle: 'montant', titre: t('Montant encaissé'), nombre: true },
+          { cle: 'part', titre: t('Part'), nombre: true },
+          { cle: 'moyenne', titre: t('Ticket moyen'), nombre: true, secondaire: true },
         ]}
       />
     </>

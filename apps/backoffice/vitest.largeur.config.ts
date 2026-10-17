@@ -19,6 +19,7 @@ export default defineConfig({
   esbuild: { jsx: 'automatic' },
   test: {
     include: ['src/**/*.largeur.test.tsx'],
+    setupFiles: ['src/i18n/largeur.setup.ts'],
     environment: 'node',
     // Playwright démarre un navigateur : la seconde par défaut ne suffit pas.
     testTimeout: 60_000,

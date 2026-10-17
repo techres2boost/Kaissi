@@ -29,6 +29,7 @@ import { chargerFiche, resoudrePeriode } from '../../../serveur/ventes.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
 import { SelecteurPeriode } from '../../../composants/SelecteurPeriode.js'
 import { AvertissementFormule } from '../../../composants/AvertissementFormule.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,6 +40,7 @@ export default async function PagePeriodes({
   params: Promise<{ restaurant: string }>
   searchParams: Promise<{ du?: string; au?: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { du, au } = await searchParams
   const { etablissement } = await etablissementObligatoire(restaurant)
@@ -76,8 +78,8 @@ export default async function PagePeriodes({
   if (servicesRes.error) {
     return (
       <section className="bloc">
-        <h1>Périodes de travail</h1>
-        <p className="message erreur">Lecture impossible : {servicesRes.error.message}</p>
+        <h1>{t('Périodes de travail')}</h1>
+        <p className="message erreur">{t('Lecture impossible :')}{' '}{servicesRes.error.message}</p>
       </section>
     )
   }
@@ -95,7 +97,7 @@ export default async function PagePeriodes({
 
   const services = servicesRes.data ?? []
   const clos = services.filter((s) => s.closed_at !== null)
-  const ecartTotal = clos.reduce((t, s) => t + (Number(s.variance_millimes) || 0), 0)
+  const ecartTotal = clos.reduce((elt, s) => elt + (Number(s.variance_millimes) || 0), 0)
   const nonJustes = clos.filter((s) => (Number(s.variance_millimes) || 0) !== 0)
 
   const heure = (valeur: string | null) =>
@@ -109,7 +111,7 @@ export default async function PagePeriodes({
 
   /** Durée du service, en heures et minutes — « 7 h 20 ». */
   const duree = (debut: string, fin: string | null) => {
-    if (!fin) return 'en cours'
+    if (!fin) return t('en cours')
     const minutes = Math.max(0, Math.round((new Date(fin).getTime() - new Date(debut).getTime()) / 60000))
     return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')}`
   }
@@ -117,11 +119,11 @@ export default async function PagePeriodes({
   return (
     <>
       <header className="entete-rapport">
-        <h1>Périodes de travail</h1>
+        <h1>{t('Périodes de travail')}</h1>
         <p className="sous-titre">
           {periode.du === periode.au
-            ? libelleJournee(periode.du)
-            : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
+            ? libelleJournee(periode.du, t.locale)
+            : t('Du {valeur} au {valeur2}', { valeur: libelleJournee(periode.du, t.locale), valeur2: libelleJournee(periode.au, t.locale) })}
         </p>
       </header>
 
@@ -131,57 +133,54 @@ export default async function PagePeriodes({
 
       <BoutonsExport
         restaurantId={restaurant}
-        exports={[{ quoi: 'periodes', libelle: 'Périodes de travail' }]}
+        exports={[{ quoi: 'periodes', libelle: t('Périodes de travail') }]}
         du={periode.du}
         au={periode.au}
       />
 
       <div className="cartes-kpi">
         <div className="kpi">
-          <span className="kpi-libelle">Services</span>
+          <span className="kpi-libelle">{t('Services')}</span>
           <span className="kpi-valeur">{services.length}</span>
           <span className="kpi-aide">
-            {services.length - clos.length} encore ouvert(s)
-          </span>
+            {services.length - clos.length}{' '}{t('encore ouvert(s)')}</span>
         </div>
         <div className={`kpi ${ecartTotal !== 0 ? 'attention' : ''}`}>
-          <span className="kpi-libelle">Écart cumulé</span>
+          <span className="kpi-libelle">{t('Écart cumulé')}</span>
           <span className={`kpi-valeur ${ecartTotal < 0 ? 'negatif' : ''}`}>
             {formaterTND(montant(ecartTotal))}
           </span>
-          <span className="kpi-aide">Compté − attendu, sur les services clos</span>
+          <span className="kpi-aide">{t('Compté − attendu, sur les services clos')}</span>
         </div>
         <div className={`kpi ${nonJustes.length > 0 ? 'attention' : ''}`}>
-          <span className="kpi-libelle">Caisses non justes</span>
+          <span className="kpi-libelle">{t('Caisses non justes')}</span>
           <span className="kpi-valeur">
             {nonJustes.length} <small>/ {clos.length}</small>
           </span>
-          <span className="kpi-aide">
-            Un écart isolé arrive ; c’est sa répétition qui parle.
-          </span>
+          <span className="kpi-aide">{t('Un écart isolé arrive ; c’est sa répétition qui parle.')}</span>
         </div>
       </div>
 
       <section className="bloc">
-        <h2>Services</h2>
+        <h2>{t('Services')}</h2>
         {services.length === 0 ? (
-          <p className="vide">Aucune prise de poste sur cette période.</p>
+          <p className="vide">{t('Aucune prise de poste sur cette période.')}</p>
         ) : (
           <div className="tableau-defilant">
             <table>
               <thead>
                 <tr>
-                  <th>Ouverte par</th>
-                  <th>Ouverture</th>
-                  <th>Fermée par</th>
-                  <th>Clôture</th>
-                  <th className="nombre">Durée</th>
-                  <th className="nombre">Fond</th>
-                  <th className="nombre">Encaissé</th>
-                  <th className="nombre">Attendu</th>
-                  <th className="nombre">Compté</th>
-                  <th className="nombre">Écart</th>
-                  <th>Note</th>
+                  <th>{t('Ouverte par')}</th>
+                  <th>{t('Ouverture')}</th>
+                  <th>{t('Fermée par')}</th>
+                  <th>{t('Clôture')}</th>
+                  <th className="nombre">{t('Durée')}</th>
+                  <th className="nombre">{t('Fond')}</th>
+                  <th className="nombre">{t('Encaissé')}</th>
+                  <th className="nombre">{t('Attendu')}</th>
+                  <th className="nombre">{t('Compté')}</th>
+                  <th className="nombre">{t('Écart')}</th>
+                  <th>{t('Note')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -207,7 +206,7 @@ export default async function PagePeriodes({
                         {encaisse ? (
                           <>
                             {formaterTND(millimes(encaisse.total))}
-                            <small className="detail"> {encaisse.nombre} op.</small>
+                            <small className="detail"> {encaisse.nombre}{' '}{t('op.')}</small>
                           </>
                         ) : (
                           <span className="detail">—</span>
@@ -238,12 +237,7 @@ export default async function PagePeriodes({
             </table>
           </div>
         )}
-        <p className="indication">
-          L’<strong>écart</strong> est <em>compté − attendu</em>. Il peut être
-          négatif, et c’est tout son intérêt : un manque et un excédent ne
-          racontent pas la même histoire, donc il n’est jamais présenté en
-          valeur absolue.
-        </p>
+        <p className="indication">{t('L’')}<strong>{t('écart')}</strong>{' '}{t('est')}{' '}<em>{t('compté − attendu')}</em>{t('. Il peut être négatif, et c’est tout son intérêt : un manque et un excédent ne racontent pas la même histoire, donc il n’est jamais présenté en valeur absolue.')}</p>
       </section>
     </>
   )

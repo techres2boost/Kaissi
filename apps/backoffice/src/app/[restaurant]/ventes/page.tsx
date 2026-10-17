@@ -25,6 +25,7 @@ import { FiltresRapport } from '../../../composants/FiltresRapport.js'
 import { GraphiqueSerie } from '../../../composants/GraphiqueSerie.js'
 import { TableauRapport } from '../../../composants/TableauRapport.js'
 import { celluleMontant, cellulePourcent } from '../../../composants/RapportVentilation.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,6 +36,7 @@ export default async function PageVentes({
   params: Promise<{ restaurant: string }>
   searchParams: Promise<Record<string, string | undefined>>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const recherche = await searchParams
   const { etablissement } = await etablissementObligatoire(restaurant)
@@ -52,8 +54,8 @@ export default async function PageVentes({
   if (agregats.erreur) {
     return (
       <section className="bloc">
-        <h1>Récapitulatif des ventes</h1>
-        <p className="message erreur">Lecture impossible : {agregats.erreur}</p>
+        <h1>{t('Récapitulatif des ventes')}</h1>
+        <p className="message erreur">{t('Lecture impossible :')}{' '}{t.m(agregats.erreur)}</p>
       </section>
     )
   }
@@ -79,7 +81,7 @@ export default async function PageVentes({
    */
   const detailDe = new Map(agregats.detailParJournee.map((d) => [d.journee, d]))
 
-  const lignesTableau = agregerSerie(journees, 'jours').map((point) => {
+  const lignesTableau = agregerSerie(journees, 'jours', t.locale).map((point) => {
     const detail = detailDe.get(point.cle)
     return {
       cle: point.cle,
@@ -96,11 +98,11 @@ export default async function PageVentes({
   return (
     <>
       <header className="entete-rapport">
-        <h1>Récapitulatif des ventes</h1>
+        <h1>{t('Récapitulatif des ventes')}</h1>
         <p className="sous-titre">
           {periode.du === periode.au
-            ? libelleJournee(periode.du)
-            : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
+            ? libelleJournee(periode.du, t.locale)
+            : t('Du {valeur} au {valeur2}', { valeur: libelleJournee(periode.du, t.locale), valeur2: libelleJournee(periode.au, t.locale) })}
         </p>
       </header>
 
@@ -119,58 +121,56 @@ export default async function PageVentes({
       <BandeauIndicateurs
         indicateurs={[
           {
-            libelle: 'Ventes brutes',
+            libelle: t('Ventes brutes'),
             valeurMillimes: i.caBrutMillimes,
             precedentMillimes: p.caBrutMillimes,
-            aide: 'Le prix des articles vendus, avant réductions et hors remboursements.',
+            aide: t('Le prix des articles vendus, avant réductions et hors remboursements.'),
           },
           {
-            libelle: 'Remboursements',
+            libelle: t('Remboursements'),
             valeurMillimes: i.remboursementsMillimes,
             precedentMillimes: p.remboursementsMillimes,
             hausseDefavorable: true,
-            aide: 'Ce qui a été rendu au client après encaissement.',
+            aide: t('Ce qui a été rendu au client après encaissement.'),
           },
           {
-            libelle: 'Réductions',
+            libelle: t('Réductions'),
             valeurMillimes: i.remisesMillimes,
             precedentMillimes: p.remisesMillimes,
             hausseDefavorable: true,
-            aide: 'Remises de ligne et remises globales, réparties au prorata.',
+            aide: t('Remises de ligne et remises globales, réparties au prorata.'),
           },
           {
-            libelle: 'Ventes nettes',
+            libelle: t('Ventes nettes'),
             valeurMillimes: i.caNetMillimes,
             precedentMillimes: p.caNetMillimes,
             detail: `${i.nombreTickets} ticket(s)`,
-            aide: 'Ventes brutes moins les réductions. Hors taxe : c’est la seule grandeur comparable à un coût d’achat.',
+            aide: t('Ventes brutes moins les réductions. Hors taxe : c’est la seule grandeur comparable à un coût d’achat.'),
           },
           {
-            libelle: 'Marge brute',
+            libelle: t('Marge brute'),
             valeurMillimes: i.marge.margeMillimes,
             precedentMillimes: p.marge.margeMillimes,
             detail:
               i.marge.margeBp === null
-                ? 'coût non saisi'
-                : `${formaterPourcentage(i.marge.margeBp)} % du CA net`,
-            aide: 'Ventes nettes moins le coût d’achat des articles vendus.',
+                ? t('coût non saisi')
+                : t('{valeur} % du CA net', { valeur: formaterPourcentage(i.marge.margeBp) }),
+            aide: t('Ventes nettes moins le coût d’achat des articles vendus.'),
           },
         ]}
       />
 
       <section className="bloc">
-        <GraphiqueSerie journees={journees} titre="Ventes brutes" />
+        <GraphiqueSerie journees={journees} titre={t('Ventes brutes')} />
       </section>
 
       {i.lignesSansCout > 0 && (
         <p className="message avertissement">
-          ⚠ {i.lignesSansCout} ligne(s) vendue(s) sans coût d’achat saisi : la marge
-          est surestimée d’autant. Renseignez le coût au Menu pour la rendre juste.
-        </p>
+          ⚠ {i.lignesSansCout}{' '}{t('ligne(s) vendue(s) sans coût d’achat saisi : la marge est surestimée d’autant. Renseignez le coût au Menu pour la rendre juste.')}</p>
       )}
 
       <TableauRapport
-        titre="Détail par journée"
+        titre={t('Détail par journée')}
         lignes={lignesTableau.map((l) => ({
           cle: l.cle,
           // Les cellules sont formatées ICI, côté serveur : seule de la
@@ -189,19 +189,19 @@ export default async function PageVentes({
         actions={
           <BoutonsExport
             restaurantId={restaurant}
-            exports={[{ quoi: 'ventes', libelle: 'Exporter' }]}
+            exports={[{ quoi: 'ventes', libelle: t('Exporter') }]}
             du={periode.du}
             au={periode.au}
           />
         }
         colonnes={[
-          { cle: 'jour', titre: 'Période' },
-          { cle: 'tickets', titre: 'Tickets', nombre: true },
-          { cle: 'nettes', titre: 'Ventes nettes', nombre: true },
-          { cle: 'cout', titre: 'Coût des marchandises', nombre: true },
-          { cle: 'marge', titre: 'Marge brute', nombre: true },
-          { cle: 'margeBp', titre: 'Marge', nombre: true },
-          { cle: 'taxes', titre: 'Taxes', nombre: true, secondaire: true },
+          { cle: 'jour', titre: t('Période') },
+          { cle: 'tickets', titre: t('Tickets'), nombre: true },
+          { cle: 'nettes', titre: t('Ventes nettes'), nombre: true },
+          { cle: 'cout', titre: t('Coût des marchandises'), nombre: true },
+          { cle: 'marge', titre: t('Marge brute'), nombre: true },
+          { cle: 'margeBp', titre: t('Marge'), nombre: true },
+          { cle: 'taxes', titre: t('Taxes'), nombre: true, secondaire: true },
         ]}
       />
     </>

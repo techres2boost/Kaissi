@@ -23,6 +23,8 @@ import {
   journeeDecalee,
   libelleJournee,
 } from '../../../serveur/journee.js'
+import { traduction } from '../../../i18n/serveur.js'
+import { aTraduire } from '@kaissi/i18n'
 
 /**
  * Ventilation de TVA telle qu'elle est STOCKÉE dans `orders.tax_breakdown` :
@@ -39,9 +41,9 @@ interface LigneVentilation {
 }
 
 const LIBELLE_PAIEMENT: Record<string, string> = {
-  cash: 'Espèces',
+  cash: aTraduire('paiement|Espèces'),
   card: 'Carte',
-  online: 'En ligne',
+  online: aTraduire('paiement|En ligne'),
   other: 'Autre',
 }
 
@@ -56,6 +58,7 @@ export default async function PageJournee({
   params: Promise<{ restaurant: string }>
   searchParams: Promise<{ j?: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { j } = await searchParams
   const { etablissement } = await etablissementObligatoire(restaurant)
@@ -147,124 +150,103 @@ export default async function PageJournee({
 
   return (
     <>
-      <h1>Journée du {libelleJournee(journee)}</h1>
-      <p className="sous-titre">
-        De {debut.toLocaleString('fr-FR', { timeZone: fuseau, timeStyle: 'short' })} à{' '}
-        {fin.toLocaleString('fr-FR', { timeZone: fuseau, timeStyle: 'short' })} le lendemain —
-        une vente encaissée après minuit appartient à la soirée de la veille.
-      </p>
+      <h1>{t('Journée du')}{' '}{libelleJournee(journee, t.locale)}</h1>
+      <p className="sous-titre">{t('De')}{' '}{debut.toLocaleString('fr-FR', { timeZone: fuseau, timeStyle: 'short' })}{' '}{t('à')}{' '}
+        {fin.toLocaleString('fr-FR', { timeZone: fuseau, timeStyle: 'short' })}{' '}{t('le lendemain — une vente encaissée après minuit appartient à la soirée de la veille.')}</p>
 
       <nav style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
-        <Link className="bouton" href={`?j=${journeeDecalee(journee, -1)}`}>
-          ← Veille
-        </Link>
-        <Link className="bouton" href={`?j=${journeeCourante(fuseau, bascule)}`}>
-          Aujourd&apos;hui
-        </Link>
-        <Link className="bouton" href={`?j=${journeeDecalee(journee, 1)}`}>
-          Lendemain →
-        </Link>
+        <Link className="bouton" href={`?j=${journeeDecalee(journee, -1)}`}>{t('← Veille')}</Link>
+        <Link className="bouton" href={`?j=${journeeCourante(fuseau, bascule)}`}>{t('Aujourd\'hui')}</Link>
+        <Link className="bouton" href={`?j=${journeeDecalee(journee, 1)}`}>{t('Lendemain →')}</Link>
       </nav>
 
       {erreurCommandes ? (
-        <p className="message erreur">
-          Lecture impossible : {erreurCommandes.message}
+        <p className="message erreur">{t('Lecture impossible :')}{' '}{erreurCommandes.message}
         </p>
       ) : null}
 
       <div className="grille deux">
         <section className="carte">
-          <h2>Chiffre d&apos;affaires</h2>
+          <h2>{t('Chiffre d\'affaires')}</h2>
           <table>
             <tbody>
               <tr>
-                <td>Commandes encaissées</td>
+                <td>{t('Commandes encaissées')}</td>
                 <td className="nombre">{encaissees.length}</td>
               </tr>
               {couverts > 0 && (
                 <tr>
-                  <td>Couverts</td>
+                  <td>{t('Couverts')}</td>
                   <td className="nombre">{couverts}</td>
                 </tr>
               )}
               <tr>
-                <td>Remises accordées</td>
+                <td>{t('Remises accordées')}</td>
                 <td className="nombre">− {formaterTND(remises)}</td>
               </tr>
               {service > 0 && (
                 <tr>
-                  <td>Service</td>
+                  <td>{t('Service')}</td>
                   <td className="nombre">{formaterTND(service)}</td>
                 </tr>
               )}
               {timbre > 0 && (
                 <tr>
-                  <td>Droit de timbre ⚠</td>
+                  <td>{t('Droit de timbre ⚠')}</td>
                   <td className="nombre">{formaterTND(timbre)}</td>
                 </tr>
               )}
               <tr className="total-ligne">
-                <td>Total</td>
+                <td>{t('Total')}</td>
                 <td className="nombre">{formaterTND(chiffreAffaires)}</td>
               </tr>
             </tbody>
           </table>
           {annulees.length > 0 && (
             <p className="indication">
-              {annulees.length} commande{annulees.length > 1 ? 's' : ''} annulée
-              {annulees.length > 1 ? 's' : ''} — comptée{annulees.length > 1 ? 's' : ''} à zéro,
-              mais conservée{annulees.length > 1 ? 's' : ''} dans le journal.
-            </p>
+              {annulees.length}{' '}{t('commande')}{annulees.length > 1 ? 's' : ''}{' '}{t('annulée')}{annulees.length > 1 ? 's' : ''}{' '}{t('— comptée')}{annulees.length > 1 ? 's' : ''}{' '}{t('à zéro, mais conservée')}{annulees.length > 1 ? 's' : ''}{' '}{t('dans le journal.')}</p>
           )}
         </section>
 
         <section className="carte">
-          <h2>Encaissements</h2>
+          <h2>{t('Encaissements')}</h2>
           {parMoyen.size === 0 ? (
-            <p className="vide">Aucun encaissement sur cette journée.</p>
+            <p className="vide">{t('Aucun encaissement sur cette journée.')}</p>
           ) : (
             <table>
               <tbody>
                 {[...parMoyen.entries()].map(([type, cumul]) => (
                   <tr key={type}>
-                    <td>{LIBELLE_PAIEMENT[type] ?? type}</td>
+                    <td>{t(LIBELLE_PAIEMENT[type] ?? type)}</td>
                     <td className="nombre">{formaterTND(montant(cumul))}</td>
                   </tr>
                 ))}
                 <tr className="total-ligne">
-                  <td>Total encaissé</td>
+                  <td>{t('Total encaissé')}</td>
                   <td className="nombre">{formaterTND(encaisse)}</td>
                 </tr>
               </tbody>
             </table>
           )}
           {encaisse !== chiffreAffaires && parMoyen.size > 0 && (
-            <p className="message avertissement" style={{ marginTop: '0.85rem' }}>
-              L&apos;encaissé diffère du chiffre d&apos;affaires de{' '}
-              {formaterTND(montant(encaisse - chiffreAffaires))}. C&apos;est normal si des
-              commandes sont encore partiellement payées, ou si un paiement a été saisi sur
-              une commande d&apos;une autre journée.
-            </p>
+            <p className="message avertissement" style={{ marginTop: '0.85rem' }}>{t('L\'encaissé diffère du chiffre d\'affaires de')}{' '}
+              {formaterTND(montant(encaisse - chiffreAffaires))}{t('. C\'est normal si des commandes sont encore partiellement payées, ou si un paiement a été saisi sur une commande d\'une autre journée.')}</p>
           )}
         </section>
       </div>
 
       <section className="carte">
-        <h2>TVA par taux</h2>
-        <p className="indication" style={{ marginTop: 0, marginBottom: '0.75rem' }}>
-          La taxe est arrondie PAR TAUX, puis additionnée — jamais l&apos;inverse.
-          ⚠ Les taux applicables à la restauration doivent être confirmés par un
-          expert-comptable tunisien.
-        </p>
+        <h2>{t('TVA par taux')}</h2>
+        <p className="indication" style={{ marginTop: 0, marginBottom: '0.75rem' }}>{t('La taxe est arrondie PAR TAUX, puis additionnée — jamais l\'inverse. ⚠ Les taux applicables à la restauration doivent être confirmés par un expert-comptable tunisien.')}</p>
         {ventilation.length === 0 ? (
-          <p className="vide">Aucune vente taxable sur cette journée.</p>
+          <p className="vide">{t('Aucune vente taxable sur cette journée.')}</p>
         ) : (
           <table>
             <thead>
               <tr>
-                <th>Taux</th>
-                <th className="nombre">Base</th>
-                <th className="nombre">TVA</th>
+                <th>{t('Taux')}</th>
+                <th className="nombre">{t('Base')}</th>
+                <th className="nombre">{t('TVA')}</th>
               </tr>
             </thead>
             <tbody>
@@ -278,7 +260,7 @@ export default async function PageJournee({
                 </tr>
               ))}
               <tr className="total-ligne">
-                <td>Total</td>
+                <td>{t('Total')}</td>
                 <td className="nombre">
                   {formaterTND(somme(ventilation.map((l) => l.baseHtMillimes)))}
                 </td>
@@ -292,21 +274,21 @@ export default async function PageJournee({
       </section>
 
       <section className="carte">
-        <h2>Caisses</h2>
+        <h2>{t('Caisses')}</h2>
         {(shifts ?? []).length === 0 ? (
-          <p className="vide">Aucune prise de poste sur cette journée.</p>
+          <p className="vide">{t('Aucune prise de poste sur cette journée.')}</p>
         ) : (
           <table>
             <thead>
               <tr>
-                <th>Ouverte par</th>
-                <th>Ouverture</th>
-                <th>Fermée par</th>
-                <th>Clôture</th>
-                <th className="nombre">Fond</th>
-                <th className="nombre">Compté</th>
-                <th className="nombre">Attendu</th>
-                <th className="nombre">Écart</th>
+                <th>{t('Ouverte par')}</th>
+                <th>{t('Ouverture')}</th>
+                <th>{t('Fermée par')}</th>
+                <th>{t('Clôture')}</th>
+                <th className="nombre">{t('Fond')}</th>
+                <th className="nombre">{t('Compté')}</th>
+                <th className="nombre">{t('Attendu')}</th>
+                <th className="nombre">{t('Écart')}</th>
               </tr>
             </thead>
             <tbody>
@@ -363,11 +345,7 @@ export default async function PageJournee({
             </tbody>
           </table>
         )}
-        <p className="indication">
-          L&apos;écart est <strong>compté − attendu</strong>, jamais borné à zéro : un excédent
-          est aussi anormal qu&apos;un manque, et un écart récurrent chez le même employé est
-          un signal à regarder.
-        </p>
+        <p className="indication">{t('L\'écart est')}{' '}<strong>{t('compté − attendu')}</strong>{t(', jamais borné à zéro : un excédent est aussi anormal qu\'un manque, et un écart récurrent chez le même employé est un signal à regarder.')}</p>
       </section>
     </>
   )

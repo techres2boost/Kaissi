@@ -38,6 +38,7 @@ import { TicketEcran } from '../composants/TicketEcran.js'
 import { ModaleNouvelArticle } from '../composants/ModaleNouvelArticle.js'
 import { IMPRESSION_ACTIVE } from '../config.js'
 import type { Employe } from '@kaissi/domain'
+import { t, tm } from '../i18n.js'
 
 interface Props {
   readonly orderId: string
@@ -130,7 +131,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
       } catch (e) {
         if (e instanceof RefusOperation && e.escaladePossible) {
           setEscalade({
-            message: `${libelle} — ${e.message}`,
+            message: `${libelle} — ${tm(e.message)}`,
             action: async (manager) => {
               await action(manager)
               await recharger()
@@ -139,7 +140,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
           })
           return
         }
-        setMessage(e instanceof Error ? e.message : String(e))
+        setMessage(e instanceof Error ? tm(e.message) : String(e))
       }
     },
     [app, recharger],
@@ -152,10 +153,13 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
     if (!produit.disponible) {
       setMessage(
         produit.motifRetrait === 'manuel'
-          ? `${produit.nom} a été retiré de la carte par le gérant. ` +
-            `Il n'est pas proposé pour le moment.`
-          : `${produit.nom} est en rupture de stock. ` +
-            `Il reviendra sur la carte dès que le gérant aura saisi la réception.`,
+          ? t("{nom} a été retiré de la carte par le gérant. Il n'est pas proposé pour le moment.", {
+              nom: produit.nom,
+            })
+          : t(
+              '{nom} est en rupture de stock. Il reviendra sur la carte dès que le gérant aura saisi la réception.',
+              { nom: produit.nom },
+            ),
       )
       return
     }
@@ -176,7 +180,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
             tauxTaxeId: produit.tauxTaxeId,
             stationId: produit.stationId,
           }),
-        'Ajout d’un article',
+        t('Ajout d’un article'),
       )
       return
     }
@@ -185,7 +189,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
 
   const envoyerCuisine = () =>
     executer(async () => {
-      const libelleTable = tables.find((t) => t.id === etat?.tableId)?.label ?? null
+      const libelleTable = tables.find((elt) => elt.id === etat?.tableId)?.label ?? null
       const resultat = await session.envoyerEnCuisine(
         employe,
         orderId,
@@ -193,17 +197,20 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
         libelleTable,
       )
       if (resultat.lignesEnvoyees === 0) {
-        setMessage('Tout est déjà parti en cuisine.')
+        setMessage(t('Tout est déjà parti en cuisine.'))
         return
       }
       if (IMPRESSION_ACTIVE) {
         setMessage(
-          `${resultat.lignesEnvoyees} article(s) envoyé(s) — ${resultat.bons} bon(s).`,
+          t('{articles} article(s) envoyé(s) — {bons} bon(s).', {
+            articles: resultat.lignesEnvoyees,
+            bons: resultat.bons,
+          }),
         )
         return
       }
-      setBonsEmis(resultat.tickets.map((t) => rendreTicketCuisine(t)))
-    }, 'Envoi en cuisine')
+      setBonsEmis(resultat.tickets.map((elt) => rendreTicketCuisine(elt)))
+    }, t('Envoi en cuisine'))
 
   const lignesActives = etat?.lignes.filter((l) => !l.annulee) ?? []
   /*
@@ -216,19 +223,24 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
    */
   const lignesRetirees = etat?.lignes.filter((l) => l.annulee) ?? []
 
-  /** Retire une ligne — le même geste depuis « Retirer » et depuis « − » à 1. */
+  /**
+   * Retire une ligne — le même geste depuis « Retirer » et depuis « − » à 1.
+   *
+   * Le motif reste en FRANÇAIS : il est écrit dans le journal, qui est une
+   * donnée, pas un écran. Il se traduit à l'affichage, partout où il est lu.
+   */
   const retirerLigne = (ligneId: string) =>
     executer(
       (manager) =>
         session.annulerLigne(employe, orderId, ligneId, 'Retiré par le caissier', manager),
-      'Annulation d’une ligne',
+      t('Annulation d’une ligne'),
     )
   const modifiable = etat ? estModifiable(etat.statut) : false
   const nonEnvoyees = lignesActives.length > 0
 
   return (
     <div className="commande">
-      <section className="menu" aria-label="Carte">
+      <section className="menu" aria-label={t('Carte')}>
         <div className="categories" role="tablist">
           {categories.map((c) => (
             <button
@@ -263,7 +275,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                 {p.disponible ? (
                   <span className="prix">{formaterTND(millimes(p.prixBaseMillimes))}</span>
                 ) : (
-                  <span className="prix mention-rupture">Rupture</span>
+                  <span className="prix mention-rupture">{t('Rupture')}</span>
                 )}
                 {/*
                   L'article créé ICI et pas encore remonté. Le dire sur la
@@ -272,17 +284,13 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                   savoir que le back-office ne le connaît pas encore.
                 */}
                 {p.etatLocal === 'en_attente' && (
-                  <span className="badge attente" title="Pas encore remonté au back-office">
-                    en attente
-                  </span>
+                  <span className="badge attente" title={t('Pas encore remonté au back-office')}>{t('en attente')}</span>
                 )}
                 {p.etatLocal === 'rejete' && (
                   <span
                     className="badge alerte"
-                    title="Le serveur a refusé cet article — voir l’écran Sync."
-                  >
-                    refusé
-                  </span>
+                    title={t('Le serveur a refusé cet article — voir l’écran Sync.')}
+                  >{t('refusé')}</span>
                 )}
               </button>
             ))}
@@ -299,28 +307,26 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
               disabled={!modifiable}
               onClick={() => setNouvelArticle(true)}
             >
-              <span className="nom">+ Nouvel article</span>
-              <span className="prix">Ajouter à la carte</span>
+              <span className="nom">{t('+ Nouvel article')}</span>
+              <span className="prix">{t('Ajouter à la carte')}</span>
             </button>
           )}
         </div>
       </section>
 
-      <aside className="ticket" aria-label="Commande en cours">
+      <aside className="ticket" aria-label={t('Commande en cours')}>
         <header className="entete-ticket">
-          <button type="button" className="retour" onClick={onRetour}>
-            ‹ Salle
-          </button>
+          <button type="button" className="retour" onClick={onRetour}>{t('‹ Salle')}</button>
           <div className="titre">
             {etat?.tableId
-              ? `Table ${tables.find((t) => t.id === etat.tableId)?.label ?? '?'}`
-              : 'À emporter'}
+              ? t('Table {numero}', { numero: tables.find((elt) => elt.id === etat.tableId)?.label ?? '?' })
+              : t('À emporter')}
             <small>{etat?.numeroTicket}</small>
           </div>
         </header>
 
         {lignesActives.length === 0 && lignesRetirees.length === 0 ? (
-          <p className="vide">Touchez un produit pour l'ajouter.</p>
+          <p className="vide">{t('Touchez un produit pour l\'ajouter.')}</p>
         ) : (
           <ul className="lignes">
             {lignesActives.map((l) => {
@@ -355,10 +361,10 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                             : executer(
                                 () =>
                                   session.changerQuantite(employe, orderId, l.id, l.quantite - 1),
-                                'Modification de quantité',
+                                t('Modification de quantité'),
                               ))
                         }
-                        aria-label={l.quantite <= 1 ? `Retirer ${l.designation}` : 'Diminuer'}
+                        aria-label={l.quantite <= 1 ? t('Retirer {nom}', { nom: l.designation }) : t('Diminuer')}
                       >
                         −
                       </button>
@@ -368,10 +374,10 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                           void executer(
                             () =>
                               session.changerQuantite(employe, orderId, l.id, l.quantite + 1),
-                            'Modification de quantité',
+                            t('Modification de quantité'),
                           )
                         }
-                        aria-label="Augmenter"
+                        aria-label={t('Augmenter')}
                       >
                         +
                       </button>
@@ -379,21 +385,19 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                         type="button"
                         className="retirer"
                         onClick={() => void retirerLigne(l.id)}
-                        aria-label={`Retirer ${l.designation}`}
-                      >
-                        Retirer
-                      </button>
+                        aria-label={t('Retirer {nom}', { nom: l.designation })}
+                      >{t('Retirer')}</button>
                     </div>
                   )}
                 </li>
               )
             })}
             {lignesRetirees.map((l) => (
-              <li key={l.id} className="retiree" aria-label={`${l.designation}, retiré`}>
+              <li key={l.id} className="retiree" aria-label={t('{nom}, retiré', { nom: l.designation })}>
                 <div className="haut">
                   <span className="qte">{l.quantite}×</span>
                   <span className="designation">{l.designation}</span>
-                  <span className="montant">retiré</span>
+                  <span className="montant">{t('retiré')}</span>
                 </div>
               </li>
             ))}
@@ -403,12 +407,12 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
         {totaux && lignesActives.length > 0 && (
           <div className="totaux">
             <div className="ligne-total">
-              <span>Sous-total</span>
+              <span>{t('Sous-total')}</span>
               <span>{formaterTND(totaux.sousTotalMillimes)}</span>
             </div>
             {totaux.totalRemisesMillimes > 0 && (
               <div className="ligne-total remise-appliquee">
-                <span>Remise</span>
+                <span>{t('Remise')}</span>
                 <span>− {formaterTND(totaux.totalRemisesMillimes)}</span>
               </div>
             )}
@@ -419,7 +423,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
               </div>
             ))}
             <div className="ligne-total grand-total">
-              <span>Total</span>
+              <span>{t('Total')}</span>
               <span>{formaterTND(totaux.totalMillimes)}</span>
             </div>
           </div>
@@ -431,9 +435,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
             className="secondaire"
             disabled={!modifiable || lignesActives.length === 0}
             onClick={() => setRemiseOuverte(true)}
-          >
-            Remise
-          </button>
+          >{t('Remise')}</button>
           {/*
             « Client » à côté de « Remise », pas dans un menu.
             
@@ -453,7 +455,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                 <UserRound size={15} strokeWidth={2} aria-hidden="true" /> {etat.clientNom}
               </>
             ) : (
-              'Client'
+              t('Client')
             )}
           </button>
           <button
@@ -461,17 +463,13 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
             className="secondaire"
             disabled={!modifiable || !nonEnvoyees}
             onClick={() => void envoyerCuisine()}
-          >
-            Cuisine
-          </button>
+          >{t('Cuisine')}</button>
           <button
             type="button"
             className="principal"
             disabled={!modifiable || lignesActives.length === 0}
             onClick={() => onEncaisser(orderId)}
-          >
-            Encaisser
-          </button>
+          >{t('Encaisser')}</button>
         </div>
       </aside>
 
@@ -506,7 +504,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                   stationId: choix.produit.stationId,
                   note: note || undefined,
                 }),
-              'Ajout d’un article',
+              t('Ajout d’un article'),
             )
             setChoix(null)
           }}
@@ -556,10 +554,10 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                   manager ? { autorisePar: manager } : {},
                 ),
               remise.motif
-                ? `Remise « ${remise.motif} »`
+                ? t('Remise « {motif} »', { motif: remise.motif })
                 : remise.type === 'pourcentage'
-                  ? `Remise de ${formaterPourcentage(remise.valeurBp)} %`
-                  : `Remise de ${formaterTND(remise.valeurMillimes)}`,
+                  ? t('Remise de {taux} %', { taux: formaterPourcentage(remise.valeurBp) })
+                  : t('Remise de {montant}', { montant: formaterTND(remise.valeurMillimes) }),
             )
           }}
         />
@@ -574,7 +572,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
             setClientOuvert(false)
             await executer(
               () => session.attacherClient(employe, orderId, client),
-              client ? `Client « ${client.nom} »` : 'Client retiré de la commande',
+              client ? t('Client « {nom} »', { nom: client.nom }) : t('Client retiré de la commande'),
             )
           }}
         />
@@ -582,7 +580,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
 
       {escalade && (
         <DemandePin
-          titre="Autorisation requise"
+          titre={t('Autorisation requise')}
           sousTitre={escalade.message}
           candidats={app.employes.filter((e) => e.role === 'gerant' || e.role === 'admin')}
           onAnnuler={() => setEscalade(null)}
@@ -590,24 +588,21 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
             const action = escalade.action
             setEscalade(null)
             void action(manager).catch((e: unknown) =>
-              setMessage(e instanceof Error ? e.message : String(e)),
+              setMessage(e instanceof Error ? tm(e.message) : String(e)),
             )
           }}
         />
       )}
 
       {message && (
-        <Modale titre="Information" onFermer={() => setMessage(null)}>
+        <Modale titre={t('Information')} onFermer={() => setMessage(null)}>
           <p>{message}</p>
         </Modale>
       )}
 
       {bonsEmis && (
-        <Modale titre="Envoyé en cuisine" onFermer={() => setBonsEmis(null)}>
-          <p className="aide">
-            La cuisine voit cette commande sur son écran. Ces bons ne
-            repartiront pas : ce qui est envoyé reste envoyé.
-          </p>
+        <Modale titre={t('Envoyé en cuisine')} onFermer={() => setBonsEmis(null)}>
+          <p className="aide">{t('La cuisine voit cette commande sur son écran. Ces bons ne repartiront pas : ce qui est envoyé reste envoyé.')}</p>
           {bonsEmis.map((charge, i) => (
             <TicketEcran key={i} charge={charge} />
           ))}
@@ -660,7 +655,7 @@ function ModaleOptions({
   const total =
     choix.produit.prixBaseMillimes +
     (variante?.prixDeltaMillimes ?? 0) +
-    selection.reduce((t, m) => t + m.prixDeltaMillimes, 0)
+    selection.reduce((elt, m) => elt + m.prixDeltaMillimes, 0)
 
   return (
     <Modale
@@ -669,23 +664,19 @@ function ModaleOptions({
       onFermer={onAnnuler}
       pied={
         <>
-          <button type="button" className="secondaire" onClick={onAnnuler}>
-            Annuler
-          </button>
+          <button type="button" className="secondaire" onClick={onAnnuler}>{t('Annuler')}</button>
           <button
             type="button"
             className="principal"
             disabled={manquants.length > 0}
             onClick={() => void onValider(variante, selection, note)}
-          >
-            Ajouter · {formaterTND(millimes(total))}
-          </button>
+          >{t('Ajouter · {montant}', { montant: formaterTND(millimes(total)) })}</button>
         </>
       }
     >
       {choix.variantes.length > 0 && (
         <fieldset>
-          <legend>Taille</legend>
+          <legend>{t('Taille')}</legend>
           <div className="options">
             {choix.variantes.map((v) => (
               <button
@@ -711,7 +702,7 @@ function ModaleOptions({
         <fieldset key={id}>
           <legend>
             {g.nom}
-            {g.obligatoire && <span className="obligatoire"> — obligatoire</span>}
+            {g.obligatoire && <span className="obligatoire">{' '}{t('— obligatoire')}</span>}
           </legend>
           <div className="options">
             {g.items.map((m) => (
@@ -742,13 +733,11 @@ function ModaleOptions({
         </fieldset>
       ))}
 
-      <label className="champ-note">
-        Note pour la cuisine
-        <input
+      <label className="champ-note">{t('Note pour la cuisine')}<input
           type="text"
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Sans oignon, bien cuit…"
+          placeholder={t('Sans oignon, bien cuit…')}
           maxLength={120}
         />
       </label>
@@ -788,11 +777,8 @@ function ModaleRemise({
   const [libre, setLibre] = useState(reductions.length === 0)
 
   return (
-    <Modale titre="Remise sur la commande" onFermer={onAnnuler}>
-      <p className="aide">
-        Au-delà de votre plafond, le code d'un responsable sera demandé — et son
-        nom restera dans le journal.
-      </p>
+    <Modale titre={t('Remise sur la commande')} onFermer={onAnnuler}>
+      <p className="aide">{t('Au-delà de votre plafond, le code d\'un responsable sera demandé — et son nom restera dans le journal.')}</p>
 
       {!libre && (
         <>
@@ -828,9 +814,7 @@ function ModaleRemise({
               </button>
             ))}
           </div>
-          <button type="button" className="secondaire" onClick={() => setLibre(true)}>
-            Autre remise…
-          </button>
+          <button type="button" className="secondaire" onClick={() => setLibre(true)}>{t('Autre remise…')}</button>
         </>
       )}
 
@@ -855,9 +839,7 @@ function ModaleRemise({
             ))}
           </div>
           {reductions.length > 0 && (
-            <button type="button" className="secondaire" onClick={() => setLibre(false)}>
-              ‹ Revenir aux réductions de la maison
-            </button>
+            <button type="button" className="secondaire" onClick={() => setLibre(false)}>{t('‹ Revenir aux réductions de la maison')}</button>
           )}
         </>
       )}
@@ -914,28 +896,26 @@ function ModaleClient({
   }, [texte, rechercher])
 
   return (
-    <Modale titre="Client de la commande" onFermer={onAnnuler}>
+    <Modale titre={t('Client de la commande')} onFermer={onAnnuler}>
       <input
         className="recherche-client"
         type="search"
         value={texte}
         autoFocus
-        placeholder="Nom ou téléphone…"
-        aria-label="Rechercher un client"
+        placeholder={t('Nom ou téléphone…')}
+        aria-label={t('Rechercher un client')}
         onChange={(e) => setTexte(e.target.value)}
       />
 
       {actuel && (
-        <button type="button" className="secondaire" onClick={() => void onChoisir(null)}>
-          Retirer « {actuel.nom} » de la commande
-        </button>
+        <button type="button" className="secondaire" onClick={() => void onChoisir(null)}>{t('Retirer « {nom} » de la commande', { nom: actuel.nom })}</button>
       )}
 
       {resultats.length === 0 ? (
         <p className="aide">
           {texte.trim() === ''
-            ? 'Aucun client enregistré. Les fiches se créent au back-office et redescendent à la prochaine synchronisation.'
-            : `Aucun client ne correspond à « ${texte} ».`}
+            ? t('Aucun client enregistré. Les fiches se créent au back-office et redescendent à la prochaine synchronisation.')
+            : t('Aucun client ne correspond à « {texte} ».', { texte })}
         </p>
       ) : (
         <div className="options grand">

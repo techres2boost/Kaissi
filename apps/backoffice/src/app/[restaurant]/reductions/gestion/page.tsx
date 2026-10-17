@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { ecranReserve, etablissementObligatoire } from '../../../../serveur/session.js'
 import { supabaseServeur } from '../../../../serveur/supabase.js'
 import { GestionReductions } from '../../../../composants/GestionReductions.js'
+import { traduction } from '../../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +19,7 @@ export default async function PageGestionReductions({
 }: {
   params: Promise<{ restaurant: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
@@ -31,14 +33,11 @@ export default async function PageGestionReductions({
 
   return (
     <>
-      <h1>Réductions</h1>
-      <p className="sous-titre">
-        Les remises habituelles de la maison. La caisse les propose ; le{' '}
-        <Link href={{ pathname: `/${restaurant}/reductions` }}>rapport</Link> dit ce
-        qu’elles ont coûté.
-      </p>
+      <h1>{t('Réductions')}</h1>
+      <p className="sous-titre">{t('Les remises habituelles de la maison. La caisse les propose ; le')}{' '}
+        <Link href={{ pathname: `/${restaurant}/reductions` }}>{t('rapport')}</Link>{' '}{t('dit ce qu’elles ont coûté.')}</p>
 
-      {error && <p className="message erreur">Lecture impossible : {error.message}</p>}
+      {error && <p className="message erreur">{t('Lecture impossible :')}{' '}{error.message}</p>}
 
       <GestionReductions
         restaurantId={restaurant}

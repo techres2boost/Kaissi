@@ -23,6 +23,7 @@ import { BoutonsExport } from '../../../composants/BoutonsExport.js'
 import { HistoriqueStock, type Mouvement } from '../../../composants/HistoriqueStock.js'
 import { TableauStock } from '../../../composants/TableauStock.js'
 import { BoutonNotifications } from '../../../composants/BoutonNotifications.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,6 +56,7 @@ export default async function PageStock({
 }: {
   params: Promise<{ restaurant: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
@@ -104,8 +106,8 @@ export default async function PageStock({
   if (produitsRes.error) {
     return (
       <section className="bloc">
-        <h1>Stock</h1>
-        <p className="message erreur">Lecture impossible : {produitsRes.error.message}</p>
+        <h1>{t('Stock')}</h1>
+        <p className="message erreur">{t('Lecture impossible :')}{' '}{produitsRes.error.message}</p>
       </section>
     )
   }
@@ -157,7 +159,7 @@ export default async function PageStock({
 
   const mouvements: Mouvement[] = (mouvementsRes.data ?? []).map((m) => ({
     id: m.id,
-    produit: nomProduit.get(m.product_id) ?? 'Produit archivé',
+    produit: nomProduit.get(m.product_id) ?? t('Produit archivé'),
     delta: Number(m.qty_delta),
     raison: m.reason,
     note: m.note,
@@ -209,12 +211,8 @@ export default async function PageStock({
   return (
     <>
       <header className="entete-rapport">
-        <h1>Stock</h1>
-        <p className="sous-titre">
-          Le stock se décrémente tout seul à chaque vente. Il n’empêche jamais
-          d’encaisser : une quantité négative signale une réception oubliée,
-          pas une erreur à corriger dans l’urgence.
-        </p>
+        <h1>{t('Stock')}</h1>
+        <p className="sous-titre">{t('Le stock se décrémente tout seul à chaque vente. Il n’empêche jamais d’encaisser : une quantité négative signale une réception oubliée, pas une erreur à corriger dans l’urgence.')}</p>
         {/*
           La clé PUBLIQUE seulement — la privée reste au service de
           synchronisation, qui est le seul à envoyer. Elle est lue à
@@ -229,39 +227,33 @@ export default async function PageStock({
 
       <div className="cartes-kpi">
         <div className="kpi">
-          <span className="kpi-libelle">Produits comptés</span>
+          <span className="kpi-libelle">{t('Produits comptés')}</span>
           <span className="kpi-valeur">
             {suivis.length} <small>/ {produits.length}</small>
           </span>
-          <span className="kpi-aide">
-            Saisir une quantité suffit : il n’y a pas de suivi à activer.
-          </span>
+          <span className="kpi-aide">{t('Saisir une quantité suffit : il n’y a pas de suivi à activer.')}</span>
         </div>
         <div className={`kpi ${ruptures.length > 0 ? 'alerte' : ''}`}>
-          <span className="kpi-libelle">En rupture</span>
+          <span className="kpi-libelle">{t('En rupture')}</span>
           <span className={`kpi-valeur ${ruptures.length > 0 ? 'negatif' : ''}`}>
             {ruptures.length}
           </span>
-          <span className="kpi-aide">Quantité nulle ou négative.</span>
+          <span className="kpi-aide">{t('Quantité nulle ou négative.')}</span>
         </div>
         <div className={`kpi ${faibles.length > 0 ? 'attention' : ''}`}>
-          <span className="kpi-libelle">Stock faible</span>
+          <span className="kpi-libelle">{t('Stock faible')}</span>
           <span className="kpi-valeur">{faibles.length}</span>
-          <span className="kpi-aide">Au niveau du seuil d’alerte ou en dessous.</span>
+          <span className="kpi-aide">{t('Au niveau du seuil d’alerte ou en dessous.')}</span>
         </div>
         <div className="kpi">
-          <span className="kpi-libelle">Valeur du stock</span>
+          <span className="kpi-libelle">{t('Valeur du stock')}</span>
           <span className="kpi-valeur">
             {formaterTND(montant(valorisation.valeurMillimes))}
           </span>
-          <span className="kpi-aide">
-            Quantités × coût d’achat.
-            {valorisation.lignesSansCout > 0 && (
+          <span className="kpi-aide">{t('Quantités × coût d’achat.')}{valorisation.lignesSansCout > 0 && (
               <>
                 {' '}
-                <strong>Incomplet</strong> : {valorisation.lignesSansCout} article(s)
-                sans coût saisi comptent pour zéro.
-              </>
+                <strong>{t('Incomplet')}</strong> : {valorisation.lignesSansCout}{' '}{t('article(s) sans coût saisi comptent pour zéro.')}</>
             )}
           </span>
         </div>
@@ -269,14 +261,14 @@ export default async function PageStock({
 
       {(ruptures.length > 0 || faibles.length > 0) && (
         <section className="bloc">
-          <h2>À réapprovisionner</h2>
+          <h2>{t('À réapprovisionner')}</h2>
           <ul className="liste-alertes">
             {[...ruptures, ...faibles].map((p) => (
               <li key={p.id}>
                 <span className={`pastille ${p.etat}`} aria-hidden="true" />
                 <strong>{p.nom}</strong>
                 <span className="detail">
-                  {p.quantite} restant(s){p.seuil !== null && ` · seuil ${p.seuil}`}
+                  {p.quantite}{' '}{t('restant(s)')}{p.seuil !== null && t(' · seuil {seuil}', { seuil: p.seuil })}
                 </span>
               </li>
             ))}
@@ -287,8 +279,8 @@ export default async function PageStock({
       <BoutonsExport
         restaurantId={restaurant}
         exports={[
-          { quoi: 'stock', libelle: 'État du stock' },
-          { quoi: 'mouvements', libelle: 'Historique des mouvements' },
+          { quoi: 'stock', libelle: t('État du stock') },
+          { quoi: 'mouvements', libelle: t('Historique des mouvements') },
         ]}
       />
 
@@ -304,11 +296,8 @@ export default async function PageStock({
 
       <HistoriqueStock mouvements={mouvements} />
 
-      <p className="indication">
-        Établissement : {etablissement.nom}. Le coût d’achat se saisit au{' '}
-        <strong>Catalogue</strong> ; il alimente la marge affichée ici et dans
-        tous les rapports.
-      </p>
+      <p className="indication">{t('Établissement :')}{' '}{etablissement.nom}{t('. Le coût d’achat se saisit au')}{' '}
+        <strong>{t('Catalogue')}</strong>{' '}{t('; il alimente la marge affichée ici et dans tous les rapports.')}</p>
     </>
   )
 }

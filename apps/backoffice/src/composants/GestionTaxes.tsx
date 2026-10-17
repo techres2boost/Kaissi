@@ -24,6 +24,7 @@ import {
   modifierTaux,
   type Resultat,
 } from '../app/[restaurant]/taxes/actions.js'
+import { useT } from '../i18n/client.js'
 
 export interface TauxTaxe {
   id: string
@@ -45,6 +46,7 @@ function enPourcent(bp: number): string {
 }
 
 function LigneTaux({ restaurantId, taux }: { restaurantId: string; taux: TauxTaxe }) {
+  const t = useT()
   const [resultat, action] = useActionState(
     modifierTaux.bind(null, restaurantId, taux.id),
     null as Resultat | null,
@@ -63,7 +65,7 @@ function LigneTaux({ restaurantId, taux }: { restaurantId: string; taux: TauxTax
         <input
           name="nom"
           defaultValue={taux.nom}
-          aria-label="Nom du taux"
+          aria-label={t('Nom du taux')}
           maxLength={60}
           disabled={taux.archive}
         />
@@ -71,7 +73,7 @@ function LigneTaux({ restaurantId, taux }: { restaurantId: string; taux: TauxTax
           <input
             name="taux"
             defaultValue={enPourcent(taux.tauxBp)}
-            aria-label="Taux en pourcent"
+            aria-label={t('Taux en pourcent')}
             inputMode="decimal"
             disabled={taux.archive}
           />
@@ -91,20 +93,15 @@ function LigneTaux({ restaurantId, taux }: { restaurantId: string; taux: TauxTax
             elle s'y additionne. Le dire ici évite de le découvrir au premier
             ticket.
           */}
-          <span title="Incluse dans le prix affiché (au lieu d’être ajoutée au total)">
-            incluse dans le prix
-          </span>
+          <span title={t('Incluse dans le prix affiché (au lieu d’être ajoutée au total)')}>{t('incluse dans le prix')}</span>
         </label>
-        <button type="submit" className="discret" disabled={taux.archive}>
-          Enregistrer
-        </button>
+        <button type="submit" className="discret" disabled={taux.archive}>{t('Enregistrer')}</button>
       </form>
 
       <div className="actions-taux">
         {taux.parDefaut ? (
           <span className="etiquette actif">
-            <CheckCircle2 size={13} strokeWidth={2.2} aria-hidden="true" /> par défaut
-          </span>
+            <CheckCircle2 size={13} strokeWidth={2.2} aria-hidden="true" />{' '}{t('par défaut')}</span>
         ) : (
           !taux.archive && (
             <button
@@ -112,9 +109,7 @@ function LigneTaux({ restaurantId, taux }: { restaurantId: string; taux: TauxTax
               className="discret"
               disabled={enCours}
               onClick={() => agir(() => definirParDefaut(restaurantId, taux.id))}
-            >
-              Mettre par défaut
-            </button>
+            >{t('Mettre par défaut')}</button>
           )
         )}
         <button
@@ -123,14 +118,14 @@ function LigneTaux({ restaurantId, taux }: { restaurantId: string; taux: TauxTax
           disabled={enCours}
           onClick={() => agir(() => archiverTaux(restaurantId, taux.id, !taux.archive))}
         >
-          {taux.archive ? 'Remettre en service' : 'Archiver'}
+          {taux.archive ? t('Remettre en service') : t('Archiver')}
         </button>
       </div>
 
-      {resultat?.erreur && <p className="message erreur">{resultat.erreur}</p>}
-      {resultat?.succes && <p className="message succes">{resultat.succes}</p>}
-      {retour?.erreur && <p className="message erreur">{retour.erreur}</p>}
-      {retour?.succes && <p className="message succes">{retour.succes}</p>}
+      {resultat?.erreur && <p className="message erreur">{t.m(resultat.erreur)}</p>}
+      {resultat?.succes && <p className="message succes">{t.m(resultat.succes)}</p>}
+      {retour?.erreur && <p className="message erreur">{t.m(retour.erreur)}</p>}
+      {retour?.succes && <p className="message succes">{t.m(retour.succes)}</p>}
     </li>
   )
 }
@@ -144,14 +139,15 @@ export function GestionTaxes({
   modifiable: boolean
   taux: TauxTaxe[]
 }) {
+  const t = useT()
   const [resultat, action] = useActionState(
     creerTaux.bind(null, restaurantId),
     null as Resultat | null,
   )
 
-  const actifs = taux.filter((t) => !t.archive)
-  const sansDefaut = actifs.length > 0 && !actifs.some((t) => t.parDefaut)
-  const aZero = actifs.filter((t) => t.tauxBp === 0)
+  const actifs = taux.filter((elt) => !elt.archive)
+  const sansDefaut = actifs.length > 0 && !actifs.some((elt) => elt.parDefaut)
+  const aZero = actifs.filter((elt) => elt.tauxBp === 0)
 
   return (
     <>
@@ -162,61 +158,47 @@ export function GestionTaxes({
       */}
       <div className="message avertissement">
         <TriangleAlert size={16} strokeWidth={2} aria-hidden="true" />{' '}
-        <strong>Kaissi ne connaît aucun taux de taxe.</strong> Les valeurs
-        ci-dessous sont celles que vous saisissez, et rien d’autre. Le taux
-        applicable à la restauration, le droit de timbre et les règles de
-        facturation relèvent de votre comptable — vérifiez-les avec lui avant
-        d’encaisser.
-      </div>
+        <strong>{t('Kaissi ne connaît aucun taux de taxe.')}</strong>{' '}{t('Les valeurs ci-dessous sont celles que vous saisissez, et rien d’autre. Le taux applicable à la restauration, le droit de timbre et les règles de facturation relèvent de votre comptable — vérifiez-les avec lui avant d’encaisser.')}</div>
 
       {aZero.length > 0 && (
         <div className="message avertissement">
           <TriangleAlert size={16} strokeWidth={2} aria-hidden="true" />{' '}
           {aZero.length === 1
-            ? `Le taux « ${aZero[0]!.nom} » est à 0 %.`
-            : `${aZero.length} taux sont à 0 %.`}{' '}
-          Un restaurant ouvert depuis la caisse en reçoit un, exprès, pour que
-          la caisse puisse fonctionner sans que Kaissi invente une règle
-          fiscale. Corrigez-le ici.
-        </div>
+            ? t('Le taux « {nom} » est à 0 %.', { nom: aZero[0]!.nom })
+            : t('{length} taux sont à 0 %.', { length: aZero.length })}{' '}{t('Un restaurant ouvert depuis la caisse en reçoit un, exprès, pour que la caisse puisse fonctionner sans que Kaissi invente une règle fiscale. Corrigez-le ici.')}</div>
       )}
 
       {sansDefaut && (
         <div className="message avertissement">
-          <TriangleAlert size={16} strokeWidth={2} aria-hidden="true" /> Aucun
-          taux par défaut : un nouvel article n’en recevra aucun, et la caisse
-          ne saura pas calculer sa taxe.
-        </div>
+          <TriangleAlert size={16} strokeWidth={2} aria-hidden="true" />{' '}{t('Aucun taux par défaut : un nouvel article n’en recevra aucun, et la caisse ne saura pas calculer sa taxe.')}</div>
       )}
 
       <ul className="liste-taux">
-        {taux.map((t) => (
-          <LigneTaux key={t.id} restaurantId={restaurantId} taux={t} />
+        {taux.map((elt) => (
+          <LigneTaux key={elt.id} restaurantId={restaurantId} taux={elt} />
         ))}
         {taux.length === 0 && (
-          <li className="vide">Aucun taux. La caisse ne peut rien encaisser.</li>
+          <li className="vide">{t('Aucun taux. La caisse ne peut rien encaisser.')}</li>
         )}
       </ul>
 
       {modifiable && (
         <form action={action} className="carte formulaire-taux">
-          <h2>Ajouter un taux</h2>
-          <label htmlFor="taux-nom">Nom</label>
-          <input id="taux-nom" name="nom" maxLength={60} placeholder="TVA restauration" />
+          <h2>{t('Ajouter un taux')}</h2>
+          <label htmlFor="taux-nom">{t('Nom')}</label>
+          <input id="taux-nom" name="nom" maxLength={60} placeholder={t('TVA restauration')} />
 
-          <label htmlFor="taux-valeur">Taux (%)</label>
+          <label htmlFor="taux-valeur">{t('Taux (%)')}</label>
           <input id="taux-valeur" name="taux" inputMode="decimal" placeholder="19" />
 
           <label className="case">
             <input type="checkbox" name="incluse" value="oui" defaultChecked />
-            <span>incluse dans le prix affiché</span>
+            <span>{t('incluse dans le prix affiché')}</span>
           </label>
 
-          <button type="submit" className="principal">
-            Ajouter
-          </button>
-          {resultat?.erreur && <p className="message erreur">{resultat.erreur}</p>}
-          {resultat?.succes && <p className="message succes">{resultat.succes}</p>}
+          <button type="submit" className="principal">{t('Ajouter')}</button>
+          {resultat?.erreur && <p className="message erreur">{t.m(resultat.erreur)}</p>}
+          {resultat?.succes && <p className="message succes">{t.m(resultat.succes)}</p>}
         </form>
       )}
     </>

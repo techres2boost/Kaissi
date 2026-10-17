@@ -33,6 +33,7 @@ import {
   TopCinq,
 } from '../../../composants/RapportVentilation.js'
 import { TableauRapport } from '../../../composants/TableauRapport.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,6 +44,7 @@ export default async function PageArticles({
   params: Promise<{ restaurant: string }>
   searchParams: Promise<Record<string, string | undefined>>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const recherche = await searchParams
   const { etablissement } = await etablissementObligatoire(restaurant)
@@ -54,8 +56,8 @@ export default async function PageArticles({
   if (agregats.erreur) {
     return (
       <section className="bloc">
-        <h1>Ventes par article</h1>
-        <p className="message erreur">Lecture impossible : {agregats.erreur}</p>
+        <h1>{t('Ventes par article')}</h1>
+        <p className="message erreur">{t('Lecture impossible :')}{' '}{t.m(agregats.erreur)}</p>
       </section>
     )
   }
@@ -67,11 +69,11 @@ export default async function PageArticles({
   return (
     <>
       <header className="entete-rapport">
-        <h1>Ventes par article</h1>
+        <h1>{t('Ventes par article')}</h1>
         <p className="sous-titre">
           {periode.du === periode.au
-            ? libelleJournee(periode.du)
-            : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
+            ? libelleJournee(periode.du, t.locale)
+            : t('Du {valeur} au {valeur2}', { valeur: libelleJournee(periode.du, t.locale), valeur2: libelleJournee(periode.au, t.locale) })}
         </p>
       </header>
 
@@ -90,45 +92,45 @@ export default async function PageArticles({
       <BandeauIndicateurs
         indicateurs={[
           {
-            libelle: 'Articles vendus',
+            libelle: t('Articles vendus'),
             valeurMillimes: i.articlesVendus * 1000,
             precedentMillimes: p.articlesVendus * 1000,
-            detail: `${articles.length} référence(s)`,
-            aide: 'Nombre d’articles vendus, toutes références confondues.',
+            detail: t('{length} référence(s)', { length: articles.length }),
+            aide: t('Nombre d’articles vendus, toutes références confondues.'),
           },
           {
-            libelle: 'Ventes brutes',
+            libelle: t('Ventes brutes'),
             valeurMillimes: i.caBrutMillimes,
             precedentMillimes: p.caBrutMillimes,
           },
           {
-            libelle: 'Réductions',
+            libelle: t('Réductions'),
             valeurMillimes: i.remisesMillimes,
             precedentMillimes: p.remisesMillimes,
             hausseDefavorable: true,
           },
           {
-            libelle: 'Ventes nettes',
+            libelle: t('Ventes nettes'),
             valeurMillimes: i.caNetMillimes,
             precedentMillimes: p.caNetMillimes,
           },
           {
-            libelle: 'Marge brute',
+            libelle: t('Marge brute'),
             valeurMillimes: i.marge.margeMillimes,
             precedentMillimes: p.marge.margeMillimes,
             detail:
               i.marge.margeBp === null
-                ? 'coût non saisi'
-                : `${formaterPourcentage(i.marge.margeBp)} % du CA net`,
+                ? t('coût non saisi')
+                : t('{valeur} % du CA net', { valeur: formaterPourcentage(i.marge.margeBp) }),
           },
         ]}
       />
 
-      <TopCinq lignes={articles} entete="Articles" />
+      <TopCinq lignes={articles} entete={t('Articles')} />
 
       <section className="bloc">
         <GraphiqueSerie
-          titre="Tableau des ventes par article"
+          titre={t('Tableau des ventes par article')}
           journees={agregats.parJournee}
           parts={articles.map((a) => ({
             cle: a.cle,
@@ -140,9 +142,7 @@ export default async function PageArticles({
 
       {i.lignesSansCout > 0 && (
         <p className="message avertissement">
-          ⚠ {i.lignesSansCout} ligne(s) sans coût d’achat saisi : leur marge
-          apparaît « — » plutôt qu’à 100 %, qui aurait l’air juste.
-        </p>
+          ⚠ {i.lignesSansCout}{' '}{t('ligne(s) sans coût d’achat saisi : leur marge apparaît « — » plutôt qu’à 100 %, qui aurait l’air juste.')}</p>
       )}
 
       <TableauRapport
@@ -157,12 +157,12 @@ export default async function PageArticles({
           },
         }))}
         colonnes={colonnesVentilation('Article', [
-          { cle: 'categorie', titre: 'Catégorie', secondaire: true },
+          { cle: 'categorie', titre: t('Catégorie'), secondaire: true },
         ])}
         actions={
           <BoutonsExport
             restaurantId={restaurant}
-            exports={[{ quoi: 'articles', libelle: 'Exporter' }]}
+            exports={[{ quoi: 'articles', libelle: t('Exporter') }]}
             du={periode.du}
             au={periode.au}
           />

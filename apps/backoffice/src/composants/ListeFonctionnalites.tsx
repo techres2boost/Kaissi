@@ -41,6 +41,9 @@ import {
   Wallet,
   type LucideIcon,
 } from 'lucide-react'
+import { traduction } from '../i18n/serveur.js'
+import { use } from 'react'
+import { aTraduire } from '@kaissi/i18n'
 
 /**
  * Les quatre états possibles. Pas de cinquième « bientôt » : une date qu'on
@@ -65,10 +68,10 @@ export interface Fonctionnalite {
 }
 
 const LIBELLES: Record<EtatFonctionnalite, { texte: string; icone: LucideIcon; classe: string }> = {
-  active: { texte: 'Active', icone: CircleCheck, classe: 'etat-active' },
-  structurelle: { texte: 'Toujours active', icone: Lock, classe: 'etat-structurelle' },
-  eteinte: { texte: 'Éteinte dans cette version', icone: CircleSlash, classe: 'etat-eteinte' },
-  absente: { texte: 'Pas construite', icone: CircleSlash, classe: 'etat-absente' },
+  active: { texte: aTraduire('Active'), icone: CircleCheck, classe: 'etat-active' },
+  structurelle: { texte: aTraduire('Toujours active'), icone: Lock, classe: 'etat-structurelle' },
+  eteinte: { texte: aTraduire('Éteinte dans cette version'), icone: CircleSlash, classe: 'etat-eteinte' },
+  absente: { texte: aTraduire('Pas construite'), icone: CircleSlash, classe: 'etat-absente' },
 }
 
 export function ListeFonctionnalites({
@@ -78,20 +81,19 @@ export function ListeFonctionnalites({
   restaurantId: string
   fonctionnalites: Fonctionnalite[]
 }) {
+  const t = use(traduction())
   const groupes: { titre: string; etats: EtatFonctionnalite[]; intro: string }[] = [
     {
-      titre: 'Ce qui fonctionne aujourd’hui',
+      titre: t('Ce qui fonctionne aujourd’hui'),
       etats: ['active', 'structurelle'],
       intro:
-        'Chaque ligne renvoie à l’écran où la régler. « Toujours active » veut dire ' +
-        'que la fonctionnalité n’est pas débrayable — la raison est dite à côté.',
+        t('Chaque ligne renvoie à l’écran où la régler. « Toujours active » veut dire que la fonctionnalité n’est pas débrayable — la raison est dite à côté.'),
     },
     {
-      titre: 'Ce qui n’est pas là',
+      titre: t('Ce qui n’est pas là'),
       etats: ['eteinte', 'absente'],
       intro:
-        'Dit tel quel plutôt que masqué. Une fonctionnalité annoncée et absente ' +
-        'coûte plus cher qu’une fonctionnalité absente et annoncée comme telle.',
+        t('Dit tel quel plutôt que masqué. Une fonctionnalité annoncée et absente coûte plus cher qu’une fonctionnalité absente et annoncée comme telle.'),
     },
   ]
 
@@ -118,7 +120,7 @@ export function ListeFonctionnalites({
                       </span>
                       <span className={`etiquette ${etat.classe}`}>
                         <IconeEtat size={13} strokeWidth={2.2} aria-hidden="true" />{' '}
-                        {etat.texte}
+                        {t(etat.texte)}
                       </span>
                     </div>
                     <p className="fonctionnalite-quoi">{f.quoi}</p>

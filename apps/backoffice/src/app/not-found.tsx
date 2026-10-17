@@ -12,19 +12,18 @@
  */
 
 import Link from 'next/link'
+import { traduction } from '../i18n/serveur.js'
+import { use } from 'react'
 
 export default function Introuvable() {
+  const t = use(traduction())
   return (
     <main className="enveloppe">
       <section className="carte">
-        <h1>Page introuvable</h1>
-        <p className="sous-titre">
-          Cette adresse ne correspond à aucun écran auquel vous ayez accès.
-        </p>
+        <h1>{t('Page introuvable')}</h1>
+        <p className="sous-titre">{t('Cette adresse ne correspond à aucun écran auquel vous ayez accès.')}</p>
         <p>
-          <Link className="bouton" href="/">
-            Retour à vos établissements
-          </Link>
+          <Link className="bouton" href="/">{t('Retour à vos établissements')}</Link>
         </p>
       </section>
     </main>

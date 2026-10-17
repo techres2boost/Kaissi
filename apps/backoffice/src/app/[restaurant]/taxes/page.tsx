@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { GestionTaxes } from '../../../composants/GestionTaxes.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +19,7 @@ export default async function PageTaxes({
 }: {
   params: Promise<{ restaurant: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
@@ -31,29 +33,24 @@ export default async function PageTaxes({
 
   return (
     <>
-      <h1>Taxes</h1>
-      <p className="sous-titre">
-        Les taux que la caisse applique. Ils descendent aux terminaux comme un
-        changement de prix — les ventes déjà encaissées gardent la ventilation
-        calculée au moment de la vente, et se lisent dans le{' '}
-        <Link href={{ pathname: `/${restaurant}/ventes` }}>
-          récapitulatif des ventes
-        </Link>
+      <h1>{t('Taxes')}</h1>
+      <p className="sous-titre">{t('Les taux que la caisse applique. Ils descendent aux terminaux comme un changement de prix — les ventes déjà encaissées gardent la ventilation calculée au moment de la vente, et se lisent dans le')}{' '}
+        <Link href={{ pathname: `/${restaurant}/ventes` }}>{t('récapitulatif des ventes')}</Link>
         .
       </p>
 
-      {error && <p className="message erreur">Lecture impossible : {error.message}</p>}
+      {error && <p className="message erreur">{t('Lecture impossible :')}{' '}{error.message}</p>}
 
       <GestionTaxes
         restaurantId={restaurant}
         modifiable={etablissement.gestionnaire}
-        taux={(data ?? []).map((t) => ({
-          id: t.id as string,
-          nom: t.name as string,
-          tauxBp: (t.rate_bp as number) ?? 0,
-          incluse: t.is_included as boolean,
-          parDefaut: t.is_default as boolean,
-          archive: t.archived_at !== null,
+        taux={(data ?? []).map((elt) => ({
+          id: elt.id as string,
+          nom: elt.name as string,
+          tauxBp: (elt.rate_bp as number) ?? 0,
+          incluse: elt.is_included as boolean,
+          parDefaut: elt.is_default as boolean,
+          archive: elt.archived_at !== null,
         }))}
       />
     </>

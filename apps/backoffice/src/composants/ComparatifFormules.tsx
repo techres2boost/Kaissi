@@ -1,5 +1,9 @@
 import { FORMULES, type EtatAbonnement, type Plan } from '@kaissi/domain'
 import { Check, Minus } from 'lucide-react'
+import { use } from 'react'
+import { aTraduire } from '@kaissi/i18n'
+import { traduction } from '../i18n/serveur.js'
+import type { Traduction } from '../i18n/commun.js'
 
 /**
  * Ce que chaque formule ouvre — et la ligne qui ne change jamais.
@@ -26,45 +30,43 @@ import { Check, Minus } from 'lucide-react'
 interface LigneComparatif {
   readonly quoi: string
   readonly detail: string
-  readonly valeur: (plan: Plan) => string | boolean
+  readonly valeur: (plan: Plan, t: Traduction) => string | boolean
 }
 
 const LIGNES: readonly LigneComparatif[] = [
   {
-    quoi: 'Encaissement, même sans Internet',
+    quoi: aTraduire('Encaissement, même sans Internet'),
     detail:
-      'La caisse est installée sur la tablette, pas chargée depuis un site. Elle ouvre, ' +
-      'encaisse et imprime sans réseau, et rattrape la synchronisation ensuite.',
+      aTraduire('La caisse est installée sur la tablette, pas chargée depuis un site. Elle ouvre, encaisse et imprime sans réseau, et rattrape la synchronisation ensuite.'),
     valeur: () => true,
   },
   {
-    quoi: 'Tickets ouverts, remises, taxes, modificateurs',
-    detail: 'Tout ce qui se passe sur la tablette pendant le service.',
+    quoi: aTraduire('Tickets ouverts, remises, taxes, modificateurs'),
+    detail: aTraduire('Tout ce qui se passe sur la tablette pendant le service.'),
     valeur: () => true,
   },
   {
-    quoi: 'Employés, code PIN et journal d’audit',
-    detail: 'Qui a fait quoi, y compris hors ligne.',
+    quoi: aTraduire('Employés, code PIN et journal d’audit'),
+    detail: aTraduire('Qui a fait quoi, y compris hors ligne.'),
     valeur: () => true,
   },
   {
-    quoi: 'Rapports et exports',
-    detail: 'Ventes, articles, catégories, employés, modes de paiement, reçus, réductions.',
+    quoi: aTraduire('Rapports et exports'),
+    detail: aTraduire('Ventes, articles, catégories, employés, modes de paiement, reçus, réductions.'),
     valeur: () => true,
   },
   {
-    quoi: 'Historique consultable',
+    quoi: aTraduire('Historique consultable'),
     detail:
-      'Jusqu’où les rapports remontent. Les ventes plus anciennes restent en base et ' +
-      'reviennent entières si vous changez de formule — rien n’est effacé.',
-    valeur: (plan) => {
+      aTraduire('Jusqu’où les rapports remontent. Les ventes plus anciennes restent en base et reviennent entières si vous changez de formule — rien n’est effacé.'),
+    valeur: (plan, t) => {
       const jours = FORMULES[plan].joursHistorique
-      return jours === null ? 'Sans limite' : `${jours} jours`
+      return jours === null ? t('Sans limite') : t('{jours} jours', { jours })
     },
   },
   {
-    quoi: 'Inventaire avancé',
-    detail: 'Fiches fournisseurs, réceptions rattachées, et valorisation du stock au coût d’achat.',
+    quoi: aTraduire('Inventaire avancé'),
+    detail: aTraduire('Fiches fournisseurs, réceptions rattachées, et valorisation du stock au coût d’achat.'),
     valeur: (plan) => FORMULES[plan].modules.includes('inventaire_avance'),
   },
 ]
@@ -73,6 +75,7 @@ const LIGNES: readonly LigneComparatif[] = [
 const COLONNES: readonly Plan[] = ['gratuit', 'pro']
 
 export function ComparatifFormules({ etat }: { etat: EtatAbonnement }) {
+  const t = use(traduction())
   /*
    * La colonne EN COURS est mise en évidence — sauf pendant un essai, où
    * aucune des deux ne l'est : pendant l'essai, le client a les droits du
@@ -87,11 +90,11 @@ export function ComparatifFormules({ etat }: { etat: EtatAbonnement }) {
         <table className="comparatif-formules">
           <thead>
             <tr>
-              <th scope="col">Ce que vous avez</th>
+              <th scope="col">{t('Ce que vous avez')}</th>
               {COLONNES.map((plan) => (
                 <th key={plan} scope="col" className={plan === colonneActuelle ? 'colonne-actuelle' : undefined}>
-                  {FORMULES[plan].nom}
-                  {plan === colonneActuelle && <span className="etiquette actif">en cours</span>}
+                  {t(FORMULES[plan].nom)}
+                  {plan === colonneActuelle && <span className="etiquette actif">{t('en cours')}</span>}
                 </th>
               ))}
             </tr>
@@ -100,11 +103,11 @@ export function ComparatifFormules({ etat }: { etat: EtatAbonnement }) {
             {LIGNES.map((ligne) => (
               <tr key={ligne.quoi}>
                 <th scope="row">
-                  {ligne.quoi}
-                  <span className="detail">{ligne.detail}</span>
+                  {t(ligne.quoi)}
+                  <span className="detail">{t(ligne.detail)}</span>
                 </th>
                 {COLONNES.map((plan) => {
-                  const valeur = ligne.valeur(plan)
+                  const valeur = ligne.valeur(plan, t)
                   return (
                     <td
                       key={plan}
@@ -120,12 +123,12 @@ export function ComparatifFormules({ etat }: { etat: EtatAbonnement }) {
                         */
                         <>
                           <Check size={17} strokeWidth={2} aria-hidden="true" className="oui" />
-                          <span className="visuellement-cache">Compris</span>
+                          <span className="visuellement-cache">{t('Compris')}</span>
                         </>
                       ) : (
                         <>
                           <Minus size={17} strokeWidth={2} aria-hidden="true" className="non" />
-                          <span className="visuellement-cache">Non compris</span>
+                          <span className="visuellement-cache">{t('Non compris')}</span>
                         </>
                       )}
                     </td>

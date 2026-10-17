@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { DELAI_PAR_DEFAUT, EDITEUR } from '../../../editeur.js'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,113 +36,71 @@ export default async function PageAide({
 }: {
   params: Promise<{ restaurant: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
 
   return (
     <>
-      <h1>Aide</h1>
-      <p className="sous-titre">
-        Par où commencer quand quelque chose ne va pas, et comment nous
-        joindre.
-      </p>
+      <h1>{t('Aide')}</h1>
+      <p className="sous-titre">{t('Par où commencer quand quelque chose ne va pas, et comment nous joindre.')}</p>
 
       <section className="bloc-fonctionnalites">
-        <h2>Les trois écrans à regarder, dans cet ordre</h2>
-        <p className="sous-titre">
-          Ils répondent à la quasi-totalité des questions qu’on nous pose, et
-          plus vite qu’un e-mail.
-        </p>
+        <h2>{t('Les trois écrans à regarder, dans cet ordre')}</h2>
+        <p className="sous-titre">{t('Ils répondent à la quasi-totalité des questions qu’on nous pose, et plus vite qu’un e-mail.')}</p>
 
         <ul className="liste-fonctionnalites">
           <li className="etat-active">
             <div className="fonctionnalite-entete">
               <span className="fonctionnalite-nom">
-                <Stethoscope size={18} strokeWidth={1.9} aria-hidden="true" />
-                1. Diagnostic — sur la tablette
-              </span>
+                <Stethoscope size={18} strokeWidth={1.9} aria-hidden="true" />{t('1. Diagnostic — sur la tablette')}</span>
             </div>
-            <p className="fonctionnalite-quoi">
-              Dans le menu de la caisse. Il dit en quatre phrases ce que la
-              tablette a en mémoire : sa version, son dernier échange avec le
-              serveur, et le nombre de ventes en attente d’envoi.
-            </p>
-            <p className="indication">
-              C’est l’écran à ouvrir <strong>avant</strong> de nous écrire, et
-              le premier que nous demanderons. Il est volontairement
-              accessible à tout le monde, caissiers compris : il ne montre
-              aucun montant, et c’est exactement la page qu’il faut ouvrir
-              quand une caisse ne synchronise plus à 20 h, sans le gérant sur
-              place.
-            </p>
+            <p className="fonctionnalite-quoi">{t('Dans le menu de la caisse. Il dit en quatre phrases ce que la tablette a en mémoire : sa version, son dernier échange avec le serveur, et le nombre de ventes en attente d’envoi.')}</p>
+            <p className="indication">{t('C’est l’écran à ouvrir')}{' '}<strong>{t('avant')}</strong>{' '}{t('de nous écrire, et le premier que nous demanderons. Il est volontairement accessible à tout le monde, caissiers compris : il ne montre aucun montant, et c’est exactement la page qu’il faut ouvrir quand une caisse ne synchronise plus à 20 h, sans le gérant sur place.')}</p>
           </li>
 
           <li className="etat-active">
             <div className="fonctionnalite-entete">
               <span className="fonctionnalite-nom">
-                <RefreshCw size={18} strokeWidth={1.9} aria-hidden="true" />
-                2. Synchronisation — sur la tablette
-              </span>
+                <RefreshCw size={18} strokeWidth={1.9} aria-hidden="true" />{t('2. Synchronisation — sur la tablette')}</span>
             </div>
-            <p className="fonctionnalite-quoi">
-              Combien de ventes attendent, et laquelle a été <em>refusée</em>.
+            <p className="fonctionnalite-quoi">{t('Combien de ventes attendent, et laquelle a été')}{' '}<em>{t('refusée')}</em>.
             </p>
-            <p className="indication">
-              Une vente en attente finit toujours par partir — c’est le
-              fonctionnement normal hors ligne, et rien n’est perdu. Une vente
-              <strong> refusée</strong>, en revanche, ne se réessaie JAMAIS
-              toute seule : c’est une décision qui remonte au gérant, et c’est
-              le seul cas où il faut agir.
-            </p>
+            <p className="indication">{t('Une vente en attente finit toujours par partir — c’est le fonctionnement normal hors ligne, et rien n’est perdu. Une vente')}<strong>{' '}{t('refusée')}</strong>{t(', en revanche, ne se réessaie JAMAIS toute seule : c’est une décision qui remonte au gérant, et c’est le seul cas où il faut agir.')}</p>
           </li>
 
           <li className="etat-active">
             <div className="fonctionnalite-entete">
               <span className="fonctionnalite-nom">
-                <CalendarDays size={18} strokeWidth={1.9} aria-hidden="true" />
-                3. Journée — ici, au back-office
-              </span>
+                <CalendarDays size={18} strokeWidth={1.9} aria-hidden="true" />{t('3. Journée — ici, au back-office')}</span>
             </div>
-            <p className="fonctionnalite-quoi">
-              Ce que le serveur a réellement reçu aujourd’hui, pour tout
-              l’établissement.
-            </p>
-            <p className="indication">
-              Si une vente figure sur la tablette et pas ici, c’est qu’elle
-              n’est pas encore remontée — revenez à l’écran 2. Si elle figure
-              ici, elle est en sécurité : les ventes vivent sur le serveur,
-              pas seulement sur la tablette.
-            </p>
+            <p className="fonctionnalite-quoi">{t('Ce que le serveur a réellement reçu aujourd’hui, pour tout l’établissement.')}</p>
+            <p className="indication">{t('Si une vente figure sur la tablette et pas ici, c’est qu’elle n’est pas encore remontée — revenez à l’écran 2. Si elle figure ici, elle est en sécurité : les ventes vivent sur le serveur, pas seulement sur la tablette.')}</p>
             <p className="fonctionnalite-lien">
-              <Link href={{ pathname: `/${restaurant}/journee` }}>
-                Ouvrir Journée
-              </Link>
+              <Link href={{ pathname: `/${restaurant}/journee` }}>{t('Ouvrir Journée')}</Link>
             </p>
           </li>
         </ul>
       </section>
 
       <section className="bloc-fonctionnalites">
-        <h2>Nous joindre</h2>
+        <h2>{t('Nous joindre')}</h2>
         <div className="carte note-imprimantes">
           <p>
-            <Mail size={16} strokeWidth={2} aria-hidden="true" /> Par e-mail :{' '}
+            <Mail size={16} strokeWidth={2} aria-hidden="true" />{' '}{t('Par e-mail :')}{' '}
             <a href={`mailto:${EDITEUR.contact}`}>{EDITEUR.contact}</a>
             {EDITEUR.telephone ? (
               <>
-                {' · '}par téléphone :{' '}
+                {' · '}{t('par téléphone :')}{' '}
                 <a href={`tel:${EDITEUR.telephone.replace(/\s/g, '')}`}>
                   {EDITEUR.telephone}
                 </a>
               </>
             ) : null}
           </p>
-          <p className="indication">{EDITEUR.horaires || DELAI_PAR_DEFAUT}</p>
-          <p className="indication">
-            Pour aller plus vite : le nom de votre établissement (
-            <strong>{etablissement.nom}</strong>), l’écran concerné, et — si la
-            caisse est en cause — ce qu’affiche son écran <em>Diagnostic</em>.
+          <p className="indication">{EDITEUR.horaires || t(DELAI_PAR_DEFAUT)}</p>
+          <p className="indication">{t('Pour aller plus vite : le nom de votre établissement (')}<strong>{etablissement.nom}</strong>{t('), l’écran concerné, et — si la caisse est en cause — ce qu’affiche son écran')}{' '}<em>{t('Diagnostic')}</em>.
           </p>
         </div>
 
@@ -157,37 +116,19 @@ export default async function PageAide({
         */}
         <div className="message info">
           <MessageSquareOff size={16} strokeWidth={2} aria-hidden="true" />{' '}
-          <strong>Pas de chat en direct.</strong> Les formules d’abonnement
-          existent ({' '}
-          <Link href={{ pathname: `/${restaurant}/abonnement` }}>
-            voir la vôtre
-          </Link>
-          ), mais aucune n’ouvre de discussion instantanée : il n’y a pas
-          d’équipe pour la tenir, et annoncer un bouton ferait attendre devant
-          un écran où il n’y en a pas. L’e-mail ci-dessus est lu par la même
-          équipe, et c’est le chemin le plus rapide.
-        </div>
+          <strong>{t('Pas de chat en direct.')}</strong>{' '}{t('Les formules d’abonnement existent (')}{' '}
+          <Link href={{ pathname: `/${restaurant}/abonnement` }}>{t('voir la vôtre')}</Link>{t('), mais aucune n’ouvre de discussion instantanée : il n’y a pas d’équipe pour la tenir, et annoncer un bouton ferait attendre devant un écran où il n’y en a pas. L’e-mail ci-dessus est lu par la même équipe, et c’est le chemin le plus rapide.')}</div>
       </section>
 
       <section className="bloc-fonctionnalites">
-        <h2>Questions fréquentes</h2>
+        <h2>{t('Questions fréquentes')}</h2>
         <div className="carte note-imprimantes">
           <p>
-            <LifeBuoy size={16} strokeWidth={2} aria-hidden="true" /> Les
-            réponses aux pannes qui reviennent — bandeau de synchronisation
-            rouge, code PIN refusé, produit qui n’apparaît pas sur la caisse —
-            sont sur la{' '}
-            <a href="/support" target="_blank" rel="noreferrer">
-              page d’assistance
-            </a>
+            <LifeBuoy size={16} strokeWidth={2} aria-hidden="true" />{' '}{t('Les réponses aux pannes qui reviennent — bandeau de synchronisation rouge, code PIN refusé, produit qui n’apparaît pas sur la caisse — sont sur la')}{' '}
+            <a href="/support" target="_blank" rel="noreferrer">{t('page d’assistance')}</a>
             .
           </p>
-          <p className="indication">
-            Elle est <strong>publique</strong>, et c’est voulu : elle s’ouvre
-            depuis n’importe quel téléphone, y compris quand personne n’arrive
-            plus à se connecter au back-office — c’est-à-dire précisément le
-            jour où l’on en a besoin.
-          </p>
+          <p className="indication">{t('Elle est')}{' '}<strong>{t('publique')}</strong>{t(', et c’est voulu : elle s’ouvre depuis n’importe quel téléphone, y compris quand personne n’arrive plus à se connecter au back-office — c’est-à-dire précisément le jour où l’on en a besoin.')}</p>
         </div>
       </section>
     </>

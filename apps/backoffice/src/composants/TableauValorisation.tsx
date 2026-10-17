@@ -1,5 +1,7 @@
 import { coutLigneExact, formaterTND } from '@kaissi/domain'
 import { montant } from '../serveur/montant.js'
+import { traduction } from '../i18n/serveur.js'
+import { use } from 'react'
 
 /**
  * Le détail de la valorisation, article par article.
@@ -29,12 +31,10 @@ function quantite(valeur: number): string {
 }
 
 export function TableauValorisation({ lignes }: { lignes: readonly LigneValorisee[] }) {
+  const t = use(traduction())
   if (lignes.length === 0) {
     return (
-      <p className="vide">
-        Aucun article suivi en stock. Activez le suivi article par article dans
-        l’écran Stock : sans quantité, il n’y a rien à valoriser.
-      </p>
+      <p className="vide">{t('Aucun article suivi en stock. Activez le suivi article par article dans l’écran Stock : sans quantité, il n’y a rien à valoriser.')}</p>
     )
   }
 
@@ -44,10 +44,10 @@ export function TableauValorisation({ lignes }: { lignes: readonly LigneValorise
         <table className="valorisation">
           <thead>
             <tr>
-              <th scope="col">Article</th>
-              <th scope="col" className="nombre">Quantité</th>
-              <th scope="col" className="nombre cout-unitaire">Coût unitaire</th>
-              <th scope="col" className="nombre">Valeur</th>
+              <th scope="col">{t('Article')}</th>
+              <th scope="col" className="nombre">{t('Quantité')}</th>
+              <th scope="col" className="nombre cout-unitaire">{t('Coût unitaire')}</th>
+              <th scope="col" className="nombre">{t('Valeur')}</th>
             </tr>
           </thead>
           <tbody>
@@ -69,8 +69,8 @@ export function TableauValorisation({ lignes }: { lignes: readonly LigneValorise
                   */}
                   <span className="cout-replie">
                     {l.coutUnitaire === null
-                      ? 'coût non saisi'
-                      : `coût unitaire ${l.coutUnitaire.toLocaleString('fr-FR', { maximumFractionDigits: 6 })}`}
+                      ? t('coût non saisi')
+                      : t('coût unitaire {valeur}', { valeur: l.coutUnitaire.toLocaleString('fr-FR', { maximumFractionDigits: 6 }) })}
                   </span>
                 </th>
                 <td className={l.quantite < 0 ? 'nombre ecart negatif' : 'nombre'}>
@@ -78,7 +78,7 @@ export function TableauValorisation({ lignes }: { lignes: readonly LigneValorise
                 </td>
                 <td className="nombre cout-unitaire">
                   {l.coutUnitaire === null ? (
-                    <span className="detail">non saisi</span>
+                    <span className="detail">{t('non saisi')}</span>
                   ) : (
                     /*
                       Le coût unitaire s'affiche avec ses décimales : c'est la
@@ -104,13 +104,7 @@ export function TableauValorisation({ lignes }: { lignes: readonly LigneValorise
         </table>
       </div>
 
-      <p className="indication">
-        Les valeurs de la colonne de droite sont arrondies <strong>pour
-        l’affichage</strong>. Le total, lui, n’est arrondi qu’une fois, sur les
-        coûts exacts : additionner cette colonne à la main peut donner quelques
-        millimes d’écart, et c’est le total qui est juste. Arrondir chaque ligne
-        ferait dériver la valeur d’un stock de plusieurs dinars.
-      </p>
+      <p className="indication">{t('Les valeurs de la colonne de droite sont arrondies')}{' '}<strong>{t('pour l’affichage')}</strong>{t('. Le total, lui, n’est arrondi qu’une fois, sur les coûts exacts : additionner cette colonne à la main peut donner quelques millimes d’écart, et c’est le total qui est juste. Arrondir chaque ligne ferait dériver la valeur d’un stock de plusieurs dinars.')}</p>
     </>
   )
 }

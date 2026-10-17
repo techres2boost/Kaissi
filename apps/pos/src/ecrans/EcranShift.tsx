@@ -23,6 +23,7 @@ import { rendreTicketShift } from '@kaissi/printing'
 import { IMPRESSION_ACTIVE } from '../config.js'
 import { useApp } from '../etat/contexte.js'
 import { PaveNumerique } from '../composants/PaveNumerique.js'
+import { t, tm } from '../i18n.js'
 
 interface Props {
   readonly onOuvert: () => void
@@ -55,23 +56,20 @@ export function EcranOuvertureShift({ onOuvert }: Props) {
       rafraichir()
       onOuvert()
     } catch (e) {
-      setErreur(e instanceof Error ? e.message : String(e))
+      setErreur(e instanceof Error ? tm(e.message) : String(e))
     } finally {
       setEnCours(false)
     }
   }
 
   return (
-    <div className="ecran-centre">
+    <div className="ecran-centre ouverture-caisse">
       <div className="carte-action">
-        <h1>Ouverture de caisse</h1>
-        <p className="aide">
-          Comptez le fond de caisse avant de commencer le service. C'est lui qui
-          sert de référence à l'écart constaté ce soir.
-        </p>
+        <h1>{t('Ouverture de caisse')}</h1>
+        <p className="aide">{t('Comptez le fond de caisse avant de commencer le service. C\'est lui qui sert de référence à l\'écart constaté ce soir.')}</p>
 
         <div className="montant-saisi">
-          <span className="libelle">Fond de caisse</span>
+          <span className="libelle">{t('Fond de caisse')}</span>
           <span className="valeur">{formaterTND(fond)}</span>
         </div>
 
@@ -82,7 +80,7 @@ export function EcranOuvertureShift({ onOuvert }: Props) {
           onChange={setSaisie}
           decimale
           onValider={() => void ouvrir()}
-          libelleValider={enCours ? 'Ouverture…' : 'Ouvrir la caisse'}
+          libelleValider={enCours ? t('Ouverture…') : t('Ouvrir la caisse')}
           validerActif={!enCours && employe !== null}
         />
       </div>
@@ -198,40 +196,40 @@ export function EcranClotureShift({ shift, onFerme, onAnnuler }: PropsCloture) {
   return (
     <div className="cloture">
       <section className="bloc-cloture">
-        <h1>Clôture de caisse</h1>
+        <h1>{t('Clôture de caisse')}</h1>
 
         <dl className="recap">
-          <dt>Commandes encaissées</dt>
+          <dt>{t('Commandes encaissées')}</dt>
           <dd>{resume.nombreCommandes}</dd>
-          <dt>Chiffre d'affaires</dt>
+          <dt>{t('Chiffre d\'affaires')}</dt>
           <dd>{formaterTND(resume.chiffreAffairesMillimes)}</dd>
-          <dt>Fond de caisse</dt>
+          <dt>{t('Fond de caisse')}</dt>
           <dd>{formaterTND(resume.fondDeCaisseMillimes)}</dd>
-          <dt>Espèces encaissées</dt>
+          <dt>{t('Espèces encaissées')}</dt>
           <dd>{formaterTND(resume.especesMillimes)}</dd>
           {resume.entreesMillimes > 0 && (
             <>
-              <dt>Entrées d'espèces</dt>
+              <dt>{t('Entrées d\'espèces')}</dt>
               <dd>{formaterTND(resume.entreesMillimes)}</dd>
             </>
           )}
           {resume.sortiesMillimes > 0 && (
             <>
-              <dt>Sorties d'espèces</dt>
+              <dt>{t('Sorties d\'espèces')}</dt>
               <dd>− {formaterTND(resume.sortiesMillimes)}</dd>
             </>
           )}
           {resume.remboursementsEspecesMillimes > 0 && (
             <>
-              <dt>Remboursé en espèces</dt>
+              <dt>{t('Remboursé en espèces')}</dt>
               <dd>− {formaterTND(resume.remboursementsEspecesMillimes)}</dd>
             </>
           )}
-          <dt className="fort">Attendu en caisse</dt>
+          <dt className="fort">{t('Attendu en caisse')}</dt>
           <dd className="fort">{formaterTND(resume.attenduMillimes)}</dd>
           {resume.carteMillimes > 0 && (
             <>
-              <dt>Carte (hors tiroir)</dt>
+              <dt>{t('Carte (hors tiroir)')}</dt>
               <dd>{formaterTND(resume.carteMillimes)}</dd>
             </>
           )}
@@ -239,11 +237,8 @@ export function EcranClotureShift({ shift, onFerme, onAnnuler }: PropsCloture) {
       </section>
 
       <section className="bloc-cloture">
-        <h2>Comptage du tiroir</h2>
-        <p className="aide">
-          Comptez réellement les coupures. Un écart n'est pas une faute : c'est
-          une information.
-        </p>
+        <h2>{t('Comptage du tiroir')}</h2>
+        <p className="aide">{t('Comptez réellement les coupures. Un écart n\'est pas une faute : c\'est une information.')}</p>
 
         <div className="coupures">
           {COUPURES_TND.map((coupure) => (
@@ -265,11 +260,11 @@ export function EcranClotureShift({ shift, onFerme, onAnnuler }: PropsCloture) {
 
         <div className="resultat-comptage">
           <div className="ligne">
-            <span>Compté</span>
+            <span>{t('Compté')}</span>
             <strong>{formaterTND(millimes(compte))}</strong>
           </div>
           <div className={`ligne ecart ${ecart === 0 ? 'juste' : alerte ? 'alerte' : 'leger'}`}>
-            <span>Écart</span>
+            <span>{t('Écart')}</span>
             <strong>
               {ecart > 0 ? '+' : ''}
               {formaterTND(millimes(ecart))}
@@ -278,32 +273,28 @@ export function EcranClotureShift({ shift, onFerme, onAnnuler }: PropsCloture) {
         </div>
 
         {alerte && (
-          <label className="motif">
-            Écart supérieur à 1 dinar — expliquez ce qui s'est passé
-            <textarea
+          <label className="motif">{t('Écart supérieur à 1 dinar — expliquez ce qui s\'est passé')}<textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={3}
-              placeholder="Erreur de rendu de monnaie, achat non enregistré…"
+              placeholder={t('Erreur de rendu de monnaie, achat non enregistré…')}
             />
           </label>
         )}
 
         <div className="actions">
-          <button type="button" className="secondaire" onClick={onAnnuler}>
-            Annuler
-          </button>
+          <button type="button" className="secondaire" onClick={onAnnuler}>{t('Annuler')}</button>
           <button
             type="button"
             className="principal"
             disabled={enCours || (alerte && note.trim() === '')}
             onClick={() => void cloturer()}
           >
-            {enCours ? 'Clôture…' : IMPRESSION_ACTIVE ? 'Clôturer et imprimer' : 'Clôturer la caisse'}
+            {enCours ? t('Clôture…') : IMPRESSION_ACTIVE ? t('Clôturer et imprimer') : t('Clôturer la caisse')}
           </button>
         </div>
         {alerte && note.trim() === '' && (
-          <p className="aide">Un écart significatif exige une justification écrite.</p>
+          <p className="aide">{t('Un écart significatif exige une justification écrite.')}</p>
         )}
       </section>
     </div>

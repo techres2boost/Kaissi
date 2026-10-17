@@ -4,6 +4,7 @@
 
 import { useState, useTransition } from 'react'
 import { changerFormuleClient } from '../app/editeur/actions.js'
+import { useT } from '../i18n/client.js'
 
 export function FormuleClient({
   organizationId,
@@ -12,6 +13,7 @@ export function FormuleClient({
   organizationId: string
   planActuel: string
 }) {
+  const t = useT()
   const [resultat, setResultat] = useState<{ erreur?: string; succes?: string }>({})
   const [enCours, demarrer] = useTransition()
   const choisir = (formule: 'gratuit' | 'pro') =>
@@ -24,18 +26,14 @@ export function FormuleClient({
         className="discret"
         disabled={enCours || planActuel === 'gratuit'}
         onClick={() => choisir('gratuit')}
-      >
-        Gratuit
-      </button>
+      >{t('Gratuit')}</button>
       <button
         type="button"
         className="discret"
         disabled={enCours || planActuel === 'pro'}
         onClick={() => choisir('pro')}
-      >
-        Payant
-      </button>
-      {resultat.erreur && <span className="ecart negatif">{resultat.erreur}</span>}
+      >{t('Payant')}</button>
+      {resultat.erreur && <span className="ecart negatif">{t.m(resultat.erreur)}</span>}
     </div>
   )
 }

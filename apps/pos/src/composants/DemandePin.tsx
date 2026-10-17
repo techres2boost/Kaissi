@@ -24,6 +24,7 @@ import type { EmployeLocal } from '@kaissi/db-local'
 import { useApp } from '../etat/contexte.js'
 import { Modale } from './Modale.js'
 import { PaveNumerique } from './PaveNumerique.js'
+import { dateLocale, libelleRole, t } from '../i18n.js'
 
 interface Props {
   readonly titre?: string
@@ -44,7 +45,7 @@ interface Props {
 }
 
 export function DemandePin({
-  titre = 'Prise de poste',
+  titre = t('Prise de poste'),
   sousTitre,
   candidats,
   proposerLHabitue = false,
@@ -175,16 +176,17 @@ export function DemandePin({
        */
       setErreur(
         estBloque(suivant)
-          ? `Trop de tentatives. Réessayez dans ${secondesRestantes(suivant)} secondes.`
+          ? t('Trop de tentatives. Réessayez dans {n} secondes.', { n: secondesRestantes(suivant) })
           : contexteCode?.appaire === false
-            ? 'Code incorrect. Cette caisse n’est rattachée à aucun ' +
-              'établissement : les employés et leurs codes sont ceux de la ' +
-              'DÉMONSTRATION, pas ceux du back-office.'
+            ? t(
+                'Code incorrect. Cette caisse n’est rattachée à aucun établissement : les employés et leurs codes sont ceux de la DÉMONSTRATION, pas ceux du back-office.',
+              )
             : contexteCode?.catalogueRecuLe
-              ? 'Code incorrect. Si le code a été changé au back-office, ' +
-                `vérifiez que la caisse l’a reçu — dernière mise à jour de la ` +
-                `carte le ${new Date(contexteCode.catalogueRecuLe).toLocaleString('fr-FR')}.`
-              : 'Code incorrect.',
+              ? t(
+                  'Code incorrect. Si le code a été changé au back-office, vérifiez que la caisse l’a reçu — dernière mise à jour de la carte le {date}.',
+                  { date: dateLocale(contexteCode.catalogueRecuLe, { dateStyle: 'short', timeStyle: 'short' }) },
+                )
+              : t('Code incorrect.'),
       )
     } finally {
       setVerification(false)
@@ -207,43 +209,39 @@ export function DemandePin({
             qu'on lui rappelle le mode de la caisse à ce moment-là.
           */}
           {proposerLHabitue && contexteCode?.appaire === false && (
-            <p className="aide avertissement-demo">
-              Caisse non rattachée : employés et codes de DÉMONSTRATION.
-            </p>
+            <p className="aide avertissement-demo">{t('Caisse non rattachée : employés et codes de DÉMONSTRATION.')}</p>
           )}
           {liste.map((e) => (
             <button key={e.id} type="button" onClick={() => setChoisi(e)}>
               <span className="nom">{e.nom}</span>
-              <span className="role">{e.role}</span>
+              <span className="role">{libelleRole(e.role)}</span>
             </button>
           ))}
           {liste.length === 0 && (
-            <p className="vide">
-              Aucun employé habilité n'est configuré sur ce terminal.
-            </p>
+            <p className="vide">{t('Aucun employé habilité n\'est configuré sur ce terminal.')}</p>
           )}
         </div>
       ) : (
         <div className="saisie-pin">
           <button type="button" className="employe-choisi" onClick={() => setChoisi(null)}>
-            {choisi.nom} <span className="changer">changer</span>
+            {choisi.nom} <span className="changer">{t('changer')}</span>
           </button>
 
-          <div className="points" aria-label={`${pin.length} chiffre(s) saisis`}>
+          <div className="points" aria-label={t('{n} chiffre(s) saisis', { n: pin.length })}>
             {Array.from({ length: Math.max(4, pin.length) }, (_, i) => (
               <span key={i} className={i < pin.length ? 'plein' : ''} />
             ))}
           </div>
 
           {erreur && <p className="erreur">{erreur}</p>}
-          {verification && <p className="aide">Vérification…</p>}
+          {verification && <p className="aide">{t('Vérification…')}</p>}
 
           <PaveNumerique
             valeur={pin}
             onChange={setPin}
             maxLongueur={8}
             onValider={() => void valider()}
-            libelleValider="Entrer"
+            libelleValider={t('Entrer')}
             validerActif={pin.length >= 4 && !bloque && !verification}
           />
         </div>

@@ -17,6 +17,8 @@
  * liste pour cet oubli.
  */
 
+import { aTraduire } from '@kaissi/i18n'
+
 export interface Groupe<T> {
   readonly cle: string
   readonly titre: string
@@ -28,7 +30,7 @@ export function grouperParCategorie<T>(
   categorieDe: (ligne: T) => string | null,
   /** Les catégories, DANS L'ORDRE d'affichage. */
   categories: readonly { id: string; nom: string }[],
-  libelleSansCategorie = 'Sans catégorie',
+  libelleSansCategorie = aTraduire('Sans catégorie'),
 ): Groupe<T>[] {
   const parCle = new Map<string, T[]>()
   for (const ligne of lignes) {
@@ -62,7 +64,7 @@ export function grouperParCategorie<T>(
     if (cle !== '' && !connues.has(cle)) egarees.push(...lignesDuGroupe)
   }
   if (egarees.length > 0) {
-    groupes.push({ cle: '__egarees', titre: 'Catégorie archivée', lignes: egarees })
+    groupes.push({ cle: '__egarees', titre: aTraduire('Catégorie archivée'), lignes: egarees })
   }
 
   const orphelins = parCle.get('')

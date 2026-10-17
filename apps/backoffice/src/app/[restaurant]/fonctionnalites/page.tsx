@@ -28,6 +28,7 @@ import {
   ListeFonctionnalites,
   type Fonctionnalite,
 } from '../../../composants/ListeFonctionnalites.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,6 +66,7 @@ export default async function PageFonctionnalites({
 }: {
   params: Promise<{ restaurant: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
@@ -136,219 +138,182 @@ export default async function PageFonctionnalites({
   const fonctionnalites: Fonctionnalite[] = [
     {
       cle: 'tickets-ouverts',
-      nom: 'Tickets ouverts',
+      nom: t('Tickets ouverts'),
       icone: ICONES.Ticket,
       etat: 'structurelle',
       quoi:
-        'Une commande reste ouverte sur une table, s’enrichit au fil du service, ' +
-        'et ne s’encaisse qu’à la fin.',
+        t('Une commande reste ouverte sur une table, s’enrichit au fil du service, et ne s’encaisse qu’à la fin.'),
       pourquoi:
-        'Non débrayable, parce que ce n’est pas une option chez Kaissi : la salle ' +
-        'est BÂTIE dessus. Une commande est un journal d’événements, pas une ligne ' +
-        'qu’on remplit d’un coup — c’est ce qui permet à deux tablettes hors ligne ' +
-        'd’ajouter chacune un article à la table 12 sans le moindre conflit.',
+        t('Non débrayable, parce que ce n’est pas une option chez Kaissi : la salle est BÂTIE dessus. Une commande est un journal d’événements, pas une ligne qu’on remplit d’un coup — c’est ce qui permet à deux tablettes hors ligne d’ajouter chacune un article à la table 12 sans le moindre conflit.'),
       chemin: 'preparation',
-      lien: 'Voir les commandes en cours',
+      lien: t('Voir les commandes en cours'),
     },
     {
       cle: 'modes-paiement',
-      nom: 'Modes de paiement',
+      nom: t('Modes de paiement'),
       icone: ICONES.CreditCard,
       etat: 'active',
-      quoi: 'Espèces, carte, paiement en ligne, et tout libellé que vous ajoutez.',
+      quoi: t('Espèces, carte, paiement en ligne, et tout libellé que vous ajoutez.'),
       pourquoi:
-        'Le nom sert au caissier et au ticket ; le type sert au rapport, qui regroupe. ' +
-        '« Flouci » et « D17 » sont deux noms pour un même type.',
-      constat: `${modes} mode(s) actif(s).`,
+        t('Le nom sert au caissier et au ticket ; le type sert au rapport, qui regroupe. « Flouci » et « D17 » sont deux noms pour un même type.'),
+      constat: t('{modes} mode(s) actif(s).', { modes }),
       chemin: 'paiements',
-      lien: 'Régler les modes de paiement',
+      lien: t('Régler les modes de paiement'),
     },
     {
       cle: 'reductions',
-      nom: 'Réductions prédéfinies',
+      nom: t('Réductions prédéfinies'),
       icone: ICONES.Tag,
       etat: 'active',
       quoi:
-        'Des remises nommées, en pourcentage ou en montant, proposées au caissier ' +
-        'et retrouvées telles quelles dans les rapports.',
+        t('Des remises nommées, en pourcentage ou en montant, proposées au caissier et retrouvées telles quelles dans les rapports.'),
       pourquoi:
-        'Le nom est RECOPIÉ sur la vente, jamais joint : renommer une réduction ne ' +
-        'réécrit pas ce qui a été accordé l’an dernier.',
+        t('Le nom est RECOPIÉ sur la vente, jamais joint : renommer une réduction ne réécrit pas ce qui a été accordé l’an dernier.'),
       constat:
         reductions === 0
-          ? 'Aucune réduction enregistrée — le caissier ne peut accorder qu’une remise libre, s’il en a le droit.'
-          : `${reductions} réduction(s) enregistrée(s).`,
+          ? t('Aucune réduction enregistrée — le caissier ne peut accorder qu’une remise libre, s’il en a le droit.')
+          : t('{reductions} réduction(s) enregistrée(s).', { reductions }),
       chemin: 'reductions/gestion',
-      lien: 'Gérer les réductions',
+      lien: t('Gérer les réductions'),
     },
     {
       cle: 'modificateurs',
-      nom: 'Modificateurs',
+      nom: t('Modificateurs'),
       icone: ICONES.UtensilsCrossed,
       etat: groupesModif === 0 ? 'absente' : 'active',
       quoi:
-        'La cuisson d’une viande, les suppléments d’une pizza — proposés au caissier ' +
-        'quand il touche l’article.',
+        t('La cuisson d’une viande, les suppléments d’une pizza — proposés au caissier quand il touche l’article.'),
       pourquoi:
-        'Ils s’ajoutent au prix de la LIGNE, jamais à la taxe ni au stock : le taux de ' +
-        'l’article s’applique au tout, et un supplément n’est pas un article vendu. ' +
-        'Un choix peut être négatif — « sans fromage −0,500 ».',
+        t('Ils s’ajoutent au prix de la LIGNE, jamais à la taxe ni au stock : le taux de l’article s’applique au tout, et un supplément n’est pas un article vendu. Un choix peut être négatif — « sans fromage −0,500 ».'),
       constat:
         groupesModif === 0
-          ? 'Aucun groupe : les articles se vendent tels quels, sans choix proposé.'
-          : `${groupesModif} groupe(s) de modificateurs.`,
+          ? t('Aucun groupe : les articles se vendent tels quels, sans choix proposé.')
+          : t('{groupesModif} groupe(s) de modificateurs.', { groupesModif }),
       chemin: 'modificateurs',
-      lien: 'Gérer les modificateurs',
+      lien: t('Gérer les modificateurs'),
     },
     {
       cle: 'inventaire',
-      nom: 'Inventaire avancé',
+      nom: t('Inventaire avancé'),
       icone: ICONES.Truck,
       etat: moduleOuvert(abonnement, 'inventaire_avance') ? 'active' : 'absente',
       quoi:
-        'La valeur d’achat de votre stock, et des fiches fournisseurs rattachées aux ' +
-        'réceptions.',
+        t('La valeur d’achat de votre stock, et des fiches fournisseurs rattachées aux réceptions.'),
       pourquoi:
-        'C’est le seul module que la formule peut fermer, avec la profondeur d’historique ' +
-        'des rapports. Le stock lui-même — comptages, mouvements, seuils, retrait ' +
-        'automatique de la carte — reste entier quelle que soit la formule, et la caisse ' +
-        'n’est jamais concernée.',
+        t('C’est le seul module que la formule peut fermer, avec la profondeur d’historique des rapports. Le stock lui-même — comptages, mouvements, seuils, retrait automatique de la carte — reste entier quelle que soit la formule, et la caisse n’est jamais concernée.'),
       constat: moduleOuvert(abonnement, 'inventaire_avance')
-        ? `${fournisseurs} fiche(s) fournisseur.`
-        : `Fermé avec la formule « ${abonnement.nom} ».`,
+        ? t('{fournisseurs} fiche(s) fournisseur.', { fournisseurs })
+        : t('Fermé avec la formule « {nom} ».', { nom: abonnement.nom }),
       chemin: 'inventaire',
       lien: moduleOuvert(abonnement, 'inventaire_avance')
-        ? 'Ouvrir l’inventaire avancé'
-        : 'Voir ce qu’il ajoute',
+        ? t('Ouvrir l’inventaire avancé')
+        : t('Voir ce qu’il ajoute'),
     },
     {
       cle: 'clients',
-      nom: 'Fiches clients',
+      nom: t('Fiches clients'),
       icone: ICONES.Contact,
       etat: 'active',
       quoi:
-        'Un carnet d’adresses : rappeler quelqu’un pour une commande à emporter, ' +
-        'reconnaître un habitué, rattacher une vente à un nom.',
+        t('Un carnet d’adresses : rappeler quelqu’un pour une commande à emporter, reconnaître un habitué, rattacher une vente à un nom.'),
       pourquoi:
-        'Les visites et le total dépensé ne sont pas stockés — ils se CALCULENT à la ' +
-        'lecture. Un compteur entretenu par déclencheur dériverait en silence à chaque ' +
-        'reprojection, et personne ne saurait depuis quand.',
-      constat: `${clients} fiche(s) client.`,
+        t('Les visites et le total dépensé ne sont pas stockés — ils se CALCULENT à la lecture. Un compteur entretenu par déclencheur dériverait en silence à chaque reprojection, et personne ne saurait depuis quand.'),
+      constat: t('{clients} fiche(s) client.', { clients }),
       chemin: 'clients',
-      lien: 'Ouvrir le carnet',
+      lien: t('Ouvrir le carnet'),
     },
     {
       cle: 'stock',
-      nom: 'Suivi du stock',
+      nom: t('Suivi du stock'),
       icone: ICONES.Package,
       etat: 'active',
       quoi:
-        'Comptage de référence, mouvements, alerte de seuil, et retrait automatique ' +
-        'de la carte à zéro.',
+        t('Comptage de référence, mouvements, alerte de seuil, et retrait automatique de la carte à zéro.'),
       pourquoi:
-        'Le stock ne BLOQUE jamais une vente hors ligne : la tablette travaille sur un ' +
-        'souvenir, refuser de vendre sur une donnée périmée serait le pire des deux ' +
-        'mondes. C’est le SERVEUR qui retire un produit de la carte, sur le stock ' +
-        'calculé à l’instant.',
+        t('Le stock ne BLOQUE jamais une vente hors ligne : la tablette travaille sur un souvenir, refuser de vendre sur une donnée périmée serait le pire des deux mondes. C’est le SERVEUR qui retire un produit de la carte, sur le stock calculé à l’instant.'),
       constat:
         suivis === 0
-          ? 'Aucun article suivi — activez le suivi article par article dans le stock.'
-          : `${suivis} article(s) suivi(s).`,
+          ? t('Aucun article suivi — activez le suivi article par article dans le stock.')
+          : t('{suivis} article(s) suivi(s).', { suivis }),
       chemin: 'stock',
-      lien: 'Ouvrir le stock',
+      lien: t('Ouvrir le stock'),
     },
     {
       cle: 'equipe',
-      nom: 'Employés et code PIN',
+      nom: t('Employés et code PIN'),
       icone: ICONES.Users,
       etat: 'active',
       quoi:
-        'Chaque action de caisse porte le nom de qui l’a faite, via un code PIN validé ' +
-        'HORS LIGNE.',
+        t('Chaque action de caisse porte le nom de qui l’a faite, via un code PIN validé HORS LIGNE.'),
       pourquoi:
-        'Le PIN TRACE, il ne protège pas : quatre chiffres n’ont que dix mille ' +
-        'combinaisons. Ce qui protège l’argent, c’est le jeton d’appareil révocable, ' +
-        'RLS, et le journal d’audit.',
-      constat: `${equipe} personne(s) dans l’équipe.`,
+        t('Le PIN TRACE, il ne protège pas : quatre chiffres n’ont que dix mille combinaisons. Ce qui protège l’argent, c’est le jeton d’appareil révocable, RLS, et le journal d’audit.'),
+      constat: t('{equipe} personne(s) dans l’équipe.', { equipe }),
       chemin: 'employes',
-      lien: 'Gérer l’équipe',
+      lien: t('Gérer l’équipe'),
     },
     {
       cle: 'postes',
-      nom: 'Postes de préparation',
+      nom: t('Postes de préparation'),
       icone: ICONES.UtensilsCrossed,
       etat: postes === 0 ? 'absente' : 'active',
-      quoi: 'Cuisine, bar, pâtisserie : chaque poste voit les lignes qu’il prépare, et rien d’autre.',
+      quoi: t('Cuisine, bar, pâtisserie : chaque poste voit les lignes qu’il prépare, et rien d’autre.'),
       pourquoi:
-        'Le poste vient de la CATÉGORIE, pas de l’article : le porter sur le produit ' +
-        'obligeait à s’en souvenir à chaque création, et un produit sans poste ' +
-        'n’apparaît sur AUCUN écran — ce qui ne se voit qu’en plein service.',
+        t('Le poste vient de la CATÉGORIE, pas de l’article : le porter sur le produit obligeait à s’en souvenir à chaque création, et un produit sans poste n’apparaît sur AUCUN écran — ce qui ne se voit qu’en plein service.'),
       constat:
         postes === 0
-          ? 'Aucun poste : l’écran de préparation restera vide.'
-          : `${postes} poste(s), dont ${postesImprimante} avec une imprimante réglée.`,
+          ? t('Aucun poste : l’écran de préparation restera vide.')
+          : t('{postes} poste(s), dont {postesImprimante} avec une imprimante réglée.', { postes, postesImprimante }),
       chemin: 'categories',
-      lien: 'Régler les postes et leurs catégories',
+      lien: t('Régler les postes et leurs catégories'),
     },
     {
       cle: 'restauration',
-      nom: 'Service et droit de timbre',
+      nom: t('Service et droit de timbre'),
       icone: ICONES.HandPlatter,
       etat: 'active',
-      quoi: 'Des frais de service en pourcentage, et un montant fixe par ticket.',
+      quoi: t('Des frais de service en pourcentage, et un montant fixe par ticket.'),
       pourquoi:
-        'Kaissi n’applique que ce que vous saisissez, et ne propose aucune valeur par ' +
-        'défaut : ce sont des paramètres réglementaires, à valider avec votre comptable.',
+        t('Kaissi n’applique que ce que vous saisissez, et ne propose aucune valeur par défaut : ce sont des paramètres réglementaires, à valider avec votre comptable.'),
       constat:
         service === 0 && timbre === 0
-          ? 'Ni service ni timbre : les tickets portent le total des articles et de leurs taxes.'
-          : `Service ${(service / 100).toString().replace('.', ',')} %` +
-            (timbre > 0 ? ` · timbre ${(timbre / 1000).toFixed(3).replace('.', ',')} TND` : ''),
+          ? t('Ni service ni timbre : les tickets portent le total des articles et de leurs taxes.')
+          : t('Service {valeur} %', { valeur: (service / 100).toString().replace('.', ',') }) +
+            (timbre > 0 ? t(' · timbre {valeur} TND', { valeur: (timbre / 1000).toFixed(3).replace('.', ',') }) : ''),
       chemin: 'restauration',
-      lien: 'Régler les options de restauration',
+      lien: t('Régler les options de restauration'),
     },
     {
       cle: 'impression',
-      nom: 'Impression des tickets et bons',
+      nom: t('Impression des tickets et bons'),
       icone: ICONES.Printer,
       etat: 'eteinte',
       quoi:
-        'Ticket client et bon de cuisine envoyés à une imprimante réseau, par une file ' +
-        'persistante qui survit au redémarrage.',
+        t('Ticket client et bon de cuisine envoyés à une imprimante réseau, par une file persistante qui survit au redémarrage.'),
       pourquoi:
-        'Le module est ÉCRIT, TESTÉ et embarqué — simplement pas allumé dans cette ' +
-        'version des caisses. Le bon s’affiche à l’écran, et la cuisine lit ses ' +
-        'commandes dans Préparation. Les adresses d’imprimante que vous réglez sont ' +
-        'conservées et descendent déjà : elles serviront telles quelles le jour où ' +
-        'l’impression sera activée.',
+        t('Le module est ÉCRIT, TESTÉ et embarqué — simplement pas allumé dans cette version des caisses. Le bon s’affiche à l’écran, et la cuisine lit ses commandes dans Préparation. Les adresses d’imprimante que vous réglez sont conservées et descendent déjà : elles serviront telles quelles le jour où l’impression sera activée.'),
       chemin: 'imprimantes',
-      lien: 'Régler les imprimantes malgré tout',
+      lien: t('Régler les imprimantes malgré tout'),
     },
     {
       cle: 'fidelite',
-      nom: 'Programme de fidélité',
+      nom: t('Programme de fidélité'),
       icone: ICONES.Percent,
       etat: 'absente',
-      quoi: 'Points cumulés par client, et récompenses à dépenser en caisse.',
+      quoi: t('Points cumulés par client, et récompenses à dépenser en caisse.'),
       pourquoi:
-        'Rien n’existe en base pour le porter — ni les points, ni leur historique, ni ' +
-        'les règles de cumul. Le carnet clients n’en est pas un début : il ne compte ' +
-        'rien. Annoncer la fonctionnalité en attendant reviendrait à la vendre deux ' +
-        'fois, dont une qui n’arrive pas.',
+        t('Rien n’existe en base pour le porter — ni les points, ni leur historique, ni les règles de cumul. Le carnet clients n’en est pas un début : il ne compte rien. Annoncer la fonctionnalité en attendant reviendrait à la vendre deux fois, dont une qui n’arrive pas.'),
       chemin: 'clients',
-      lien: 'Voir ce qui existe : le carnet clients',
+      lien: t('Voir ce qui existe : le carnet clients'),
     },
     {
       cle: 'assistance',
-      nom: 'Assistance',
+      nom: t('Assistance'),
       icone: ICONES.BookOpen,
       etat: 'active',
       quoi:
-        'Les trois écrans à regarder quand quelque chose ne va pas, et par où nous joindre.',
+        t('Les trois écrans à regarder quand quelque chose ne va pas, et par où nous joindre.'),
       pourquoi:
-        'La foire aux questions vit sur une page PUBLIQUE, qui s’ouvre depuis n’importe ' +
-        'quel téléphone — y compris quand personne n’arrive plus à se connecter au ' +
-        'back-office, c’est-à-dire précisément le jour où l’on en a besoin.',
+        t('La foire aux questions vit sur une page PUBLIQUE, qui s’ouvre depuis n’importe quel téléphone — y compris quand personne n’arrive plus à se connecter au back-office, c’est-à-dire précisément le jour où l’on en a besoin.'),
       /*
        * Le constat disait « prévu avec les abonnements, qui n'existent pas
        * encore ». Les abonnements existent depuis la migration 0040 : la
@@ -356,55 +321,44 @@ export default async function PageFonctionnalites({
        * de déjà arrivé. Ce qui manque, c'est le chat.
        */
       constat:
-        'Pas de chat en direct : aucune formule n’en ouvre un, et il n’y a pas ' +
-        'd’équipe pour le tenir.',
+        t('Pas de chat en direct : aucune formule n’en ouvre un, et il n’y a pas d’équipe pour le tenir.'),
       chemin: 'aide',
-      lien: 'Ouvrir l’aide',
+      lien: t('Ouvrir l’aide'),
     },
     {
       cle: 'abonnement',
-      nom: 'Abonnement',
+      nom: t('Abonnement'),
       icone: ICONES.Wallet,
       etat: 'active',
       quoi:
-        'La formule de votre compte, ce qu’elle ouvre, et ce qu’elle laisse fermé — ' +
-        'aujourd’hui l’inventaire avancé et la profondeur d’historique des rapports.',
+        t('La formule de votre compte, ce qu’elle ouvre, et ce qu’elle laisse fermé — aujourd’hui l’inventaire avancé et la profondeur d’historique des rapports.'),
       pourquoi:
-        'Une formule ne ferme JAMAIS un geste de caisse. La tablette encaisse hors ligne ' +
-        'quelle que soit la formule, et même expirée : son code est dans l’application, ' +
-        'il n’interroge aucun abonnement, et lui apprendre à le faire reviendrait à ' +
-        'écrire de quoi arrêter un service un vendredi soir.',
+        t('Une formule ne ferme JAMAIS un geste de caisse. La tablette encaisse hors ligne quelle que soit la formule, et même expirée : son code est dans l’application, il n’interroge aucun abonnement, et lui apprendre à le faire reviendrait à écrire de quoi arrêter un service un vendredi soir.'),
       constat: abonnement.enEssai
-        ? `Essai en cours — ${abonnement.joursRestants} jour(s) restant(s), tout est ouvert.`
+        ? t('Essai en cours — {joursRestants} jour(s) restant(s), tout est ouvert.', { joursRestants: abonnement.joursRestants ?? 0 })
         : abonnement.essaiExpire
-          ? 'Essai terminé : vous avez les droits de la formule « Gratuit ».'
-          : `Formule « ${abonnement.nom} ».`,
+          ? t('Essai terminé : vous avez les droits de la formule « Gratuit ».')
+          : t('Formule « {nom} ».', { nom: abonnement.nom }),
       chemin: 'abonnement',
-      lien: 'Voir la formule',
+      lien: t('Voir la formule'),
     },
     {
       cle: 'facturation',
-      nom: 'Factures et prélèvement',
+      nom: t('Factures et prélèvement'),
       icone: ICONES.BookOpen,
       etat: 'absente',
-      quoi: 'Échéances, factures téléchargeables et moyen de paiement enregistré.',
+      quoi: t('Échéances, factures téléchargeables et moyen de paiement enregistré.'),
       pourquoi:
-        'Kaissi ne conserve aucun moyen de paiement et ne prélève rien tout seul : un ' +
-        'abonnement se règle avec quelqu’un. Afficher un échéancier qui ne déclenche ' +
-        'aucun prélèvement ferait croire que la facturation tourne.',
+        t('Kaissi ne conserve aucun moyen de paiement et ne prélève rien tout seul : un abonnement se règle avec quelqu’un. Afficher un échéancier qui ne déclenche aucun prélèvement ferait croire que la facturation tourne.'),
       chemin: 'abonnement',
-      lien: 'Voir la formule en cours',
+      lien: t('Voir la formule en cours'),
     },
   ]
 
   return (
     <>
-      <h1>Fonctionnalités</h1>
-      <p className="sous-titre">
-        Ce que Kaissi fait pour <strong>{etablissement.nom}</strong> aujourd’hui,
-        et ce qu’il ne fait pas. Les états sont lus dans vos données — ce n’est
-        pas une plaquette.
-      </p>
+      <h1>{t('Fonctionnalités')}</h1>
+      <p className="sous-titre">{t('Ce que Kaissi fait pour')}{' '}<strong>{etablissement.nom}</strong>{' '}{t('aujourd’hui, et ce qu’il ne fait pas. Les états sont lus dans vos données — ce n’est pas une plaquette.')}</p>
 
       {/*
         Le paragraphe qui explique l'absence d'interrupteurs. Sans lui, un
@@ -412,14 +366,9 @@ export default async function PageFonctionnalites({
         l'écran est cassé.
       */}
       <div className="message info">
-        <strong>Pas d’interrupteurs sur cette page, et c’est voulu.</strong> Une
-        fonctionnalité se règle là où elle vit — les modes de paiement dans{' '}
-        <Link href={{ pathname: `/${restaurant}/paiements` }}>Modes de paiement</Link>,
-        le suivi article par article dans{' '}
-        <Link href={{ pathname: `/${restaurant}/stock` }}>Stock</Link>. Une
-        bascule ici, qu’il faudrait tenir d’accord avec le réglage réel, finirait
-        par dire le contraire de ce qui se passe vraiment.
-      </div>
+        <strong>{t('Pas d’interrupteurs sur cette page, et c’est voulu.')}</strong>{' '}{t('Une fonctionnalité se règle là où elle vit — les modes de paiement dans')}{' '}
+        <Link href={{ pathname: `/${restaurant}/paiements` }}>{t('Modes de paiement')}</Link>{t(', le suivi article par article dans')}{' '}
+        <Link href={{ pathname: `/${restaurant}/stock` }}>{t('Stock')}</Link>{t('. Une bascule ici, qu’il faudrait tenir d’accord avec le réglage réel, finirait par dire le contraire de ce qui se passe vraiment.')}</div>
 
       <ListeFonctionnalites restaurantId={restaurant} fonctionnalites={fonctionnalites} />
     </>

@@ -8,6 +8,7 @@
  */
 
 import { registerPlugin } from '@capacitor/core'
+import { t } from '../i18n.js'
 
 export interface ArgumentsImpression {
   hote: string
@@ -37,15 +38,14 @@ export const ImprimanteReseau = registerPlugin<PluginImprimanteReseau>('Impriman
   web: async () => ({
     async imprimer(): Promise<ResultatImpression> {
       throw new Error(
-        "L'impression réseau n'existe que dans l'application Android. " +
-          "En développement, utilisez l'aperçu du ticket.",
+        t("L'impression réseau n'existe que dans l'application Android. En développement, utilisez l'aperçu du ticket."),
       )
     },
     async tester(): Promise<ResultatTest> {
       return {
         joignable: false,
         dureeMs: 0,
-        erreur: 'Socket TCP indisponible dans un navigateur.',
+        erreur: t('Socket TCP indisponible dans un navigateur.'),
       }
     },
   }),

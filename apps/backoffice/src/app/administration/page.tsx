@@ -16,10 +16,12 @@ import { sessionObligatoire } from '../../serveur/session.js'
 import { BarreCompte } from '../../composants/BarreCompte.js'
 import { OuvrirEtablissement } from '../../composants/OuvrirEtablissement.js'
 import { CycleEtablissement } from '../../composants/CycleEtablissement.js'
+import { traduction } from '../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
 export default async function PageAdministration() {
+  const t = await traduction()
   const session = await sessionObligatoire()
   const administres = session.etablissements.filter((e) => e.administrateur)
   const ouverts = session.etablissements.filter((e) => !e.ferme)
@@ -38,20 +40,16 @@ export default async function PageAdministration() {
     <>
       <BarreCompte session={session} />
       <main className="enveloppe">
-        <h1>Administration</h1>
-        <p className="sous-titre">
-          Ouvrir un établissement, et voir ceux que vous administrez. Réservé au
-          rôle <strong>administrateur</strong> : un gérant exploite le sien, il
-          n’en ouvre pas un second.
-        </p>
+        <h1>{t('Administration')}</h1>
+        <p className="sous-titre">{t('Ouvrir un établissement, et voir ceux que vous administrez. Réservé au rôle')}{' '}<strong>{t('administrateur')}</strong>{' '}{t(': un gérant exploite le sien, il n’en ouvre pas un second.')}</p>
 
         <section className="carte">
-          <h2>Vos établissements</h2>
+          <h2>{t('Vos établissements')}</h2>
           <table>
             <thead>
               <tr>
-                <th>Établissement</th>
-                <th>Votre rôle</th>
+                <th>{t('Établissement')}</th>
+                <th>{t('Votre rôle')}</th>
                 <th />
               </tr>
             </thead>
@@ -60,12 +58,10 @@ export default async function PageAdministration() {
                 <tr key={e.id}>
                   <td>{e.nom}</td>
                   <td>
-                    <span className="etiquette">{e.role}</span>
+                    <span className="etiquette">{t.role(e.role)}</span>
                   </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <Link className="bouton discret" href={{ pathname: `/${e.id}/journee` }}>
-                      Ouvrir
-                    </Link>
+                  <td style={{ textAlign: 'end' }}>
+                    <Link className="bouton discret" href={{ pathname: `/${e.id}/journee` }}>{t('Ouvrir')}</Link>
                     <CycleEtablissement
                       etablissement={{
                         id: e.id,
@@ -93,17 +89,13 @@ export default async function PageAdministration() {
         */}
         {fermes.length > 0 && (
           <section className="carte">
-            <h2>Établissements fermés</h2>
-            <p className="sous-titre">
-              Aucune nouvelle caisse ne peut y être mise en service. Leurs
-              données restent consultables, et les terminaux déjà appairés
-              continuent d’envoyer ce qu’ils avaient en attente.
-            </p>
+            <h2>{t('Établissements fermés')}</h2>
+            <p className="sous-titre">{t('Aucune nouvelle caisse ne peut y être mise en service. Leurs données restent consultables, et les terminaux déjà appairés continuent d’envoyer ce qu’ils avaient en attente.')}</p>
             <table>
               <thead>
                 <tr>
-                  <th>Établissement</th>
-                  <th>Fermé le</th>
+                  <th>{t('Établissement')}</th>
+                  <th>{t('Fermé le')}</th>
                   <th />
                 </tr>
               </thead>
@@ -121,10 +113,8 @@ export default async function PageAdministration() {
                            */
                           '—'}
                     </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <Link className="bouton discret" href={{ pathname: `/${e.id}/journee` }}>
-                        Consulter
-                      </Link>
+                    <td style={{ textAlign: 'end' }}>
+                      <Link className="bouton discret" href={{ pathname: `/${e.id}/journee` }}>{t('Consulter')}</Link>
                       <CycleEtablissement
                         etablissement={{
                           id: e.id,

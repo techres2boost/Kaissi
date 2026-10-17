@@ -30,6 +30,7 @@ import { LogIn, Store } from 'lucide-react'
 import { useApp } from '../etat/contexte.js'
 import { FormulaireAppairage } from './EcranSync.js'
 import { FormulaireInscription } from '../composants/FormulaireInscription.js'
+import { t } from '../i18n.js'
 
 export function EcranBienvenue({ onDemonstration }: { onDemonstration: () => void }) {
   const { app, rafraichir } = useApp()
@@ -45,9 +46,7 @@ export function EcranBienvenue({ onDemonstration }: { onDemonstration: () => voi
   if (voie === 'connexion') {
     return (
       <div className="bienvenue">
-        <button type="button" className="retour-accueil" onClick={() => setVoie('choix')}>
-          ‹ Retour
-        </button>
+        <button type="button" className="retour-accueil" onClick={() => setVoie('choix')}>{t('‹ Retour')}</button>
         <FormulaireAppairage onAppaire={rafraichir} />
       </div>
     )
@@ -56,9 +55,7 @@ export function EcranBienvenue({ onDemonstration }: { onDemonstration: () => voi
   if (voie === 'creation') {
     return (
       <div className="bienvenue">
-        <button type="button" className="retour-accueil" onClick={() => setVoie('choix')}>
-          ‹ Retour
-        </button>
+        <button type="button" className="retour-accueil" onClick={() => setVoie('choix')}>{t('‹ Retour')}</button>
         <FormulaireInscription
           onInscrit={onDemonstration}
           onDejaUnCompte={() => setVoie('connexion')}
@@ -70,28 +67,22 @@ export function EcranBienvenue({ onDemonstration }: { onDemonstration: () => voi
   return (
     <div className="bienvenue">
       <div className="bienvenue-marque">
-        <span className="logo">Kaissi</span>
-        <span className="signature">Caisse et gestion de restaurant</span>
+        <span className="logo">{t('Kaissi')}</span>
+        <span className="signature">{t('Caisse et gestion de restaurant')}</span>
       </div>
 
       <section className="carte-action">
         {/* Pas « Mettre cette caisse en service » : c'est le titre du
             formulaire qui suit, et répéter le même titre sur deux écrans
             enchaînés donne l'impression de n'avoir pas avancé. */}
-        <h1>À quel restaurant appartient cette caisse ?</h1>
-        <p>
-          Connectez-vous avec le compte du restaurant. Ce terminal recevra son
-          identité tout seul — il n'y a aucun code à recopier, et rien d'autre à
-          régler ensuite.
-        </p>
+        <h1>{t('À quel restaurant appartient cette caisse ?')}</h1>
+        <p>{t('Connectez-vous avec le compte du restaurant. Ce terminal recevra son identité tout seul — il n\'y a aucun code à recopier, et rien d\'autre à régler ensuite.')}</p>
 
         <button type="button" className="principal" onClick={() => setVoie('connexion')}>
-          <LogIn size={18} strokeWidth={2} aria-hidden="true" /> Se connecter
-        </button>
+          <LogIn size={18} strokeWidth={2} aria-hidden="true" />{' '}{t('Se connecter')}</button>
 
         <button type="button" onClick={() => setVoie('creation')}>
-          <Store size={18} strokeWidth={2} aria-hidden="true" /> Créer un compte
-        </button>
+          <Store size={18} strokeWidth={2} aria-hidden="true" />{' '}{t('Créer un compte')}</button>
       </section>
 
       {/*
@@ -99,9 +90,7 @@ export function EcranBienvenue({ onDemonstration }: { onDemonstration: () => voi
         tard » laisseraient croire à un report anodin ; ce qu'on choisit ici,
         c'est une caisse dont les ventes ne quitteront jamais l'appareil.
       */}
-      <button type="button" className="lien-discret" onClick={accepterDemonstration}>
-        Découvrir sans compte — les ventes resteront sur cet appareil
-      </button>
+      <button type="button" className="lien-discret" onClick={accepterDemonstration}>{t('Découvrir sans compte — les ventes resteront sur cet appareil')}</button>
     </div>
   )
 }

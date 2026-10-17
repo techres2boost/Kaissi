@@ -588,9 +588,9 @@ export async function archiverPoste(restaurantId: string, posteId: string): Prom
     if (noms.length > 0) {
       throw new ErreurSaisie(
         'poste',
-        `Ce poste sert encore à ${noms.length} élément(s) : ${noms.slice(0, 4).join(', ')}` +
-          `${noms.length > 4 ? '…' : ''}. Rattachez-les ailleurs d’abord — sinon leurs ` +
-          'lignes disparaîtraient des écrans de préparation sans rien dire.',
+        `Ce poste sert encore à ${noms.length} élément(s) : ${listeCourte(noms)}. ` +
+          'Rattachez-les ailleurs d’abord — sinon leurs lignes disparaîtraient des écrans ' +
+          'de préparation sans rien dire.',
       )
     }
     if ((membresRes.data ?? []).length > 0) {
@@ -613,4 +613,9 @@ export async function archiverPoste(restaurantId: string, posteId: string): Prom
     if (error) throw new Error(messageBase(error.message, error.code))
     return 'Poste archivé.'
   })
+}
+
+/** « Pizzas, Boissons, Desserts, Bar… » : quatre noms au plus, puis une ellipse. */
+function listeCourte(noms: readonly string[]): string {
+  return noms.slice(0, 4).join(', ') + (noms.length > 4 ? '…' : '')
 }

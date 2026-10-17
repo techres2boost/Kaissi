@@ -27,6 +27,8 @@ import { EcranSync } from './ecrans/EcranSync.js'
 import { EcranBienvenue } from './ecrans/EcranBienvenue.js'
 import { ICONES_TIROIR, TiroirNavigation, type EntreeTiroir } from './composants/TiroirNavigation.js'
 import type { Vue } from './navigation.js'
+import { t, tm } from './i18n.js'
+import { ChoixLangue } from './composants/ChoixLangue.js'
 
 export function Application() {
   const [contexte, setContexte] = useState<ContexteApplication | null>(null)
@@ -37,7 +39,7 @@ export function Application() {
     demarrer()
       .then((c) => vivant && setContexte(c))
       .catch((e: unknown) => {
-        if (vivant) setErreur(e instanceof Error ? e.message : String(e))
+        if (vivant) setErreur(e instanceof Error ? tm(e.message) : String(e))
       })
     return () => {
       vivant = false
@@ -47,13 +49,9 @@ export function Application() {
   if (erreur) {
     return (
       <div className="ecran-bloquant">
-        <h1>Démarrage impossible</h1>
+        <h1>{t('Démarrage impossible')}</h1>
         <p className="erreur">{erreur}</p>
-        <p className="aide">
-          La base locale n'a pas pu être ouverte ou migrée. Aucune vente n'est
-          possible dans cet état. Redémarrez l'application ; si le problème
-          persiste, transmettez ce message au support.
-        </p>
+        <p className="aide">{t('La base locale n\'a pas pu être ouverte ou migrée. Aucune vente n\'est possible dans cet état. Redémarrez l\'application ; si le problème persiste, transmettez ce message au support.')}</p>
       </div>
     )
   }
@@ -62,7 +60,7 @@ export function Application() {
     return (
       <div className="ecran-bloquant">
         <div className="pastille-chargement" aria-hidden="true" />
-        <p>Ouverture de la caisse…</p>
+        <p>{t('Ouverture de la caisse…')}</p>
       </div>
     )
   }
@@ -161,21 +159,21 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
     {
       cle: 'salle',
       vues: ['salle', 'commande', 'paiement'],
-      libelle: 'Ventes',
+      libelle: t('Ventes'),
       icone: ICONES_TIROIR.salle,
       action: () => setVue({ nom: 'salle' }),
     },
     {
       cle: 'recus',
       vues: ['recus'],
-      libelle: 'Reçus',
+      libelle: t('Reçus'),
       icone: ICONES_TIROIR.recus,
       action: bascule('recus'),
     },
     {
       cle: 'periodes',
       vues: ['periodes'],
-      libelle: 'Périodes de travail',
+      libelle: t('Périodes de travail'),
       icone: ICONES_TIROIR.periodes,
       action: bascule('periodes'),
     },
@@ -191,7 +189,7 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
           {
             cle: 'carte',
             vues: ['carte' as const],
-            libelle: 'Carte',
+            libelle: t('Carte'),
             icone: ICONES_TIROIR.carte,
             action: bascule('carte'),
           },
@@ -200,14 +198,14 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
     {
       cle: 'sync',
       vues: ['sync'],
-      libelle: 'Synchronisation',
+      libelle: t('Synchronisation'),
       icone: ICONES_TIROIR.sync,
       action: bascule('sync'),
     },
     {
       cle: 'diagnostic',
       vues: ['diagnostic'],
-      libelle: 'Diagnostic',
+      libelle: t('Diagnostic'),
       icone: ICONES_TIROIR.diagnostic,
       action: bascule('diagnostic'),
     },
@@ -216,7 +214,7 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
           {
             cle: 'cloture',
             vues: ['cloture' as const],
-            libelle: 'Clôturer la caisse',
+            libelle: t('Clôturer la caisse'),
             icone: ICONES_TIROIR.cloture,
             action: () => setVue({ nom: 'cloture' }),
           },
@@ -231,7 +229,7 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
       ? [
           {
             cle: 'back-office',
-            libelle: 'Back-office',
+            libelle: t('Back-office'),
             icone: ICONES_TIROIR.backOffice,
             action: ouvrirBackOffice,
             sortante: true,
@@ -294,8 +292,8 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
       <div className="application">
         <BandeauSimple reseau={reseau} />
         <DemandePin
-          titre="Prise de poste"
-          sousTitre="Qui utilise la caisse ?"
+          titre={t('Prise de poste')}
+          sousTitre={t('Qui utilise la caisse ?')}
           proposerLHabitue
           onValide={definirEmploye}
         />
@@ -424,23 +422,14 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
 
       {backOfficeHorsLigne && (
         <Modale
-          titre="Le back-office a besoin d’une connexion"
+          titre={t('Le back-office a besoin d’une connexion')}
           onFermer={() => setBackOfficeHorsLigne(false)}
           pied={
-            <button type="button" className="principal" onClick={() => setBackOfficeHorsLigne(false)}>
-              Revenir à la caisse
-            </button>
+            <button type="button" className="principal" onClick={() => setBackOfficeHorsLigne(false)}>{t('Revenir à la caisse')}</button>
           }
         >
-          <p>
-            Cette tablette est hors ligne. Le back-office est un site web : il
-            ne s’ouvrira pas tant que la connexion n’est pas revenue.
-          </p>
-          <p className="indication">
-            La caisse, elle, continue de fonctionner normalement — encaissements
-            compris. Ce qui attend d’être envoyé partira tout seul au retour du
-            réseau.
-          </p>
+          <p>{t('Cette tablette est hors ligne. Le back-office est un site web : il ne s’ouvrira pas tant que la connexion n’est pas revenue.')}</p>
+          <p className="indication">{t('La caisse, elle, continue de fonctionner normalement — encaissements compris. Ce qui attend d’être envoyé partira tout seul au retour du réseau.')}</p>
         </Modale>
       )}
 
@@ -456,12 +445,12 @@ function IndicateurReseau({ reseau }: { reseau: { connecte: boolean; type: strin
       className={`etat-reseau ${reseau.connecte ? 'en-ligne' : 'hors-ligne'}`}
       title={
         reseau.connecte
-          ? `Connecté (${reseau.type}) — les ventes seront synchronisées`
-          : 'Hors ligne — la caisse fonctionne normalement, la synchronisation reprendra au retour du réseau'
+          ? t('Connecté ({type}) — les ventes seront synchronisées', { type: reseau.type })
+          : t('Hors ligne — la caisse fonctionne normalement, la synchronisation reprendra au retour du réseau')
       }
     >
       <span className="point" aria-hidden="true" />
-      {reseau.connecte ? 'En ligne' : 'Hors ligne'}
+      {reseau.connecte ? t('En ligne') : t('Hors ligne')}
     </div>
   )
 }
@@ -488,7 +477,12 @@ function BandeauSimple({
         <span className="logo">Kaissi</span>
         {montrerEtablissement && <span className="etablissement">{etablissement.nom}</span>}
       </div>
-      <div style={{ marginLeft: 'auto' }}>
+      {/*
+        La langue AVANT la prise de poste : une caissière qui ne lit pas le
+        français doit pouvoir passer en arabe pour trouver son propre nom.
+      */}
+      <div className="bandeau-simple-droite">
+        <ChoixLangue compact />
         <IndicateurReseau reseau={reseau} />
       </div>
     </header>
@@ -519,7 +513,7 @@ function Bandeau({
         type="button"
         className="ouvrir-tiroir"
         onClick={onOuvrirTiroir}
-        aria-label="Ouvrir le menu"
+        aria-label={t('Ouvrir le menu')}
       >
         <Menu size={22} strokeWidth={2} aria-hidden="true" />
       </button>
@@ -537,15 +531,10 @@ function Bandeau({
         {!app.base.persistant && (
           <span
             className="etiquette-demo"
-            title={
-              'Base SQLite en mémoire : tout disparaît au rechargement, et le ' +
-              'catalogue vient de la graine locale — les modifications faites au ' +
-              'back-office n\u2019arrivent pas ici. Seule l\u2019application Android ' +
-              'installée se synchronise réellement.'
-            }
-          >
-            démo — mémoire
-          </span>
+            title={t(
+              'Base SQLite en mémoire : tout disparaît au rechargement, et le catalogue vient de la graine locale — les modifications faites au back-office n’arrivent pas ici. Seule l’application Android installée se synchronise réellement.',
+            )}
+          >{t('démo — mémoire')}</span>
         )}
       </div>
 
@@ -567,8 +556,8 @@ function Bandeau({
             className={`badge-impression ${impression.echecs > 0 ? 'echec' : ''}`}
             title={
               impression.echecs > 0
-                ? `${impression.echecs} ticket(s) en échec d'impression`
-                : `${impression.enAttente} ticket(s) en attente`
+                ? t("{n} ticket(s) en échec d'impression", { n: impression.echecs })
+                : t('{n} ticket(s) en attente', { n: impression.enAttente })
             }
           >
             {/*
@@ -604,12 +593,12 @@ function Bandeau({
             onClick={onSync}
             title={
               !sync
-                ? 'Ce terminal n\u2019est relié à aucun compte : ses ventes restent sur ' +
-                  'l\u2019appareil et n\u2019arriveront JAMAIS au back-office. Touchez ici pour ' +
-                  'l\u2019appairer avec votre e-mail et votre mot de passe.'
+                ? t(
+                    'Ce terminal n’est relié à aucun compte : ses ventes restent sur l’appareil et n’arriveront JAMAIS au back-office. Touchez ici pour l’appairer avec votre e-mail et votre mot de passe.',
+                  )
                 : resumeSync.rejetes > 0
-                  ? `${resumeSync.rejetes} opération(s) refusée(s) — votre attention est requise`
-                  : `${resumeSync.enAttente} opération(s) en attente d'envoi`
+                  ? t('{n} opération(s) refusée(s) — votre attention est requise', { n: resumeSync.rejetes })
+                  : t("{n} opération(s) en attente d'envoi", { n: resumeSync.enAttente })
             }
           >
             {/*
@@ -628,7 +617,7 @@ function Bandeau({
               rejet de synchronisation.
             */}
             {!sync
-              ? '⚠ À appairer'
+              ? `⚠ ${t('À appairer')}`
               : resumeSync.rejetes > 0
                 ? `⚠ ${resumeSync.rejetes}`
                 : `⇅ ${resumeSync.enAttente}`}
@@ -637,7 +626,7 @@ function Bandeau({
 
         <button type="button" className="employe" onClick={onVerrouiller}>
           {employe?.nom ?? '—'}
-          <small>verrouiller</small>
+          <small>{t('verrouiller')}</small>
         </button>
         <IndicateurReseau reseau={reseau} />
       </div>

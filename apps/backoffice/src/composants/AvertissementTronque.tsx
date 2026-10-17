@@ -1,4 +1,6 @@
 import { PLAFOND_COMMANDES } from '../serveur/ventes.js'
+import { traduction } from '../i18n/serveur.js'
+import { use } from 'react'
 
 /**
  * « Ce rapport est incomplet » — dit, jamais tu.
@@ -20,14 +22,11 @@ import { PLAFOND_COMMANDES } from '../serveur/ventes.js'
  * page : ce qu'elle annonce change la lecture de tout ce qui suit.
  */
 export function AvertissementTronque({ tronque }: { tronque: boolean }) {
+  const t = use(traduction())
   if (!tronque) return null
   return (
     <p className="message avertissement" role="status">
-      <strong>Ce rapport est incomplet.</strong> La période choisie dépasse{' '}
-      {PLAFOND_COMMANDES.toLocaleString('fr-FR')} ventes : seules les plus
-      récentes sont comptées. Les totaux ci-dessous ne portent donc PAS sur
-      toute la période. Choisissez une période plus courte — un mois, un
-      trimestre — pour obtenir des chiffres complets.
-    </p>
+      <strong>{t('Ce rapport est incomplet.')}</strong>{' '}{t('La période choisie dépasse')}{' '}
+      {PLAFOND_COMMANDES.toLocaleString('fr-FR')}{' '}{t('ventes : seules les plus récentes sont comptées. Les totaux ci-dessous ne portent donc PAS sur toute la période. Choisissez une période plus courte — un mois, un trimestre — pour obtenir des chiffres complets.')}</p>
   )
 }

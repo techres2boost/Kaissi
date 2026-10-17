@@ -361,7 +361,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   padding: 0.7rem 1.1rem;
   white-space: nowrap;
   min-height: 48px;
-  border-left: 4px solid var(--teinte, var(--bordure));
+  border-inline-start: 4px solid var(--teinte, var(--bordure));
 }
 /*
  * ── La catégorie courante — un rapport INVERSÉ par le passage au clair ───
@@ -401,7 +401,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   flex-direction: column;
   justify-content: space-between;
   gap: 0.5rem;
-  text-align: left;
+  text-align: start;
   padding: 0.8rem;
   background: var(--surface);
   border: 1px solid var(--bordure);
@@ -441,7 +441,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
      client y imposaient 449 px sur un écran de 390. */
   min-width: 0;
   background: var(--surface);
-  border-left: 1px solid var(--bordure);
+  border-inline-start: 1px solid var(--bordure);
   /* Un panneau collé au bord, pas une carte posée : une ombre portée vers la
      gauche le détache du fond ombré sans faire flotter un rectangle. */
   box-shadow: -12px 0 28px -22px rgba(27, 31, 28, 0.5);
@@ -535,7 +535,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .diagnostic::-webkit-scrollbar { width: 22px; }
 .diagnostic::-webkit-scrollbar-track {
   background: var(--surface);
-  border-left: 1px solid var(--bordure);
+  border-inline-start: 1px solid var(--bordure);
 }
 .diagnostic::-webkit-scrollbar-thumb {
   /* `--texte-2` et non l'accent pâle : un pouce de barre est un objet
@@ -561,11 +561,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .bloc table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
 .bloc th {
-  text-align: left; color: var(--texte-2); font-weight: 600;
+  text-align: start; color: var(--texte-2); font-weight: 600;
   border-bottom: 1px solid var(--bordure); padding: 0.4rem 0.5rem;
 }
 .bloc td { padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--bordure); vertical-align: top; }
-.bloc td.nombre { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.bloc td.nombre { font-variant-numeric: tabular-nums; text-align: end; white-space: nowrap; }
 .bloc td.detail { color: var(--texte-2); word-break: break-word; }
 .bloc td.mono { font-family: ui-monospace, monospace; font-size: 0.78rem; }
 .bloc td.ok { color: var(--ok); }
@@ -587,7 +587,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   padding: 0.45rem 0.5rem; font-size: 0.83rem;
   font-family: ui-monospace, monospace;
 }
-.bloc td input.port { min-width: 4.5rem; text-align: right; }
+.bloc td input.port { min-width: 4.5rem; text-align: end; }
 .bloc > p > button {
   background: var(--surface-2); color: var(--texte);
   border: 1px solid var(--bordure); border-radius: var(--rayon);
@@ -618,7 +618,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
  * tenaient pas, et la moitié des écrans n'existait qu'après un geste qui ne
  * s'annonce pas.
  */
-.bandeau-etats { display: flex; align-items: center; gap: 0.5rem; margin-left: auto; }
+.bandeau-etats { display: flex; align-items: center; gap: 0.5rem; margin-inline-start: auto; }
 .bandeau-etats .employe {
   display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15;
   background: var(--surface-2); border: 1px solid var(--bordure);
@@ -651,14 +651,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .tiroir {
   position: fixed; z-index: 41;
-  top: 0; left: 0; bottom: 0;
+  top: 0; inset-inline-start: 0; bottom: 0;
   /* 17rem sur une tablette ; jamais plus de 85 % sur un téléphone, sinon le
      voile n'offre plus de zone à toucher pour refermer. */
   width: min(17rem, 85vw);
   display: flex; flex-direction: column;
   background: linear-gradient(180deg, #0b2016 0%, #0f2e1f 45%, #123725 100%);
-  border-right: 1px solid rgba(126, 198, 148, 0.14);
-  box-shadow: 18px 0 40px -24px rgba(0, 0, 0, 0.65);
+  border-inline-end: 1px solid rgba(126, 198, 148, 0.14);
+  box-shadow: calc(18px * var(--sens)) 0 40px -24px rgba(0, 0, 0, 0.65);
   /* La zone sûre de l'encoche et de la barre de navigation : le tiroir est
      en `fixed`, donc il ignore la marge posée sur `body`. */
   padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom)
@@ -668,7 +668,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 @media (prefers-reduced-motion: no-preference) {
   .tiroir { animation: tiroir-entre 0.18s ease-out; }
   @keyframes tiroir-entre {
-    from { transform: translateX(-100%); }
+    from { transform: translateX(calc(-100% * var(--sens))); }
     to { transform: translateX(0); }
   }
 }
@@ -702,7 +702,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: flex; align-items: center; gap: 0.75rem;
   background: transparent; border: 0; border-radius: var(--rayon);
   padding: 0.8rem 0.85rem; min-height: 48px;
-  color: var(--texte-2); text-align: left;
+  color: var(--texte-2); text-align: start;
   position: relative;
 }
 .tiroir-lien:active { background: rgba(255, 255, 255, 0.05); }
@@ -722,8 +722,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .tiroir-lien[data-actif='true']::before {
   content: '';
   position: absolute;
-  left: 0; top: 0.4rem; bottom: 0.4rem;
-  width: 3px; border-radius: 0 3px 3px 0;
+  inset-inline-start: 0; top: 0.4rem; bottom: 0.4rem;
+  width: 3px; border-start-end-radius: 3px; border-end-end-radius: 3px;
   background: linear-gradient(180deg, var(--orange-clair), var(--orange));
   box-shadow: 0 0 12px rgba(196, 86, 43, 0.6);
 }
@@ -761,7 +761,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .secondaire:disabled { opacity: 0.35; }
 .retour {
   background: transparent; border: none; color: var(--texte-2);
-  padding: 0.5rem 0; min-height: 44px; text-align: left;
+  padding: 0.5rem 0; min-height: 44px; text-align: start;
 }
 
 /* L'avertissement de la prise de poste sur une caisse non rattachée. */
@@ -907,7 +907,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .modale header h2 { margin: 0; font-size: 1.05rem; }
 .modale .sous-titre { margin: 0.25rem 0 0; color: var(--texte-2); font-size: 0.82rem; line-height: 1.45; }
 .modale .fermer {
-  margin-left: auto; background: transparent; border: none;
+  margin-inline-start: auto; background: transparent; border: none;
   color: var(--texte-2); font-size: 1.2rem; min-width: 44px; min-height: 44px;
 }
 .modale .corps { padding: 1rem; overflow-y: auto; }
@@ -940,7 +940,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .liste-employes button {
   display: flex; justify-content: space-between; align-items: center;
   background: var(--surface-2); border: 1px solid var(--bordure);
-  border-radius: var(--rayon); padding: 1rem; min-height: 60px; text-align: left;
+  border-radius: var(--rayon); padding: 1rem; min-height: 60px; text-align: start;
 }
 .liste-employes .role { color: var(--texte-2); font-size: 0.78rem; }
 
@@ -981,7 +981,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   color: var(--orange-texte);
   font-weight: 650;
 }
-.barre-salle .principal { margin-left: auto; }
+.barre-salle .principal { margin-inline-start: auto; }
 
 .grille-tables {
   flex: 1; min-height: 0; overflow-y: auto;
@@ -1058,7 +1058,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .liste-commandes button {
   display: grid; grid-template-columns: 1fr auto auto auto; gap: 1rem; align-items: center;
   background: var(--surface); border: 1px solid var(--bordure);
-  border-radius: var(--rayon); padding: 0.9rem 1rem; min-height: 60px; text-align: left;
+  border-radius: var(--rayon); padding: 0.9rem 1rem; min-height: 60px; text-align: start;
   box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
 }
 .liste-commandes .ref { display: flex; flex-direction: column; }
@@ -1089,9 +1089,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .ticket .lignes li { display: flex; flex-direction: column; gap: 0.3rem; }
 .ticket .lignes .haut { display: grid; grid-template-columns: 2.2rem 1fr auto; gap: 0.5rem; align-items: baseline; }
-.ticket .lignes .details, .ticket .lignes .note { font-size: 0.72rem; color: var(--texte-2); padding-left: 2.7rem; }
+.ticket .lignes .details, .ticket .lignes .note { font-size: 0.72rem; color: var(--texte-2); padding-inline-start: 2.7rem; }
 .ticket .lignes .note { color: var(--accent); }
-.actions-ligne { display: flex; gap: 0.35rem; padding-left: 2.7rem; }
+.actions-ligne { display: flex; gap: 0.35rem; padding-inline-start: 2.7rem; }
 .actions-ligne button {
   background: var(--surface); border: 1px solid var(--bordure); border-radius: 6px;
   min-width: 40px; min-height: 36px; font-size: 0.85rem; color: var(--texte-2);
@@ -1110,7 +1110,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 @media (max-width: 900px) { .paiement { grid-template-columns: 1fr; grid-template-rows: auto 1fr; } }
 .colonne-recap { padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; overflow-y: auto; }
 .colonne-saisie {
-  background: var(--surface); border-left: 1px solid var(--bordure);
+  background: var(--surface); border-inline-start: 1px solid var(--bordure);
   box-shadow: -12px 0 28px -22px rgba(27, 31, 28, 0.5);
   padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; overflow-y: auto;
 }
@@ -1163,7 +1163,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .bloc-cloture h2 { margin: 0 0 0.5rem; font-size: 1rem; }
 .recap { display: grid; grid-template-columns: 1fr auto; gap: 0.45rem 1rem; margin: 0; font-size: 0.88rem; }
 .recap dt { color: var(--texte-2); }
-.recap dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+.recap dd { margin: 0; font-variant-numeric: tabular-nums; text-align: end; }
 .recap .fort { font-weight: 800; color: var(--texte); font-size: 1rem; }
 
 .coupures { display: grid; grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr)); gap: 0.5rem; margin: 0.75rem 0; }
@@ -1203,7 +1203,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* Signale sans ambiguïté une base en mémoire : ni persistance, ni
    synchronisation. Or l'écran, lui, ressemble en tout point à la production. */
 .etiquette-demo {
-  margin-left: 0.6rem;
+  margin-inline-start: 0.6rem;
   padding: 0.15rem 0.55rem;
   border-radius: 999px;
   font-size: 0.7rem;
@@ -1451,6 +1451,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .lignes-remboursables input[type='checkbox'] { inline-size: 22px; block-size: 22px; }
 .lignes-remboursables .designation { min-width: 0; overflow-wrap: anywhere; }
 .lignes-remboursables .montant { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+/* « Tout le ticket » : un raccourci sous la liste, sur sa propre ligne. */
+.tout-le-ticket { display: block; margin-block: 0.25rem 0.75rem; }
 /* Déjà rendue : barrée mais lisible, comme une ligne annulée — rien ne disparaît. */
 .lignes-remboursables li.deja { opacity: 0.6; }
 .lignes-remboursables li.deja .designation { text-decoration: line-through; }
@@ -1539,10 +1541,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   .barre-salle::-webkit-scrollbar { display: none; }
   .barre-salle > * { flex: 0 0 auto; }
-  /* `margin-left: auto` pousse le bouton au bout d'une piste qui défile : il
+  /* `margin-inline-start: auto` pousse le bouton au bout d'une piste qui défile : il
      serait hors champ à l'arrivée sur l'écran. Il reprend sa place dans le
      flux, juste après les onglets. */
-  .barre-salle .principal { margin-left: 0; }
+  .barre-salle .principal { margin-inline-start: 0; }
 
   /*
    * Le reçu passe à deux colonnes : la référence et le montant. Le détail
@@ -1579,4 +1581,110 @@ button { font: inherit; color: inherit; cursor: pointer; }
      8 rem en garde deux. */
   .grille-produits { grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); }
   .grille-tables { grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr)); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * ARABE — l'écran se lit de DROITE à GAUCHE
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * L'essentiel se fait tout seul : `dir="rtl"` sur la page inverse les rangées
+ * flex et la grille, et la feuille n'emploie que des propriétés LOGIQUES
+ * (`margin-inline-start`, `text-align: start`…), qui suivent le sens. Ce qui
+ * reste ici est ce qu'aucune propriété logique ne sait exprimer.
+ *
+ * `--sens` vaut 1 de gauche à droite, −1 de droite à gauche : c'est le
+ * multiplicateur des DÉPLACEMENTS (animation du tiroir, ombre portée), qui
+ * n'ont pas d'équivalent logique en CSS.
+ */
+:root { --sens: 1; }
+:root[dir='rtl'] { --sens: -1; }
+
+/*
+ * La police : celles du SYSTÈME, comme pour le français — la caisse ne
+ * charge rien depuis le réseau. Android embarque Noto Naskh/Sans Arabic,
+ * iOS « SF Arabic » et Geeza Pro, Windows « Segoe UI » et Tahoma : toutes
+ * savent lier les lettres arabes. L'ordre privilégie les polices dessinées
+ * pour l'écran plutôt que pour l'imprimé.
+ */
+:root[lang='ar'] body {
+  font-family: system-ui, "Noto Sans Arabic", "SF Arabic", "Segoe UI", "Geeza Pro",
+    Tahoma, "Noto Naskh Arabic", sans-serif;
+}
+
+/*
+ * Le tiroir s'ouvre du côté où l'on commence à lire. La zone sûre de
+ * l'encoche suit : à droite en arabe.
+ */
+:root[dir='rtl'] .tiroir {
+  padding-left: 0;
+  padding-right: env(safe-area-inset-right);
+}
+
+/*
+ * Chaque texte prend le SENS DE SON CONTENU.
+ *
+ * Une caisse arabe affiche des données écrites en français : « TVA 19 % »,
+ * « Pizza Margherita (Moyenne) », un nom d'employé. Dans un paragraphe de
+ * droite à gauche, l'algorithme bidirectionnel range ces fragments selon
+ * l'arabe qui les entoure — « TVA 19 % » devenait « % TVA 19 ». Avec
+ * `plaintext`, chaque bloc de texte prend le sens de son premier caractère
+ * fort : une phrase arabe se lit de droite à gauche, un nom latin de gauche
+ * à droite. L'ALIGNEMENT, lui, reste celui de la page (à droite).
+ */
+:root[dir='rtl'] :is(p, li, td, th, dd, dt, label, button, span, small, strong, em,
+    h1, h2, h3, h4, legend, summary, option, a, .titre, .ref) {
+  unicode-bidi: plaintext;
+}
+
+/*
+ * Les MONTANTS restent des blocs de gauche à droite : « 24,500 TND ».
+ *
+ * Sans cet isolement, l'algorithme bidirectionnel range les chiffres et le
+ * code de la devise selon le texte arabe qui les entoure — « TND 24,500 »,
+ * voire un signe moins séparé de son nombre. Un montant n'est pas une
+ * phrase : il se lit d'un bloc, comme sur le ticket et sur la calculette.
+ */
+:root[dir='rtl'] :is(.montant, .prix, .total, .nombre, .recap dd, .ligne-total span:last-child,
+    .bloc-reste strong, .suggestions button, .mono, td.nombre) {
+  unicode-bidi: isolate;
+  direction: ltr;
+}
+
+/* Le bandeau des écrans d'avant connexion : la langue, puis le réseau. */
+.bandeau-simple-droite {
+  margin-inline-start: auto;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+
+/*
+ * Le choix de la langue. Chaque bouton est écrit dans SA langue : on
+ * reconnaît la sienne sans savoir lire l'autre.
+ */
+.choix-langue { display: inline-flex; gap: 0.35rem; }
+.choix-langue button {
+  min-height: 40px; padding: 0.35rem 0.8rem;
+  border: 1px solid var(--bordure); border-radius: var(--rayon);
+  background: var(--surface); color: var(--texte); font: inherit;
+}
+.choix-langue button.actif {
+  border-color: var(--accent); background: var(--surface-2); font-weight: 650;
+}
+/* Version compacte, dans le bandeau sombre : un seul bouton, l'AUTRE langue. */
+.choix-langue.compact {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  min-height: 36px; padding: 0.3rem 0.7rem;
+  border: 1px solid rgba(126, 198, 148, 0.35); border-radius: 999px;
+  background: transparent; color: inherit; font: inherit; font-size: 0.85rem;
+}
+.tiroir-langue {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid rgba(126, 198, 148, 0.12);
+  color: rgba(244, 241, 234, 0.75);
+}
+.tiroir-langue .choix-langue button {
+  background: transparent; color: inherit; border-color: rgba(126, 198, 148, 0.3);
+}
+.tiroir-langue .choix-langue button.actif {
+  background: rgba(126, 198, 148, 0.16); color: #fff; border-color: rgba(126, 198, 148, 0.6);
 }

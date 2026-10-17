@@ -2,6 +2,10 @@ import type { Metadata } from 'next'
 // Le contact vit dans UN seul module : cette page et « Paramètres → Aide »
 // l'affichent toutes les deux, et deux copies finiraient par diverger.
 import { DELAI_PAR_DEFAUT, EDITEUR } from '../../editeur.js'
+import type { Traduction } from '../../i18n/commun.js'
+import { traduction } from '../../i18n/serveur.js'
+import { use } from 'react'
+import { aTraduire } from '@kaissi/i18n'
 
 /**
  * La page d'assistance — publique, et exigée par l'App Store.
@@ -27,14 +31,16 @@ import { DELAI_PAR_DEFAUT, EDITEUR } from '../../editeur.js'
  *   une page qui promet une hotline inexistante est pire que pas de hotline.
  */
 
-export const metadata: Metadata = {
-  title: 'Assistance — Kaissi',
-  description:
-    'Comment obtenir de l’aide sur Kaissi : nous joindre, et les réponses aux questions les plus fréquentes.',
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await traduction()
+  return {
+    title: t('Assistance — Kaissi'),
+    description: t('Comment obtenir de l’aide sur Kaissi : nous joindre, et les réponses aux questions les plus fréquentes.'),
+  }
 }
 
 
-const MAJ = '13 septembre 2026'
+const MAJ = aTraduire('13 septembre 2026')
 
 /**
  * Les pannes qui reviennent, avec ce qu'il faut FAIRE.
@@ -44,127 +50,93 @@ const MAJ = '13 septembre 2026'
  * nouveau produit. Une FAQ qui répond « contactez-nous » à tout ne fait
  * gagner de temps à personne.
  */
-const QUESTIONS: { q: string; r: React.ReactNode }[] = [
+function questions(t: Traduction): { q: string; r: React.ReactNode }[] {
+  return [
   {
-    q: 'La caisse fonctionne-t-elle sans Internet ?',
+    q: t('La caisse fonctionne-t-elle sans Internet ?'),
     r: (
       <>
-        <strong>Oui, entièrement.</strong> C’est la raison d’être de Kaissi :
-        prendre une commande, encaisser, rendre la monnaie et imprimer se font
-        hors ligne. Les ventes sont enregistrées sur la tablette, puis remontent
-        d’elles-mêmes dès que la connexion revient. Aucune vente n’est perdue et
-        aucune n’est comptée deux fois.
+        <strong>{t('Oui, entièrement.')}</strong>{' '}{t('C’est la raison d’être de Kaissi : prendre une commande, encaisser, rendre la monnaie et imprimer se font hors ligne. Les ventes sont enregistrées sur la tablette, puis remontent d’elles-mêmes dès que la connexion revient. Aucune vente n’est perdue et aucune n’est comptée deux fois.')}</>
+    ),
+  },
+  {
+    q: t('Le bandeau de synchronisation est rouge. Que faire ?'),
+    r: (
+      <>
+        <strong>{t('Continuez d’encaisser')}</strong>{' '}{t('— c’est prévu, et rien n’est perdu. Le bandeau indique que les ventes attendent d’être envoyées, pas qu’elles sont en danger. Ouvrez l’écran')}{' '}<em>{t('Sync')}</em>{' '}{t(': il dit combien d’opérations sont en attente et pourquoi. Si le rouge persiste après le retour du réseau, écrivez-nous en nous envoyant une capture de l’écran')}{' '}
+        <em>{t('Diagnostic')}</em>.
       </>
     ),
   },
   {
-    q: 'Le bandeau de synchronisation est rouge. Que faire ?',
+    q: t('Une vente n’apparaît pas dans le back-office.'),
     r: (
-      <>
-        <strong>Continuez d’encaisser</strong> — c’est prévu, et rien n’est
-        perdu. Le bandeau indique que les ventes attendent d’être envoyées, pas
-        qu’elles sont en danger. Ouvrez l’écran <em>Sync</em> : il dit combien
-        d’opérations sont en attente et pourquoi. Si le rouge persiste après le
-        retour du réseau, écrivez-nous en nous envoyant une capture de l’écran{' '}
-        <em>Diagnostic</em>.
-      </>
+      <>{t('Vérifiez d’abord que la tablette est en ligne et que l’écran')}{' '}
+        <em>{t('Sync')}</em>{' '}{t('n’affiche aucune opération en attente. Le back-office n’affiche que ce qui lui est parvenu ; une tablette restée hors ligne toute la journée remonte tout d’un coup le soir. Si l’attente est vide et que la vente manque toujours, écrivez-nous avec le numéro de ticket.')}</>
     ),
   },
   {
-    q: 'Une vente n’apparaît pas dans le back-office.',
+    q: t('Un code PIN est refusé.'),
     r: (
-      <>
-        Vérifiez d’abord que la tablette est en ligne et que l’écran{' '}
-        <em>Sync</em> n’affiche aucune opération en attente. Le back-office
-        n’affiche que ce qui lui est parvenu ; une tablette restée hors ligne
-        toute la journée remonte tout d’un coup le soir. Si l’attente est vide
-        et que la vente manque toujours, écrivez-nous avec le numéro de ticket.
-      </>
+      <>{t('Le PIN est vérifié sur la tablette, sans réseau. S’il vient d’être modifié au back-office, la tablette doit d’abord recevoir la mise à jour : connectez-la quelques secondes. Un employé')}{' '}
+        <strong>{t('suspendu')}</strong>{' '}{t('est refusé même avec le bon code — c’est voulu.')}</>
     ),
   },
   {
-    q: 'Un code PIN est refusé.',
+    q: t('Un produit ajouté au back-office n’apparaît pas sur la caisse.'),
     r: (
-      <>
-        Le PIN est vérifié sur la tablette, sans réseau. S’il vient d’être
-        modifié au back-office, la tablette doit d’abord recevoir la mise à
-        jour : connectez-la quelques secondes. Un employé{' '}
-        <strong>suspendu</strong> est refusé même avec le bon code — c’est
-        voulu.
-      </>
+      <>{t('La carte descend par la synchronisation, comme les prix. Connectez la tablette et attendez un cycle. Si le produit est marqué')}{' '}
+        <em>{t('indisponible')}</em>{t(', il reste visible sur la caisse mais refuse la vente en disant pourquoi — rupture de stock, ou retrait manuel.')}</>
     ),
   },
   {
-    q: 'Un produit ajouté au back-office n’apparaît pas sur la caisse.',
+    q: t('J’ai perdu l’accès au back-office.'),
     r: (
-      <>
-        La carte descend par la synchronisation, comme les prix. Connectez la
-        tablette et attendez un cycle. Si le produit est marqué{' '}
-        <em>indisponible</em>, il reste visible sur la caisse mais refuse la
-        vente en disant pourquoi — rupture de stock, ou retrait manuel.
-      </>
+      <>{t('Le gérant de votre établissement peut réinitialiser un mot de passe depuis')}{' '}<em>{t('Administration → Employés')}</em>{t('. Si personne ne peut plus entrer, écrivez-nous depuis l’adresse e-mail du compte concerné.')}</>
     ),
   },
   {
-    q: 'J’ai perdu l’accès au back-office.',
+    q: t('Comment supprimer mes données ?'),
     r: (
-      <>
-        Le gérant de votre établissement peut réinitialiser un mot de passe
-        depuis <em>Administration → Employés</em>. Si personne ne peut plus
-        entrer, écrivez-nous depuis l’adresse e-mail du compte concerné.
+      <>{t('Écrivez-nous depuis l’adresse du compte : la procédure et les délais sont décrits dans la')}{' '}
+        <a href="/confidentialite">{t('politique de confidentialité')}</a>.
       </>
     ),
   },
-  {
-    q: 'Comment supprimer mes données ?',
-    r: (
-      <>
-        Écrivez-nous depuis l’adresse du compte : la procédure et les délais
-        sont décrits dans la{' '}
-        <a href="/confidentialite">politique de confidentialité</a>.
-      </>
-    ),
-  },
-]
+  ]
+}
 
 export default function Support() {
+  const t = use(traduction())
   return (
     <main className="enveloppe" style={{ maxWidth: '46rem' }}>
-      <h1>Assistance</h1>
-      <p className="sous-titre">
-        Kaissi — caisse et gestion pour restaurants · {EDITEUR.nom}
-        <br />
-        Dernière mise à jour : {MAJ}
+      <h1>{t('Assistance')}</h1>
+      <p className="sous-titre">{t('Kaissi — caisse et gestion pour restaurants ·')}{' '}{EDITEUR.nom}
+        <br />{t('Dernière mise à jour :')}{' '}{t(MAJ)}
       </p>
 
       <section className="carte">
-        <h2>Nous joindre</h2>
-        <p>
-          Par e-mail :{' '}
+        <h2>{t('Nous joindre')}</h2>
+        <p>{t('Par e-mail :')}{' '}
           <a href={`mailto:${EDITEUR.contact}`}>{EDITEUR.contact}</a>
           {EDITEUR.telephone ? (
             <>
-              <br />
-              Par téléphone : <a href={`tel:${EDITEUR.telephone.replace(/\s/g, '')}`}>{EDITEUR.telephone}</a>
+              <br />{t('Par téléphone :')}{' '}<a href={`tel:${EDITEUR.telephone.replace(/\s/g, '')}`}>{EDITEUR.telephone}</a>
             </>
           ) : null}
         </p>
         <p className="indication">
           {EDITEUR.horaires
             ? EDITEUR.horaires
-            : DELAI_PAR_DEFAUT}
+            : t(DELAI_PAR_DEFAUT)}
         </p>
-        <p className="indication">
-          Pour aller plus vite, indiquez le <strong>nom de votre
-          établissement</strong>, l’écran concerné, et — si la caisse est en
-          cause — ce qu’affiche l’écran <em>Diagnostic</em> de la tablette.
-        </p>
+        <p className="indication">{t('Pour aller plus vite, indiquez le')}{' '}<strong>{t('nom de votre établissement')}</strong>{t(', l’écran concerné, et — si la caisse est en cause — ce qu’affiche l’écran')}{' '}<em>{t('Diagnostic')}</em>{' '}{t('de la tablette.')}</p>
       </section>
 
       <section className="carte">
-        <h2>Questions fréquentes</h2>
+        <h2>{t('Questions fréquentes')}</h2>
         <dl className="faq">
-          {QUESTIONS.map(({ q, r }) => (
+          {questions(t).map(({ q, r }) => (
             <div key={q}>
               <dt>{q}</dt>
               <dd>{r}</dd>
@@ -174,12 +146,9 @@ export default function Support() {
       </section>
 
       <section className="carte">
-        <h2>Vos données</h2>
-        <p>
-          Kaissi enregistre les ventes d’un restaurant et les comptes de son
-          équipe. Aucune localisation, aucun accès aux contacts ou aux photos,
-          aucune publicité. Le détail est dans la{' '}
-          <a href="/confidentialite">politique de confidentialité</a>.
+        <h2>{t('Vos données')}</h2>
+        <p>{t('Kaissi enregistre les ventes d’un restaurant et les comptes de son équipe. Aucune localisation, aucun accès aux contacts ou aux photos, aucune publicité. Le détail est dans la')}{' '}
+          <a href="/confidentialite">{t('politique de confidentialité')}</a>.
         </p>
       </section>
     </main>

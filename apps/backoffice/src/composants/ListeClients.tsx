@@ -28,6 +28,7 @@ import {
   type Resultat,
 } from '../app/[restaurant]/clients/actions.js'
 import { destinationSure } from '../serveur/redirection.js'
+import { useT } from '../i18n/client.js'
 
 export interface ClientAffiche {
   id: string
@@ -64,6 +65,7 @@ export function ListeClients({
   recherche: string
   archives: boolean
 }) {
+  const t = useT()
   const router = useRouter()
   const chemin = usePathname()
   const parametres = useSearchParams()
@@ -87,18 +89,14 @@ export function ListeClients({
 
   return (
     <>
-      {message?.erreur && <p className="message erreur">{message.erreur}</p>}
-      {message?.succes && <p className="message succes">{message.succes}</p>}
+      {message?.erreur && <p className="message erreur">{t.m(message.erreur)}</p>}
+      {message?.succes && <p className="message succes">{t.m(message.succes)}</p>}
 
       <div className="barre-clients">
         {modifiable && (
           <>
-            <button type="button" className="principal" onClick={() => setAjoutOuvert(true)}>
-              + Ajouter un client
-            </button>
-            <button type="button" className="discret" onClick={() => setImportOuvert(true)}>
-              Importer
-            </button>
+            <button type="button" className="principal" onClick={() => setAjoutOuvert(true)}>{t('+ Ajouter un client')}</button>
+            <button type="button" className="discret" onClick={() => setImportOuvert(true)}>{t('Importer')}</button>
           </>
         )}
         {/*
@@ -107,9 +105,7 @@ export function ListeClients({
           route d'export, qui refait le contrôle de rôle — un export sans
           garde rendrait ce qu'on vient de retirer de l'écran.
         */}
-        <a className="bouton discret" href={`/${restaurantId}/export/clients`}>
-          Exporter
-        </a>
+        <a className="bouton discret" href={`/${restaurantId}/export/clients`}>{t('Exporter')}</a>
 
         <form
           className="recherche-clients"
@@ -123,13 +119,11 @@ export function ListeClients({
           <input
             type="search"
             value={saisie}
-            placeholder="Nom, téléphone, e-mail…"
-            aria-label="Rechercher un client"
+            placeholder={t('Nom, téléphone, e-mail…')}
+            aria-label={t('Rechercher un client')}
             onChange={(e) => setSaisie(e.target.value)}
           />
-          <button type="submit" className="discret">
-            Rechercher
-          </button>
+          <button type="submit" className="discret">{t('Rechercher')}</button>
           {recherche !== '' && (
             <button
               type="button"
@@ -138,9 +132,7 @@ export function ListeClients({
                 setSaisie('')
                 aller({ q: null, page: null })
               }}
-            >
-              Effacer
-            </button>
+            >{t('Effacer')}</button>
           )}
         </form>
 
@@ -149,7 +141,7 @@ export function ListeClients({
           className={archives ? 'discret actif' : 'discret'}
           onClick={() => aller({ archives: archives ? null : '1', page: null })}
         >
-          {archives ? 'Voir les clients actifs' : 'Voir les archivés'}
+          {archives ? t('Voir les clients actifs') : t('Voir les archivés')}
         </button>
       </div>
 
@@ -169,22 +161,22 @@ export function ListeClients({
         {clients.length === 0 ? (
           <p className="vide">
             {recherche !== ''
-              ? `Aucun client ne correspond à « ${recherche} ».`
+              ? t('Aucun client ne correspond à « {recherche} ».', { recherche })
               : archives
-                ? 'Aucun client archivé.'
-                : 'Aucun client enregistré. Ajoutez-en un, ou importez votre carnet.'}
+                ? t('Aucun client archivé.')
+                : t('Aucun client enregistré. Ajoutez-en un, ou importez votre carnet.')}
           </p>
         ) : (
           <>
             <table>
               <thead>
                 <tr>
-                  <th>Client</th>
-                  <th>Contacts</th>
-                  <th>Première visite</th>
-                  <th>Dernière visite</th>
-                  <th className="nombre">Total des visites</th>
-                  <th className="nombre">Total dépensé</th>
+                  <th>{t('Client')}</th>
+                  <th>{t('Contacts')}</th>
+                  <th>{t('Première visite')}</th>
+                  <th>{t('Dernière visite')}</th>
+                  <th className="nombre">{t('Total des visites')}</th>
+                  <th className="nombre">{t('Total dépensé')}</th>
                   {modifiable && <th />}
                 </tr>
               </thead>
@@ -207,14 +199,12 @@ export function ListeClients({
                     <td className="nombre">{c.visites}</td>
                     <td className="nombre">{c.depense}</td>
                     {modifiable && (
-                      <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
+                      <td style={{ whiteSpace: 'nowrap', textAlign: 'end' }}>
                         <button
                           type="button"
                           className="discret"
                           onClick={() => setCible(c)}
-                        >
-                          Ouvrir
-                        </button>
+                        >{t('Ouvrir')}</button>
                         <button
                           type="button"
                           className={c.archive ? 'discret' : 'discret danger'}
@@ -226,7 +216,7 @@ export function ListeClients({
                             })
                           }
                         >
-                          {c.archive ? 'Réactiver' : 'Archiver'}
+                          {c.archive ? t('Réactiver') : t('Archiver')}
                         </button>
                       </td>
                     )}
@@ -241,31 +231,28 @@ export function ListeClients({
                 className="discret"
                 disabled={page <= 1}
                 onClick={() => aller({ page: String(page - 1) })}
-                aria-label="Page précédente"
+                aria-label={t('Page précédente')}
               >
                 ‹
               </button>
-              <span>
-                Page {page} de {pages} · {total} client{total > 1 ? 's' : ''}
+              <span>{t('Page')}{' '}{page}{' '}{t('de')}{' '}{pages} · {total}{' '}{t('client')}{total > 1 ? 's' : ''}
               </span>
               <button
                 type="button"
                 className="discret"
                 disabled={page >= pages}
                 onClick={() => aller({ page: String(page + 1) })}
-                aria-label="Page suivante"
+                aria-label={t('Page suivante')}
               >
                 ›
               </button>
-              <label>
-                Lignes par page
-                <select
+              <label>{t('Lignes par page')}<select
                   value={taille}
                   onChange={(e) => aller({ taille: e.target.value, page: null })}
                 >
-                  {tailles.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
+                  {tailles.map((elt) => (
+                    <option key={elt} value={elt}>
+                      {elt}
                     </option>
                   ))}
                 </select>
@@ -297,6 +284,7 @@ function FicheClient({
   client: ClientAffiche | null
   fermer: () => void
 }) {
+  const t = useT()
   const router = useRouter()
   const [resultat, action, enCours] = useActionState(
     client === null
@@ -314,31 +302,24 @@ function FicheClient({
   return (
     <section className="carte">
       <div className="entete-panneau">
-        <h2>{client === null ? 'Nouveau client' : client.nom}</h2>
-        <button type="button" className="discret" onClick={fermer}>
-          Fermer
-        </button>
+        <h2>{client === null ? t('Nouveau client') : client.nom}</h2>
+        <button type="button" className="discret" onClick={fermer}>{t('Fermer')}</button>
       </div>
 
-      {resultat?.erreur && <p className="message erreur">{resultat.erreur}</p>}
-      {resultat?.succes && <p className="message succes">{resultat.succes}</p>}
+      {resultat?.erreur && <p className="message erreur">{t.m(resultat.erreur)}</p>}
+      {resultat?.succes && <p className="message succes">{t.m(resultat.succes)}</p>}
 
       {client !== null && (
         <p className="indication">
-          {client.visites} visite{client.visites > 1 ? 's' : ''} · {client.depense} dépensé
-          {client.derniereVisite !== '—' && ` · dernière le ${client.derniereVisite}`}
+          {client.visites}{' '}{t('visite')}{client.visites > 1 ? 's' : ''} · {client.depense}{' '}{t('dépensé')}{client.derniereVisite !== '—' && t(' · dernière le {derniereVisite}', { derniereVisite: client.derniereVisite })}
         </p>
       )}
 
       <form action={action}>
         <div className="champs deux">
-          <label className="champ">
-            Nom
-            <input name="nom" defaultValue={client?.nom ?? ''} maxLength={120} required />
+          <label className="champ">{t('Nom')}<input name="nom" defaultValue={client?.nom ?? ''} maxLength={120} required />
           </label>
-          <label className="champ">
-            Téléphone
-            <input
+          <label className="champ">{t('Téléphone')}<input
               name="telephone"
               defaultValue={client?.telephone ?? ''}
               inputMode="tel"
@@ -348,32 +329,24 @@ function FicheClient({
           </label>
         </div>
         <div className="champs deux">
-          <label className="champ">
-            E-mail
-            <input
+          <label className="champ">{t('E-mail')}<input
               name="email"
               type="email"
               defaultValue={client?.email ?? ''}
               maxLength={160}
             />
           </label>
-          <label className="champ">
-            Note de service
-            <input
+          <label className="champ">{t('Note de service')}<input
               name="note"
               defaultValue={client?.note ?? ''}
               maxLength={500}
-              placeholder="Allergique aux fruits de mer"
+              placeholder={t('Allergique aux fruits de mer')}
             />
           </label>
         </div>
-        <p className="indication">
-          Le téléphone est ce qui distingue deux clients du même prénom : un
-          numéro déjà connu ouvre la fiche existante au lieu d’en créer une
-          seconde, qui partagerait ses visites en deux.
-        </p>
+        <p className="indication">{t('Le téléphone est ce qui distingue deux clients du même prénom : un numéro déjà connu ouvre la fiche existante au lieu d’en créer une seconde, qui partagerait ses visites en deux.')}</p>
         <button type="submit" disabled={enCours}>
-          {enCours ? 'Enregistrement…' : client === null ? 'Ajouter' : 'Enregistrer'}
+          {enCours ? t('Enregistrement…') : client === null ? t('Ajouter') : t('Enregistrer')}
         </button>
       </form>
     </section>
@@ -388,6 +361,7 @@ function PanneauImport({
   restaurantId: string
   fermer: () => void
 }) {
+  const t = useT()
   const router = useRouter()
   const [bilan, action, enCours] = useActionState(
     importerClients.bind(null, restaurantId),
@@ -398,14 +372,12 @@ function PanneauImport({
   return (
     <section className="carte">
       <div className="entete-panneau">
-        <h2>Importer des clients</h2>
-        <button type="button" className="discret" onClick={fermer}>
-          Fermer
-        </button>
+        <h2>{t('Importer des clients')}</h2>
+        <button type="button" className="discret" onClick={fermer}>{t('Fermer')}</button>
       </div>
 
-      {bilan?.erreur && <p className="message erreur">{bilan.erreur}</p>}
-      {bilan?.succes && <p className="message succes">{bilan.succes}</p>}
+      {bilan?.erreur && <p className="message erreur">{t.m(bilan.erreur)}</p>}
+      {bilan?.succes && <p className="message succes">{t.m(bilan.succes)}</p>}
       {bilan?.refuses && bilan.refuses.length > 0 && (
         <ul className="indication">
           {bilan.refuses.map((r) => (
@@ -415,34 +387,26 @@ function PanneauImport({
       )}
 
       <form action={action}>
-        <p className="indication">
-          Un fichier CSV dont la première ligne porte les en-têtes{' '}
-          <strong>nom</strong>, <strong>telephone</strong>, <strong>email</strong>,{' '}
-          <strong>note</strong>. La virgule et le point-virgule sont acceptés,
-          l’ordre des colonnes n’a pas d’importance, et un export de Loyverse
-          passe tel quel.
-        </p>
+        <p className="indication">{t('Un fichier CSV dont la première ligne porte les en-têtes')}{' '}
+          <strong>{t('nom')}</strong>, <strong>{t('telephone')}</strong>, <strong>{t('email')}</strong>,{' '}
+          <strong>{t('note')}</strong>{t('. La virgule et le point-virgule sont acceptés, l’ordre des colonnes n’a pas d’importance, et un export de Loyverse passe tel quel.')}</p>
         <div className="champ">
-          <label htmlFor="fichier-clients">Fichier</label>
+          <label htmlFor="fichier-clients">{t('Fichier')}</label>
           <input id="fichier-clients" type="file" name="fichier" accept=".csv,text/csv" />
         </div>
         <div className="champ">
-          <label htmlFor="colle-clients">…ou collez le contenu</label>
+          <label htmlFor="colle-clients">{t('…ou collez le contenu')}</label>
           <textarea
             id="colle-clients"
             name="colle"
             rows={5}
-            placeholder={'nom,telephone\nSalem,20123456'}
+            placeholder={t('nom,telephone\nSalem,20123456')}
           />
         </div>
-        <p className="indication">
-          Un client dont le <strong>téléphone</strong> est déjà connu n’est{' '}
-          <strong>jamais</strong> écrasé : il est compté comme doublon et laissé
-          tel quel. Ré-importer un fichier après quelques corrections ne peut donc
-          rien effacer.
-        </p>
+        <p className="indication">{t('Un client dont le')}{' '}<strong>{t('téléphone')}</strong>{' '}{t('est déjà connu n’est')}{' '}
+          <strong>{t('jamais')}</strong>{' '}{t('écrasé : il est compté comme doublon et laissé tel quel. Ré-importer un fichier après quelques corrections ne peut donc rien effacer.')}</p>
         <button type="submit" disabled={enCours}>
-          {enCours ? 'Import en cours…' : 'Importer'}
+          {enCours ? t('Import en cours…') : t('Importer')}
         </button>
       </form>
     </section>

@@ -27,6 +27,7 @@ import {
   TopCinq,
 } from '../../../composants/RapportVentilation.js'
 import { TableauRapport } from '../../../composants/TableauRapport.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,6 +38,7 @@ export default async function PageVentesParCategorie({
   params: Promise<{ restaurant: string }>
   searchParams: Promise<Record<string, string | undefined>>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const recherche = await searchParams
   const { etablissement } = await etablissementObligatoire(restaurant)
@@ -48,8 +50,8 @@ export default async function PageVentesParCategorie({
   if (agregats.erreur) {
     return (
       <section className="bloc">
-        <h1>Ventes par catégorie</h1>
-        <p className="message erreur">Lecture impossible : {agregats.erreur}</p>
+        <h1>{t('Ventes par catégorie')}</h1>
+        <p className="message erreur">{t('Lecture impossible :')}{' '}{t.m(agregats.erreur)}</p>
       </section>
     )
   }
@@ -61,11 +63,11 @@ export default async function PageVentesParCategorie({
   return (
     <>
       <header className="entete-rapport">
-        <h1>Ventes par catégorie</h1>
+        <h1>{t('Ventes par catégorie')}</h1>
         <p className="sous-titre">
           {periode.du === periode.au
-            ? libelleJournee(periode.du)
-            : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
+            ? libelleJournee(periode.du, t.locale)
+            : t('Du {valeur} au {valeur2}', { valeur: libelleJournee(periode.du, t.locale), valeur2: libelleJournee(periode.au, t.locale) })}
         </p>
       </header>
 
@@ -84,36 +86,36 @@ export default async function PageVentesParCategorie({
       <BandeauIndicateurs
         indicateurs={[
           {
-            libelle: 'Catégories vendues',
+            libelle: t('Catégories vendues'),
             valeurMillimes: categories.length * 1000,
             precedentMillimes: null,
             detail: `${i.articlesVendus} article(s)`,
           },
-          { libelle: 'Ventes brutes', valeurMillimes: i.caBrutMillimes, precedentMillimes: p.caBrutMillimes },
+          { libelle: t('Ventes brutes'), valeurMillimes: i.caBrutMillimes, precedentMillimes: p.caBrutMillimes },
           {
-            libelle: 'Réductions',
+            libelle: t('Réductions'),
             valeurMillimes: i.remisesMillimes,
             precedentMillimes: p.remisesMillimes,
             hausseDefavorable: true,
           },
-          { libelle: 'Ventes nettes', valeurMillimes: i.caNetMillimes, precedentMillimes: p.caNetMillimes },
+          { libelle: t('Ventes nettes'), valeurMillimes: i.caNetMillimes, precedentMillimes: p.caNetMillimes },
           {
-            libelle: 'Marge brute',
+            libelle: t('Marge brute'),
             valeurMillimes: i.marge.margeMillimes,
             precedentMillimes: p.marge.margeMillimes,
             detail:
               i.marge.margeBp === null
-                ? 'coût non saisi'
-                : `${formaterPourcentage(i.marge.margeBp)} % du CA net`,
+                ? t('coût non saisi')
+                : t('{valeur} % du CA net', { valeur: formaterPourcentage(i.marge.margeBp) }),
           },
         ]}
       />
 
-      <TopCinq lignes={categories} entete="Catégories" />
+      <TopCinq lignes={categories} entete={t('Catégories')} />
 
       <section className="bloc">
         <GraphiqueSerie
-          titre="Ventes par catégorie"
+          titre={t('Ventes par catégorie')}
           journees={agregats.parJournee}
           parts={categories.map((c) => ({
             cle: c.cle,
@@ -125,11 +127,11 @@ export default async function PageVentesParCategorie({
 
       <TableauRapport
         lignes={lignesVentilation(categories)}
-        colonnes={colonnesVentilation('Catégorie')}
+        colonnes={colonnesVentilation(t('Catégorie'))}
         actions={
           <BoutonsExport
             restaurantId={restaurant}
-            exports={[{ quoi: 'categories', libelle: 'Exporter' }]}
+            exports={[{ quoi: 'categories', libelle: t('Exporter') }]}
             du={periode.du}
             au={periode.au}
           />

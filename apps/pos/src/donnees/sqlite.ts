@@ -25,6 +25,7 @@ import {
   type AdaptateurSqlite,
 } from '@kaissi/db-local'
 import { Capacitor } from '@capacitor/core'
+import { t } from '../i18n.js'
 
 export const NOM_BASE = 'kaissi'
 
@@ -62,7 +63,10 @@ export async function ouvrirBaseLocale(): Promise<BaseLocale> {
       adaptateur,
       mode: 'natif',
       persistant: true,
-      detail: `SQLite natif (${NOM_BASE}.db) — ${Capacitor.getPlatform()}`,
+      detail: t('SQLite natif ({fichier}) — {plateforme}', {
+        fichier: `${NOM_BASE}.db`,
+        plateforme: Capacitor.getPlatform(),
+      }),
       avertissement: null,
     }
   }
@@ -82,10 +86,9 @@ export async function ouvrirBaseLocale(): Promise<BaseLocale> {
       detail: base.detail,
       avertissement: base.protege
         ? null
-        : "Le navigateur a refusé le stockage persistant : sous forte pression " +
-          "disque, il peut effacer les données de ce site. Installez " +
-          "l'application depuis le navigateur (« Installer »), ou passez à " +
-          "l'APK Android, dont le stockage n'est évinçable par personne.",
+        : t(
+            "Le navigateur a refusé le stockage persistant : sous forte pression disque, il peut effacer les données de ce site. Installez l'application depuis le navigateur (« Installer »), ou passez à l'APK Android, dont le stockage n'est évinçable par personne.",
+          ),
     }
   }
 
@@ -96,18 +99,17 @@ export async function ouvrirBaseLocale(): Promise<BaseLocale> {
       adaptateur: await adaptateurMemoire(),
       mode: 'memoire',
       persistant: false,
-      detail: 'Base EN MÉMOIRE — navigateur de développement, non persistante',
-      avertissement:
-        'Base en mémoire : tout disparaît au rechargement. Développement ' +
-        'uniquement — jamais un poste de caisse réel.',
+      detail: t('Base EN MÉMOIRE — navigateur de développement, non persistante'),
+      avertissement: t(
+        'Base en mémoire : tout disparaît au rechargement. Développement uniquement — jamais un poste de caisse réel.',
+      ),
     }
   }
 
   throw new Error(
-    "Aucun moteur SQLite disponible. Ce bundle a été construit pour la cible " +
-      "Android (SQLite natif de Capacitor) et tourne hors d'une coque native. " +
-      "Pour servir le POS comme site, construisez la cible web : " +
-      '`pnpm pos:build:web`.',
+    t(
+      "Aucun moteur SQLite disponible. Ce bundle a été construit pour la cible Android (SQLite natif de Capacitor) et tourne hors d'une coque native. Pour servir le POS comme site, construisez la cible web : `pnpm pos:build:web`.",
+    ),
   )
 }
 

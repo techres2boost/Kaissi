@@ -27,7 +27,15 @@
 import { readFileSync } from 'node:fs'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { chromium, type Browser } from 'playwright'
-import { renderToStaticMarkup } from 'react-dom/server'
+import { renderToStaticMarkup as rendreBrut } from 'react-dom/server'
+import type { ReactElement } from 'react'
+import { direction } from '@kaissi/i18n'
+import { FournisseurLangue } from '../i18n/client.js'
+import { LANGUE_DU_PASSAGE } from '../i18n/largeur.setup.js'
+
+/** Rendu dans la langue du passage — `KAISSI_LANGUE`, voir `largeur.setup.ts`. */
+const renderToStaticMarkup = (element: ReactElement) =>
+  rendreBrut(<FournisseurLangue langue={LANGUE_DU_PASSAGE}>{element}</FournisseurLangue>)
 import { vi } from 'vitest'
 
 /*
@@ -75,7 +83,7 @@ async function mesurer(html: string, largeur: number, hauteur: number) {
   })
   try {
     await page.setContent(
-      `<!doctype html><html lang="fr"><head><meta charset="utf-8">
+      `<!doctype html><html lang="${LANGUE_DU_PASSAGE}" dir="${direction(LANGUE_DU_PASSAGE)}"><head><meta charset="utf-8">
        <meta name="viewport" content="width=device-width, initial-scale=1">
        <style>*{box-sizing:border-box}html,body{margin:0}</style>
        <style>${STYLES}</style></head><body>${html}</body></html>`,

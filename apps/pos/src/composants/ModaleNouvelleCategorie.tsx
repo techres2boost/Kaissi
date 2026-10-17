@@ -18,6 +18,7 @@ import {
 } from '@kaissi/domain'
 import { Modale } from './Modale.js'
 import { useApp } from '../etat/contexte.js'
+import { t, tm } from '../i18n.js'
 
 interface Props {
   readonly employe: Employe
@@ -68,7 +69,7 @@ export function ModaleNouvelleCategorie({ employe, onFerme, onCree }: Props) {
     // LA MÊME validation que le serveur exécutera.
     const verdict = validerMutationCatalogue(mutation)
     if (!verdict.valide) {
-      setErreur(verdict.motif ?? 'Saisie invalide.')
+      setErreur(verdict.motif ? tm(verdict.motif) : t('Saisie invalide.'))
       return
     }
 
@@ -79,7 +80,7 @@ export function ModaleNouvelleCategorie({ employe, onFerme, onCree }: Props) {
       await onCree(nom.trim())
       onFerme()
     } catch (e) {
-      setErreur(e instanceof Error ? e.message : String(e))
+      setErreur(e instanceof Error ? tm(e.message) : String(e))
     } finally {
       setEnCours(false)
     }
@@ -87,17 +88,15 @@ export function ModaleNouvelleCategorie({ employe, onFerme, onCree }: Props) {
 
   if (!peutModifierCatalogue(employe.role)) {
     return (
-      <Modale titre="Nouvelle catégorie" onFermer={onFerme}>
-        <p className="aide">
-          Seul un gérant ou un administrateur tient la carte.
-        </p>
+      <Modale titre={t('Nouvelle catégorie')} onFermer={onFerme}>
+        <p className="aide">{t('Seul un gérant ou un administrateur tient la carte.')}</p>
       </Modale>
     )
   }
 
   return (
     <Modale
-      titre="Nouvelle catégorie"
+      titre={t('Nouvelle catégorie')}
       onFermer={onFerme}
       pied={
         <button
@@ -106,39 +105,35 @@ export function ModaleNouvelleCategorie({ employe, onFerme, onCree }: Props) {
           disabled={enCours || nom.trim() === ''}
           onClick={() => void enregistrer()}
         >
-          {enCours ? 'Enregistrement…' : 'Créer la catégorie'}
+          {enCours ? t('Enregistrement…') : t('Créer la catégorie')}
         </button>
       }
     >
-      <label htmlFor="cat-nom">Nom</label>
+      <label htmlFor="cat-nom">{t('Nom')}</label>
       <input
         id="cat-nom"
         type="text"
         value={nom}
         autoFocus
         maxLength={100}
-        placeholder="Entrées"
+        placeholder={t('Entrées')}
         onChange={(e) => setNom(e.target.value)}
       />
 
-      <label htmlFor="cat-poste">Poste de préparation</label>
+      <label htmlFor="cat-poste">{t('Poste de préparation')}</label>
       <select
         id="cat-poste"
         value={stationId ?? ''}
         onChange={(e) => setStationId(e.target.value || null)}
       >
-        <option value="">Aucun — ne part dans aucune cuisine</option>
+        <option value="">{t('Aucun — ne part dans aucune cuisine')}</option>
         {stations.map((s) => (
           <option key={s.id} value={s.id}>
             {s.nom}
           </option>
         ))}
       </select>
-      <p className="aide">
-        C’est le poste qui décide où part le bon de préparation. Sans poste, les
-        articles de cette catégorie n’apparaissent sur <strong>aucun</strong>{' '}
-        écran de préparation — et cela ne se voit qu’en plein service.
-      </p>
+      <p className="aide">{t('C’est le poste qui décide où part le bon de préparation. Sans poste, les articles de cette catégorie n’apparaissent sur')}{' '}<strong>{t('aucun')}</strong>{' '}{t('écran de préparation — et cela ne se voit qu’en plein service.')}</p>
 
       {erreur && <p className="erreur">{erreur}</p>}
     </Modale>

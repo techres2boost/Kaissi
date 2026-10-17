@@ -21,7 +21,6 @@ import {
   configEffective,
   construireTicketClient,
   formaterTND,
-  libelleModePaiement,
   partsRemboursables,
   resteRemboursable,
   totalRembourse,
@@ -35,8 +34,15 @@ import { RefusOperation } from '../donnees/session.js'
 import { DemandePin } from './DemandePin.js'
 import { Modale } from './Modale.js'
 import { TicketEcran } from './TicketEcran.js'
+import { libellePaiement, t, tm } from '../i18n.js'
 
-/** Les motifs qu'on entend au comptoir — un toucher au lieu d'une phrase à taper. */
+/**
+ * Les motifs qu'on entend au comptoir — un toucher au lieu d'une phrase à taper.
+ *
+ * Ils sont ÉCRITS en français dans le journal, quelle que soit la langue de
+ * la caisse : le journal est une donnée, et le back-office les traduit à
+ * l'affichage. Seul le bouton parle la langue du caissier.
+ */
 const MOTIFS_COURANTS = [
   'Plat non conforme',
   'Erreur d’encaissement',
@@ -100,7 +106,7 @@ export function ModaleRecu({ orderId, onFermer }: Props) {
     const ticket = construireTicketClient(etat, totaux, {
       etablissement,
       employe: employes.find((e) => e.id === etat.closePar)?.nom ?? null,
-      libelleTable: tables.find((t) => t.id === etat.tableId)?.label ?? null,
+      libelleTable: tables.find((elt) => elt.id === etat.tableId)?.label ?? null,
       numeroFiscal: null,
       libellesPaiement: Object.fromEntries(methodesPaiement.map((m) => [m.id, m.nom])),
       ...(piedDePage.length > 0 ? { piedDePage } : {}),
@@ -132,8 +138,8 @@ export function ModaleRecu({ orderId, onFermer }: Props) {
 
   if (!etat || !totaux || !charge) {
     return (
-      <Modale titre="Reçu" onFermer={onFermer}>
-        <p className="aide">Lecture du ticket…</p>
+      <Modale titre={t('Reçu')} onFermer={onFermer}>
+        <p className="aide">{t('Lecture du ticket…')}</p>
       </Modale>
     )
   }
@@ -170,7 +176,7 @@ export function ModaleRecu({ orderId, onFermer }: Props) {
         setEscalade(e.message)
         return
       }
-      setErreur(e instanceof Error ? e.message : String(e))
+      setErreur(e instanceof Error ? tm(e.message) : String(e))
     } finally {
       setEnCours(false)
     }
@@ -179,10 +185,10 @@ export function ModaleRecu({ orderId, onFermer }: Props) {
   if (escalade) {
     return (
       <DemandePin
-        titre="Autorisation requise"
+        titre={t('Autorisation requise')}
         // Le refus du domaine nomme la permission technique : utile au
         // journal, illisible au comptoir. On dit ce qui est attendu.
-        sousTitre="Un remboursement doit être autorisé par un gérant. Il pose son code ; son nom restera dans le journal."
+        sousTitre={t('Un remboursement doit être autorisé par un gérant. Il pose son code ; son nom restera dans le journal.')}
         candidats={employes.filter((e) => e.role === 'gerant' || e.role === 'admin')}
         onAnnuler={() => setEscalade(null)}
         onValide={(manager) => {
@@ -196,8 +202,8 @@ export function ModaleRecu({ orderId, onFermer }: Props) {
   if (mode === 'remboursement') {
     return (
       <Modale
-        titre={`Rembourser — ${etat.numeroTicket ?? 'ticket'}`}
-        sousTitre="Choisissez ce que le client rend. Le montant est calculé avec sa part de remise et de TVA."
+        titre={t('Rembourser — {numero}', { numero: etat.numeroTicket ?? t('ticket') })}
+        sousTitre={t('Choisissez ce que le client rend. Le montant est calculé avec sa part de remise et de TVA.')}
         onFermer={() => setMode('ticket')}
         large
         pied={
@@ -208,10 +214,10 @@ export function ModaleRecu({ orderId, onFermer }: Props) {
             onClick={() => void confirmer()}
           >
             {enCours
-              ? 'Enregistrement…'
+              ? t('Enregistrement…')
               : calcul
-                ? `Rendre ${formaterTND(calcul.montantMillimes)}`
-                : 'Rembourser'}
+                ? t('Rendre {montant}', { montant: formaterTND(calcul.montantMillimes) })
+                : t('Rembourser')}
           </button>
         }
       >
@@ -229,7 +235,7 @@ export function ModaleRecu({ orderId, onFermer }: Props) {
                   {p.quantite} × {p.designation}
                 </span>
                 <span className="montant">
-                  {p.dejaRemboursee ? 'déjà remboursé' : formaterTND(p.montantMillimes)}
+                  {p.dejaRemboursee ? t('déjà remboursé') : formaterTND(p.montantMillimes)}
                 </span>
               </label>
             </li>
@@ -237,24 +243,24 @@ export function ModaleRecu({ orderId, onFermer }: Props) {
         </ul>
         <button
           type="button"
-          className="lien"
+          className="lien tout-le-ticket"
           onClick={() =>
             setChoisies(new Set(parts.filter((p) => !p.dejaRemboursee).map((p) => p.ligneId)))
           }
-        >
-          Tout le ticket
-        </button>
+        >{t('Tout le ticket')}</button>
 
         {calcul && calcul.timbreMillimes > 0 && (
           <p className="aide">
-            Le droit de timbre ({formaterTND(calcul.timbreMillimes)}) est rendu avec la dernière
-            ligne : le ticket est alors entièrement remboursé.
+            {t(
+              'Le droit de timbre ({montant}) est rendu avec la dernière ligne : le ticket est alors entièrement remboursé.',
+              { montant: formaterTND(calcul.timbreMillimes) },
+            )}
           </p>
         )}
 
         {modes.length > 1 && (
           <>
-            <label>Rendu en</label>
+            <label>{t('Rendu en')}</label>
             <div className="options">
               {modes.map((m) => (
                 <button
@@ -264,20 +270,17 @@ export function ModaleRecu({ orderId, onFermer }: Props) {
                   aria-pressed={modeRendu === m}
                   onClick={() => setModeRendu(m)}
                 >
-                  {libelleModePaiement(m)}
+                  {libellePaiement(m)}
                 </button>
               ))}
             </div>
           </>
         )}
         {modeRendu === 'card' && (
-          <p className="aide">
-            Un remboursement sur carte se fait sur le terminal de la banque. Kaissi l’enregistre ;
-            le tiroir n’est pas concerné.
-          </p>
+          <p className="aide">{t('Un remboursement sur carte se fait sur le terminal de la banque. Kaissi l’enregistre ; le tiroir n’est pas concerné.')}</p>
         )}
 
-        <label htmlFor="remb-motif">Motif</label>
+        <label htmlFor="remb-motif">{t('Motif')}</label>
         <div className="options">
           {MOTIFS_COURANTS.map((m) => (
             <button
@@ -287,16 +290,18 @@ export function ModaleRecu({ orderId, onFermer }: Props) {
               aria-pressed={motif === m}
               onClick={() => setMotif(m)}
             >
-              {m}
+              {t(m)}
             </button>
           ))}
         </div>
         <input
           id="remb-motif"
           type="text"
-          value={motif}
+          // Un motif RAPIDE est gardé en français (il part au journal), mais
+          // il s'affiche dans la langue de la caisse.
+          value={(MOTIFS_COURANTS as readonly string[]).includes(motif) ? t(motif) : motif}
           maxLength={200}
-          placeholder="Ou écrivez le motif"
+          placeholder={t('Ou écrivez le motif')}
           onChange={(e) => setMotif(e.target.value)}
         />
 
@@ -307,10 +312,10 @@ export function ModaleRecu({ orderId, onFermer }: Props) {
 
   return (
     <Modale
-      titre={`Reçu ${etat.numeroTicket ?? ''}`.trim()}
+      titre={t('Reçu {numero}', { numero: etat.numeroTicket ?? '' }).trim()}
       sousTitre={
         deja > 0
-          ? `Déjà remboursé : ${formaterTND(deja)} — reste ${formaterTND(reste)}`
+          ? t('Déjà remboursé : {deja} — reste {reste}', { deja: formaterTND(deja), reste: formaterTND(reste) })
           : undefined
       }
       onFermer={onFermer}
@@ -323,21 +328,16 @@ export function ModaleRecu({ orderId, onFermer }: Props) {
               setErreur(null)
               setMode('remboursement')
             }}
-          >
-            Rembourser…
-          </button>
+          >{t('Rembourser…')}</button>
         ) : undefined
       }
     >
       <TicketEcran charge={charge} />
       {etat.statut === 'annulee' && (
-        <p className="aide">Commande annulée : il n’y a rien à rembourser.</p>
+        <p className="aide">{t('Commande annulée : il n’y a rien à rembourser.')}</p>
       )}
       {etat.exceptions.some((e) => e.type === 'double_remboursement') && (
-        <p className="erreur">
-          Une même ligne a été remboursée deux fois, sans doute par deux caisses hors ligne. Le
-          gérant doit vérifier les deux tiroirs.
-        </p>
+        <p className="erreur">{t('Une même ligne a été remboursée deux fois, sans doute par deux caisses hors ligne. Le gérant doit vérifier les deux tiroirs.')}</p>
       )}
     </Modale>
   )

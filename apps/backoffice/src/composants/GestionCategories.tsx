@@ -29,6 +29,7 @@ import {
 } from '../app/[restaurant]/catalogue/actions.js'
 import type { Categorie, Produit, Station } from './EditeurCatalogue.js'
 import { Message } from './EditeurCatalogue.js'
+import { useT } from '../i18n/client.js'
 
 function LigneCategorie({
   restaurantId,
@@ -39,6 +40,7 @@ function LigneCategorie({
   categorie: Categorie
   stations: Station[]
 }) {
+  const t = useT()
   const [resultat, action] = useActionState(
     modifierCategorie.bind(
       null,
@@ -54,29 +56,27 @@ function LigneCategorie({
       <input
         name="nom"
         defaultValue={categorie.nom}
-        aria-label={`Nom de la catégorie ${categorie.nom}`}
+        aria-label={t('Nom de la catégorie {nom}', { nom: categorie.nom })}
         style={{ maxWidth: '12rem' }}
       />
       <select
         name="station"
         defaultValue={categorie.stationId ?? ''}
-        aria-label={`Poste de ${categorie.nom}`}
+        aria-label={t('Poste de {nom}', { nom: categorie.nom })}
         // Le changement VAUT validation : sans cela, un gérant choisit « Bar »,
         // change de page, et le réglage n'a jamais été enregistré — sans que
         // rien ne le lui dise.
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
       >
-        <option value="">— non réglé —</option>
+        <option value="">{t('— non réglé —')}</option>
         {stations.map((s) => (
           <option key={s.id} value={s.id}>
             {s.nom}
           </option>
         ))}
       </select>
-      <button type="submit" className="discret">
-        Enregistrer
-      </button>
-      {resultat?.erreur && <span className="ecart negatif">{resultat.erreur}</span>}
+      <button type="submit" className="discret">{t('Enregistrer')}</button>
+      {resultat?.erreur && <span className="ecart negatif">{t.m(resultat.erreur)}</span>}
     </form>
   )
 }
@@ -89,6 +89,7 @@ function LignePoste({
   restaurantId: string
   poste: Station
 }) {
+  const t = useT()
   const [resultat, action] = useActionState(
     renommerPoste.bind(null, restaurantId, poste.id),
     null as Resultat | null,
@@ -98,13 +99,11 @@ function LignePoste({
       <input
         name="nom"
         defaultValue={poste.nom}
-        aria-label={`Nom du poste ${poste.nom}`}
+        aria-label={t('Nom du poste {nom}', { nom: poste.nom })}
         style={{ maxWidth: '12rem' }}
       />
-      <button type="submit" className="discret">
-        Renommer
-      </button>
-      {resultat?.erreur && <span className="ecart negatif">{resultat.erreur}</span>}
+      <button type="submit" className="discret">{t('Renommer')}</button>
+      {resultat?.erreur && <span className="ecart negatif">{t.m(resultat.erreur)}</span>}
     </form>
   )
 }
@@ -132,6 +131,7 @@ function PostesPreparation({
   stations: Station[]
   categories: Categorie[]
 }) {
+  const t = useT()
   const [resultat, action, enCours] = useActionState(
     creerPoste.bind(null, restaurantId),
     null as Resultat | null,
@@ -141,26 +141,19 @@ function PostesPreparation({
     <section className="carte">
       <Message resultat={resultat} />
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem' }}>
-        <h2 style={{ marginBottom: 0 }}>Postes de préparation</h2>
+        <h2 style={{ marginBottom: 0 }}>{t('Postes de préparation')}</h2>
         <span className="etiquette">{stations.length}</span>
       </div>
-      <p className="indication">
-        Un poste, c’est un écran : la cuisine voit le sien, le bar le sien. Un
-        employé de rôle « cuisine » ou « bar » est rattaché à un poste dans
-        <strong> Employés</strong>, et n’ouvre que celui-là.
-      </p>
+      <p className="indication">{t('Un poste, c’est un écran : la cuisine voit le sien, le bar le sien. Un employé de rôle « cuisine » ou « bar » est rattaché à un poste dans')}<strong>{' '}{t('Employés')}</strong>{t(', et n’ouvre que celui-là.')}</p>
 
       {stations.length === 0 ? (
-        <p className="vide">
-          Aucun poste. Tant qu’il n’y en a pas, aucune catégorie ne peut être
-          rattachée, et rien n’apparaît sur les écrans de préparation.
-        </p>
+        <p className="vide">{t('Aucun poste. Tant qu’il n’y en a pas, aucune catégorie ne peut être rattachée, et rien n’apparaît sur les écrans de préparation.')}</p>
       ) : (
         <table>
           <thead>
             <tr>
-              <th>Poste</th>
-              <th className="nombre">Catégories</th>
+              <th>{t('Poste')}</th>
+              <th className="nombre">{t('Catégories')}</th>
               {modifiable && <th />}
             </tr>
           </thead>
@@ -178,24 +171,22 @@ function PostesPreparation({
                   </td>
                   <td className="nombre">
                     {rattachees.length === 0 ? (
-                      <span className="etiquette inactif">aucune</span>
+                      <span className="etiquette inactif">{t('aucune')}</span>
                     ) : (
                       rattachees.length
                     )}
                   </td>
                   {modifiable && (
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <td style={{ textAlign: 'end', whiteSpace: 'nowrap' }}>
                       <button
                         type="button"
                         className="discret danger"
                         onClick={() => {
-                          if (confirm(`Archiver le poste « ${poste.nom} » ?`)) {
+                          if (confirm(t('Archiver le poste « {nom} » ?', { nom: poste.nom }))) {
                             void archiverPoste(restaurantId, poste.id)
                           }
                         }}
-                      >
-                        Archiver
-                      </button>
+                      >{t('Archiver')}</button>
                     </td>
                   )}
                 </tr>
@@ -208,13 +199,9 @@ function PostesPreparation({
       {modifiable && (
         <form action={action} style={{ marginTop: '1rem' }}>
           <div className="champ">
-            <label htmlFor="nom-poste">Nouveau poste</label>
-            <input id="nom-poste" name="nom" placeholder="Pizzeria" required maxLength={60} />
-            <p className="indication">
-              Le nom est libre et se change à tout moment : le rattachement des
-              employés et des catégories se fait par identifiant, jamais par le
-              nom. Renommer « Bar » en « Comptoir » ne vide donc aucun écran.
-            </p>
+            <label htmlFor="nom-poste">{t('Nouveau poste')}</label>
+            <input id="nom-poste" name="nom" placeholder={t('Pizzeria')} required maxLength={60} />
+            <p className="indication">{t('Le nom est libre et se change à tout moment : le rattachement des employés et des catégories se fait par identifiant, jamais par le nom. Renommer « Bar » en « Comptoir » ne vide donc aucun écran.')}</p>
           </div>
           {/*
             `max + 1`, et non `length + 1` : après un archivage, la longueur
@@ -227,7 +214,7 @@ function PostesPreparation({
             value={String(stations.reduce((m, s) => Math.max(m, s.position ?? 0), 0) + 1)}
           />
           <button type="submit" disabled={enCours}>
-            {enCours ? 'Création…' : 'Créer le poste'}
+            {enCours ? t('Création…') : t('Créer le poste')}
           </button>
         </form>
       )}
@@ -250,6 +237,7 @@ export function GestionCategories({
   produits: Produit[]
   archivees: Categorie[]
 }) {
+  const t = useT()
   const [resultatCategorie, actionCategorie, categorieEnCours] = useActionState(
     creerCategorie.bind(null, restaurantId),
     null as Resultat | null,
@@ -267,22 +255,17 @@ export function GestionCategories({
       />
 
       <section className="carte">
-        <h2>Catégories</h2>
-        <p className="indication">
-          Le <strong>poste de préparation</strong> se règle ici, pas produit par
-          produit : tout ce que contient « Boissons » part au bar, y compris ce
-          que vous y ajouterez dans six mois. Une catégorie sans poste
-          n’apparaît sur aucun écran de préparation.
-        </p>
+        <h2>{t('Catégories')}</h2>
+        <p className="indication">{t('Le')}{' '}<strong>{t('poste de préparation')}</strong>{' '}{t('se règle ici, pas produit par produit : tout ce que contient « Boissons » part au bar, y compris ce que vous y ajouterez dans six mois. Une catégorie sans poste n’apparaît sur aucun écran de préparation.')}</p>
         {categories.length === 0 ? (
-          <p className="vide">Aucune catégorie — les produits apparaîtront tous ensemble.</p>
+          <p className="vide">{t('Aucune catégorie — les produits apparaîtront tous ensemble.')}</p>
         ) : (
           <table>
             <thead>
               <tr>
-                <th>Catégorie</th>
-                <th>Poste de préparation</th>
-                <th className="nombre">Produits</th>
+                <th>{t('Catégorie')}</th>
+                <th>{t('Poste de préparation')}</th>
+                <th className="nombre">{t('Produits')}</th>
                 {modifiable && <th />}
               </tr>
             </thead>
@@ -302,7 +285,7 @@ export function GestionCategories({
                   </td>
                   <td>
                     {categorie.stationId === null ? (
-                      <span className="etiquette inactif">non réglé</span>
+                      <span className="etiquette inactif">{t('non réglé')}</span>
                     ) : (
                       (stations.find((s) => s.id === categorie.stationId)?.nom ?? '—')
                     )}
@@ -311,12 +294,12 @@ export function GestionCategories({
                     {produits.filter((p) => p.categorieId === categorie.id).length}
                   </td>
                   {modifiable && (
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <td style={{ textAlign: 'end', whiteSpace: 'nowrap' }}>
                       <button
                         type="button"
                         className="discret"
                         disabled={rang === 0}
-                        title="Monter"
+                        title={t('Monter')}
                         onClick={() => void deplacerCategorie(restaurantId, categorie.id, 'haut')}
                       >
                         ↑
@@ -325,7 +308,7 @@ export function GestionCategories({
                         type="button"
                         className="discret"
                         disabled={rang === categories.length - 1}
-                        title="Descendre"
+                        title={t('Descendre')}
                         onClick={() => void deplacerCategorie(restaurantId, categorie.id, 'bas')}
                       >
                         ↓
@@ -334,13 +317,11 @@ export function GestionCategories({
                         type="button"
                         className="discret danger"
                         onClick={() => {
-                          if (confirm(`Archiver la catégorie « ${categorie.nom} » ?`)) {
+                          if (confirm(t('Archiver la catégorie « {nom} » ?', { nom: categorie.nom }))) {
                             void archiverCategorie(restaurantId, categorie.id)
                           }
                         }}
-                      >
-                        Archiver
-                      </button>
+                      >{t('Archiver')}</button>
                     </td>
                   )}
                 </tr>
@@ -352,12 +333,9 @@ export function GestionCategories({
         {modifiable && (
           <form action={actionCategorie} style={{ marginTop: '1rem' }}>
             <div className="champ">
-              <label htmlFor="nom-categorie">Nouvelle catégorie</label>
-              <input id="nom-categorie" name="nom" placeholder="Desserts" required />
-              <p className="indication">
-                Elle se place à la fin ; les flèches la déplacent ensuite. Son
-                poste de préparation se choisit sur sa ligne.
-              </p>
+              <label htmlFor="nom-categorie">{t('Nouvelle catégorie')}</label>
+              <input id="nom-categorie" name="nom" placeholder={t('Desserts')} required />
+              <p className="indication">{t('Elle se place à la fin ; les flèches la déplacent ensuite. Son poste de préparation se choisit sur sa ligne.')}</p>
             </div>
             {/* La position ne se saisit plus : elle se règle avec les flèches. */}
             <input
@@ -366,7 +344,7 @@ export function GestionCategories({
               value={String(categories.reduce((m, c) => Math.max(m, c.position), 0) + 1)}
             />
             <button type="submit" disabled={categorieEnCours}>
-              {categorieEnCours ? 'Création…' : 'Créer la catégorie'}
+              {categorieEnCours ? t('Création…') : t('Créer la catégorie')}
             </button>
           </form>
         )}
@@ -375,24 +353,19 @@ export function GestionCategories({
 
       {modifiable && archivees.length > 0 && (
         <section className="carte">
-          <h2>Catégories archivées</h2>
-          <p className="indication">
-            Archiver n’est pas supprimer : l’historique des ventes garde la
-            référence. Remettre une catégorie la replace en fin de liste.
-          </p>
+          <h2>{t('Catégories archivées')}</h2>
+          <p className="indication">{t('Archiver n’est pas supprimer : l’historique des ventes garde la référence. Remettre une catégorie la replace en fin de liste.')}</p>
           <table>
             <tbody>
               {archivees.map((categorie) => (
                 <tr key={categorie.id}>
                   <td>{categorie.nom}</td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td style={{ textAlign: 'end' }}>
                     <button
                       type="button"
                       className="discret"
                       onClick={() => void desarchiverCategorie(restaurantId, categorie.id)}
-                    >
-                      Remettre
-                    </button>
+                    >{t('Remettre')}</button>
                   </td>
                 </tr>
               ))}

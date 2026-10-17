@@ -11,7 +11,12 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Application } from './Application.js'
 import { CIBLE_WEB } from './config.js'
+import { appliquerLangue } from './i18n.js'
 import './styles.css'
+
+// Le sens d'écriture AVANT le premier rendu : sans cela, une caisse en
+// arabe clignoterait de gauche à droite pendant une image.
+appliquerLangue()
 
 const racine = document.getElementById('racine')
 if (!racine) throw new Error('Élément racine introuvable dans index.html')

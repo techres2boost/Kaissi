@@ -34,6 +34,7 @@ import type { AdaptateurSqlite, ValeurSql } from '@kaissi/db-local'
 import { ErreurSqlite } from '@kaissi/db-local'
 import initSqlJs, { type Database } from 'sql.js'
 import urlWasm from 'sql.js/dist/sql-wasm.wasm?url'
+import { t } from '../i18n.js'
 
 const BASE_IDB = 'kaissi-pos'
 const MAGASIN = 'base'
@@ -63,7 +64,7 @@ function ouvrirIdb(): Promise<IDBDatabase> {
     }
     requete.onsuccess = () => resoudre(requete.result)
     requete.onerror = () =>
-      rejeter(new ErreurSqlite("IndexedDB inaccessible — navigation privée ?", requete.error))
+      rejeter(new ErreurSqlite(t("IndexedDB inaccessible — navigation privée ?"), requete.error))
   })
 }
 
@@ -79,7 +80,7 @@ function lireImage(idb: IDBDatabase): Promise<Uint8Array | null> {
     // `catch` qui reçoit `undefined`, sans message ni pile. On garantit donc
     // une vraie `Error` — c'est elle qu'on lira dans un rapport de panne.
     requete.onerror = () =>
-      rejeter(requete.error ?? new Error('Lecture IndexedDB refusée, sans motif.'))
+      rejeter(requete.error ?? new Error(t('Lecture IndexedDB refusée, sans motif.')))
   })
 }
 
@@ -91,8 +92,8 @@ function ecrireImage(idb: IDBDatabase, image: Uint8Array): Promise<void> {
     // durable. Confondre les deux, c'est croire une vente enregistrée alors
     // qu'elle est encore en vol.
     tx.oncomplete = () => resoudre()
-    tx.onerror = () => rejeter(tx.error ?? new Error('Écriture IndexedDB refusée.'))
-    tx.onabort = () => rejeter(tx.error ?? new Error('Écriture IndexedDB interrompue.'))
+    tx.onerror = () => rejeter(tx.error ?? new Error(t('Écriture IndexedDB refusée.')))
+    tx.onabort = () => rejeter(tx.error ?? new Error(t('Écriture IndexedDB interrompue.')))
     // Une COPIE : sql.js rend une vue sur sa mémoire linéaire, que la
     // prochaine écriture peut réallouer sous les pieds d'IndexedDB.
     tx.objectStore(MAGASIN).put(new Uint8Array(image), CLE)
@@ -148,7 +149,7 @@ export async function adaptateurWeb(): Promise<BaseWeb> {
         db.run(sql, params as ValeurSql[])
         sale = true
       } catch (e) {
-        throw new ErreurSqlite(`Échec de « ${sql.slice(0, 80)} »`, e)
+        throw new ErreurSqlite(t('Échec de « {sql} »', { sql: sql.slice(0, 80) }), e)
       }
       // Hors transaction, chaque écriture est sa propre unité de travail.
       if (profondeur === 0) await sauvegarder()
@@ -159,7 +160,7 @@ export async function adaptateurWeb(): Promise<BaseWeb> {
         db.exec(sql)
         sale = true
       } catch (e) {
-        throw new ErreurSqlite("Échec de l'exécution du script SQL", e)
+        throw new ErreurSqlite(t("Échec de l'exécution du script SQL"), e)
       }
       if (profondeur === 0) await sauvegarder()
     },
@@ -168,7 +169,7 @@ export async function adaptateurWeb(): Promise<BaseWeb> {
       try {
         return lignes(sql, params) as never
       } catch (e) {
-        throw new ErreurSqlite(`Échec de la lecture « ${sql.slice(0, 80)} »`, e)
+        throw new ErreurSqlite(t('Échec de la lecture « {sql} »', { sql: sql.slice(0, 80) }), e)
       }
     },
 
@@ -176,7 +177,7 @@ export async function adaptateurWeb(): Promise<BaseWeb> {
       try {
         return (lignes(sql, params)[0] ?? null) as never
       } catch (e) {
-        throw new ErreurSqlite(`Échec de la lecture « ${sql.slice(0, 80)} »`, e)
+        throw new ErreurSqlite(t('Échec de la lecture « {sql} »', { sql: sql.slice(0, 80) }), e)
       }
     },
 
@@ -221,9 +222,9 @@ export async function adaptateurWeb(): Promise<BaseWeb> {
     adaptateur,
     protege,
     detail: protege
-      ? 'SQLite WebAssembly dans IndexedDB — stockage persistant accordé'
-      : 'SQLite WebAssembly dans IndexedDB — stockage persistant REFUSÉ par le ' +
-        'navigateur : les ventes survivent au rechargement, mais l’origine ' +
-        'reste évinçable sous pression disque',
+      ? t('SQLite WebAssembly dans IndexedDB — stockage persistant accordé')
+      : t(
+          'SQLite WebAssembly dans IndexedDB — stockage persistant REFUSÉ par le navigateur : les ventes survivent au rechargement, mais l’origine reste évinçable sous pression disque',
+        ),
   }
 }

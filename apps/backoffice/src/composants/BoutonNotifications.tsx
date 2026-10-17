@@ -29,6 +29,7 @@ import {
   retirerAbonnement,
   type ResultatAbonnement,
 } from '../app/[restaurant]/stock/notifications.js'
+import { useT } from '../i18n/client.js'
 
 /**
  * La clé VAPID voyage en base64url ; `applicationServerKey` veut des octets.
@@ -64,6 +65,7 @@ export function BoutonNotifications({
   /** `null` : aucune clé VAPID configurée côté serveur. */
   clePublique: string | null
 }) {
+  const t = useT()
   const [etat, setEtat] = useState<Etat>('inconnu')
   const [message, setMessage] = useState<ResultatAbonnement>({})
   const [enCours, demarrer] = useTransition()
@@ -98,13 +100,13 @@ export function BoutonNotifications({
     demarrer(async () => {
       try {
         if (!clePublique) {
-          setMessage({ erreur: 'Les notifications ne sont pas configurées sur ce serveur.' })
+          setMessage({ erreur: t('Les notifications ne sont pas configurées sur ce serveur.') })
           return
         }
         const permission = await Notification.requestPermission()
         if (permission !== 'granted') {
           setEtat(permission === 'denied' ? 'refuse' : 'inactif')
-          setMessage({ erreur: 'Le navigateur a refusé les notifications.' })
+          setMessage({ erreur: t('Le navigateur a refusé les notifications.') })
           return
         }
         const enregistrement = await navigator.serviceWorker.register('/sw-alertes.js')
@@ -121,7 +123,7 @@ export function BoutonNotifications({
         })
         const cles = clesDe(abonnement)
         if (!cles) {
-          setMessage({ erreur: 'Le navigateur n’a pas fourni de clés d’abonnement.' })
+          setMessage({ erreur: t('Le navigateur n’a pas fourni de clés d’abonnement.') })
           return
         }
         const resultat = await enregistrerAbonnement(restaurant, {
@@ -136,7 +138,7 @@ export function BoutonNotifications({
         else await abonnement.unsubscribe().catch(() => undefined)
       } catch (erreur) {
         setMessage({
-          erreur: `Abonnement impossible : ${erreur instanceof Error ? erreur.message : String(erreur)}`,
+          erreur: t('Abonnement impossible : {valeur}', { valeur: erreur instanceof Error ? erreur.message : String(erreur) }),
         })
       }
     })
@@ -176,7 +178,7 @@ export function BoutonNotifications({
       const abonnement = await enregistrement?.pushManager.getSubscription()
       if (!abonnement) {
         setEtat('inactif')
-        setMessage({ erreur: 'Ce navigateur n’est plus abonné. Réactive les alertes.' })
+        setMessage({ erreur: t('Ce navigateur n’est plus abonné. Réactive les alertes.') })
         return
       }
       setMessage(await envoyerNotificationTest(restaurant, abonnement.endpoint))
@@ -186,40 +188,25 @@ export function BoutonNotifications({
   return (
     <div className="notifications">
       {etat === 'indisponible' && (
-        <p className="detail">
-          Ce navigateur ne sait pas recevoir de notifications. Les alertes
-          restent visibles sur cet écran.
-        </p>
+        <p className="detail">{t('Ce navigateur ne sait pas recevoir de notifications. Les alertes restent visibles sur cet écran.')}</p>
       )}
       {etat === 'refuse' && (
-        <p className="detail">
-          Les notifications ont été refusées pour ce site. Réautorise-les dans
-          les réglages du navigateur (cadenas à gauche de l’adresse), puis
-          recharge la page.
-        </p>
+        <p className="detail">{t('Les notifications ont été refusées pour ce site. Réautorise-les dans les réglages du navigateur (cadenas à gauche de l’adresse), puis recharge la page.')}</p>
       )}
       {etat === 'inactif' && (
-        <button type="button" onClick={activer} disabled={enCours || !clePublique}>
-          🔔 M’alerter des ruptures sur ce navigateur
-        </button>
+        <button type="button" onClick={activer} disabled={enCours || !clePublique}>{t('🔔 M’alerter des ruptures sur ce navigateur')}</button>
       )}
       {etat === 'actif' && (
         <span style={{ display: 'inline-flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button type="button" onClick={tester} disabled={enCours}>
-            Envoyer une notification de test
-          </button>
-          <button type="button" className="discret" onClick={desactiver} disabled={enCours}>
-            Alertes actives sur ce navigateur — désactiver
-          </button>
+          <button type="button" onClick={tester} disabled={enCours}>{t('Envoyer une notification de test')}</button>
+          <button type="button" className="discret" onClick={desactiver} disabled={enCours}>{t('Alertes actives sur ce navigateur — désactiver')}</button>
         </span>
       )}
       {!clePublique && etat === 'inactif' && (
-        <p className="detail">
-          Notifications non configurées sur ce serveur (clé VAPID absente).
-        </p>
+        <p className="detail">{t('Notifications non configurées sur ce serveur (clé VAPID absente).')}</p>
       )}
-      {message.erreur && <p className="message erreur">{message.erreur}</p>}
-      {message.succes && <p className="message succes">{message.succes}</p>}
+      {message.erreur && <p className="message erreur">{t.m(message.erreur)}</p>}
+      {message.succes && <p className="message succes">{t.m(message.succes)}</p>}
     </div>
   )
 }

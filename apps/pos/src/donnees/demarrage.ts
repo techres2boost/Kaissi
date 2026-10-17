@@ -28,6 +28,7 @@ import {
   type MigrationAppliquee,
 } from '@kaissi/db-local'
 import { ouvrirBaseLocale, type BaseLocale } from './sqlite.js'
+import { t } from '../i18n.js'
 
 export interface EtapeDemarrage {
   readonly nom: string
@@ -79,36 +80,39 @@ export async function demarrer(): Promise<ContexteApplication> {
     }
   }
 
-  const base = await mesurer('Ouverture de la base locale', async () => {
+  const base = await mesurer(t('Ouverture de la base locale'), async () => {
     const b = await ouvrirBaseLocale()
     return b
   })
   etapes[etapes.length - 1] = { ...etapes[etapes.length - 1]!, detail: base.detail }
 
-  const resultatMigration = await mesurer('Migrations locales', () => migrer(base.adaptateur))
+  const resultatMigration = await mesurer(t('Migrations locales'), () => migrer(base.adaptateur))
   etapes[etapes.length - 1] = {
     ...etapes[etapes.length - 1]!,
     detail:
       resultatMigration.appliquees.length === 0
-        ? `Déjà en version ${resultatMigration.versionApres}`
-        : `${resultatMigration.appliquees.length} migration(s) appliquée(s) → version ${resultatMigration.versionApres}`,
+        ? t('Déjà en version {version}', { version: resultatMigration.versionApres })
+        : t('{n} migration(s) appliquée(s) → version {version}', {
+            n: resultatMigration.appliquees.length,
+            version: resultatMigration.versionApres,
+          }),
   }
 
-  const grainePosee = await mesurer('Graine du catalogue', () =>
+  const grainePosee = await mesurer(t('Graine du catalogue'), () =>
     installerGraine(base.adaptateur),
   )
   etapes[etapes.length - 1] = {
     ...etapes[etapes.length - 1]!,
-    detail: grainePosee ? 'Catalogue de démonstration installé' : 'Catalogue déjà présent',
+    detail: grainePosee ? t('Catalogue de démonstration installé') : t('Catalogue déjà présent'),
   }
 
   const catalogue = depotCatalogue(base.adaptateur)
-  const nombreProduits = await mesurer('Lecture du menu (local)', () =>
+  const nombreProduits = await mesurer(t('Lecture du menu (local)'), () =>
     catalogue.nombreProduits(),
   )
   etapes[etapes.length - 1] = {
     ...etapes[etapes.length - 1]!,
-    detail: `${nombreProduits} produit(s) lus depuis SQLite — aucun accès réseau`,
+    detail: t('{n} produit(s) lus depuis SQLite — aucun accès réseau', { n: nombreProduits }),
   }
 
   return {

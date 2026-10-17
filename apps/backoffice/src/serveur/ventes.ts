@@ -493,7 +493,7 @@ export async function chargerVentes(
       closeA: commande.closed_at,
       vendeur: nomEmploye(vendeurId),
       couverts: commande.covers,
-      nombreArticles: brutes.reduce((t, l) => t + l.qty, 0),
+      nombreArticles: brutes.reduce((elt, l) => elt + l.qty, 0),
     })
   }
 

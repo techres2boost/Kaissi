@@ -125,13 +125,13 @@ export async function reconstruireTicket(
   const serviceBp = Number(restaurantRes.data?.service_rate_bp ?? 0)
   const config: ConfigCalcul = {
     tauxTaxes: Object.fromEntries(
-      (tauxRes.data ?? []).map((t) => [
-        t.id,
+      (tauxRes.data ?? []).map((elt) => [
+        elt.id,
         {
-          id: t.id as Uuid,
-          nom: t.name as string,
-          tauxBp: t.rate_bp as PointsDeBase,
-          incluse: Boolean(t.is_included),
+          id: elt.id as Uuid,
+          nom: elt.name as string,
+          tauxBp: elt.rate_bp as PointsDeBase,
+          incluse: Boolean(elt.is_included),
         },
       ]),
     ),

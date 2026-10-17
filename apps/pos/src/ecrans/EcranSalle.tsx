@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { formaterTND, libelleStatut, millimes, type StatutCommande } from '@kaissi/domain'
 import type { CommandeOuverte } from '@kaissi/db-local'
 import { useApp } from '../etat/contexte.js'
+import { t } from '../i18n.js'
 
 interface Props {
   readonly onOuvrirCommande: (orderId: string) => void
@@ -50,27 +51,21 @@ export function EcranSalle({ onOuvrirCommande, onNouvelleCommande }: Props) {
             aria-selected={vue === 'salle'}
             className={vue === 'salle' ? 'actif' : ''}
             onClick={() => setVue('salle')}
-          >
-            Salle
-          </button>
+          >{t('Salle')}</button>
           <button
             type="button"
             role="tab"
             aria-selected={vue === 'commandes'}
             className={vue === 'commandes' ? 'actif' : ''}
             onClick={() => setVue('commandes')}
-          >
-            Commandes ({ouvertes.length})
-          </button>
+          >{t('Commandes ({n})', { n: ouvertes.length })}</button>
         </div>
 
         <button
           type="button"
           className="principal"
           onClick={() => onNouvelleCommande(null)}
-        >
-          + À emporter
-        </button>
+        >{t('+ À emporter')}</button>
       </div>
 
       {/*
@@ -83,10 +78,10 @@ export function EcranSalle({ onOuvrirCommande, onNouvelleCommande }: Props) {
       */}
       {pretes.length > 0 && (
         <div className="bandeau-prets">
-          <strong>Prêt à servir</strong>
+          <strong>{t('Prêt à servir')}</strong>
           {pretes.map((c) => (
             <button key={c.id} type="button" onClick={() => onOuvrirCommande(c.id)}>
-              {c.tableLabel ? `Table ${c.tableLabel}` : (c.numeroTicket ?? 'À emporter')}
+              {c.tableLabel ? t('Table {numero}', { numero: c.tableLabel }) : (c.numeroTicket ?? t('À emporter'))}
             </button>
           ))}
         </div>
@@ -94,21 +89,21 @@ export function EcranSalle({ onOuvrirCommande, onNouvelleCommande }: Props) {
 
       {vue === 'salle' ? (
         <div className="grille-tables">
-          {tables.map((t) => {
-            const commande = parTable.get(t.id)
+          {tables.map((elt) => {
+            const commande = parTable.get(elt.id)
             return (
               <button
-                key={t.id}
+                key={elt.id}
                 type="button"
                 className={`table ${commande ? 'occupee' : 'libre'} ${
                   commande?.preteA ? 'prete' : ''
                 }`}
                 onClick={() =>
-                  commande ? onOuvrirCommande(commande.id) : onNouvelleCommande(t.id)
+                  commande ? onOuvrirCommande(commande.id) : onNouvelleCommande(elt.id)
                 }
               >
-                <span className="numero">{t.label}</span>
-                <span className="places">{t.places} pl.</span>
+                <span className="numero">{elt.label}</span>
+                <span className="places">{t('{n} pl.', { n: elt.places })}</span>
                 {commande ? (
                   <>
                     <span className="montant">
@@ -124,12 +119,12 @@ export function EcranSalle({ onOuvrirCommande, onNouvelleCommande }: Props) {
                       className={`badge ${commande.preteA ? 'pret' : commande.statut}`}
                     >
                       {commande.preteA
-                        ? 'Prêt'
-                        : libelleStatut(commande.statut as StatutCommande)}
+                        ? t('Prêt')
+                        : t(libelleStatut(commande.statut as StatutCommande))}
                     </span>
                   </>
                 ) : (
-                  <span className="libre-libelle">Libre</span>
+                  <span className="libre-libelle">{t('Libre')}</span>
                 )}
               </button>
             )
@@ -138,17 +133,17 @@ export function EcranSalle({ onOuvrirCommande, onNouvelleCommande }: Props) {
       ) : (
         <div className="liste-commandes">
           {ouvertes.length === 0 && (
-            <p className="vide">Aucune commande en cours. Touchez une table pour commencer.</p>
+            <p className="vide">{t('Aucune commande en cours. Touchez une table pour commencer.')}</p>
           )}
           {ouvertes.map((c) => (
             <button key={c.id} type="button" onClick={() => onOuvrirCommande(c.id)}>
               <span className="ref">
-                {c.tableLabel ? `Table ${c.tableLabel}` : 'À emporter'}
+                {c.tableLabel ? t('Table {numero}', { numero: c.tableLabel }) : t('À emporter')}
                 <small>{c.numeroTicket ?? ''}</small>
               </span>
-              <span className="articles">{c.nombreArticles} art.</span>
+              <span className="articles">{t('{n} art.', { n: c.nombreArticles })}</span>
               <span className={`badge ${c.preteA ? 'pret' : c.statut}`}>
-                {c.preteA ? 'Prêt' : libelleStatut(c.statut as StatutCommande)}
+                {c.preteA ? t('Prêt') : t(libelleStatut(c.statut as StatutCommande))}
               </span>
               <span className="montant">{formaterTND(millimes(c.totalMillimes))}</span>
             </button>
@@ -158,7 +153,7 @@ export function EcranSalle({ onOuvrirCommande, onNouvelleCommande }: Props) {
 
       {vue === 'salle' && aEmporter.length > 0 && (
         <div className="bande-emporter">
-          <h3>À emporter</h3>
+          <h3>{t('À emporter')}</h3>
           <div className="liste-emporter">
             {aEmporter.map((c) => (
               <button key={c.id} type="button" onClick={() => onOuvrirCommande(c.id)}>
@@ -167,7 +162,7 @@ export function EcranSalle({ onOuvrirCommande, onNouvelleCommande }: Props) {
                   {formaterTND(millimes(c.totalMillimes), { symbole: false })}
                 </span>
                 <span className={`badge ${c.preteA ? 'pret' : c.statut}`}>
-                  {c.preteA ? 'Prêt' : libelleStatut(c.statut as StatutCommande)}
+                  {c.preteA ? t('Prêt') : t(libelleStatut(c.statut as StatutCommande))}
                 </span>
               </button>
             ))}

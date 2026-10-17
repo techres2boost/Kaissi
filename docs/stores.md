@@ -2829,6 +2829,116 @@ identifiants absents. Ce n'est pas une régression, c'est l'état d'attente.
 
 ---
 
+## 4 duodecies. Mettre à jour SON téléphone de test — pas à pas
+
+Codemagic a construit, Play Console et TestFlight montrent le nouveau numéro…
+et le téléphone affiche toujours l'ancienne caisse. Ce n'est presque jamais la
+construction : c'est le chemin entre le magasin et TON appareil. Dans l'ordre.
+
+### Étape 0 — Savoir QUELLE version tourne, avant de chercher
+
+Sur la caisse : menu ☰ → **Diagnostic** → « Version en cours d'exécution ».
+La ligne **Commit** donne les 7 premiers caractères du commit construit.
+Compare-la au commit affiché sur la ligne du build Codemagic
+(`c45d6de`, par exemple). Différents : le téléphone n'a pas reçu la mise à
+jour, la suite de cette section s'applique. Identiques : le bug est dans le
+code, signale-le.
+
+> Si la caisse ne démarre même pas (« Démarrage impossible »), l'écran de
+> diagnostic est inaccessible : passe directement aux étapes ci-dessous.
+
+### Android — Google Play, piste interne
+
+Play Console montre deux pistes, et ton téléphone n'en suit qu'une :
+
+| Piste | Version | Qui la reçoit |
+|---|---|---|
+| *Closed testing — Alpha* | **103** — téléversée à la main, figée | les comptes de la liste « Alpha » |
+| *Internal testing* | **121** et suivantes — publiées par Codemagic | les comptes de la liste « Internal » |
+
+**Un téléphone inscrit seulement à Alpha reste sur 103 pour toujours.** Il
+faut que le compte Google DU TÉLÉPHONE soit testeur INTERNE :
+
+1. Play Console → Kaissi → *Test and release* → **Internal testing** → onglet
+   **Testers** → coche (ou crée) une liste qui contient l'adresse Gmail
+   **utilisée par le Play Store du téléphone** — pas forcément celle de la
+   console. Enregistre.
+2. Même onglet, en bas : **Copy link** (« Join on the web »). Ouvre ce lien
+   **sur le téléphone**, connecté à ce compte Gmail → **Become a tester** /
+   **Devenir testeur**.
+3. Sur le téléphone : Play Store → icône du compte → **Gérer les applis et
+   l'appareil** → **Mises à jour disponibles** → Kaissi → **Mettre à jour**.
+   Si Kaissi n'y figure pas : ferme le Play Store (balayer dans les
+   applications récentes), attends deux minutes, recommence. Play met parfois
+   quelques minutes à propager une version interne.
+4. Toujours rien ? Désinstalle Kaissi, puis réinstalle-la **depuis le lien de
+   test interne** (étape 2 → « Download it on Google Play »).
+5. Vérifie l'étape 0 : le commit doit correspondre.
+
+> Inutile de toucher à la piste Alpha : elle ne bouge plus. Si tu veux que les
+> testeurs Alpha reçoivent aussi les nouvelles versions, *Internal testing* →
+> la version → **Promote release → Closed testing (Alpha)**.
+
+### iOS — TestFlight
+
+1. App Store Connect → Kaissi → **TestFlight** : le build de Codemagic doit
+   apparaître avec le statut **Ready to Submit / Prêt à tester**. Juste après
+   la construction il reste quelques minutes en **Processing** ; tant qu'il y
+   est, TestFlight ne le propose à personne.
+2. Le build doit être rattaché au groupe **interne** dont tu fais partie
+   (*Internal Testing* → ton groupe → **Builds**). Codemagic l'y met ; si la
+   case est vide, ajoute-le avec **+**.
+3. Sur l'iPhone : application **TestFlight** → Kaissi → le numéro le plus
+   haut → **Mettre à jour** (ou **Installer**). Une mise à jour TestFlight ne
+   s'installe pas toute seule, sauf si « Mises à jour automatiques » est activé
+   dans la fiche de l'application dans TestFlight.
+4. Vérifie l'étape 0.
+
+### « Démarrage impossible — Échec de la migration locale 14 » sur iPhone
+
+Corrigé. Le greffon SQLite d'iOS retirait les retours à la ligne d'un script
+contenant `DELETE FROM` **sans les remplacer par une espace** :
+`DELETE FROM discounts\n WHERE id IN (…)` devenait
+`DELETE FROM discountsWHERE id IN (…)` — d'où « near "id": syntax error ».
+Android recolle avec une espace, d'où une caisse qui marchait sur la tablette
+et pas sur l'iPhone. L'adaptateur aplatit désormais chaque instruction sur une
+ligne avant de l'envoyer (`packages/db-local/src/adaptateurs/aplatir.ts`), et
+un test rejoue le prétraitement d'iOS sur toutes les migrations.
+
+Rien n'est perdu sur l'iPhone : la migration s'exécute dans une transaction,
+elle a été annulée, la base est restée en version 13. Installe le build qui
+suit ce correctif (étapes iOS ci-dessus) : au lancement, les migrations 14 à 16
+s'appliquent et la caisse s'ouvre. **Ne supprime pas l'application** si elle
+contient des ventes non synchronisées.
+
+### La caisse montre encore « Snack Lac 1 », Ahmed, Karim, Salma
+
+Ce ne sont pas des données figées dans l'application : c'est le **mode
+démonstration**, choisi un jour sur ce téléphone (lien « Découvrir sans
+compte » de l'accueil, ou une version antérieure qui démarrait directement
+dessus). La mise à jour garde la base locale — c'est voulu,
+sinon une mise à jour effacerait les ventes d'un vrai restaurant. Pour en
+sortir :
+
+- **Le geste normal** : dans la caisse, touche le badge rouge **« À
+  appairer »** en haut (ou menu ☰ → **Synchronisation**), saisis l'e-mail et
+  le mot de passe du compte du restaurant → **Effacer et mettre en service**.
+  La démonstration est effacée, la carte et les employés du restaurant
+  descendent du serveur.
+- **Repartir de zéro** (téléphone de test uniquement) :
+  - Android : Paramètres → Applications → Kaissi → Stockage → **Effacer les
+    données**, puis rouvrir ;
+  - iPhone : appui long sur l'icône → **Supprimer l'app**, puis réinstaller
+    depuis TestFlight.
+
+  L'accueil réapparaît : choisis **Se connecter**, pas la démonstration.
+
+> ⚠ « Effacer les données » supprime aussi les ventes **non synchronisées**.
+> Sur une caisse en service, vérifie d'abord l'écran **Synchronisation** :
+> « En attente » doit valoir **0**.
+
+---
+
 ## 5. Dans quel ordre
 
 1. **Maintenant** — l'APK signé, installé à la main. Zéro attente, correction

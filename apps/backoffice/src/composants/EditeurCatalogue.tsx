@@ -12,6 +12,7 @@ import {
 import { pourChampMontant } from '../serveur/formulaire.js'
 import { grouperParCategorie } from './grouper.js'
 import { formaterPourcentage, formaterTND, margeProduit, millimes } from '@kaissi/domain'
+import { useT } from '../i18n/client.js'
 
 /**
  * La marge d'un produit, telle qu'elle s'affiche au catalogue.
@@ -93,12 +94,13 @@ export function EditeurCatalogue({
    *  archivées, elles, se remettent depuis l'écran Catégories. */
   produitsArchives: Produit[]
 }) {
+  const t = useT()
   const [enEdition, setEnEdition] = useState<Produit | null>(null)
   const [nouveau, setNouveau] = useState(false)
 
   const idsCategories = categories.map((c) => c.id)
   const idsStations = stations.map((s) => s.id)
-  const idsTaux = taux.map((t) => t.id)
+  const idsTaux = taux.map((elt) => elt.id)
 
   const [resultatProduit, actionProduit, produitEnCours] = useActionState(
     enregistrerProduit.bind(null, restaurantId, idsCategories, idsStations, idsTaux),
@@ -129,20 +131,18 @@ export function EditeurCatalogue({
 
       <section className="carte">
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem' }}>
-          <h2 style={{ marginBottom: 0 }}>Produits</h2>
+          <h2 style={{ marginBottom: 0 }}>{t('Produits')}</h2>
           <span className="etiquette">{produits.length}</span>
           {modifiable && !formulaireOuvert && taux.length > 0 && (
             <button
               type="button"
               className="principal"
-              style={{ marginLeft: 'auto' }}
+              style={{ marginInlineStart: 'auto' }}
               onClick={() => {
                 setEnEdition(null)
                 setNouveau(true)
               }}
-            >
-              Ajouter un produit
-            </button>
+            >{t('Ajouter un produit')}</button>
           )}
         </div>
 
@@ -153,16 +153,16 @@ export function EditeurCatalogue({
             style={{ marginTop: '1rem', background: 'var(--panneau-clair)' }}
             key={cible?.id ?? 'nouveau'}
           >
-            <h2>{cible ? `Modifier « ${cible.nom} »` : 'Nouveau produit'}</h2>
+            <h2>{cible ? t('Modifier « {nom} »', { nom: cible.nom }) : t('Nouveau produit')}</h2>
             {cible && <input type="hidden" name="id" value={cible.id} />}
 
             <div className="champs deux">
               <div className="champ">
-                <label htmlFor="nom">Nom</label>
+                <label htmlFor="nom">{t('Nom')}</label>
                 <input id="nom" name="nom" defaultValue={cible?.nom ?? ''} required autoFocus />
               </div>
               <div className="champ">
-                <label htmlFor="prix">Prix de vente</label>
+                <label htmlFor="prix">{t('Prix de vente')}</label>
                 <input
                   id="prix"
                   name="prix"
@@ -171,14 +171,11 @@ export function EditeurCatalogue({
                   placeholder="24.500"
                   required
                 />
-                <p className="indication">
-                  En dinars, avec <strong>trois</strong> décimales. « 24,5 » et « 24.500 »
-                  donnent le même prix.
-                </p>
+                <p className="indication">{t('En dinars, avec')}{' '}<strong>{t('trois')}</strong>{' '}{t('décimales. « 24,5 » et « 24.500 » donnent le même prix.')}</p>
               </div>
 
               <div className="champ">
-                <label htmlFor="cout">Coût d’achat (facultatif)</label>
+                <label htmlFor="cout">{t('Coût d’achat (facultatif)')}</label>
                 <input
                   id="cout"
                   name="cout"
@@ -190,20 +187,15 @@ export function EditeurCatalogue({
                   }
                   placeholder="10"
                 />
-                <p className="indication">
-                  Ce que le produit vous COÛTE, en dinars. C’est lui qui donne la
-                  marge dans les rapports. Laissé vide, le produit est compté
-                  sans coût — et les rapports le signalent, plutôt que d’afficher
-                  une marge de 100 % qui paraîtrait juste.
-                </p>
+                <p className="indication">{t('Ce que le produit vous COÛTE, en dinars. C’est lui qui donne la marge dans les rapports. Laissé vide, le produit est compté sans coût — et les rapports le signalent, plutôt que d’afficher une marge de 100 % qui paraîtrait juste.')}</p>
               </div>
             </div>
 
             <div className="champs deux">
               <div className="champ">
-                <label htmlFor="categorie">Catégorie</label>
+                <label htmlFor="categorie">{t('Catégorie')}</label>
                 <select id="categorie" name="categorie" defaultValue={cible?.categorieId ?? ''}>
-                  <option value="">— aucune —</option>
+                  <option value="">{t('— aucune —')}</option>
                   {categories.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.nom}
@@ -223,20 +215,20 @@ export function EditeurCatalogue({
                 <input
                   type="hidden"
                   name="taux"
-                  value={cible?.tauxId ?? taux.find((t) => t.defaut)?.id ?? taux[0]?.id ?? ''}
+                  value={cible?.tauxId ?? taux.find((elt) => elt.defaut)?.id ?? taux[0]?.id ?? ''}
                 />
               ) : (
                 <div className="champ">
-                  <label htmlFor="taux">Taux de TVA</label>
+                  <label htmlFor="taux">{t('Taux de TVA')}</label>
                   <select
                     id="taux"
                     name="taux"
-                    defaultValue={cible?.tauxId ?? taux.find((t) => t.defaut)?.id ?? ''}
+                    defaultValue={cible?.tauxId ?? taux.find((elt) => elt.defaut)?.id ?? ''}
                     required
                   >
-                    {taux.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.libelle}
+                    {taux.map((elt) => (
+                      <option key={elt.id} value={elt.id}>
+                        {elt.libelle}
                       </option>
                     ))}
                   </select>
@@ -268,7 +260,7 @@ export function EditeurCatalogue({
             />
 
             <div className="champ">
-              <label htmlFor="description">Description</label>
+              <label htmlFor="description">{t('Description')}</label>
               <input id="description" name="description" defaultValue={cible?.description ?? ''} />
             </div>
 
@@ -279,12 +271,12 @@ export function EditeurCatalogue({
                 type="checkbox"
                 defaultChecked={cible ? cible.disponible : true}
               />
-              <label htmlFor="disponible">Disponible à la vente</label>
+              <label htmlFor="disponible">{t('Disponible à la vente')}</label>
             </div>
 
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button type="submit" className="principal" disabled={produitEnCours}>
-                {produitEnCours ? 'Enregistrement…' : 'Enregistrer'}
+                {produitEnCours ? t('Enregistrement…') : t('Enregistrer')}
               </button>
               <button
                 type="button"
@@ -292,24 +284,22 @@ export function EditeurCatalogue({
                   setEnEdition(null)
                   setNouveau(false)
                 }}
-              >
-                Annuler
-              </button>
+              >{t('Annuler')}</button>
             </div>
           </form>
         )}
 
         {produits.length === 0 ? (
-          <p className="vide">Aucun produit. La carte est vide.</p>
+          <p className="vide">{t('Aucun produit. La carte est vide.')}</p>
         ) : (
           <table style={{ marginTop: '1rem' }}>
             <thead>
               <tr>
-                <th>Produit</th>
-                <th className="nombre">Prix</th>
-                <th className="nombre">Coût</th>
-                <th className="nombre">Marge</th>
-                <th>État</th>
+                <th>{t('Produit')}</th>
+                <th className="nombre">{t('Prix')}</th>
+                <th className="nombre">{t('Coût')}</th>
+                <th className="nombre">{t('Marge')}</th>
+                <th>{t('État')}</th>
                 {modifiable && <th />}
               </tr>
             </thead>
@@ -324,7 +314,7 @@ export function EditeurCatalogue({
               <tbody key={groupe.cle}>
                 <tr className="ligne-groupe">
                   <td colSpan={modifiable ? 6 : 5}>
-                    {groupe.titre} <span className="compte">· {groupe.lignes.length}</span>
+                    {t.donnee(groupe.titre)} <span className="compte">· {groupe.lignes.length}</span>
                   </td>
                 </tr>
               {groupe.lignes.map((produit) => (
@@ -346,7 +336,7 @@ export function EditeurCatalogue({
                   <td className="nombre">{margeAffichee(produit)}</td>
                   <td>
                     <span className={`etiquette ${produit.disponible ? 'actif' : 'inactif'}`}>
-                      {produit.disponible ? 'en vente' : 'retiré'}
+                      {produit.disponible ? t('en vente') : t('retiré')}
                     </span>
                   </td>
                   {modifiable && (
@@ -362,7 +352,7 @@ export function EditeurCatalogue({
                         type="button"
                         className="discret"
                         disabled={rangDansCategorie(produit) === 0}
-                        title="Monter"
+                        title={t('Monter')}
                         onClick={() => void deplacerProduit(restaurantId, produit.id, 'haut')}
                       >
                         ↑
@@ -371,7 +361,7 @@ export function EditeurCatalogue({
                         type="button"
                         className="discret"
                         disabled={rangDansCategorie(produit) === tailleCategorie(produit) - 1}
-                        title="Descendre"
+                        title={t('Descendre')}
                         onClick={() => void deplacerProduit(restaurantId, produit.id, 'bas')}
                       >
                         ↓
@@ -383,9 +373,7 @@ export function EditeurCatalogue({
                           setNouveau(false)
                           setEnEdition(produit)
                         }}
-                      >
-                        Modifier
-                      </button>
+                      >{t('Modifier')}</button>
                       <button
                         type="button"
                         className="discret"
@@ -397,7 +385,7 @@ export function EditeurCatalogue({
                           )
                         }
                       >
-                        {produit.disponible ? 'Retirer' : 'Remettre'}
+                        {produit.disponible ? t('Retirer') : t('Remettre')}
                       </button>
                       <button
                         type="button"
@@ -405,17 +393,16 @@ export function EditeurCatalogue({
                         onClick={() => {
                           if (
                             confirm(
-                              `Archiver « ${produit.nom} » ?\n\n` +
-                                'Il disparaît de la carte mais reste visible dans les commandes ' +
-                                'déjà passées.',
+                              t(
+                                'Archiver « {nom} » ?\n\nIl disparaît de la carte mais reste visible dans les commandes déjà passées.',
+                                { nom: produit.nom },
+                              ),
                             )
                           ) {
                             void archiverProduit(restaurantId, produit.id)
                           }
                         }}
-                      >
-                        Archiver
-                      </button>
+                      >{t('Archiver')}</button>
                     </td>
                   )}
                 </tr>
@@ -429,7 +416,7 @@ export function EditeurCatalogue({
 
       {modifiable && produitsArchives.length > 0 && (
         <section className="carte">
-          <h2>Archive</h2>
+          <h2>{t('Archive')}</h2>
           {/*
             Archiver n'est pas supprimer — l'historique des ventes garde la
             référence — mais c'était jusqu'ici SANS RETOUR. Une catégorie
@@ -437,18 +424,14 @@ export function EditeurCatalogue({
             recréer, avec un nouvel identifiant, donc en coupant l'historique
             en deux. Et rien ne montrait ce qui avait été archivé.
           */}
-          <p className="indication">
-            Rien n’est supprimé : les commandes déjà passées mentionnent
-            toujours ces lignes. Un produit remis revient <strong>hors
-            vente</strong> — le remettre à la carte est une seconde décision.
-          </p>
+          <p className="indication">{t('Rien n’est supprimé : les commandes déjà passées mentionnent toujours ces lignes. Un produit remis revient')}{' '}<strong>{t('hors vente')}</strong>{' '}{t('— le remettre à la carte est une seconde décision.')}</p>
 
           {produitsArchives.length > 0 && (
             <table style={{ marginTop: '1rem' }}>
               <thead>
                 <tr>
-                  <th>Produit archivé</th>
-                  <th className="nombre">Prix</th>
+                  <th>{t('Produit archivé')}</th>
+                  <th className="nombre">{t('Prix')}</th>
                   <th />
                 </tr>
               </thead>
@@ -457,14 +440,12 @@ export function EditeurCatalogue({
                   <tr key={p.id}>
                     <td>{p.nom}</td>
                     <td className="nombre">{p.prixAffiche}</td>
-                    <td style={{ textAlign: 'right' }}>
+                    <td style={{ textAlign: 'end' }}>
                       <button
                         type="button"
                         className="discret"
                         onClick={() => void desarchiverProduit(restaurantId, p.id)}
-                      >
-                        Remettre
-                      </button>
+                      >{t('Remettre')}</button>
                     </td>
                   </tr>
                 ))}
@@ -478,13 +459,14 @@ export function EditeurCatalogue({
 }
 
 export function Message({ resultat }: { resultat: Resultat | null }) {
+  const t = useT()
   if (!resultat) return null
   if (resultat.erreur) {
     return (
       <p className="message erreur" role="alert">
-        {resultat.erreur}
+        {t.m(resultat.erreur)}
       </p>
     )
   }
-  return <p className="message succes">{resultat.succes}</p>
+  return <p className="message succes">{t.m(resultat.succes ?? '')}</p>
 }

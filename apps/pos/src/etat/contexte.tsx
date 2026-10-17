@@ -29,6 +29,7 @@ import { IMPRESSION_ACTIVE } from '../config.js'
 import { SessionCaisse, type IdentiteTerminal } from '../donnees/session.js'
 import { ServiceImpression, type EtatImpression } from '../donnees/impression.js'
 import { depotLocalSync } from '../donnees/synchronisation.js'
+import { t } from '../i18n.js'
 
 export interface StationImprimante {
   id: string
@@ -474,7 +475,7 @@ export function FournisseurApp({ app, children }: Props) {
     return (
       <div className="ecran-bloquant">
         <div className="pastille-chargement" aria-hidden="true" />
-        <p>Chargement du catalogue…</p>
+        <p>{t('Chargement du catalogue…')}</p>
       </div>
     )
   }

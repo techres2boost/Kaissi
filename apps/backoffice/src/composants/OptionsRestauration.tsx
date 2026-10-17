@@ -25,6 +25,7 @@ import {
   type Resultat,
 } from '../app/[restaurant]/restauration/actions.js'
 import { lignesApercu } from './apercu-restauration.js'
+import { useT } from '../i18n/client.js'
 
 export interface TauxDisponible {
   id: string
@@ -77,6 +78,7 @@ export function OptionsRestauration({
   valeurs: ValeursRestauration
   taux: TauxDisponible[]
 }) {
+  const t = useT()
   const [resultat, action] = useActionState(
     enregistrerOptions.bind(null, restaurantId),
     null as Resultat | null,
@@ -87,7 +89,7 @@ export function OptionsRestauration({
   const [tauxService, setTauxService] = useState(valeurs.serviceTauxTaxeId ?? '')
   const [timbre, setTimbre] = useState(pourChampTimbre(valeurs.timbreMillimes))
 
-  const tauxParDefaut = taux.find((t) => !t.incluse) ?? taux[0]
+  const tauxParDefaut = taux.find((elt) => !elt.incluse) ?? taux[0]
 
   /*
    * L'aperçu : une commande d'exemple, passée dans le VRAI calcul.
@@ -137,7 +139,7 @@ export function OptionsRestauration({
      *   total conclut que le logiciel compte faux, et il a raison de le
      *   croire. Les deux cas se disent donc différemment.
      */
-    const tauxDuService = taxable ? taux.find((t) => t.id === tauxService) : undefined
+    const tauxDuService = taxable ? taux.find((elt) => elt.id === tauxService) : undefined
     return {
       avec,
       sans,
@@ -152,23 +154,20 @@ export function OptionsRestauration({
   return (
     <div className="reglages-recu">
       <form action={action} className="carte formulaire-taux">
-        <h2>Frais de service</h2>
+        <h2>{t('Frais de service')}</h2>
 
-        <label htmlFor="service">Taux de service (%)</label>
+        <label htmlFor="service">{t('Taux de service (%)')}</label>
         <input
           id="service"
           name="service"
           value={service}
           onChange={(e) => setService(e.target.value)}
-          placeholder="aucun"
+          placeholder={t('aucun')}
           inputMode="decimal"
           maxLength={6}
           disabled={!modifiable}
         />
-        <p className="indication">
-          Appliqué à la base <strong>après remises</strong>, jamais au TTC.
-          Vide ou zéro : aucun service, et aucune ligne sur le ticket.
-        </p>
+        <p className="indication">{t('Appliqué à la base')}{' '}<strong>{t('après remises')}</strong>{t(', jamais au TTC. Vide ou zéro : aucun service, et aucune ligne sur le ticket.')}</p>
 
         <label className="case">
           <input
@@ -179,12 +178,12 @@ export function OptionsRestauration({
             onChange={(e) => setTaxable(e.target.checked)}
             disabled={!modifiable}
           />
-          <span>le service est lui-même soumis à la taxe</span>
+          <span>{t('le service est lui-même soumis à la taxe')}</span>
         </label>
 
         {taxable && (
           <>
-            <label htmlFor="tauxService">Taux applicable au service</label>
+            <label htmlFor="tauxService">{t('Taux applicable au service')}</label>
             <select
               id="tauxService"
               name="tauxService"
@@ -192,10 +191,10 @@ export function OptionsRestauration({
               onChange={(e) => setTauxService(e.target.value)}
               disabled={!modifiable}
             >
-              <option value="">— choisir un taux —</option>
-              {taux.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.nom}
+              <option value="">{t('— choisir un taux —')}</option>
+              {taux.map((elt) => (
+                <option key={elt.id} value={elt.id}>
+                  {elt.nom}
                 </option>
               ))}
             </select>
@@ -204,48 +203,36 @@ export function OptionsRestauration({
                 La phrase qui évite un réglage muet. Le domaine ne taxe le
                 service que s'il connaît le taux : sans ce choix, la case
                 serait cochée et le service sortirait tout de même hors taxe.
-              */}
-              Sans taux choisi, la case ci-dessus <strong>ne taxe rien</strong> —
-              l’enregistrement sera refusé plutôt que de laisser un réglage qui
-              n’a pas d’effet.
-            </p>
+              */}{t('Sans taux choisi, la case ci-dessus')}{' '}<strong>{t('ne taxe rien')}</strong>{' '}{t('— l’enregistrement sera refusé plutôt que de laisser un réglage qui n’a pas d’effet.')}</p>
           </>
         )}
 
-        <h2 style={{ marginTop: '1.25rem' }}>Droit de timbre</h2>
-        <label htmlFor="timbre">Montant fixe par ticket (TND)</label>
+        <h2 style={{ marginTop: '1.25rem' }}>{t('Droit de timbre')}</h2>
+        <label htmlFor="timbre">{t('Montant fixe par ticket (TND)')}</label>
         <input
           id="timbre"
           name="timbre"
           value={timbre}
           onChange={(e) => setTimbre(e.target.value)}
-          placeholder="aucun"
+          placeholder={t('aucun')}
           inputMode="decimal"
           maxLength={10}
           disabled={!modifiable}
         />
-        <p className="indication">
-          Ajouté au total, <strong>après</strong> les taxes et le service. Le
-          dinar a trois décimales : « 0,600 » vaut six cents millimes.
-        </p>
+        <p className="indication">{t('Ajouté au total,')}{' '}<strong>{t('après')}</strong>{' '}{t('les taxes et le service. Le dinar a trois décimales : « 0,600 » vaut six cents millimes.')}</p>
 
         {modifiable && (
-          <button type="submit" className="principal">
-            Enregistrer
-          </button>
+          <button type="submit" className="principal">{t('Enregistrer')}</button>
         )}
-        {resultat?.erreur && <p className="message erreur">{resultat.erreur}</p>}
-        {resultat?.succes && <p className="message succes">{resultat.succes}</p>}
+        {resultat?.erreur && <p className="message erreur">{t.m(resultat.erreur)}</p>}
+        {resultat?.succes && <p className="message succes">{t.m(resultat.succes)}</p>}
       </form>
 
       <div className="carte apercu-restauration">
-        <h2>Sur une addition d’exemple</h2>
+        <h2>{t('Sur une addition d’exemple')}</h2>
         {apercu === null ? (
           <p className="indication">
-            <TriangleAlert size={14} strokeWidth={2} aria-hidden="true" /> Aucun
-            taux de taxe : l’aperçu ne peut rien calculer, et la caisse ne
-            pourrait rien encaisser non plus.
-          </p>
+            <TriangleAlert size={14} strokeWidth={2} aria-hidden="true" />{' '}{t('Aucun taux de taxe : l’aperçu ne peut rien calculer, et la caisse ne pourrait rien encaisser non plus.')}</p>
         ) : (
           <>
             <table className="tableau-apercu">
@@ -259,20 +246,20 @@ export function OptionsRestauration({
                 */}
                 {apercu.lignes.map((l) => (
                   <tr key={l.libelle} className={l.dont ? 'apercu-dont' : undefined}>
-                    <td>{l.libelle}</td>
+                    <td>{t.m(l.libelle)}</td>
                     <td>{formaterTND(millimes(l.montantMillimes))}</td>
                   </tr>
                 ))}
                 <tr className="apercu-total">
-                  <td>Total</td>
+                  <td>{t('Total')}</td>
                   <td>{formaterTND(apercu.avec.totalMillimes)}</td>
                 </tr>
               </tbody>
             </table>
             <p className="indication">
               {apercu.ecart === 0
-                ? 'Identique à un ticket sans options : rien n’est ajouté.'
-                : `Soit ${formaterTND(millimes(apercu.ecart))} de plus qu’un ticket sans options.`}
+                ? t('Identique à un ticket sans options : rien n’est ajouté.')
+                : t('Soit {montant} de plus qu’un ticket sans options.', { montant: formaterTND(millimes(apercu.ecart)) })}
             </p>
           </>
         )}
@@ -286,13 +273,7 @@ export function OptionsRestauration({
         */}
         <div className="message info" style={{ marginTop: '1rem', marginBottom: 0 }}>
           <Info size={16} strokeWidth={2} aria-hidden="true" />{' '}
-          <strong>À valider avec votre comptable.</strong> Kaissi n’applique
-          que ce que vous saisissez ici, et ne propose aucune valeur par
-          défaut. Le droit de timbre s’applique-t-il à un ticket de restaurant,
-          à quel montant, et les frais de service sont-ils soumis à la TVA ?
-          Ce sont des questions réglementaires — un logiciel qui y répondrait à
-          votre place vous ferait facturer faux sans que rien ne le signale.
-        </div>
+          <strong>{t('À valider avec votre comptable.')}</strong>{' '}{t('Kaissi n’applique que ce que vous saisissez ici, et ne propose aucune valeur par défaut. Le droit de timbre s’applique-t-il à un ticket de restaurant, à quel montant, et les frais de service sont-ils soumis à la TVA ? Ce sont des questions réglementaires — un logiciel qui y répondrait à votre place vous ferait facturer faux sans que rien ne le signale.')}</div>
       </div>
     </div>
   )

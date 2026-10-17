@@ -22,13 +22,15 @@ import { chargerRapport } from '../../../serveur/rapport.js'
 import { BoutonsExport } from '../../../composants/BoutonsExport.js'
 import { FiltresRapport } from '../../../composants/FiltresRapport.js'
 import { AvertissementTronque } from '../../../composants/AvertissementTronque.js'
+import { traduction } from '../../../i18n/serveur.js'
+import { aTraduire } from '@kaissi/i18n'
 
 export const dynamic = 'force-dynamic'
 
 const LIBELLE_PAIEMENT: Record<string, string> = {
-  cash: 'Espèces',
+  cash: aTraduire('paiement|Espèces'),
   card: 'Carte',
-  online: 'En ligne',
+  online: aTraduire('paiement|En ligne'),
   other: 'Autre',
 }
 
@@ -49,6 +51,7 @@ export default async function PageRecus({
   params: Promise<{ restaurant: string }>
   searchParams: Promise<Record<string, string | undefined>>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const recherche = await searchParams
   const ticket = recherche['ticket']
@@ -70,22 +73,22 @@ export default async function PageRecus({
   if (ventes.erreur) {
     return (
       <section className="bloc">
-        <h1>Reçus</h1>
-        <p className="message erreur">Lecture impossible : {ventes.erreur}</p>
+        <h1>{t('Reçus')}</h1>
+        <p className="message erreur">{t('Lecture impossible :')}{' '}{t.m(ventes.erreur)}</p>
       </section>
     )
   }
 
-  const totalPeriode = ventes.tickets.reduce((t, x) => t + x.totalMillimes, 0)
+  const totalPeriode = ventes.tickets.reduce((elt, x) => elt + x.totalMillimes, 0)
 
   return (
     <>
       <header className="entete-rapport">
-        <h1>Reçus</h1>
+        <h1>{t('Reçus')}</h1>
         <p className="sous-titre">
           {periode.du === periode.au
-            ? libelleJournee(periode.du)
-            : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
+            ? libelleJournee(periode.du, t.locale)
+            : t('Du {valeur} au {valeur2}', { valeur: libelleJournee(periode.du, t.locale), valeur2: libelleJournee(periode.au, t.locale) })}
         </p>
       </header>
 
@@ -107,7 +110,7 @@ export default async function PageRecus({
           regarde septembre et on télécharge la semaine en cours. */}
       <BoutonsExport
         restaurantId={restaurant}
-        exports={[{ quoi: 'tickets', libelle: 'Reçus' }]}
+        exports={[{ quoi: 'tickets', libelle: t('Reçus') }]}
         du={periode.du}
         au={periode.au}
       />
@@ -116,39 +119,37 @@ export default async function PageRecus({
 
       <section className="bloc">
         <h2>
-          {ventes.tickets.length} ticket(s) · {formaterTND(montant(totalPeriode))}
+          {ventes.tickets.length}{' '}{t('ticket(s) ·')}{' '}{formaterTND(montant(totalPeriode))}
         </h2>
         {ventes.tickets.length === 0 ? (
-          <p className="vide">Aucun ticket encaissé sur cette période.</p>
+          <p className="vide">{t('Aucun ticket encaissé sur cette période.')}</p>
         ) : (
           <table>
             <thead>
               <tr>
-                <th>Numéro</th>
-                <th>Encaissé le</th>
-                <th>Par</th>
-                <th className="nombre">Articles</th>
-                <th className="nombre">Total</th>
+                <th>{t('Numéro')}</th>
+                <th>{t('Encaissé le')}</th>
+                <th>{t('Par')}</th>
+                <th className="nombre">{t('Articles')}</th>
+                <th className="nombre">{t('Total')}</th>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {ventes.tickets.map((t) => (
-                <tr key={t.id}>
-                  <td className="mono">{t.numero ?? '—'}</td>
-                  <td>{heure(t.closeA)}</td>
-                  <td>{t.vendeur}</td>
-                  <td className="nombre">{t.nombreArticles}</td>
-                  <td className="nombre">{formaterTND(montant(t.totalMillimes))}</td>
+              {ventes.tickets.map((elt) => (
+                <tr key={elt.id}>
+                  <td className="mono">{elt.numero ?? '—'}</td>
+                  <td>{heure(elt.closeA)}</td>
+                  <td>{elt.vendeur}</td>
+                  <td className="nombre">{elt.nombreArticles}</td>
+                  <td className="nombre">{formaterTND(montant(elt.totalMillimes))}</td>
                   <td>
                     <Link
                       href={{
                         pathname: `/${restaurant}/recus`,
-                        query: { du: periode.du, au: periode.au, ticket: t.id },
+                        query: { du: periode.du, au: periode.au, ticket: elt.id },
                       }}
-                    >
-                      Détail
-                    </Link>
+                    >{t('Détail')}</Link>
                   </td>
                 </tr>
               ))}
@@ -177,6 +178,7 @@ async function DetailTicket({
   orderId: string
   periode: { du: string; au: string }
 }) {
+  const t = await traduction()
   const supabase = await supabaseServeur()
   // Le ticket TEL QUE LE POS le montre — reconstruit depuis le journal, par
   // la même chaîne que la caisse. Chargé en parallèle du reste : il répond à
@@ -216,7 +218,7 @@ async function DetailTicket({
   if (!commande) {
     return (
       <section className="bloc">
-        <p className="message avertissement">Ticket introuvable sur cet établissement.</p>
+        <p className="message avertissement">{t('Ticket introuvable sur cet établissement.')}</p>
       </section>
     )
   }
@@ -224,7 +226,7 @@ async function DetailTicket({
   const lignes = lignesRes.data ?? []
   const paiements = paiementsRes.data ?? []
   const remboursements = remboursementsRes.data ?? []
-  const rembourse = remboursements.reduce((t, r) => t + r.amount_millimes, 0)
+  const rembourse = remboursements.reduce((elt, r) => elt + r.amount_millimes, 0)
 
   return (
     <section className="bloc detail-ticket">
@@ -241,12 +243,9 @@ async function DetailTicket({
         branchée, ce bloc n'aura pas à changer.
       */}
       <details open className="ticket-papier">
-        <summary>Ticket, tel qu’il s’imprime</summary>
+        <summary>{t('Ticket, tel qu’il s’imprime')}</summary>
         {'erreur' in ticketPapier ? (
-          <p className="indication">
-            Ticket non reconstructible : {ticketPapier.erreur} Le détail
-            ci-dessous reste exact — il vient de la projection.
-          </p>
+          <p className="indication">{t('Ticket non reconstructible :')}{' '}{t.m(ticketPapier.erreur)}{' '}{t('Le détail ci-dessous reste exact — il vient de la projection.')}</p>
         ) : (
           <>
             <pre className="ticket-ecran">{ticketPapier.apercu}</pre>
@@ -255,38 +254,31 @@ async function DetailTicket({
                 href={`/${restaurantId}/export/ticket?commande=${orderId}`}
                 download
                 className="discret"
-              >
-                Exporter ce ticket
-              </a>
-              <span className="detail">
-                Fichier texte, à joindre à une réclamation ou à une pièce
-                comptable.
-              </span>
+              >{t('Exporter ce ticket')}</a>
+              <span className="detail">{t('Fichier texte, à joindre à une réclamation ou à une pièce comptable.')}</span>
             </p>
           </>
         )}
       </details>
 
       <div className="detail-entete">
-        <h2>Ticket {commande.ticket_number ?? '—'}</h2>
+        <h2>{t('Ticket')}{' '}{commande.ticket_number ?? '—'}</h2>
         <Link
           href={{
             pathname: `/${restaurantId}/recus`,
             query: { du: periode.du, au: periode.au },
           }}
-        >
-          ✕ Fermer
-        </Link>
+        >{t('✕ Fermer')}</Link>
       </div>
 
       <dl className="lignes-chiffres">
-        <dt>Ouvert le</dt>
+        <dt>{t('Ouvert le')}</dt>
         <dd>{heure(commande.opened_at)}</dd>
-        <dt>Encaissé le</dt>
+        <dt>{t('Encaissé le')}</dt>
         <dd>{heure(commande.closed_at)}</dd>
         {commande.covers !== null && (
           <>
-            <dt>Couverts</dt>
+            <dt>{t('Couverts')}</dt>
             <dd>{commande.covers}</dd>
           </>
         )}
@@ -295,12 +287,12 @@ async function DetailTicket({
       <table>
         <thead>
           <tr>
-            <th>Article</th>
-            <th className="nombre">Qté</th>
-            <th className="nombre">Brut</th>
-            <th className="nombre">Remise</th>
-            <th className="nombre">Net HT</th>
-            <th className="nombre">TVA</th>
+            <th>{t('Article')}</th>
+            <th className="nombre">{t('Qté')}</th>
+            <th className="nombre">{t('Brut')}</th>
+            <th className="nombre">{t('Remise')}</th>
+            <th className="nombre">{t('Net HT')}</th>
+            <th className="nombre">{t('TVA')}</th>
           </tr>
         </thead>
         <tbody>
@@ -310,7 +302,7 @@ async function DetailTicket({
               <tr key={l.id} className={l.voided_at ? 'ligne-annulee' : ''}>
                 <td>
                   {l.designation}
-                  {l.voided_at && <span className="etiquette inactif"> annulée</span>}
+                  {l.voided_at && <span className="etiquette inactif">{' '}{t('annulée')}</span>}
                   {l.note && <small className="detail"> « {l.note} »</small>}
                 </td>
                 <td className="nombre">{l.qty}</td>
@@ -328,47 +320,47 @@ async function DetailTicket({
 
       <div className="grille deux" style={{ marginTop: '1rem' }}>
         <dl className="lignes-chiffres">
-          <dt>Sous-total</dt>
+          <dt>{t('Sous-total')}</dt>
           <dd>{formaterTND(montant(commande.subtotal_millimes))}</dd>
-          <dt>Remises</dt>
+          <dt>{t('Remises')}</dt>
           <dd>− {formaterTND(montant(commande.discount_millimes))}</dd>
-          <dt>TVA</dt>
+          <dt>{t('TVA')}</dt>
           <dd>{formaterTND(montant(commande.tax_millimes))}</dd>
           {commande.service_millimes > 0 && (
             <>
-              <dt>Service</dt>
+              <dt>{t('Service')}</dt>
               <dd>{formaterTND(montant(commande.service_millimes))}</dd>
             </>
           )}
           {commande.stamp_duty_millimes > 0 && (
             <>
-              <dt>Timbre</dt>
+              <dt>{t('Timbre')}</dt>
               <dd>{formaterTND(montant(commande.stamp_duty_millimes))}</dd>
             </>
           )}
-          <dt className="fort">Total</dt>
+          <dt className="fort">{t('Total')}</dt>
           <dd className="fort">{formaterTND(montant(commande.total_millimes))}</dd>
         </dl>
 
         <div>
-          <h3>Transactions</h3>
+          <h3>{t('Transactions')}</h3>
           {paiements.length === 0 ? (
-            <p className="vide">Aucun paiement enregistré.</p>
+            <p className="vide">{t('Aucun paiement enregistré.')}</p>
           ) : (
             <table>
               <thead>
                 <tr>
-                  <th>Moyen</th>
-                  <th className="nombre">Montant</th>
-                  <th className="nombre">Rendu</th>
+                  <th>{t('Moyen')}</th>
+                  <th className="nombre">{t('Montant')}</th>
+                  <th className="nombre">{t('Rendu')}</th>
                 </tr>
               </thead>
               <tbody>
                 {paiements.map((p) => (
                   <tr key={p.id} className={p.voided_at ? 'ligne-annulee' : ''}>
                     <td>
-                      {LIBELLE_PAIEMENT[p.type] ?? p.type}
-                      {p.voided_at && <span className="etiquette inactif"> annulé</span>}
+                      {t(LIBELLE_PAIEMENT[p.type] ?? p.type)}
+                      {p.voided_at && <span className="etiquette inactif">{' '}{t('annulé')}</span>}
                     </td>
                     <td className="nombre">{formaterTND(montant(p.amount_millimes))}</td>
                     <td className="nombre">
@@ -382,14 +374,14 @@ async function DetailTicket({
 
           {remboursements.length > 0 && (
             <>
-              <h3>Remboursements</h3>
+              <h3>{t('Remboursements')}</h3>
               <table>
                 <thead>
                   <tr>
-                    <th>Le</th>
-                    <th>Motif</th>
-                    <th>Rendu en</th>
-                    <th className="nombre">Montant</th>
+                    <th>{t('date|Le')}</th>
+                    <th>{t('Motif')}</th>
+                    <th>{t('Rendu en')}</th>
+                    <th className="nombre">{t('Montant')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -397,29 +389,25 @@ async function DetailTicket({
                     <tr key={r.id}>
                       <td>{heure(r.created_at)}</td>
                       <td>{r.reason}</td>
-                      <td>{r.type ? (LIBELLE_PAIEMENT[r.type] ?? r.type) : '—'}</td>
+                      <td>{r.type ? (t(LIBELLE_PAIEMENT[r.type] ?? r.type)) : '—'}</td>
                       <td className="nombre">− {formaterTND(montant(r.amount_millimes))}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <p className="indication">
-                Net encaissé : <strong>{formaterTND(montant(commande.total_millimes - rembourse))}</strong>.
-                La vente reste dans le chiffre d’affaires ; le remboursement apparaît à part, à la
-                date où l’argent a été rendu.
-              </p>
+              <p className="indication">{t('Net encaissé :')}{' '}<strong>{formaterTND(montant(commande.total_millimes - rembourse))}</strong>{t('. La vente reste dans le chiffre d’affaires ; le remboursement apparaît à part, à la date où l’argent a été rendu.')}</p>
             </>
           )}
         </div>
       </div>
 
-      <h3>Ventilation de TVA</h3>
+      <h3>{t('Ventilation de TVA')}</h3>
       <table>
         <thead>
           <tr>
-            <th>Taux</th>
-            <th className="nombre">Base HT</th>
-            <th className="nombre">TVA</th>
+            <th>{t('Taux')}</th>
+            <th className="nombre">{t('Base HT')}</th>
+            <th className="nombre">{t('TVA')}</th>
           </tr>
         </thead>
         <tbody>

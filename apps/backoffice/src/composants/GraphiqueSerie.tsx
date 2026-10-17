@@ -30,24 +30,27 @@ import { useState } from 'react'
 import { formaterTND, millimes } from '@kaissi/domain'
 import { agregerSerie, type Granularite, type JourneeCA } from '../serveur/rapports.js'
 import { CamembertParts, type Part } from './CamembertParts.js'
+import { useT } from '../i18n/client.js'
+import type { Traduction } from '../i18n/commun.js'
+import { aTraduire } from '@kaissi/i18n'
 
 type Forme = 'colonnes' | 'aires' | 'ligne' | 'circulaire'
 
 const FORMES: { valeur: Forme; libelle: string }[] = [
-  { valeur: 'colonnes', libelle: 'Colonnes' },
-  { valeur: 'aires', libelle: 'Aires' },
-  { valeur: 'ligne', libelle: 'Ligne' },
+  { valeur: 'colonnes', libelle: aTraduire('Colonnes') },
+  { valeur: 'aires', libelle: aTraduire('Aires') },
+  { valeur: 'ligne', libelle: aTraduire('Ligne') },
 ]
 
 const PAS: { valeur: Granularite; libelle: string }[] = [
-  { valeur: 'jours', libelle: 'Jours' },
-  { valeur: 'semaines', libelle: 'Semaines' },
-  { valeur: 'mois', libelle: 'Mois' },
+  { valeur: 'jours', libelle: aTraduire('Jours') },
+  { valeur: 'semaines', libelle: aTraduire('Semaines') },
+  { valeur: 'mois', libelle: aTraduire('Mois') },
 ]
 
 export function GraphiqueSerie({
   journees,
-  titre = 'Ventes brutes',
+  titre,
   parts,
 }: {
   journees: readonly JourneeCA[]
@@ -62,6 +65,7 @@ export function GraphiqueSerie({
    */
   parts?: readonly Part[]
 }) {
+  const t = useT()
   const [forme, setForme] = useState<Forme>('colonnes')
   /*
    * Le pas par défaut suit la LONGUEUR de la période.
@@ -76,27 +80,27 @@ export function GraphiqueSerie({
   const [survole, setSurvole] = useState<number | null>(null)
 
   if (journees.length === 0) {
-    return <p className="vide">Aucune vente sur cette période.</p>
+    return <p className="vide">{t('Aucune vente sur cette période.')}</p>
   }
 
-  const points = agregerSerie(journees, pas)
+  const points = agregerSerie(journees, pas, t.locale)
   const maximum = Math.max(...points.map((p) => p.caMillimes)) || 1
-  const total = points.reduce((t, p) => t + p.caMillimes, 0)
+  const total = points.reduce((elt, p) => elt + p.caMillimes, 0)
 
   return (
     <div className="graphique-serie">
       <div className="entete-bloc">
-        <h2>{titre}</h2>
+        <h2>{titre ?? t('Ventes brutes')}</h2>
         <div className="options-graphique">
           <label>
-            <span className="visuellement-cache">Forme du graphique</span>
+            <span className="visuellement-cache">{t('Forme du graphique')}</span>
             <select value={forme} onChange={(e) => setForme(e.target.value as Forme)}>
               {FORMES.map((f) => (
                 <option key={f.valeur} value={f.valeur}>
-                  {f.libelle}
+                  {t(f.libelle)}
                 </option>
               ))}
-              {parts && <option value="circulaire">Circulaire</option>}
+              {parts && <option value="circulaire">{t('Circulaire')}</option>}
             </select>
           </label>
           {/* Le pas de temps ne s'applique qu'aux formes temporelles : le
@@ -104,11 +108,11 @@ export function GraphiqueSerie({
               à côté d'un cercle poserait une question sans réponse. */}
           {forme !== 'circulaire' && (
             <label>
-              <span className="visuellement-cache">Pas de temps</span>
+              <span className="visuellement-cache">{t('Pas de temps')}</span>
               <select value={pas} onChange={(e) => setPas(e.target.value as Granularite)}>
                 {PAS.map((p) => (
                   <option key={p.valeur} value={p.valeur}>
-                    {p.libelle}
+                    {t(p.libelle)}
                   </option>
                 ))}
               </select>
@@ -123,10 +127,7 @@ export function GraphiqueSerie({
         // Un seul seau ne fait pas une évolution : deux colonnes côte à côte
         // suggéreraient une comparaison qu'on n'a pas. Le chiffre est déjà
         // au-dessus.
-        <p className="indication">
-          Un seul {pas === 'jours' ? 'jour' : pas === 'semaines' ? 'semaine' : 'mois'} sur
-          cette période — élargissez les dates, ou choisissez un pas plus fin.
-        </p>
+        <p className="indication">{t('Un seul')}{' '}{pas === 'jours' ? t('jour') : pas === 'semaines' ? t('semaine') : t('mois')}{' '}{t('sur cette période — élargissez les dates, ou choisissez un pas plus fin.')}</p>
       ) : forme === 'colonnes' ? (
         <Colonnes points={points} maximum={maximum} survole={survole} setSurvole={setSurvole} />
       ) : (
@@ -140,16 +141,11 @@ export function GraphiqueSerie({
       )}
 
       {forme === 'circulaire' ? (
-        <p className="indication">
-          Répartition sur toute la période. Le détail complet est dans le tableau
-          ci-dessous — un camembert dit qui domine, pas combien exactement.
-        </p>
+        <p className="indication">{t('Répartition sur toute la période. Le détail complet est dans le tableau ci-dessous — un camembert dit qui domine, pas combien exactement.')}</p>
       ) : (
         <p className="indication">
-          {points.length} {pas} · {formaterTND(millimes(total))} au total ·{' '}
-          <strong>{formaterTND(millimes(Math.round(total / points.length)))}</strong> en
-          moyenne. Survolez pour le détail.
-        </p>
+          {points.length} {pas} · {formaterTND(millimes(total))}{' '}{t('au total ·')}{' '}
+          <strong>{formaterTND(millimes(Math.round(total / points.length)))}</strong>{' '}{t('en moyenne. Survolez pour le détail.')}</p>
       )}
     </div>
   )
@@ -162,8 +158,12 @@ interface Point {
   tickets: number
 }
 
-function infobulle(p: Point): string {
-  return `${p.libelle} — ${formaterTND(millimes(p.caMillimes))} · ${p.tickets} ticket(s)`
+function infobulle(t: Traduction, p: Point): string {
+  return t('{libelle} — {montant} · {tickets} ticket(s)', {
+    libelle: p.libelle,
+    montant: formaterTND(millimes(p.caMillimes)),
+    tickets: p.tickets,
+  })
 }
 
 function Colonnes({
@@ -177,14 +177,15 @@ function Colonnes({
   survole: number | null
   setSurvole: (i: number | null) => void
 }) {
+  const t = useT()
   return (
     <div className="graphique-jours">
-      <div className="colonnes" role="img" aria-label={`Chiffre d’affaires sur ${points.length} périodes`}>
+      <div className="colonnes" role="img" aria-label={t('Chiffre d’affaires sur {length} périodes', { length: points.length })}>
         {points.map((p, i) => (
           <div key={p.cle} className="colonne">
             <div
               className="colonne-piste"
-              title={infobulle(p)}
+              title={infobulle(t, p)}
               onMouseEnter={() => setSurvole(i)}
               onMouseLeave={() => setSurvole(null)}
             >
@@ -198,7 +199,7 @@ function Colonnes({
         ))}
       </div>
       <p className="detail" aria-live="polite">
-        {survole === null ? ' ' : infobulle(points[survole]!)}
+        {survole === null ? ' ' : infobulle(t, points[survole]!)}
       </p>
     </div>
   )
@@ -225,6 +226,7 @@ function Trace({
   survole: number | null
   setSurvole: (i: number | null) => void
 }) {
+  const t = useT()
   const L = 1000
   const H = 300
   const marge = 12
@@ -241,7 +243,7 @@ function Trace({
         viewBox={`0 0 ${L} ${H}`}
         className="trace"
         role="img"
-        aria-label={`Chiffre d’affaires sur ${points.length} périodes`}
+        aria-label={t('Chiffre d’affaires sur {length} périodes', { length: points.length })}
         preserveAspectRatio="none"
       >
         {/* Grille : trois repères, en trait plein et discret. Un pointillé
@@ -271,7 +273,7 @@ function Trace({
               onMouseEnter={() => setSurvole(i)}
               onMouseLeave={() => setSurvole(null)}
             >
-              <title>{infobulle(p)}</title>
+              <title>{infobulle(t, p)}</title>
             </rect>
             <circle
               cx={x(i)}
@@ -292,7 +294,7 @@ function Trace({
         ))}
       </div>
       <p className="detail" aria-live="polite">
-        {survole === null ? ' ' : infobulle(points[survole]!)}
+        {survole === null ? ' ' : infobulle(t, points[survole]!)}
       </p>
     </div>
   )

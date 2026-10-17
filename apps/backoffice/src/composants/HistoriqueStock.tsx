@@ -1,3 +1,6 @@
+import { traduction } from '../i18n/serveur.js'
+import { use } from 'react'
+import { aTraduire } from '@kaissi/i18n'
 /**
  * L'historique des mouvements de stock.
  *
@@ -34,8 +37,8 @@ export interface Mouvement {
 }
 
 const LIBELLES_RAISON: Record<string, string> = {
-  reception: 'Réception',
-  perte: 'Perte / casse',
+  reception: aTraduire('Réception'),
+  perte: aTraduire('Perte / casse'),
   // Retiré de la saisie, mais présent dans l'historique : des lignes
   // existantes le portent, et un libellé absent afficherait un code brut.
   correction: 'Correction',
@@ -63,38 +66,32 @@ function dateEtHeure(iso: string): { jour: string; heure: string } {
 }
 
 export function HistoriqueStock({ mouvements }: { mouvements: Mouvement[] }) {
+  const t = use(traduction())
   if (mouvements.length === 0) {
     return (
       <section className="bloc">
-        <h2>Historique des mouvements</h2>
-        <p className="vide">
-          Aucun mouvement manuel enregistré. Les réceptions et les pertes
-          saisies plus haut apparaîtront ici.
-        </p>
+        <h2>{t('Historique des mouvements')}</h2>
+        <p className="vide">{t('Aucun mouvement manuel enregistré. Les réceptions et les pertes saisies plus haut apparaîtront ici.')}</p>
       </section>
     )
   }
 
   return (
     <section className="bloc">
-      <h2>Historique des mouvements</h2>
-      <p className="indication">
-        Les <strong>ventes n’y figurent pas</strong> : elles ne sont pas
-        recopiées ici, le stock les déduit directement des commandes. Cette
-        liste montre ce qui est entré et sorti à la main.
-      </p>
+      <h2>{t('Historique des mouvements')}</h2>
+      <p className="indication">{t('Les')}{' '}<strong>{t('ventes n’y figurent pas')}</strong>{' '}{t(': elles ne sont pas recopiées ici, le stock les déduit directement des commandes. Cette liste montre ce qui est entré et sorti à la main.')}</p>
       <div className="tableau-defilant">
         <table>
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Heure</th>
-              <th>Produit</th>
-              <th className="nombre">Mouvement</th>
-              <th>Motif</th>
-              <th>Fournisseur</th>
-              <th>Note</th>
-              <th>Par</th>
+              <th>{t('Date')}</th>
+              <th>{t('Heure')}</th>
+              <th>{t('Produit')}</th>
+              <th className="nombre">{t('Mouvement')}</th>
+              <th>{t('Motif')}</th>
+              <th>{t('Fournisseur')}</th>
+              <th>{t('Note')}</th>
+              <th>{t('Par')}</th>
             </tr>
           </thead>
           <tbody>
@@ -116,7 +113,7 @@ export function HistoriqueStock({ mouvements }: { mouvements: Mouvement[] }) {
                   <td className={`nombre ${m.delta < 0 ? 'ecart negatif' : ''}`}>
                     {m.delta > 0 ? `+${m.delta}` : m.delta}
                   </td>
-                  <td>{LIBELLES_RAISON[m.raison] ?? m.raison}</td>
+                  <td>{t(LIBELLES_RAISON[m.raison] ?? m.raison)}</td>
                   <td>{m.fournisseur ?? <span className="detail">—</span>}</td>
                   <td className="detail">{m.note ?? '—'}</td>
                   <td className="detail">{m.auteur ?? '—'}</td>

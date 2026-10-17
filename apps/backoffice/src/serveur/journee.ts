@@ -127,10 +127,10 @@ export function journeeCourante(fuseau: string, bascule: string, maintenant = ne
   }).format(decale)
 }
 
-/** « 2026-08-29 » → « samedi 29 août 2026 ». */
-export function libelleJournee(journee: string): string {
+/** « 2026-08-29 » → « samedi 29 août 2026 » — ou « السبت 29 أوت 2026 ». */
+export function libelleJournee(journee: string, locale: 'fr-FR' | 'ar-TN' = 'fr-FR'): string {
   const [annee, mois, jour] = journee.split('-').map(Number)
-  return new Intl.DateTimeFormat('fr-FR', {
+  return new Intl.DateTimeFormat(locale, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',

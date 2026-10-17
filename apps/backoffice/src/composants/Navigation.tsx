@@ -34,6 +34,8 @@ import {
 } from 'lucide-react'
 import { seDeconnecter } from '../app/connexion/actions.js'
 import type { Etablissement, SessionBackoffice } from '../serveur/session.js'
+import { ChoixLangue, useT } from '../i18n/client.js'
+import { aTraduire } from '@kaissi/i18n'
 
 /**
  * La navigation — une COLONNE à gauche, pas une rangée en haut.
@@ -108,9 +110,9 @@ const GROUPES = [
     // premier clic de la journée.
     titre: null,
     onglets: [
-      { chemin: 'tableau-bord', libelle: 'Tableau de bord', icone: LayoutDashboard, gestionnaire: true },
-      { chemin: 'preparation', libelle: 'Préparation', icone: ChefHat, gestionnaire: false },
-      { chemin: 'journee', libelle: 'Journée', icone: CalendarDays, gestionnaire: false },
+      { chemin: 'tableau-bord', libelle: aTraduire('Tableau de bord'), icone: LayoutDashboard, gestionnaire: true },
+      { chemin: 'preparation', libelle: aTraduire('Préparation'), icone: ChefHat, gestionnaire: false },
+      { chemin: 'journee', libelle: aTraduire('Journée'), icone: CalendarDays, gestionnaire: false },
     ],
   },
   {
@@ -122,27 +124,27 @@ const GROUPES = [
      * « Récapitulatif des ventes » ; l'appeler « Ventes » l'oblige à
      * apprendre notre mot pour sa propre question.
      */
-    titre: 'Rapports',
+    titre: aTraduire('Rapports'),
     onglets: [
-      { chemin: 'ventes', libelle: 'Récapitulatif des ventes', icone: ReceiptText, gestionnaire: true },
-      { chemin: 'articles', libelle: 'Ventes par article', icone: UtensilsCrossed, gestionnaire: true },
-      { chemin: 'ventes-par-categorie', libelle: 'Ventes par catégorie', icone: FolderTree, gestionnaire: true },
-      { chemin: 'ventes-par-employe', libelle: 'Ventes par employé', icone: UserRound, gestionnaire: true },
-      { chemin: 'ventes-par-paiement', libelle: 'Ventes par mode de paiement', icone: CreditCard, gestionnaire: true },
-      { chemin: 'recus', libelle: 'Reçus', icone: Ticket, gestionnaire: true },
-      { chemin: 'reductions', libelle: 'Réductions', icone: Tag, gestionnaire: true },
-      { chemin: 'periodes', libelle: 'Périodes de travail', icone: Clock, gestionnaire: true },
+      { chemin: 'ventes', libelle: aTraduire('Récapitulatif des ventes'), icone: ReceiptText, gestionnaire: true },
+      { chemin: 'articles', libelle: aTraduire('Ventes par article'), icone: UtensilsCrossed, gestionnaire: true },
+      { chemin: 'ventes-par-categorie', libelle: aTraduire('Ventes par catégorie'), icone: FolderTree, gestionnaire: true },
+      { chemin: 'ventes-par-employe', libelle: aTraduire('Ventes par employé'), icone: UserRound, gestionnaire: true },
+      { chemin: 'ventes-par-paiement', libelle: aTraduire('Ventes par mode de paiement'), icone: CreditCard, gestionnaire: true },
+      { chemin: 'recus', libelle: aTraduire('Reçus'), icone: Ticket, gestionnaire: true },
+      { chemin: 'reductions', libelle: aTraduire('Réductions'), icone: Tag, gestionnaire: true },
+      { chemin: 'periodes', libelle: aTraduire('Périodes de travail'), icone: Clock, gestionnaire: true },
     ],
   },
   {
     // « Articles » et non « Menu » : c'est là qu'on gère la carte, ses
     // catégories et ses réductions. Le mot « Menu » désignait à la fois la
     // carte et la barre de navigation — deux choses dans un même mot.
-    titre: 'Articles',
+    titre: aTraduire('Articles'),
     onglets: [
-      { chemin: 'catalogue', libelle: 'Liste d’articles', icone: BookOpen, gestionnaire: true },
-      { chemin: 'categories', libelle: 'Catégories', icone: Boxes, gestionnaire: true },
-      { chemin: 'stock', libelle: 'Stock', icone: Package, gestionnaire: true },
+      { chemin: 'catalogue', libelle: aTraduire('Liste d’articles'), icone: BookOpen, gestionnaire: true },
+      { chemin: 'categories', libelle: aTraduire('Catégories'), icone: Boxes, gestionnaire: true },
+      { chemin: 'stock', libelle: aTraduire('Stock'), icone: Package, gestionnaire: true },
       /*
        * « Inventaire avancé » JUSTE sous « Stock », et pas ailleurs : c'est le
        * même sujet regardé par l'autre bout — ce qu'il reste d'un côté, ce que
@@ -150,14 +152,14 @@ const GROUPES = [
        * module n'est pas ouvert : l'écran explique alors ce qu'il ajoute.
        * La cacher ferait vendre une fonctionnalité que personne ne découvre.
        */
-      { chemin: 'inventaire', libelle: 'Inventaire avancé', icone: Truck, gestionnaire: true },
+      { chemin: 'inventaire', libelle: aTraduire('Inventaire avancé'), icone: Truck, gestionnaire: true },
       /*
        * « Modificateurs » avec les ARTICLES, pas avec les Paramètres : ce sont
        * des éléments de la carte, au même titre qu'un produit ou une
        * catégorie. C'est aussi là que Loyverse les range, et donc là qu'un
        * restaurateur qui en vient les cherche.
        */
-      { chemin: 'modificateurs', libelle: 'Modificateurs', icone: ListPlus, gestionnaire: true },
+      { chemin: 'modificateurs', libelle: aTraduire('Modificateurs'), icone: ListPlus, gestionnaire: true },
       /*
        * Le RÉFÉRENTIEL des réductions, pas leur rapport.
        *
@@ -166,7 +168,7 @@ const GROUPES = [
        * on lit ce que cela a coûté. Un seul écran mélangerait un réglage et
        * une mesure — et on ne consulte pas les deux au même moment.
        */
-      { chemin: 'reductions/gestion', libelle: 'Réductions', icone: Tag, gestionnaire: true },
+      { chemin: 'reductions/gestion', libelle: aTraduire('Réductions'), icone: Tag, gestionnaire: true },
     ],
   },
   {
@@ -175,33 +177,33 @@ const GROUPES = [
      * plus haut sur les rapports : c'est le mot que le marché connaît, et un
      * restaurateur qui vient de Loyverse le cherche sous ce nom.
      */
-    titre: 'Paramètres',
+    titre: aTraduire('Paramètres'),
     onglets: [
-      { chemin: 'employes', libelle: 'Employés', icone: Users, gestionnaire: true },
+      { chemin: 'employes', libelle: aTraduire('Employés'), icone: Users, gestionnaire: true },
       // « Clients » juste sous « Employés », comme dans Loyverse : ce sont
       // les deux carnets de personnes, et on les cherche au même endroit.
-      { chemin: 'clients', libelle: 'Clients', icone: Contact, gestionnaire: true },
+      { chemin: 'clients', libelle: aTraduire('Clients'), icone: Contact, gestionnaire: true },
       /*
        * Taxes AVANT modes de paiement, et ce n'est pas alphabétique : un
        * restaurant ouvert depuis la caisse reçoit un taux à ZÉRO, exprès —
        * Kaissi refuse d'inventer une règle fiscale. C'est donc le tout
        * premier réglage à corriger, et il doit se trouver sans chercher.
        */
-      { chemin: 'taxes', libelle: 'Taxes', icone: Percent, gestionnaire: true },
-      { chemin: 'paiements', libelle: 'Modes de paiement', icone: CreditCard, gestionnaire: true },
+      { chemin: 'taxes', libelle: aTraduire('Taxes'), icone: Percent, gestionnaire: true },
+      { chemin: 'paiements', libelle: aTraduire('Modes de paiement'), icone: CreditCard, gestionnaire: true },
       /*
        * « Reçu » au singulier : c'est le RÉGLAGE du ticket, pas la liste des
        * reçus émis — celle-là vit dans « Rapports → Reçus », au pluriel. Les
        * deux mots se ressemblent assez pour qu'on les distingue exprès.
        */
-      { chemin: 'recu', libelle: 'Reçu', icone: Ticket, gestionnaire: true },
+      { chemin: 'recu', libelle: aTraduire('Reçu'), icone: Ticket, gestionnaire: true },
       /*
        * Les imprimantes APRÈS le reçu : c'est le même objet vu deux fois — ce
        * que le ticket dit, puis où il sort. Et c'est le réglage qu'on ouvre le
        * moins souvent des cinq, parce que dans la version actuelle des
        * caisses rien ne s'imprime encore : l'écran le dit en toutes lettres.
        */
-      { chemin: 'imprimantes', libelle: 'Imprimantes cuisine', icone: Printer, gestionnaire: true },
+      { chemin: 'imprimantes', libelle: aTraduire('Imprimantes cuisine'), icone: Printer, gestionnaire: true },
       /*
        * « Options de restauration » APRÈS les taxes, et ce n'est pas anodin :
        * le service et le timbre s'ajoutent APRÈS elles dans l'ordre figé de
@@ -209,7 +211,7 @@ const GROUPES = [
        * calcul, ce qui est la seule façon de ranger deux réglages dont l'un
        * dépend de l'autre.
        */
-      { chemin: 'restauration', libelle: 'Options de restauration', icone: HandPlatter, gestionnaire: true },
+      { chemin: 'restauration', libelle: aTraduire('Options de restauration'), icone: HandPlatter, gestionnaire: true },
       /*
        * « Fonctionnalités » en DERNIER de la rubrique, et c'est sa place.
        *
@@ -218,7 +220,7 @@ const GROUPES = [
        * quand on cherche où régler quelque chose, ou ce que le produit sait
        * faire ; jamais au milieu d'un réglage en cours.
        */
-      { chemin: 'fonctionnalites', libelle: 'Fonctionnalités', icone: LayoutList, gestionnaire: true },
+      { chemin: 'fonctionnalites', libelle: aTraduire('Fonctionnalités'), icone: LayoutList, gestionnaire: true },
       /*
        * « Abonnement » juste après « Fonctionnalités », et pas ailleurs : les
        * deux répondent à la même question à un jour d'intervalle — « qu'est-ce
@@ -228,10 +230,10 @@ const GROUPES = [
       // Un portefeuille, et surtout pas une icône de MONNAIE : lucide n'en
       // propose qu'en euro, dollar et livre. Kaissi facture en dinars, et un
       // « € » dans la colonne d'un restaurant tunisien se remarque tout de suite.
-      { chemin: 'abonnement', libelle: 'Abonnement', icone: Wallet, gestionnaire: true },
+      { chemin: 'abonnement', libelle: aTraduire('Abonnement'), icone: Wallet, gestionnaire: true },
       // « Aide » tout en bas, comme partout : c'est là qu'on la cherche, et
       // c'est le seul écran de la rubrique qui ne règle rien.
-      { chemin: 'aide', libelle: 'Aide', icone: LifeBuoy, gestionnaire: true },
+      { chemin: 'aide', libelle: aTraduire('Aide'), icone: LifeBuoy, gestionnaire: true },
     ],
   },
 ] as const
@@ -256,6 +258,7 @@ export function Navigation({
   session: SessionBackoffice
   etablissement: Etablissement
 }) {
+  const t = useT()
   const cheminActuel = usePathname()
   /*
    * Sur un téléphone, la colonne se replie derrière un bouton.
@@ -280,9 +283,7 @@ export function Navigation({
         aria-controls="navigation-laterale"
         onClick={() => setOuvert((o) => !o)}
       >
-        <Menu size={17} strokeWidth={1.75} aria-hidden="true" />
-        Menu
-      </button>
+        <Menu size={17} strokeWidth={1.75} aria-hidden="true" />{t('Menu')}</button>
 
       <aside
         id="navigation-laterale"
@@ -290,14 +291,14 @@ export function Navigation({
         // La colonne est un point de repère permanent : on la nomme, pour
         // qu'un lecteur d'écran ne l'annonce pas comme « navigation » parmi
         // trois autres.
-        aria-label="Navigation principale"
+        aria-label={t('Navigation principale')}
       >
         <div className="laterale-entete">
           <span className="marque">Kaissi</span>
           {session.etablissements.length > 1 && !etablissement.preparation ? (
             <Link href="/" className="laterale-etablissement">
               {etablissement.nom}
-              <span className="detail"> changer</span>
+              <span className="detail">{' '}{t('changer')}</span>
             </Link>
           ) : (
             <span className="laterale-etablissement">{etablissement.nom}</span>
@@ -312,7 +313,7 @@ export function Navigation({
             if (onglets.length === 0) return null
             return (
               <div key={groupe.titre ?? 'principal'} className="laterale-groupe">
-                {groupe.titre && <span className="laterale-titre">{groupe.titre}</span>}
+                {groupe.titre && <span className="laterale-titre">{t(groupe.titre)}</span>}
                 {onglets.map((onglet) => {
                   // Le gabarit est écrit dans le JSX plutôt que stocké dans un
                   // `const` : TypeScript conserve alors son type littéral, et
@@ -339,7 +340,7 @@ export function Navigation({
                       <span className="laterale-icone" aria-hidden="true">
                         <onglet.icone size={17} strokeWidth={1.75} />
                       </span>
-                      {onglet.libelle}
+                      {t(onglet.libelle)}
                     </Link>
                   )
                 })}
@@ -360,7 +361,7 @@ export function Navigation({
         */}
         {etablissement.administrateur && !etablissement.preparation && (
           <nav className="laterale-groupe">
-            <span className="laterale-titre">Administration</span>
+            <span className="laterale-titre">{t('Administration')}</span>
             <Link
               href="/administration"
               aria-current={cheminActuel === '/administration' ? 'page' : undefined}
@@ -368,19 +369,16 @@ export function Navigation({
             >
               <span className="laterale-icone" aria-hidden="true">
                 <Building2 size={17} strokeWidth={1.75} />
-              </span>
-              Établissements
-            </Link>
+              </span>{t('Établissements')}</Link>
           </nav>
         )}
 
         <div className="laterale-pied">
           <span className="laterale-qui">{session.nom}</span>
-          <span className="etiquette">{etablissement.role}</span>
+          <span className="etiquette">{t.role(etablissement.role)}</span>
+          <ChoixLangue />
           <form action={seDeconnecter}>
-            <button type="submit" className="discret">
-              Se déconnecter
-            </button>
+            <button type="submit" className="discret">{t('Se déconnecter')}</button>
           </form>
         </div>
       </aside>
@@ -393,7 +391,7 @@ export function Navigation({
         <button
           type="button"
           className="voile"
-          aria-label="Fermer le menu"
+          aria-label={t('Fermer le menu')}
           onClick={() => setOuvert(false)}
         />
       )}

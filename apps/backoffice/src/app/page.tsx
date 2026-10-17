@@ -12,8 +12,10 @@ import { redirect } from 'next/navigation'
 import { sessionObligatoire } from '../serveur/session.js'
 import { BarreCompte } from '../composants/BarreCompte.js'
 import { estEditeur } from './[restaurant]/abonnement/actions.js'
+import { traduction } from '../i18n/serveur.js'
 
 export default async function Accueil() {
+  const t = await traduction()
   const session = await sessionObligatoire()
   /*
    * Les établissements FERMÉS à part.
@@ -38,8 +40,8 @@ export default async function Accueil() {
     <>
       <BarreCompte session={session} />
       <main className="enveloppe">
-        <h1>Vos établissements</h1>
-        <p className="sous-titre">Choisissez celui que vous voulez administrer.</p>
+        <h1>{t('Vos établissements')}</h1>
+        <p className="sous-titre">{t('Choisissez celui que vous voulez administrer.')}</p>
 
         {/*
           Le raccourci d'administration, pour qui en a le rôle. Il est ici
@@ -49,30 +51,18 @@ export default async function Accueil() {
         {(session.etablissements.some((e) => e.administrateur) || editeur) && (
           <p style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             {session.etablissements.some((e) => e.administrateur) && (
-              <Link className="bouton discret" href="/administration">
-                🏢 Administration — ouvrir un établissement
-              </Link>
+              <Link className="bouton discret" href="/administration">{t('🏢 Administration — ouvrir un établissement')}</Link>
             )}
             {editeur && (
-              <Link className="bouton discret" href="/editeur">
-                🧾 Éditeur — clients et formules
-              </Link>
+              <Link className="bouton discret" href="/editeur">{t('🧾 Éditeur — clients et formules')}</Link>
             )}
           </p>
         )}
 
         {session.etablissements.length === 0 ? (
           <div className="carte">
-            <p className="message avertissement">
-              Votre compte n&apos;est rattaché à aucun établissement.
-            </p>
-            <p className="indication">
-              Un compte Supabase seul ne suffit pas : il faut une ligne dans
-              <code> kaissi.memberships</code> qui vous relie à un restaurant, avec un
-              rôle. C&apos;est cette ligne que lisent les politiques RLS —
-              sans elle, la base ne vous rend aucune donnée, ce qui est le
-              comportement voulu.
-            </p>
+            <p className="message avertissement">{t('Votre compte n\'est rattaché à aucun établissement.')}</p>
+            <p className="indication">{t('Un compte Supabase seul ne suffit pas : il faut une ligne dans')}<code>{' '}{t('kaissi.memberships')}</code>{' '}{t('qui vous relie à un restaurant, avec un rôle. C\'est cette ligne que lisent les politiques RLS — sans elle, la base ne vous rend aucune donnée, ce qui est le comportement voulu.')}</p>
           </div>
         ) : (
           <div className="grille deux">
@@ -86,10 +76,7 @@ export default async function Accueil() {
                 <h2 style={{ marginBottom: '0.35rem' }}>{etablissement.nom}</h2>
                 <span className="etiquette">{etablissement.role}</span>
                 {!etablissement.gestionnaire && (
-                  <p className="indication">
-                    Consultation seule — la modification du catalogue et des employés
-                    demande le rôle gérant.
-                  </p>
+                  <p className="indication">{t('Consultation seule — la modification du catalogue et des employés demande le rôle gérant.')}</p>
                 )}
               </Link>
             ))}
@@ -98,11 +85,8 @@ export default async function Accueil() {
 
         {fermes.length > 0 && (
           <section style={{ marginTop: '1.5rem' }}>
-            <h2>Établissements fermés</h2>
-            <p className="indication">
-              Aucune caisse ne peut y être mise en service. Leurs rapports restent
-              consultables ; on les rouvre depuis l’Administration.
-            </p>
+            <h2>{t('Établissements fermés')}</h2>
+            <p className="indication">{t('Aucune caisse ne peut y être mise en service. Leurs rapports restent consultables ; on les rouvre depuis l’Administration.')}</p>
             <div className="grille deux">
               {fermes.map((etablissement) => (
                 <Link
@@ -112,7 +96,7 @@ export default async function Accueil() {
                   style={{ textDecoration: 'none', color: 'inherit', display: 'block', opacity: 0.75 }}
                 >
                   <h2 style={{ marginBottom: '0.35rem' }}>{etablissement.nom}</h2>
-                  <span className="etiquette inactif">fermé</span>
+                  <span className="etiquette inactif">{t('fermé')}</span>
                 </Link>
               ))}
             </div>

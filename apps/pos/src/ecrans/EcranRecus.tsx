@@ -27,10 +27,11 @@
  */
 
 import { useEffect, useState } from 'react'
-import { formaterTND, libelleModePaiement, millimes } from '@kaissi/domain'
+import { formaterTND, millimes } from '@kaissi/domain'
 import type { Recu } from '@kaissi/db-local'
 import { useApp } from '../etat/contexte.js'
 import { ModaleRecu } from '../composants/ModaleRecu.js'
+import { dateLocale, libellePaiement, t } from '../i18n.js'
 
 /** Bornée, comme la requête : un an de tickets ne tient pas dans une tablette. */
 const PAR_PAGE = 100
@@ -55,31 +56,26 @@ export function EcranRecus({ onRetour }: { readonly onRetour: () => void }) {
   return (
     <div className="recus">
       <div className="barre-salle">
-        <button type="button" className="lien" onClick={onRetour}>
-          ‹ Salle
-        </button>
-        <strong>Reçus</strong>
+        <button type="button" className="lien" onClick={onRetour}>{t('‹ Salle')}</button>
+        <strong>{t('Reçus')}</strong>
         {enAttente > 0 && (
           <span
             className="badge attente"
             title={
-              `${enAttente} vente(s) encaissée(s) ne sont pas encore remontées au ` +
-              'back-office. Elles le seront dès que la caisse aura du réseau — ' +
-              'rien n’est perdu.'
+              t(
+                '{n} vente(s) encaissée(s) ne sont pas encore remontées au back-office. Elles le seront dès que la caisse aura du réseau — rien n’est perdu.',
+                { n: enAttente },
+              )
             }
           >
-            {enAttente} en attente d’envoi
-          </span>
+            {enAttente}{' '}{t('en attente d’envoi')}</span>
         )}
       </div>
 
       {recus === null ? (
-        <p className="indication-vide">Lecture des ventes…</p>
+        <p className="indication-vide">{t('Lecture des ventes…')}</p>
       ) : recus.length === 0 ? (
-        <p className="indication-vide">
-          Aucune vente encaissée pour l’instant. Les reçus des autres caisses
-          apparaissent ici dès qu’elles se sont synchronisées.
-        </p>
+        <p className="indication-vide">{t('Aucune vente encaissée pour l’instant. Les reçus des autres caisses apparaissent ici dès qu’elles se sont synchronisées.')}</p>
       ) : (
         <>
           <ul className="liste-recus">
@@ -91,34 +87,31 @@ export function EcranRecus({ onRetour }: { readonly onRetour: () => void }) {
                 */}
                 <button type="button" className="ouvrir-recu" onClick={() => setOuvert(r.id)}>
                 <div className="ref">
-                  <strong>{r.numeroTicket ?? '— sans numéro —'}</strong>
+                  <strong>{r.numeroTicket ?? `— ${t('sans numéro')} —`}</strong>
                   <small>
                     {heure(r.termineeA)}
-                    {r.tableLabel ? ` · ${r.tableLabel}` : ' · À emporter'}
+                    {r.tableLabel ? ` · ${r.tableLabel}` : ` · ${t('À emporter')}`}
                     {r.employe ? ` · ${r.employe}` : ''}
                   </small>
                 </div>
                 <div className="detail">
-                  <span className="articles">{r.nombreArticles} art.</span>
+                  <span className="articles">{t('{n} art.', { n: r.nombreArticles })}</span>
                   <span className="modes">{modes(r.paiements)}</span>
                 </div>
                 <div className="cote">
                   <span className="montant">{formaterTND(millimes(r.totalMillimes))}</span>
-                  {r.statut === 'annulee' && <span className="badge">Annulée</span>}
+                  {r.statut === 'annulee' && <span className="badge">{t('Annulée')}</span>}
                   {/*
                     Le marqueur est posé À CÔTÉ DU MONTANT, pas dans un
                     en-tête : c'est le montant qu'on compare au back-office,
                     et c'est donc là que l'explication de l'écart doit être.
                   */}
                   {r.rembourseMillimes > 0 && (
-                    <span className="badge rembourse">
-                      remboursé {formaterTND(millimes(r.rembourseMillimes))}
+                    <span className="badge rembourse">{t('remboursé')}{' '}{formaterTND(millimes(r.rembourseMillimes))}
                     </span>
                   )}
                   {r.enAttente && (
-                    <span className="badge attente" title="Pas encore remontée au back-office">
-                      en attente
-                    </span>
+                    <span className="badge attente" title={t('Pas encore remontée au back-office')}>{t('en attente')}</span>
                   )}
                 </div>
                 </button>
@@ -133,9 +126,7 @@ export function EcranRecus({ onRetour }: { readonly onRetour: () => void }) {
               type="button"
               className="lien charger-plus"
               onClick={() => setLimite((l) => l + PAR_PAGE)}
-            >
-              Afficher {PAR_PAGE} reçus de plus
-            </button>
+            >{t('Afficher {n} reçus de plus', { n: PAR_PAGE })}</button>
           )}
         </>
       )}
@@ -148,12 +139,12 @@ function heure(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
   const aujourdhui = new Date().toDateString() === d.toDateString()
-  const h = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-  return aujourdhui ? h : `${d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} ${h}`
+  const h = dateLocale(d, { hour: '2-digit', minute: '2-digit' })
+  return aujourdhui ? h : `${dateLocale(d, { day: '2-digit', month: '2-digit' })} ${h}`
 }
 
 /** « cash,card » → « Espèces, Carte ». Une note partagée en porte plusieurs. */
 function modes(bruts: string): string {
   if (!bruts) return '—'
-  return bruts.split(',').map(libelleModePaiement).join(', ')
+  return bruts.split(',').map(libellePaiement).join(', ')
 }

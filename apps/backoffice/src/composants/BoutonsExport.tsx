@@ -18,6 +18,8 @@
 
 import Link from 'next/link'
 import { destinationSure } from '../serveur/redirection.js'
+import { traduction } from '../i18n/serveur.js'
+import { use } from 'react'
 
 export interface Export {
   /** Sujet de la route `/[restaurant]/export/[quoi]`. */
@@ -37,6 +39,7 @@ export function BoutonsExport({
   du?: string
   au?: string
 }) {
+  const t = use(traduction())
   const parametres = new URLSearchParams()
   if (du) parametres.set('du', du)
   if (au) parametres.set('au', au)
@@ -44,7 +47,7 @@ export function BoutonsExport({
 
   return (
     <div className="actions-export">
-      <span className="detail">Exporter :</span>
+      <span className="detail">{t('Exporter :')}</span>
       {exports.map((e) => (
         <Link
           key={e.quoi}
@@ -58,9 +61,7 @@ export function BoutonsExport({
           {e.libelle}
         </Link>
       ))}
-      <span className="detail">
-        Format CSV — s’ouvre dans Excel, LibreOffice et Google Sheets.
-      </span>
+      <span className="detail">{t('Format CSV — s’ouvre dans Excel, LibreOffice et Google Sheets.')}</span>
     </div>
   )
 }

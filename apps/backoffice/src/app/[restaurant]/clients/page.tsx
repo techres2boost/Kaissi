@@ -28,6 +28,7 @@ import { ecranReserve, etablissementObligatoire } from '../../../serveur/session
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { chargerFiche } from '../../../serveur/ventes.js'
 import { ListeClients, type ClientAffiche } from '../../../composants/ListeClients.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,6 +42,7 @@ export default async function PageClients({
   params: Promise<{ restaurant: string }>
   searchParams: Promise<Record<string, string | undefined>>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const recherche = await searchParams
   const { etablissement } = await etablissementObligatoire(restaurant)
@@ -130,14 +132,11 @@ export default async function PageClients({
 
   return (
     <>
-      <h1>Clients</h1>
-      <p className="sous-titre">
-        Qui vient au restaurant. Les visites et le total dépensé se{' '}
-        <strong>calculent</strong> sur les ventes encaissées — rien n’est saisi à
-        la main, rien ne peut donc dériver.
-      </p>
+      <h1>{t('Clients')}</h1>
+      <p className="sous-titre">{t('Qui vient au restaurant. Les visites et le total dépensé se')}{' '}
+        <strong>{t('calculent')}</strong>{' '}{t('sur les ventes encaissées — rien n’est saisi à la main, rien ne peut donc dériver.')}</p>
 
-      {error && <p className="message erreur">Lecture impossible : {error.message}</p>}
+      {error && <p className="message erreur">{t('Lecture impossible :')}{' '}{error.message}</p>}
 
       <ListeClients
         restaurantId={restaurant}

@@ -19,6 +19,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { destinationSure } from '../serveur/redirection.js'
 import { marquerPrete, retirerPrete } from '../app/[restaurant]/preparation/actions.js'
+import { useT } from '../i18n/client.js'
+import { aTraduire } from '@kaissi/i18n'
 
 export interface CommandeCuisine {
   id: string
@@ -42,8 +44,8 @@ export interface CommandeCuisine {
 const PERIODE_MS = 15_000
 
 const LIBELLE_TYPE: Record<string, string> = {
-  dine_in: 'Sur place',
-  takeaway: 'À emporter',
+  dine_in: aTraduire('Sur place'),
+  takeaway: aTraduire('À emporter'),
   delivery: 'Livraison',
 }
 
@@ -75,6 +77,7 @@ export function TableauCuisine({
    */
   titre: string
 }) {
+  const t = useT()
   const router = useRouter()
   const [enCours, demarrer] = useTransition()
   const [erreur, setErreur] = useState<string | null>(null)
@@ -119,10 +122,7 @@ export function TableauCuisine({
         <h1>
           {titre} <span className="compteur">{enAttente.length}</span>
         </h1>
-        <p className="note">
-          Mise à jour automatique toutes les {PERIODE_MS / 1000} secondes. Une
-          commande sort de cet écran quand la caisse l'encaisse ou l'annule.
-        </p>
+        <p className="note">{t('Mise à jour automatique toutes les')}{' '}{PERIODE_MS / 1000}{' '}{t('secondes. Une commande sort de cet écran quand la caisse l\'encaisse ou l\'annule.')}</p>
 
         {/*
           La caisse émet DÉJÀ un bon par poste (Cuisine, Bar). Ce filtre rend
@@ -131,13 +131,11 @@ export function TableauCuisine({
           dans un snack à un seul écran, c'est ce qu'on veut.
         */}
         {postes.length > 1 && (
-          <nav className="onglets-postes" aria-label="Poste de préparation">
+          <nav className="onglets-postes" aria-label={t('Poste de préparation')}>
             <Link
               href={destinationSure(`/${restaurantId}/preparation`)}
               className={posteActif === null ? 'actif' : ''}
-            >
-              Tous les postes
-            </Link>
+            >{t('Tous les postes')}</Link>
             {postes.map((p) => (
               <Link
                 key={p.id}
@@ -151,13 +149,10 @@ export function TableauCuisine({
         )}
       </header>
 
-      {erreur && <p className="message erreur">{erreur}</p>}
+      {erreur && <p className="message erreur">{t.m(erreur)}</p>}
 
       {commandes.length === 0 ? (
-        <p className="vide">
-          Rien à préparer. Les commandes apparaissent ici dès qu'un serveur
-          les envoie en cuisine depuis la caisse.
-        </p>
+        <p className="vide">{t('Rien à préparer. Les commandes apparaissent ici dès qu\'un serveur les envoie en cuisine depuis la caisse.')}</p>
       ) : (
         <div className="cuisine-grille">
           {commandes.map((commande) => {
@@ -171,16 +166,16 @@ export function TableauCuisine({
               >
                 <header>
                   <span className="place">
-                    {commande.table ? `Table ${commande.table}` : LIBELLE_TYPE[commande.type] ?? commande.type}
+                    {commande.table ? t('Table {table}', { table: commande.table }) : t(LIBELLE_TYPE[commande.type] ?? commande.type)}
                   </span>
                   <span className="attente">
-                    {attente === null ? '—' : `${attente} min`}
+                    {attente === null ? '—' : t('{attente} min', { attente })}
                   </span>
                 </header>
 
                 <p className="reference">
                   {commande.numero ?? '—'}
-                  {commande.couverts ? ` · ${commande.couverts} couverts` : ''}
+                  {commande.couverts ? t(' · {couverts} couverts', { couverts: commande.couverts }) : ''}
                 </p>
 
                 <ul className="plats">
@@ -197,7 +192,7 @@ export function TableauCuisine({
                     </li>
                   ))}
                   {commande.lignes.length === 0 && (
-                    <li className="note">Aucune ligne active — commande vidée en salle.</li>
+                    <li className="note">{t('Aucune ligne active — commande vidée en salle.')}</li>
                   )}
                 </ul>
 
@@ -207,18 +202,14 @@ export function TableauCuisine({
                     className="discret"
                     disabled={enCours}
                     onClick={() => agir(() => retirerPrete(restaurantId, commande.id))}
-                  >
-                    Annuler « prêt »
-                  </button>
+                  >{t('Annuler « prêt »')}</button>
                 ) : (
                   <button
                     type="button"
                     className="principal"
                     disabled={enCours}
                     onClick={() => agir(() => marquerPrete(restaurantId, commande.id))}
-                  >
-                    Prêt
-                  </button>
+                  >{t('Prêt')}</button>
                 )}
               </article>
             )
@@ -227,10 +218,7 @@ export function TableauCuisine({
       )}
 
       {commandes.length >= plafond && (
-        <p className="note">
-          Seules les {plafond} plus anciennes commandes sont affichées. Au-delà,
-          ce n'est plus un écran de cuisine mais un rapport — voir « Journée ».
-        </p>
+        <p className="note">{t('Seules les')}{' '}{plafond}{' '}{t('plus anciennes commandes sont affichées. Au-delà, ce n\'est plus un écran de cuisine mais un rapport — voir « Journée ».')}</p>
       )}
     </section>
   )

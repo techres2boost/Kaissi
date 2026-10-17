@@ -46,6 +46,7 @@ import { rendreTicketClient, rendreTicketCuisine } from '@kaissi/printing'
 import { IMPRESSION_ACTIVE } from '../config.js'
 import type { ContexteApplication } from './demarrage.js'
 import type { ServiceImpression } from './impression.js'
+import { t } from '../i18n.js'
 
 export class RefusOperation extends Error {
   constructor(
@@ -130,7 +131,7 @@ export class SessionCaisse {
 
   private garde(acteur: Employe | null, permission: Permission): void {
     if (!acteur) {
-      throw new RefusOperation('Aucun employé identifié sur ce terminal.', false)
+      throw new RefusOperation(t('Aucun employé identifié sur ce terminal.'), false)
     }
     const verdict = autoriser(acteur, permission)
     if (!verdict.accorde) {
@@ -269,7 +270,7 @@ export class SessionCaisse {
     remise: Remise,
     options: { ligneId?: string | null; autorisePar?: Employe } = {},
   ): Promise<EtatCommande> {
-    if (!acteur) throw new RefusOperation('Aucun employé identifié.', false)
+    if (!acteur) throw new RefusOperation(t('Aucun employé identifié.'), false)
     const tauxBp = remise.type === 'pourcentage' ? remise.valeurBp : 0
     // Un manager qui autorise fait sauter le plafond de celui qui demande.
     const evaluateur = options.autorisePar ?? acteur
@@ -328,7 +329,7 @@ export class SessionCaisse {
     orderId: string,
     client: { id: string; nom: string; telephone?: string | null } | null,
   ): Promise<EtatCommande> {
-    if (!acteur) throw new RefusOperation('Aucun employé identifié.', false)
+    if (!acteur) throw new RefusOperation(t('Aucun employé identifié.'), false)
     const etat = await this.etatDe(orderId)
     this.gardeTransition(etat, 'customer.attached')
     // Détacher, c'est rattacher « personne » : `clientId: null`. Le domaine
@@ -555,7 +556,7 @@ export class SessionCaisse {
     this.garde(autorisePar, 'commande.annuler')
     if (motif.trim() === '') {
       throw new RefusOperation(
-        "Une annulation exige un motif écrit : sans lui, le journal d'audit ne sert à rien.",
+        t("Une annulation exige un motif écrit : sans lui, le journal d'audit ne sert à rien."),
         false,
       )
     }
@@ -588,12 +589,11 @@ export class SessionCaisse {
     demande: { readonly ligneIds: readonly string[]; readonly mode: ModePaiement; readonly motif: string },
     autorisePar?: Employe,
   ): Promise<EtatCommande> {
-    if (!acteur) throw new RefusOperation('Aucun employé identifié sur ce terminal.', false)
+    if (!acteur) throw new RefusOperation(t('Aucun employé identifié sur ce terminal.'), false)
     this.garde(autorisePar ?? acteur, 'paiement.rembourser')
     if (demande.motif.trim() === '') {
       throw new RefusOperation(
-        'Un remboursement exige un motif : « remboursé par Ahmed » n’explique rien, ' +
-          '« pizza froide » explique tout.',
+        t('Un remboursement exige un motif : « remboursé par Ahmed » n’explique rien, « pizza froide » explique tout.'),
         false,
       )
     }
@@ -616,7 +616,7 @@ export class SessionCaisse {
 
     const paiement = paiementARembourser(etat, demande.mode)
     if (!paiement) {
-      throw new RefusOperation('Ce ticket ne porte aucun paiement : il n’y a rien à rendre.', false)
+      throw new RefusOperation(t('Ce ticket ne porte aucun paiement : il n’y a rien à rendre.'), false)
     }
 
     /*
@@ -627,7 +627,7 @@ export class SessionCaisse {
     const shiftId = (await this.contexte.etat.lire('shift_courant')) || null
     if (demande.mode === 'cash' && !shiftId) {
       throw new RefusOperation(
-        'Ouvrez la caisse avant de rendre des espèces : l’argent doit sortir d’un tiroir qu’on comptera.',
+        t('Ouvrez la caisse avant de rendre des espèces : l’argent doit sortir d’un tiroir qu’on comptera.'),
         false,
       )
     }

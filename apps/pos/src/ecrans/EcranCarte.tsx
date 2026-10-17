@@ -36,6 +36,7 @@ import { ModaleNouvelArticle } from '../composants/ModaleNouvelArticle.js'
 import { ModaleNouvelleCategorie } from '../composants/ModaleNouvelleCategorie.js'
 import { ModaleNouvelleReduction } from '../composants/ModaleNouvelleReduction.js'
 import { ModaleNouveauModificateur } from '../composants/ModaleNouveauModificateur.js'
+import { t } from '../i18n.js'
 
 type Quoi = 'article' | 'categorie' | 'reduction' | 'modificateur'
 
@@ -68,44 +69,41 @@ export function EcranCarte({ employe }: { readonly employe: Employe | null }) {
   if (!employe || !peutModifierCatalogue(employe.role)) {
     return (
       <section className="carte-action">
-        <h1>Carte</h1>
-        <p>
-          Tenir la carte demande le rôle <strong>gérant</strong> ou{' '}
-          <strong>administrateur</strong>. Demande à un responsable de se
-          déverrouiller sur ce terminal.
-        </p>
+        <h1>{t('Carte')}</h1>
+        <p>{t('Tenir la carte demande le rôle')}{' '}<strong>{t('gérant')}</strong>{' '}{t('ou')}{' '}
+          <strong>{t('administrateur')}</strong>{t('. Demande à un responsable de se déverrouiller sur ce terminal.')}</p>
       </section>
     )
   }
 
   const apresCreation = async (quoi: string) => {
-    setMessage(`${quoi} — créé. Il part au bureau à la prochaine synchronisation.`)
+    setMessage(t('{quoi} — créé. Il part au bureau à la prochaine synchronisation.', { quoi }))
     await recharger()
   }
 
   const entrees: { cle: Quoi; libelle: string; detail: string; icone: typeof Tag }[] = [
     {
       cle: 'article',
-      libelle: 'Nouvel article',
-      detail: `${produits.length} article(s) · vendable aussitôt, même hors ligne`,
+      libelle: t('Nouvel article'),
+      detail: t('{n} article(s) · vendable aussitôt, même hors ligne', { n: produits.length }),
       icone: ListPlus,
     },
     {
       cle: 'categorie',
-      libelle: 'Nouvelle catégorie',
-      detail: `${categories.length} catégorie(s) · son poste décide où sort le bon`,
+      libelle: t('Nouvelle catégorie'),
+      detail: t('{n} catégorie(s) · son poste décide où sort le bon', { n: categories.length }),
       icone: Tag,
     },
     {
       cle: 'reduction',
-      libelle: 'Nouvelle réduction',
-      detail: `${reductions.length} réduction(s) · proposée au moment de la remise`,
+      libelle: t('Nouvelle réduction'),
+      detail: t('{n} réduction(s) · proposée au moment de la remise', { n: reductions.length }),
       icone: Percent,
     },
     {
       cle: 'modificateur',
-      libelle: 'Nouveau groupe d’options',
-      detail: `${groupes.length} groupe(s) · cuisson, suppléments`,
+      libelle: t('Nouveau groupe d’options'),
+      detail: t('{n} groupe(s) · cuisson, suppléments', { n: groupes.length }),
       icone: SlidersHorizontal,
     },
   ]
@@ -113,13 +111,9 @@ export function EcranCarte({ employe }: { readonly employe: Employe | null }) {
   return (
     <section className="ecran-carte">
       <header>
-        <h1>Carte</h1>
-        <p className="aide">
-          Ce qu’on ajoute ici se vend <strong>tout de suite</strong>, même sans
-          réseau, et remonte au bureau à la prochaine synchronisation. Pour{' '}
-          <strong>modifier</strong> ou retirer quelque chose, c’est le
-          back-office : la caisse propose, le bureau décide.
-        </p>
+        <h1>{t('Carte')}</h1>
+        <p className="aide">{t('Ce qu’on ajoute ici se vend')}{' '}<strong>{t('tout de suite')}</strong>{t(', même sans réseau, et remonte au bureau à la prochaine synchronisation. Pour')}{' '}
+          <strong>{t('modifier')}</strong>{' '}{t('ou retirer quelque chose, c’est le back-office : la caisse propose, le bureau décide.')}</p>
       </header>
 
       {message && (
@@ -135,6 +129,9 @@ export function EcranCarte({ employe }: { readonly employe: Employe | null }) {
             <button
               key={e.cle}
               type="button"
+              // Une clé STABLE, indépendante de la langue : les parcours de
+              // test et le support la visent, pas un libellé qui se traduit.
+              data-cle={e.cle}
               onClick={() => {
                 setMessage(null)
                 setOuvert(e.cle)

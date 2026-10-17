@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { libelleJournee } from '../serveur/journee.js'
 import type { Periode } from '../serveur/ventes.js'
+import { traduction } from '../i18n/serveur.js'
+import { use } from 'react'
 
 /**
  * « Votre formule ne remonte pas si loin » — dit, et pas deviné.
@@ -32,15 +34,13 @@ export function AvertissementFormule({
   restaurantId: string
   periode: Periode
 }) {
+  const t = use(traduction())
   if (!periode.limiteeParFormule) return null
   return (
     <p className="message avertissement" role="status">
-      <strong>Votre formule limite l’historique.</strong> Ce rapport commence au{' '}
-      {libelleJournee(periode.du)} — les ventes antérieures existent toujours,
-      elles ne sont simplement pas consultables avec la formule en cours.{' '}
-      <Link href={{ pathname: `/${restaurantId}/abonnement` }}>
-        Voir la formule
-      </Link>
+      <strong>{t('Votre formule limite l’historique.')}</strong>{' '}{t('Ce rapport commence au')}{' '}
+      {libelleJournee(periode.du, t.locale)}{' '}{t('— les ventes antérieures existent toujours, elles ne sont simplement pas consultables avec la formule en cours.')}{' '}
+      <Link href={{ pathname: `/${restaurantId}/abonnement` }}>{t('Voir la formule')}</Link>
       .
     </p>
   )

@@ -23,6 +23,7 @@ import {
 } from '@kaissi/domain'
 import { Modale } from './Modale.js'
 import { useApp } from '../etat/contexte.js'
+import { t, tm } from '../i18n.js'
 
 interface Props {
   readonly employe: Employe
@@ -59,11 +60,11 @@ export function ModaleNouvelleReduction({ employe, onFerme, onCree }: Props) {
     const bp = type === 'pourcentage' ? pourcentageEnBp(valeur) : null
     const montant = type === 'montant' ? montantEnMillimes(valeur) : null
     if (type === 'pourcentage' && bp === null) {
-      setErreur('Le pourcentage n’est pas lisible. Exemple : 10 ou 12,5')
+      setErreur(t('Le pourcentage n’est pas lisible. Exemple : 10 ou 12,5'))
       return
     }
     if (type === 'montant' && montant === null) {
-      setErreur('Le montant n’est pas lisible. Exemple : 2,000')
+      setErreur(t('Le montant n’est pas lisible. Exemple : 2,000'))
       return
     }
 
@@ -87,7 +88,7 @@ export function ModaleNouvelleReduction({ employe, onFerme, onCree }: Props) {
     // LA MÊME validation que le serveur exécutera.
     const verdict = validerMutationCatalogue(mutation)
     if (!verdict.valide) {
-      setErreur(verdict.motif ?? 'Saisie invalide.')
+      setErreur(verdict.motif ? tm(verdict.motif) : t('Saisie invalide.'))
       return
     }
 
@@ -98,7 +99,7 @@ export function ModaleNouvelleReduction({ employe, onFerme, onCree }: Props) {
       await onCree(nom.trim())
       onFerme()
     } catch (e) {
-      setErreur(e instanceof Error ? e.message : String(e))
+      setErreur(e instanceof Error ? tm(e.message) : String(e))
     } finally {
       setEnCours(false)
     }
@@ -106,15 +107,15 @@ export function ModaleNouvelleReduction({ employe, onFerme, onCree }: Props) {
 
   if (!peutModifierCatalogue(employe.role)) {
     return (
-      <Modale titre="Nouvelle réduction" onFermer={onFerme}>
-        <p className="aide">Seul un gérant ou un administrateur tient la carte.</p>
+      <Modale titre={t('Nouvelle réduction')} onFermer={onFerme}>
+        <p className="aide">{t('Seul un gérant ou un administrateur tient la carte.')}</p>
       </Modale>
     )
   }
 
   return (
     <Modale
-      titre="Nouvelle réduction"
+      titre={t('Nouvelle réduction')}
       onFermer={onFerme}
       pied={
         <button
@@ -123,22 +124,22 @@ export function ModaleNouvelleReduction({ employe, onFerme, onCree }: Props) {
           disabled={enCours || nom.trim() === '' || valeur.trim() === ''}
           onClick={() => void enregistrer()}
         >
-          {enCours ? 'Enregistrement…' : 'Créer la réduction'}
+          {enCours ? t('Enregistrement…') : t('Créer la réduction')}
         </button>
       }
     >
-      <label htmlFor="red-nom">Nom</label>
+      <label htmlFor="red-nom">{t('Nom')}</label>
       <input
         id="red-nom"
         type="text"
         value={nom}
         autoFocus
         maxLength={60}
-        placeholder="Happy hour"
+        placeholder={t('Happy hour')}
         onChange={(e) => setNom(e.target.value)}
       />
 
-      <label htmlFor="red-type">Type</label>
+      <label htmlFor="red-type">{t('Type')}</label>
       <select
         id="red-type"
         value={type}
@@ -147,12 +148,12 @@ export function ModaleNouvelleReduction({ employe, onFerme, onCree }: Props) {
           setValeur('')
         }}
       >
-        <option value="pourcentage">Pourcentage</option>
-        <option value="montant">Montant fixe</option>
+        <option value="pourcentage">{t('Pourcentage')}</option>
+        <option value="montant">{t('Montant fixe')}</option>
       </select>
 
       <label htmlFor="red-valeur">
-        {type === 'pourcentage' ? 'Pourcentage' : 'Montant en dinars'}
+        {type === 'pourcentage' ? t('Pourcentage') : t('Montant en dinars')}
       </label>
       <input
         id="red-valeur"
@@ -164,8 +165,8 @@ export function ModaleNouvelleReduction({ employe, onFerme, onCree }: Props) {
       />
       <p className="aide">
         {type === 'pourcentage'
-          ? 'En pour-cent, sans le signe. « 12,5 » est accepté.'
-          : 'Le dinar a trois décimales : « 2,000 » vaut deux dinars.'}
+          ? t('En pour-cent, sans le signe. « 12,5 » est accepté.')
+          : t('Le dinar a trois décimales : « 2,000 » vaut deux dinars.')}
       </p>
 
       {erreur && <p className="erreur">{erreur}</p>}

@@ -10,10 +10,11 @@
     "start": "next start",
     "typecheck": "next typegen && tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
-    "test:largeur": "vitest run --config vitest.largeur.config.ts"
+    "test:largeur": "vitest run --config vitest.largeur.config.ts && KAISSI_LANGUE=ar vitest run --config vitest.largeur.config.ts"
   },
   "dependencies": {
     "@kaissi/domain": "workspace:*",
+    "@kaissi/i18n": "workspace:*",
     "@kaissi/printing": "workspace:*",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",

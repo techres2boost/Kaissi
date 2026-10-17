@@ -18,6 +18,8 @@ import {
   type Resultat,
 } from '../app/[restaurant]/paiements/actions.js'
 import { TYPES_PAIEMENT } from '../app/[restaurant]/paiements/types-paiement.js'
+import { useT } from '../i18n/client.js'
+import { aTraduire } from '@kaissi/i18n'
 
 export interface ModePaiement {
   id: string
@@ -34,18 +36,19 @@ export interface ModePaiement {
  * le nom sert au caissier et au ticket, le type sert au rapport, qui regroupe.
  */
 const LIBELLES: Record<string, { texte: string; icone: typeof Wallet }> = {
-  cash: { texte: 'Espèces', icone: Banknote },
-  card: { texte: 'Carte', icone: CreditCard },
-  online: { texte: 'En ligne', icone: Globe },
-  other: { texte: 'Autre', icone: Wallet },
+  cash: { texte: aTraduire('paiement|Espèces'), icone: Banknote },
+  card: { texte: aTraduire('paiement|Carte'), icone: CreditCard },
+  online: { texte: aTraduire('paiement|En ligne'), icone: Globe },
+  other: { texte: aTraduire('paiement|Autre'), icone: Wallet },
 }
 
 function ChoixType({ defaut, id }: { defaut: string; id?: string }) {
+  const t = useT()
   return (
-    <select name="type" defaultValue={defaut} aria-label="Type de paiement" id={id}>
-      {TYPES_PAIEMENT.map((t) => (
-        <option key={t} value={t}>
-          {LIBELLES[t]?.texte ?? t}
+    <select name="type" defaultValue={defaut} aria-label={t('Type de paiement')} id={id}>
+      {TYPES_PAIEMENT.map((elt) => (
+        <option key={elt} value={elt}>
+          {t(LIBELLES[elt]?.texte ?? elt)}
         </option>
       ))}
     </select>
@@ -53,6 +56,7 @@ function ChoixType({ defaut, id }: { defaut: string; id?: string }) {
 }
 
 function LigneMode({ restaurantId, mode }: { restaurantId: string; mode: ModePaiement }) {
+  const t = useT()
   const [resultat, action] = useActionState(
     modifierModePaiement.bind(null, restaurantId, mode.id),
     null as Resultat | null,
@@ -68,7 +72,7 @@ function LigneMode({ restaurantId, mode }: { restaurantId: string; mode: ModePai
         <input
           name="nom"
           defaultValue={mode.nom}
-          aria-label="Nom du mode de paiement"
+          aria-label={t('Nom du mode de paiement')}
           maxLength={60}
           disabled={mode.archive}
         />
@@ -81,13 +85,9 @@ function LigneMode({ restaurantId, mode }: { restaurantId: string; mode: ModePai
             defaultChecked={mode.ouvreTiroir}
             disabled={mode.archive}
           />
-          <span title="Le tiroir-caisse s’ouvre à la validation de ce paiement">
-            ouvre le tiroir
-          </span>
+          <span title={t('Le tiroir-caisse s’ouvre à la validation de ce paiement')}>{t('ouvre le tiroir')}</span>
         </label>
-        <button type="submit" className="discret" disabled={mode.archive}>
-          Enregistrer
-        </button>
+        <button type="submit" className="discret" disabled={mode.archive}>{t('Enregistrer')}</button>
       </form>
 
       <div className="actions-taux">
@@ -101,14 +101,14 @@ function LigneMode({ restaurantId, mode }: { restaurantId: string; mode: ModePai
             })
           }
         >
-          {mode.archive ? 'Remettre en service' : 'Archiver'}
+          {mode.archive ? t('Remettre en service') : t('Archiver')}
         </button>
       </div>
 
-      {resultat?.erreur && <p className="message erreur">{resultat.erreur}</p>}
-      {resultat?.succes && <p className="message succes">{resultat.succes}</p>}
-      {retour?.erreur && <p className="message erreur">{retour.erreur}</p>}
-      {retour?.succes && <p className="message succes">{retour.succes}</p>}
+      {resultat?.erreur && <p className="message erreur">{t.m(resultat.erreur)}</p>}
+      {resultat?.succes && <p className="message succes">{t.m(resultat.succes)}</p>}
+      {retour?.erreur && <p className="message erreur">{t.m(retour.erreur)}</p>}
+      {retour?.succes && <p className="message succes">{t.m(retour.succes)}</p>}
     </li>
   )
 }
@@ -122,6 +122,7 @@ export function GestionModesPaiement({
   modifiable: boolean
   modes: ModePaiement[]
 }) {
+  const t = useT()
   const [resultat, action] = useActionState(
     creerModePaiement.bind(null, restaurantId),
     null as Resultat | null,
@@ -134,9 +135,7 @@ export function GestionModesPaiement({
       {actifs.length === 0 && (
         <div className="message avertissement">
           <TriangleAlert size={16} strokeWidth={2} aria-hidden="true" />{' '}
-          <strong>Aucun mode de paiement actif.</strong> La caisse ne peut plus
-          rien encaisser tant qu’il n’y en a pas au moins un.
-        </div>
+          <strong>{t('Aucun mode de paiement actif.')}</strong>{' '}{t('La caisse ne peut plus rien encaisser tant qu’il n’y en a pas au moins un.')}</div>
       )}
 
       <ul className="liste-taux">
@@ -147,11 +146,11 @@ export function GestionModesPaiement({
 
       {modifiable && (
         <form action={action} className="carte formulaire-taux">
-          <h2>Ajouter un mode de paiement</h2>
-          <label htmlFor="mode-nom">Nom</label>
-          <input id="mode-nom" name="nom" maxLength={60} placeholder="Flouci" />
+          <h2>{t('Ajouter un mode de paiement')}</h2>
+          <label htmlFor="mode-nom">{t('Nom')}</label>
+          <input id="mode-nom" name="nom" maxLength={60} placeholder={t('Flouci')} />
 
-          <label htmlFor="mode-type">Type</label>
+          <label htmlFor="mode-type">{t('Type')}</label>
           {/*
             Le TYPE sert au rapport, qui regroupe ; le NOM sert au caissier et
             au ticket. « Flouci » et « D17 » sont deux noms pour un même type.
@@ -160,14 +159,12 @@ export function GestionModesPaiement({
 
           <label className="case">
             <input type="checkbox" name="tiroir" value="oui" />
-            <span>ouvre le tiroir-caisse</span>
+            <span>{t('ouvre le tiroir-caisse')}</span>
           </label>
 
-          <button type="submit" className="principal">
-            Ajouter
-          </button>
-          {resultat?.erreur && <p className="message erreur">{resultat.erreur}</p>}
-          {resultat?.succes && <p className="message succes">{resultat.succes}</p>}
+          <button type="submit" className="principal">{t('Ajouter')}</button>
+          {resultat?.erreur && <p className="message erreur">{t.m(resultat.erreur)}</p>}
+          {resultat?.succes && <p className="message succes">{t.m(resultat.succes)}</p>}
         </form>
       )}
     </>

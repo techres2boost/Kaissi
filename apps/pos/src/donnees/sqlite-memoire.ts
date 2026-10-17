@@ -16,6 +16,7 @@ import type { AdaptateurSqlite, ValeurSql } from '@kaissi/db-local'
 import { ErreurSqlite } from '@kaissi/db-local'
 import initSqlJs, { type Database } from 'sql.js'
 import urlWasm from 'sql.js/dist/sql-wasm.wasm?url'
+import { t } from '../i18n.js'
 
 let base: Database | null = null
 
@@ -44,7 +45,7 @@ export async function adaptateurMemoire(): Promise<AdaptateurSqlite> {
       try {
         db.run(sql, params as ValeurSql[])
       } catch (e) {
-        throw new ErreurSqlite(`Échec de « ${sql.slice(0, 80)} »`, e)
+        throw new ErreurSqlite(t('Échec de « {sql} »', { sql: sql.slice(0, 80) }), e)
       }
     },
 
@@ -52,7 +53,7 @@ export async function adaptateurMemoire(): Promise<AdaptateurSqlite> {
       try {
         db.exec(sql)
       } catch (e) {
-        throw new ErreurSqlite("Échec de l'exécution du script SQL", e)
+        throw new ErreurSqlite(t("Échec de l'exécution du script SQL"), e)
       }
     },
 
@@ -60,7 +61,7 @@ export async function adaptateurMemoire(): Promise<AdaptateurSqlite> {
       try {
         return lignes(sql, params) as never
       } catch (e) {
-        throw new ErreurSqlite(`Échec de la lecture « ${sql.slice(0, 80)} »`, e)
+        throw new ErreurSqlite(t('Échec de la lecture « {sql} »', { sql: sql.slice(0, 80) }), e)
       }
     },
 
@@ -68,7 +69,7 @@ export async function adaptateurMemoire(): Promise<AdaptateurSqlite> {
       try {
         return (lignes(sql, params)[0] ?? null) as never
       } catch (e) {
-        throw new ErreurSqlite(`Échec de la lecture « ${sql.slice(0, 80)} »`, e)
+        throw new ErreurSqlite(t('Échec de la lecture « {sql} »', { sql: sql.slice(0, 80) }), e)
       }
     },
 

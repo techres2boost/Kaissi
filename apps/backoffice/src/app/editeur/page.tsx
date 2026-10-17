@@ -12,6 +12,7 @@ import { BarreCompte } from '../../composants/BarreCompte.js'
 import { FORMULES, PLANS, type Plan } from '@kaissi/domain'
 import { FormuleClient } from '../../composants/FormuleClient.js'
 import { listerClients } from './actions.js'
+import { traduction } from '../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,6 +21,7 @@ function nomFormule(plan: string): string {
 }
 
 export default async function PageEditeur() {
+  const t = await traduction()
   const session = await sessionObligatoire()
   const clients = await listerClients()
   if (clients === null) notFound()
@@ -28,20 +30,17 @@ export default async function PageEditeur() {
     <>
       <BarreCompte session={session} />
       <main className="enveloppe">
-        <h1>Clients et formules</h1>
-        <p className="sous-titre">
-          Écran de l’éditeur. Changer une formule s’applique à toute
-          l’organisation du client, aussitôt. La caisse n’est jamais concernée.
-        </p>
+        <h1>{t('Clients et formules')}</h1>
+        <p className="sous-titre">{t('Écran de l’éditeur. Changer une formule s’applique à toute l’organisation du client, aussitôt. La caisse n’est jamais concernée.')}</p>
 
         <section className="carte">
           <div className="tableau-defilant">
             <table>
               <thead>
                 <tr>
-                  <th>Client</th>
-                  <th>Établissements</th>
-                  <th>Formule</th>
+                  <th>{t('Client')}</th>
+                  <th>{t('Établissements')}</th>
+                  <th>{t('Formule')}</th>
                   <th />
                 </tr>
               </thead>
@@ -58,7 +57,7 @@ export default async function PageEditeur() {
                         : c.etablissements.map((e) => (
                             <div key={e.nom}>
                               {e.nom}
-                              {e.ferme && <span className="etiquette inactif"> fermé</span>}
+                              {e.ferme && <span className="etiquette inactif">{' '}{t('fermé')}</span>}
                             </div>
                           ))}
                     </td>

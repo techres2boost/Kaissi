@@ -1,3 +1,4 @@
+import { t } from '../i18n.js'
 /**
  * Pavé numérique tactile.
  *
@@ -39,9 +40,9 @@ export function PaveNumerique({
 
   return (
     <div className="pave">
-      {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((t) => (
-        <button key={t} type="button" onClick={() => taper(t)}>
-          {t}
+      {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((elt) => (
+        <button key={elt} type="button" onClick={() => taper(elt)}>
+          {elt}
         </button>
       ))}
       <button
@@ -59,7 +60,7 @@ export function PaveNumerique({
         type="button"
         className="effacer"
         onClick={() => onChange(valeur.slice(0, -1))}
-        aria-label="Effacer le dernier chiffre"
+        aria-label={t('Effacer le dernier chiffre')}
       >
         ⌫
       </button>

@@ -16,6 +16,8 @@
  *   tenue, et les deux écrans s'adaptent — une page qui promet une hotline
  *   inexistante est pire que pas de hotline.
  */
+
+import { aTraduire } from '@kaissi/i18n'
 /*
  * Types ÉCRITS, et surtout pas `as const`.
  *
@@ -43,4 +45,4 @@ export const EDITEUR: Editeur = {
 
 /** Le repli affiché quand `horaires` est vide. Une seule formulation. */
 export const DELAI_PAR_DEFAUT =
-  'Nous répondons sous un jour ouvré. Le service se fait en français et en arabe.'
+  aTraduire('Nous répondons sous un jour ouvré. Le service se fait en français et en arabe.')

@@ -25,6 +25,7 @@ import {
 import type { ProduitLocal } from '@kaissi/db-local'
 import { Modale } from './Modale.js'
 import { useApp } from '../etat/contexte.js'
+import { t, tm } from '../i18n.js'
 
 interface Props {
   readonly employe: Employe
@@ -77,7 +78,7 @@ export function ModaleNouveauModificateur({ employe, produits, onFerme, onCree }
         // Un supplément NÉGATIF est légitime : la petite portion coûte moins.
         delta = depuisDecimal(c.prix.trim() === '' ? '0' : c.prix.trim())
       } catch {
-        setErreur(`Le prix de « ${c.nom.trim()} » n’est pas lisible. Exemple : 1,500`)
+        setErreur(t('Le prix de « {nom} » n’est pas lisible. Exemple : 1,500', { nom: c.nom.trim() }))
         return
       }
       convertis.push({ id: c.id, nom: c.nom, prixDeltaMillimes: delta })
@@ -104,7 +105,7 @@ export function ModaleNouveauModificateur({ employe, produits, onFerme, onCree }
     // LA MÊME validation que le serveur exécutera.
     const verdict = validerMutationCatalogue(mutation)
     if (!verdict.valide) {
-      setErreur(verdict.motif ?? 'Saisie invalide.')
+      setErreur(verdict.motif ? tm(verdict.motif) : t('Saisie invalide.'))
       return
     }
 
@@ -115,7 +116,7 @@ export function ModaleNouveauModificateur({ employe, produits, onFerme, onCree }
       await onCree(nom.trim())
       onFerme()
     } catch (e) {
-      setErreur(e instanceof Error ? e.message : String(e))
+      setErreur(e instanceof Error ? tm(e.message) : String(e))
     } finally {
       setEnCours(false)
     }
@@ -123,15 +124,15 @@ export function ModaleNouveauModificateur({ employe, produits, onFerme, onCree }
 
   if (!peutModifierCatalogue(employe.role)) {
     return (
-      <Modale titre="Nouveau groupe d’options" onFermer={onFerme}>
-        <p className="aide">Seul un gérant ou un administrateur tient la carte.</p>
+      <Modale titre={t('Nouveau groupe d’options')} onFermer={onFerme}>
+        <p className="aide">{t('Seul un gérant ou un administrateur tient la carte.')}</p>
       </Modale>
     )
   }
 
   return (
     <Modale
-      titre="Nouveau groupe d’options"
+      titre={t('Nouveau groupe d’options')}
       onFermer={onFerme}
       large
       pied={
@@ -141,24 +142,24 @@ export function ModaleNouveauModificateur({ employe, produits, onFerme, onCree }
           disabled={enCours || nom.trim() === ''}
           onClick={() => void enregistrer()}
         >
-          {enCours ? 'Enregistrement…' : 'Créer le groupe'}
+          {enCours ? t('Enregistrement…') : t('Créer le groupe')}
         </button>
       }
     >
-      <label htmlFor="mod-nom">Nom du groupe</label>
+      <label htmlFor="mod-nom">{t('Nom du groupe')}</label>
       <input
         id="mod-nom"
         type="text"
         value={nom}
         autoFocus
         maxLength={100}
-        placeholder="Cuisson"
+        placeholder={t('Cuisson')}
         onChange={(e) => setNom(e.target.value)}
       />
 
       <div className="champs deux">
         <div>
-          <label htmlFor="mod-min">Choix obligatoires (min)</label>
+          <label htmlFor="mod-min">{t('Choix obligatoires (min)')}</label>
           <input
             id="mod-min"
             inputMode="numeric"
@@ -168,7 +169,7 @@ export function ModaleNouveauModificateur({ employe, produits, onFerme, onCree }
           />
         </div>
         <div>
-          <label htmlFor="mod-max">Au plus (max)</label>
+          <label htmlFor="mod-max">{t('Au plus (max)')}</label>
           <input
             id="mod-max"
             inputMode="numeric"
@@ -179,27 +180,24 @@ export function ModaleNouveauModificateur({ employe, produits, onFerme, onCree }
         </div>
       </div>
       <p className="aide">
-        <strong>min</strong> : combien de choix le caissier DOIT faire (0 =
-        facultatif). <strong>max</strong> : combien il PEUT en faire au plus
-        (0 = autant qu’il veut).
-      </p>
+        <strong>{t('min')}</strong>{' '}{t(': combien de choix le caissier DOIT faire (0 = facultatif).')}{' '}<strong>{t('max')}</strong>{' '}{t(': combien il PEUT en faire au plus (0 = autant qu’il veut).')}</p>
 
-      <label>Les choix proposés</label>
+      <label>{t('Les choix proposés')}</label>
       {choix.map((c) => (
         <div key={c.id} className="champs deux">
           <input
             type="text"
             value={c.nom}
             maxLength={100}
-            placeholder="Saignant"
-            aria-label="Nom du choix"
+            placeholder={t('Saignant')}
+            aria-label={t('Nom du choix')}
             onChange={(e) => majChoix(c.id, 'nom', e.target.value)}
           />
           <input
             type="text"
             inputMode="decimal"
             value={c.prix}
-            aria-label="Supplément en dinars"
+            aria-label={t('Supplément en dinars')}
             onChange={(e) => majChoix(c.id, 'prix', e.target.value)}
           />
         </div>
@@ -208,18 +206,13 @@ export function ModaleNouveauModificateur({ employe, produits, onFerme, onCree }
         type="button"
         className="secondaire"
         onClick={() => setChoix((l) => [...l, { id: uuidV7(), nom: '', prix: '0' }])}
-      >
-        + Ajouter un choix
-      </button>
-      <p className="aide">
-        Le supplément s’ajoute au prix de la ligne. Il peut être{' '}
-        <strong>négatif</strong> (« −1,500 » pour une petite portion). Les
-        lignes laissées vides sont ignorées.
-      </p>
+      >{t('+ Ajouter un choix')}</button>
+      <p className="aide">{t('Le supplément s’ajoute au prix de la ligne. Il peut être')}{' '}
+        <strong>{t('négatif')}</strong>{' '}{t('(« −1,500 » pour une petite portion). Les lignes laissées vides sont ignorées.')}</p>
 
-      <label>S’applique à</label>
+      <label>{t('S’applique à')}</label>
       {produits.length === 0 ? (
-        <p className="aide">Aucun article dans la carte pour l’instant.</p>
+        <p className="aide">{t('Aucun article dans la carte pour l’instant.')}</p>
       ) : (
         <div className="options">
           {produits.map((p) => (
@@ -235,10 +228,7 @@ export function ModaleNouveauModificateur({ employe, produits, onFerme, onCree }
           ))}
         </div>
       )}
-      <p className="aide">
-        Un groupe rattaché à <strong>aucun</strong> article n’apparaît nulle
-        part en caisse. On peut l’y rattacher plus tard au back-office.
-      </p>
+      <p className="aide">{t('Un groupe rattaché à')}{' '}<strong>{t('aucun')}</strong>{' '}{t('article n’apparaît nulle part en caisse. On peut l’y rattacher plus tard au back-office.')}</p>
 
       {erreur && <p className="erreur">{erreur}</p>}
     </Modale>

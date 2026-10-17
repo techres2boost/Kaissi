@@ -15,6 +15,7 @@ import { formaterPourcentage } from '@kaissi/domain'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { ListeEmployes } from '../../../composants/ListeEmployes.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 /** Miroir de `remiseMaxBp` du domaine — affiché pour expliquer le rôle. */
 const PLAFOND_PAR_ROLE: Record<string, number> = {
@@ -31,6 +32,7 @@ export default async function PageEmployes({
 }: {
   params: Promise<{ restaurant: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { session, etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
@@ -90,14 +92,14 @@ export default async function PageEmployes({
 
   return (
     <>
-      <h1>Employés</h1>
+      <h1>{t('Employés')}</h1>
       <p className="sous-titre">
         {etablissement.gestionnaire
-          ? 'Rôles et codes PIN. Une modification atteint les tablettes à leur prochaine synchronisation.'
-          : `Consultation seule : le rôle « ${etablissement.role} » n’administre pas les employés.`}
+          ? t('Rôles et codes PIN. Une modification atteint les tablettes à leur prochaine synchronisation.')
+          : t('Consultation seule : le rôle « {role} » n’administre pas les employés.', { role: etablissement.role })}
       </p>
 
-      {error ? <p className="message erreur">Lecture impossible : {error.message}</p> : null}
+      {error ? <p className="message erreur">{t('Lecture impossible :')}{' '}{error.message}</p> : null}
 
       <ListeEmployes
         restaurantId={restaurant}

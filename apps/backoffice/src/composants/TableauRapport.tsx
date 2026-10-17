@@ -34,6 +34,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { destinationSure } from '../serveur/redirection.js'
+import { useT } from '../i18n/client.js'
 
 /** Une cellule : du texte, et de quoi la trier ou la nuancer. */
 export interface Cellule {
@@ -71,7 +72,7 @@ export function TableauRapport({
   colonnes,
   titre,
   actions,
-  vide = 'Aucune ligne sur cette période.',
+  vide,
 }: {
   lignes: readonly LigneRapport[]
   colonnes: readonly ColonneRapport[]
@@ -81,6 +82,7 @@ export function TableauRapport({
   actions?: React.ReactNode
   vide?: string
 }) {
+  const t = useT()
   const [taille, setTaille] = useState<number>(10)
   const [page, setPage] = useState(1)
   const [masquees, setMasquees] = useState<ReadonlySet<string>>(
@@ -123,15 +125,13 @@ export function TableauRapport({
             className="discret"
             aria-expanded={choixOuvert}
             onClick={() => setChoixOuvert((o) => !o)}
-          >
-            ▥ Colonnes
-          </button>
+          >{t('▥ Colonnes')}</button>
         </div>
       </div>
 
       {choixOuvert && (
         <fieldset className="choix-colonnes">
-          <legend>Champs affichés</legend>
+          <legend>{t('Champs affichés')}</legend>
           {colonnes.map((c) => (
             <label key={c.cle}>
               <input
@@ -144,14 +144,14 @@ export function TableauRapport({
                   setMasquees(suivantes)
                 }}
               />
-              {c.titre}
+              {t(c.titre)}
             </label>
           ))}
         </fieldset>
       )}
 
       {lignes.length === 0 ? (
-        <p className="vide">{vide}</p>
+        <p className="vide">{vide ?? t('Aucune ligne sur cette période.')}</p>
       ) : (
         <>
           <div className="tableau-defilant">
@@ -167,14 +167,14 @@ export function TableauRapport({
                           type="button"
                           className="tri"
                           onClick={() =>
-                            setTri((t) =>
-                              t?.cle === c.cle
-                                ? { cle: c.cle, descendant: !t.descendant }
+                            setTri((elt) =>
+                              elt?.cle === c.cle
+                                ? { cle: c.cle, descendant: !elt.descendant }
                                 : { cle: c.cle, descendant: true },
                             )
                           }
                         >
-                          {c.titre}
+                          {t(c.titre)}
                           {tri?.cle === c.cle ? (tri.descendant ? ' ↓' : ' ↑') : ''}
                         </button>
                       )}
@@ -191,11 +191,11 @@ export function TableauRapport({
                         .filter(Boolean)
                         .join(' ')
                       return (
-                        <td key={c.cle} className={classes || undefined} title={cellule?.aide}>
+                        <td key={c.cle} className={classes || undefined} title={cellule?.aide ? t(cellule.aide) : undefined}>
                           {cellule?.lien ? (
-                            <Link href={destinationSure(cellule.lien)}>{cellule.texte}</Link>
+                            <Link href={destinationSure(cellule.lien)}>{t.donnee(cellule.texte)}</Link>
                           ) : (
-                            (cellule?.texte ?? '—')
+                            (cellule ? t.donnee(cellule.texte) : '—')
                           )}
                         </td>
                       )
@@ -223,21 +223,17 @@ export function TableauRapport({
             >
               ›
             </button>
-            <span className="detail">
-              Page {pageSure} de {pages} · {triees.length} ligne(s)
-            </span>
-            <label className="detail">
-              Lignes par page :
-              <select
+            <span className="detail">{t('Page')}{' '}{pageSure}{' '}{t('de')}{' '}{pages} · {triees.length}{' '}{t('ligne(s)')}</span>
+            <label className="detail">{t('Lignes par page :')}<select
                 value={taille}
                 onChange={(e) => {
                   setTaille(Number(e.target.value))
                   setPage(1)
                 }}
               >
-                {TAILLES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+                {TAILLES.map((elt) => (
+                  <option key={elt} value={elt}>
+                    {elt}
                   </option>
                 ))}
               </select>

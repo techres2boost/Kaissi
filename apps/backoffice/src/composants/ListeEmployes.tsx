@@ -11,6 +11,8 @@ import {
   retirerDeLEtablissement,
   type Resultat,
 } from '../app/[restaurant]/employes/actions.js'
+import { useT } from '../i18n/client.js'
+import { aTraduire } from '@kaissi/i18n'
 
 export interface Employe {
   id: string
@@ -36,11 +38,11 @@ export interface Employe {
 const ROLES_A_CLES: readonly string[] = ['admin', 'gerant']
 
 const ROLES = [
-  { valeur: 'gerant', libelle: 'Gérant — remises sans limite', cles: true },
-  { valeur: 'caissier', libelle: 'Caissier — remises jusqu’à 10 %', cles: false },
-  { valeur: 'serveur', libelle: 'Serveur — remises jusqu’à 5 %', cles: false },
-  { valeur: 'cuisine', libelle: 'Cuisine — écran de préparation seul', cles: false },
-  { valeur: 'bar', libelle: 'Bar — écran de préparation seul', cles: false },
+  { valeur: 'gerant', libelle: aTraduire('Gérant — remises sans limite'), cles: true },
+  { valeur: 'caissier', libelle: aTraduire('Caissier — remises jusqu’à 10 %'), cles: false },
+  { valeur: 'serveur', libelle: aTraduire('Serveur — remises jusqu’à 5 %'), cles: false },
+  { valeur: 'cuisine', libelle: aTraduire('Cuisine — écran de préparation seul'), cles: false },
+  { valeur: 'bar', libelle: aTraduire('Bar — écran de préparation seul'), cles: false },
 ]
 
 /**
@@ -72,6 +74,7 @@ export function ListeEmployes({
   employes: Employe[]
   postes: Poste[]
 }) {
+  const t = useT()
   const [cible, setCible] = useState<Employe | null>(null)
   const [embaucheOuverte, setEmbaucheOuverte] = useState(false)
   /*
@@ -132,12 +135,12 @@ export function ListeEmployes({
       <section className="carte">
         <Message resultat={message} />
         {employes.length === 0 ? (
-          <p className="vide">Aucun employé rattaché à cet établissement.</p>
+          <p className="vide">{t('Aucun employé rattaché à cet établissement.')}</p>
         ) : (
           <TableEmployes
-            titre="En poste"
+            titre={t('En poste')}
             employes={enPoste}
-            vide="Personne en poste : tout le monde est suspendu."
+            vide={t('Personne en poste : tout le monde est suspendu.')}
             modifiable={modifiable}
             enCours={enCours}
             gerer={setCible}
@@ -155,15 +158,9 @@ export function ListeEmployes({
       {suspendus.length > 0 && (
         <section className="carte">
           <details>
-            <summary>
-              Ne prennent plus de poste <span className="etiquette">{suspendus.length}</span>
+            <summary>{t('Ne prennent plus de poste')}{' '}<span className="etiquette">{suspendus.length}</span>
             </summary>
-            <p className="indication">
-              Un employé suspendu ne peut plus ouvrir de commande ; ses ventes
-              passées gardent son nom. <strong>Retirer</strong> le sort
-              définitivement de cet établissement — sans rien effacer de ce
-              qu’il a fait.
-            </p>
+            <p className="indication">{t('Un employé suspendu ne peut plus ouvrir de commande ; ses ventes passées gardent son nom.')}{' '}<strong>{t('Retirer')}</strong>{' '}{t('le sort définitivement de cet établissement — sans rien effacer de ce qu’il a fait.')}</p>
             <TableEmployes
               titre={null}
               employes={suspendus}
@@ -212,6 +209,7 @@ function TableEmployes({
   basculerStatut: (e: Employe) => void
   retirer: (e: Employe) => void
 }) {
+  const t = useT()
   if (employes.length === 0) return vide ? <p className="vide">{vide}</p> : null
   return (
     <>
@@ -219,11 +217,11 @@ function TableEmployes({
       <table>
             <thead>
               <tr>
-                <th>Employé</th>
-                <th>Rôle</th>
-                <th className="nombre">Plafond de remise</th>
-                <th>Code PIN</th>
-                <th>État</th>
+                <th>{t('Employé')}</th>
+                <th>{t('Rôle')}</th>
+                <th className="nombre">{t('Plafond de remise')}</th>
+                <th>{t('Code PIN')}</th>
+                <th>{t('État')}</th>
                 {modifiable && <th />}
               </tr>
             </thead>
@@ -234,13 +232,13 @@ function TableEmployes({
                     {employe.nom}
                     <div className="indication">{employe.email}</div>
                   </td>
-                  <td>{employe.role}</td>
+                  <td>{t.role(employe.role)}</td>
                   <td className="nombre">{employe.plafondRemise} %</td>
                   <td>
                     {employe.aUnPin ? (
-                      <span className="etiquette actif">défini</span>
+                      <span className="etiquette actif">{t('défini')}</span>
                     ) : (
-                      <span className="etiquette inactif">aucun</span>
+                      <span className="etiquette inactif">{t('aucun')}</span>
                     )}
                   </td>
                   <td>
@@ -258,16 +256,14 @@ function TableEmployes({
                             type="button"
                             className="discret"
                             onClick={() => gerer(employe)}
-                          >
-                            Gérer
-                          </button>
+                          >{t('Gérer')}</button>
                           <button
                             type="button"
                             className="discret"
                             disabled={enCours}
                             onClick={() => basculerStatut(employe)}
                           >
-                            {employe.statut === 'actif' ? 'Suspendre' : 'Réactiver'}
+                            {employe.statut === 'actif' ? t('Suspendre') : t('Réactiver')}
                           </button>
                           {/*
                             « Retirer » n'apparaît QUE pour un employé déjà
@@ -286,22 +282,20 @@ function TableEmployes({
                               onClick={() => {
                                 if (
                                   confirm(
-                                    `Retirer ${employe.nom} de cet établissement ?\n\n` +
-                                      'Il disparaîtra de la liste et ne pourra plus prendre de ' +
-                                      'poste. Ses ventes passées gardent son nom — rien n’est ' +
-                                      'effacé. Le réembaucher plus tard reste possible.',
+                                    t(
+                                      'Retirer {nom} de cet établissement ?\n\nIl disparaîtra de la liste et ne pourra plus prendre de poste. Ses ventes passées gardent son nom — rien n’est effacé. Le réembaucher plus tard reste possible.',
+                                      { nom: employe.nom },
+                                    ),
                                   )
                                 ) {
                                   retirer(employe)
                                 }
                               }}
-                            >
-                              Retirer
-                            </button>
+                            >{t('Retirer')}</button>
                           )}
                         </>
                       ) : (
-                        <span className="indication">non administrable ici</span>
+                        <span className="indication">{t('non administrable ici')}</span>
                       )}
                     </td>
                   )}
@@ -326,6 +320,7 @@ function PanneauEmploye({
   postes: Poste[]
   fermer: () => void
 }) {
+  const t = useT()
   const [resultatPin, actionPin, pinEnCours] = useActionState(
     reinitialiserPin.bind(null, restaurantId, employe.id),
     null as Resultat | null,
@@ -340,17 +335,15 @@ function PanneauEmploye({
     <section className="carte" style={{ borderColor: 'var(--accent)' }}>
       <div style={{ display: 'flex', alignItems: 'baseline' }}>
         <h2 style={{ marginBottom: 0 }}>{employe.nom}</h2>
-        <button type="button" className="discret" style={{ marginLeft: 'auto' }} onClick={fermer}>
-          Fermer
-        </button>
+        <button type="button" className="discret" style={{ marginInlineStart: 'auto' }} onClick={fermer}>{t('Fermer')}</button>
       </div>
 
       <div className="grille deux" style={{ marginTop: '1rem' }}>
         <form action={actionPin}>
-          <h2 style={{ fontSize: '0.95rem' }}>Code PIN</h2>
+          <h2 style={{ fontSize: '0.95rem' }}>{t('Code PIN')}</h2>
           <Message resultat={resultatPin} />
           <div className="champ">
-            <label htmlFor={`pin-${employe.id}`}>Nouveau code</label>
+            <label htmlFor={`pin-${employe.id}`}>{t('Nouveau code')}</label>
             <input
               id={`pin-${employe.id}`}
               name="pin"
@@ -361,7 +354,7 @@ function PanneauEmploye({
             />
           </div>
           <div className="champ">
-            <label htmlFor={`conf-${employe.id}`}>Confirmer</label>
+            <label htmlFor={`conf-${employe.id}`}>{t('Confirmer')}</label>
             <input
               id={`conf-${employe.id}`}
               name="confirmation"
@@ -372,15 +365,9 @@ function PanneauEmploye({
             />
           </div>
           <button type="submit" className="principal" disabled={pinEnCours}>
-            {pinEnCours ? 'Calcul du hachage…' : 'Réinitialiser le PIN'}
+            {pinEnCours ? t('Calcul du hachage…') : t('Réinitialiser le PIN')}
           </button>
-          <p className="indication">
-            Le code est haché (Argon2id) avant d&apos;être enregistré&nbsp;: il n&apos;est
-            jamais stocké ni réaffiché en clair. Notez-le maintenant — vous ne pourrez pas
-            le relire. Un PIN à quatre chiffres dit <strong>qui</strong> a agi&nbsp;; ce qui
-            protège l&apos;argent, c&apos;est le jeton d&apos;appareil, RLS et le journal
-            d&apos;audit.
-          </p>
+          <p className="indication">{t('Le code est haché (Argon2id) avant d\'être enregistré : il n\'est jamais stocké ni réaffiché en clair. Notez-le maintenant — vous ne pourrez pas le relire. Un PIN à quatre chiffres dit')}{' '}<strong>{t('qui')}</strong>{' '}{t('a agi ; ce qui protège l\'argent, c\'est le jeton d\'appareil, RLS et le journal d\'audit.')}</p>
         </form>
 
         {/*
@@ -391,19 +378,16 @@ function PanneauEmploye({
         */}
         {!administrateur && ROLES_A_CLES.includes(employe.role) ? (
           <section>
-            <h2 style={{ fontSize: '0.95rem' }}>Rôle</h2>
+            <h2 style={{ fontSize: '0.95rem' }}>{t('Rôle')}</h2>
             <p className="indication">
-              {employe.nom} est {employe.role}. Seul un administrateur peut
-              modifier ce rôle : accorder ou retirer l’accès à l’argent et à la
-              configuration ne relève pas de la gestion courante.
-            </p>
+              {employe.nom}{' '}{t('est')}{' '}{t.role(employe.role)}{t('. Seul un administrateur peut modifier ce rôle : accorder ou retirer l’accès à l’argent et à la configuration ne relève pas de la gestion courante.')}</p>
           </section>
         ) : (
         <form action={actionRole}>
-          <h2 style={{ fontSize: '0.95rem' }}>Rôle</h2>
+          <h2 style={{ fontSize: '0.95rem' }}>{t('Rôle')}</h2>
           <Message resultat={resultatRole} />
           <div className="champ">
-            <label htmlFor={`role-${employe.id}`}>Rôle dans cet établissement</label>
+            <label htmlFor={`role-${employe.id}`}>{t('Rôle dans cet établissement')}</label>
             <select
               id={`role-${employe.id}`}
               name="role"
@@ -414,7 +398,7 @@ function PanneauEmploye({
             >
               {ROLES.filter((r) => administrateur || !r.cles).map((role) => (
                 <option key={role.valeur} value={role.valeur}>
-                  {role.libelle}
+                  {t(role.libelle)}
                 </option>
               ))}
             </select>
@@ -428,13 +412,9 @@ function PanneauEmploye({
           />
 
           <button type="submit" disabled={roleEnCours}>
-            {roleEnCours ? 'Enregistrement…' : 'Changer le rôle'}
+            {roleEnCours ? t('Enregistrement…') : t('Changer le rôle')}
           </button>
-          <p className="indication">
-            Le rôle vaut pour <strong>cet établissement</strong> seulement. Le même employé
-            peut être serveur ici et caissier ailleurs. « Gérant » et
-            « Administrateur » ne s&apos;attribuent que par un administrateur.
-          </p>
+          <p className="indication">{t('Le rôle vaut pour')}{' '}<strong>{t('cet établissement')}</strong>{' '}{t('seulement. Le même employé peut être serveur ici et caissier ailleurs. « Gérant » et « Administrateur » ne s\'attribuent que par un administrateur.')}</p>
         </form>
         )}
       </div>
@@ -475,6 +455,7 @@ function AccesBackoffice({
   administrateur: boolean
   employe: Employe
 }) {
+  const t = useT()
   const [resultat, action, enCours] = useActionState(
     employe.aUnCompte
       ? changerMotDePasseAcces.bind(null, restaurantId, employe.id)
@@ -493,11 +474,9 @@ function AccesBackoffice({
   if (!administrateur && ROLES_A_CLES.includes(employe.role)) {
     return (
       <section style={{ marginTop: '1rem' }}>
-        <h2 style={{ fontSize: '0.95rem' }}>Accès au back-office</h2>
-        <p className="indication">
-          Seul un administrateur peut ouvrir ou réinitialiser l’accès d’un
-          {' '}
-          {employe.role}.
+        <h2 style={{ fontSize: '0.95rem' }}>{t('Accès au back-office')}</h2>
+        <p className="indication">{t('Seul un administrateur peut ouvrir ou réinitialiser l’accès d’un')}{' '}
+          {t.role(employe.role)}.
         </p>
       </section>
     )
@@ -505,17 +484,15 @@ function AccesBackoffice({
 
   return (
     <form action={action} style={{ marginTop: '1rem' }}>
-      <h2 style={{ fontSize: '0.95rem' }}>Accès au back-office</h2>
+      <h2 style={{ fontSize: '0.95rem' }}>{t('Accès au back-office')}</h2>
       <Message resultat={resultat} />
 
       {employe.aUnCompte ? (
         <p className="indication">
-          {employe.nom} se connecte déjà avec <strong>{employe.email}</strong>.
-          Mot de passe perdu ? Posez-en un nouveau ci-dessous.
-        </p>
+          {employe.nom}{' '}{t('se connecte déjà avec')}{' '}<strong>{employe.email}</strong>{t('. Mot de passe perdu ? Posez-en un nouveau ci-dessous.')}</p>
       ) : (
         <div className="champ">
-          <label htmlFor={`email-${employe.id}`}>Adresse e-mail</label>
+          <label htmlFor={`email-${employe.id}`}>{t('Adresse e-mail')}</label>
           <input
             id={`email-${employe.id}`}
             name="email"
@@ -523,16 +500,13 @@ function AccesBackoffice({
             defaultValue={employe.email}
             required
           />
-          <p className="indication">
-            C’est l’identifiant de connexion. Elle n’a pas besoin d’être relevée :
-            aucun e-mail n’est envoyé, le mot de passe se communique de vive voix.
-          </p>
+          <p className="indication">{t('C’est l’identifiant de connexion. Elle n’a pas besoin d’être relevée : aucun e-mail n’est envoyé, le mot de passe se communique de vive voix.')}</p>
         </div>
       )}
 
       <div className="champ">
         <label htmlFor={`mdp-${employe.id}`}>
-          {employe.aUnCompte ? 'Nouveau mot de passe' : 'Mot de passe'}
+          {employe.aUnCompte ? t('Nouveau mot de passe') : t('Mot de passe')}
         </label>
         <input
           id={`mdp-${employe.id}`}
@@ -542,26 +516,18 @@ function AccesBackoffice({
           minLength={8}
           required
         />
-        <p className="indication">
-          Huit caractères au moins. Il est affiché en clair pendant que vous le
-          tapez — c’est voulu : il faut le dicter, et un mot de passe qu’on
-          recopie de travers n’ouvre rien.
-        </p>
+        <p className="indication">{t('Huit caractères au moins. Il est affiché en clair pendant que vous le tapez — c’est voulu : il faut le dicter, et un mot de passe qu’on recopie de travers n’ouvre rien.')}</p>
       </div>
 
       <button type="submit" className="principal" disabled={enCours}>
         {enCours
-          ? 'Envoi…'
+          ? t('Envoi…')
           : employe.aUnCompte
-            ? 'Changer le mot de passe'
-            : `Ouvrir l’accès (rôle « ${employe.role} »)`}
+            ? t('Changer le mot de passe')
+            : t('Ouvrir l’accès (rôle « {role} »)', { role: employe.role })}
       </button>
       {!employe.aUnCompte && (
-        <p className="indication">
-          Le rôle donné à l’accès est celui de l’employé, ci-dessus. Un rôle de
-          préparation n’ouvre que son écran ; un caissier ou un serveur n’a en
-          général pas besoin de compte du tout — il tape un PIN sur la tablette.
-        </p>
+        <p className="indication">{t('Le rôle donné à l’accès est celui de l’employé, ci-dessus. Un rôle de préparation n’ouvre que son écran ; un caissier ou un serveur n’a en général pas besoin de compte du tout — il tape un PIN sur la tablette.')}</p>
       )}
     </form>
   )
@@ -591,34 +557,27 @@ function ChampPoste({
   postes: Poste[]
   valeur?: string | null
 }) {
+  const t = useT()
   if (!ROLES_DE_PREPARATION.includes(role)) return null
 
   if (postes.length === 0) {
     return (
-      <p className="indication">
-        Aucun poste de préparation n’est défini pour cet établissement. Cette
-        personne verra <strong>toutes</strong> les lignes du service — ce qui
-        est correct s’il n’y a qu’un écran.
-      </p>
+      <p className="indication">{t('Aucun poste de préparation n’est défini pour cet établissement. Cette personne verra')}{' '}<strong>{t('toutes')}</strong>{' '}{t('les lignes du service — ce qui est correct s’il n’y a qu’un écran.')}</p>
     )
   }
 
   return (
     <div className="champ">
-      <label htmlFor={id}>Poste tenu</label>
+      <label htmlFor={id}>{t('Poste tenu')}</label>
       <select id={id} name="poste" defaultValue={valeur ?? ''}>
-        <option value="">— tous les postes —</option>
+        <option value="">{t('— tous les postes —')}</option>
         {postes.map((p) => (
           <option key={p.id} value={p.id}>
             {p.nom}
           </option>
         ))}
       </select>
-      <p className="indication">
-        Son écran de préparation n’affichera que les lignes de ce poste, et son
-        titre en portera le nom. « Tous les postes » convient à un
-        établissement qui n’a qu’un seul écran.
-      </p>
+      <p className="indication">{t('Son écran de préparation n’affichera que les lignes de ce poste, et son titre en portera le nom. « Tous les postes » convient à un établissement qui n’a qu’un seul écran.')}</p>
     </div>
   )
 }
@@ -647,6 +606,7 @@ function FormulaireEmbauche({
   ouvrir: () => void
   fermer: () => void
 }) {
+  const t = useT()
   const [roleChoisi, setRoleChoisi] = useState('serveur')
   const [resultat, action, enCours] = useActionState(
     embaucher.bind(null, restaurantId, postes.map((p) => p.id)),
@@ -657,9 +617,7 @@ function FormulaireEmbauche({
     return (
       <div style={{ marginBottom: '1.25rem' }}>
         <Message resultat={resultat} />
-        <button type="button" className="principal" onClick={ouvrir}>
-          Embaucher un employé
-        </button>
+        <button type="button" className="principal" onClick={ouvrir}>{t('Embaucher un employé')}</button>
       </div>
     )
   }
@@ -667,10 +625,8 @@ function FormulaireEmbauche({
   return (
     <section className="carte" style={{ borderColor: 'var(--accent)' }}>
       <div style={{ display: 'flex', alignItems: 'baseline' }}>
-        <h2 style={{ marginBottom: 0 }}>Embaucher un employé</h2>
-        <button type="button" className="discret" style={{ marginLeft: 'auto' }} onClick={fermer}>
-          Annuler
-        </button>
+        <h2 style={{ marginBottom: 0 }}>{t('Embaucher un employé')}</h2>
+        <button type="button" className="discret" style={{ marginInlineStart: 'auto' }} onClick={fermer}>{t('Annuler')}</button>
       </div>
 
       <form action={action} style={{ marginTop: '1rem' }}>
@@ -678,11 +634,11 @@ function FormulaireEmbauche({
 
         <div className="champs deux">
           <div className="champ">
-            <label htmlFor="nom-embauche">Nom complet</label>
-            <input id="nom-embauche" name="nom" required autoFocus placeholder="Mohamed Ben Ali" />
+            <label htmlFor="nom-embauche">{t('Nom complet')}</label>
+            <input id="nom-embauche" name="nom" required autoFocus placeholder={t('Mohamed Ben Ali')} />
           </div>
           <div className="champ">
-            <label htmlFor="role-embauche">Rôle</label>
+            <label htmlFor="role-embauche">{t('Rôle')}</label>
             <select
               id="role-embauche"
               name="role"
@@ -691,7 +647,7 @@ function FormulaireEmbauche({
             >
               {ROLES.filter((r) => administrateur || !r.cles).map((role) => (
                 <option key={role.valeur} value={role.valeur}>
-                  {role.libelle}
+                  {t(role.libelle)}
                 </option>
               ))}
             </select>
@@ -702,7 +658,7 @@ function FormulaireEmbauche({
 
         <div className="champs deux">
           <div className="champ">
-            <label htmlFor="pin-embauche">Code PIN</label>
+            <label htmlFor="pin-embauche">{t('Code PIN')}</label>
             <input
               id="pin-embauche"
               name="pin"
@@ -713,7 +669,7 @@ function FormulaireEmbauche({
             />
           </div>
           <div className="champ">
-            <label htmlFor="conf-embauche">Confirmer le code</label>
+            <label htmlFor="conf-embauche">{t('Confirmer le code')}</label>
             <input
               id="conf-embauche"
               name="confirmation"
@@ -726,23 +682,15 @@ function FormulaireEmbauche({
         </div>
 
         <div className="champ">
-          <label htmlFor="email-embauche">E-mail (facultatif)</label>
+          <label htmlFor="email-embauche">{t('E-mail (facultatif)')}</label>
           <input id="email-embauche" name="email" type="email" placeholder="—" />
-          <p className="indication">
-            Uniquement si cette personne doit un jour ouvrir le back-office. Un serveur en
-            salle n&apos;en a pas besoin&nbsp;: il tape son PIN sur la tablette, il ne se
-            connecte à rien.
-          </p>
+          <p className="indication">{t('Uniquement si cette personne doit un jour ouvrir le back-office. Un serveur en salle n\'en a pas besoin : il tape son PIN sur la tablette, il ne se connecte à rien.')}</p>
         </div>
 
         <button type="submit" className="principal" disabled={enCours}>
-          {enCours ? 'Calcul du hachage…' : 'Embaucher'}
+          {enCours ? t('Calcul du hachage…') : t('Embaucher')}
         </button>
-        <p className="indication">
-          Le PIN est haché (Argon2id) avant d&apos;être enregistré. Notez-le maintenant&nbsp;:
-          il ne sera jamais réaffiché. Renseigner un e-mail ne crée <strong>pas</strong> de
-          compte de connexion — cela reste une opération d&apos;administrateur.
-        </p>
+        <p className="indication">{t('Le PIN est haché (Argon2id) avant d\'être enregistré. Notez-le maintenant : il ne sera jamais réaffiché. Renseigner un e-mail ne crée')}{' '}<strong>{t('pas')}</strong>{' '}{t('de compte de connexion — cela reste une opération d\'administrateur.')}</p>
       </form>
     </section>
   )

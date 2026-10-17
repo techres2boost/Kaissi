@@ -35,7 +35,7 @@ function lab(hex: string): [number, number, number] {
   const x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047
   const y = 0.2126 * r + 0.7152 * g + 0.0722 * b
   const z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883
-  const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116)
+  const f = (elt: number) => (elt > 0.008856 ? Math.cbrt(elt) : 7.787 * elt + 16 / 116)
   return [116 * f(y) - 16, 500 * (f(x) - f(y)), 200 * (f(y) - f(z))]
 }
 

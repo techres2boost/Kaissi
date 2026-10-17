@@ -45,6 +45,7 @@ import Link from 'next/link'
 import { TableauRapport } from '../../../composants/TableauRapport.js'
 import { celluleMontant } from '../../../composants/RapportVentilation.js'
 import { AvertissementTronque } from '../../../composants/AvertissementTronque.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,6 +56,7 @@ export default async function PageReductions({
   params: Promise<{ restaurant: string }>
   searchParams: Promise<Record<string, string | undefined>>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const recherche = await searchParams
   const { etablissement } = await etablissementObligatoire(restaurant)
@@ -72,9 +74,8 @@ export default async function PageReductions({
   if (agregats.erreur ?? ventes.erreur) {
     return (
       <section className="bloc">
-        <h1>Réductions</h1>
-        <p className="message erreur">
-          Lecture impossible : {agregats.erreur ?? ventes.erreur}
+        <h1>{t('Réductions')}</h1>
+        <p className="message erreur">{t('Lecture impossible :')}{' '}{agregats.erreur ?? ventes.erreur}
         </p>
       </section>
     )
@@ -102,12 +103,12 @@ export default async function PageReductions({
   }
 
   const ticketsRemises = ventes.tickets
-    .map((t) => ({
-      ...t,
-      remiseMillimes: remisesParCommande.get(t.id) ?? 0,
-      brutMillimes: brutParCommande.get(t.id) ?? 0,
+    .map((elt) => ({
+      ...elt,
+      remiseMillimes: remisesParCommande.get(elt.id) ?? 0,
+      brutMillimes: brutParCommande.get(elt.id) ?? 0,
     }))
-    .filter((t) => t.remiseMillimes > 0)
+    .filter((elt) => elt.remiseMillimes > 0)
 
   /*
    * Par MOTIF : la première question qu'on se pose devant un total de remises.
@@ -120,11 +121,11 @@ export default async function PageReductions({
 
   /** Par employé : c'est la répartition qui parle, pas le total. */
   const parEmploye = new Map<string, { nom: string; remise: number; tickets: number }>()
-  for (const t of ticketsRemises) {
-    const seau = parEmploye.get(t.vendeur) ?? { nom: t.vendeur, remise: 0, tickets: 0 }
-    seau.remise += t.remiseMillimes
+  for (const ticket of ticketsRemises) {
+    const seau = parEmploye.get(ticket.vendeur) ?? { nom: ticket.vendeur, remise: 0, tickets: 0 }
+    seau.remise += ticket.remiseMillimes
     seau.tickets += 1
-    parEmploye.set(t.vendeur, seau)
+    parEmploye.set(ticket.vendeur, seau)
   }
   const classementEmployes = [...parEmploye.entries()]
     .map(([cle, v]) => ({ cle, ...v }))
@@ -138,11 +139,11 @@ export default async function PageReductions({
   return (
     <>
       <header className="entete-rapport">
-        <h1>Réductions</h1>
+        <h1>{t('Réductions')}</h1>
         <p className="sous-titre">
           {periode.du === periode.au
-            ? libelleJournee(periode.du)
-            : `Du ${libelleJournee(periode.du)} au ${libelleJournee(periode.au)}`}
+            ? libelleJournee(periode.du, t.locale)
+            : t('Du {valeur} au {valeur2}', { valeur: libelleJournee(periode.du, t.locale), valeur2: libelleJournee(periode.au, t.locale) })}
         </p>
       </header>
 
@@ -163,37 +164,37 @@ export default async function PageReductions({
       <BandeauIndicateurs
         indicateurs={[
           {
-            libelle: 'Réductions accordées',
+            libelle: t('Réductions accordées'),
             valeurMillimes: i.remisesMillimes,
             precedentMillimes: p.remisesMillimes,
             hausseDefavorable: true,
-            detail: `${formaterPourcentage(partDuBrut)} % des ventes brutes`,
+            detail: t('{valeur} % des ventes brutes', { valeur: formaterPourcentage(partDuBrut) }),
           },
           {
-            libelle: 'Tickets remisés',
+            libelle: t('Tickets remisés'),
             valeurMillimes: ticketsRemises.length * 1000,
             precedentMillimes: null,
             detail:
               i.nombreTickets === 0
-                ? 'aucun ticket'
-                : `sur ${i.nombreTickets} ticket(s)`,
+                ? t('aucun ticket')
+                : t('sur {nombreTickets} ticket(s)', { nombreTickets: i.nombreTickets }),
           },
           {
-            libelle: 'Remise moyenne',
+            libelle: t('Remise moyenne'),
             valeurMillimes:
               ticketsRemises.length === 0
                 ? 0
                 : Math.round(i.remisesMillimes / ticketsRemises.length),
             precedentMillimes: null,
-            detail: 'par ticket remisé',
+            detail: t('par ticket remisé'),
           },
           {
-            libelle: 'Ventes brutes',
+            libelle: t('Ventes brutes'),
             valeurMillimes: i.caBrutMillimes,
             precedentMillimes: p.caBrutMillimes,
           },
           {
-            libelle: 'Ventes nettes',
+            libelle: t('Ventes nettes'),
             valeurMillimes: i.caNetMillimes,
             precedentMillimes: p.caNetMillimes,
           },
@@ -202,7 +203,7 @@ export default async function PageReductions({
 
       <section className="bloc">
         <GraphiqueSerie
-          titre="Réductions dans le temps"
+          titre={t('Réductions dans le temps')}
           journees={agregats.parJournee}
           parts={classementEmployes.map((e) => ({
             cle: e.cle,
@@ -210,16 +211,11 @@ export default async function PageReductions({
             valeurMillimes: e.remise,
           }))}
         />
-        <p className="indication">
-          La forme <strong>circulaire</strong> montre qui accorde les remises ;
-          les colonnes montrent l’activité de la période. Une remise
-          exceptionnelle est du commerce — la même, chaque jour, chez la même
-          personne, est autre chose.
-        </p>
+        <p className="indication">{t('La forme')}{' '}<strong>{t('circulaire')}</strong>{' '}{t('montre qui accorde les remises ; les colonnes montrent l’activité de la période. Une remise exceptionnelle est du commerce — la même, chaque jour, chez la même personne, est autre chose.')}</p>
       </section>
 
       <TableauRapport
-        titre="Par motif"
+        titre={t('Par motif')}
         lignes={parMotif.map((l) => ({
           cle: l.cle,
           cellules: {
@@ -237,24 +233,19 @@ export default async function PageReductions({
             },
           },
         }))}
-        vide="Aucune réduction accordée sur cette période."
+        vide={t('Aucune réduction accordée sur cette période.')}
         colonnes={[
-          { cle: 'libelle', titre: 'Réduction' },
-          { cle: 'ventes', titre: 'Ventes concernées', nombre: true },
-          { cle: 'montant', titre: 'Montant', nombre: true },
-          { cle: 'part', titre: 'Part des réductions', nombre: true, secondaire: true },
+          { cle: 'libelle', titre: t('Réduction') },
+          { cle: 'ventes', titre: t('Ventes concernées'), nombre: true },
+          { cle: 'montant', titre: t('Montant'), nombre: true },
+          { cle: 'part', titre: t('Part des réductions'), nombre: true, secondaire: true },
         ]}
       />
-      <p className="indication">
-        Les motifs proposés par la caisse se règlent dans{' '}
-        <Link href={{ pathname: `/${restaurant}/reductions/gestion` }}>
-          Articles → Réductions
-        </Link>
-        . Une remise tapée à la main apparaît sous « Sans motif ».
-      </p>
+      <p className="indication">{t('Les motifs proposés par la caisse se règlent dans')}{' '}
+        <Link href={{ pathname: `/${restaurant}/reductions/gestion` }}>{t('Articles → Réductions')}</Link>{t('. Une remise tapée à la main apparaît sous « Sans motif ».')}</p>
 
       <TableauRapport
-        titre="Par employé"
+        titre={t('Par employé')}
         lignes={classementEmployes.map((l) => ({
           cle: l.cle,
           cellules: {
@@ -264,50 +255,50 @@ export default async function PageReductions({
             moyenne: celluleMontant(Math.round(l.remise / l.tickets)),
           },
         }))}
-        vide="Aucune réduction accordée sur cette période."
+        vide={t('Aucune réduction accordée sur cette période.')}
         colonnes={[
-          { cle: 'nom', titre: 'Employé' },
-          { cle: 'tickets', titre: 'Tickets remisés', nombre: true },
-          { cle: 'remise', titre: 'Réductions', nombre: true },
-          { cle: 'moyenne', titre: 'Moyenne par ticket', nombre: true },
+          { cle: 'nom', titre: t('Employé') },
+          { cle: 'tickets', titre: t('Tickets remisés'), nombre: true },
+          { cle: 'remise', titre: t('Réductions'), nombre: true },
+          { cle: 'moyenne', titre: t('Moyenne par ticket'), nombre: true },
         ]}
       />
 
       <TableauRapport
-        titre="Les tickets concernés"
-        lignes={ticketsRemises.map((t) => ({
-          cle: t.id,
+        titre={t('Les tickets concernés')}
+        lignes={ticketsRemises.map((elt) => ({
+          cle: elt.id,
           cellules: {
             numero: {
-              texte: t.numero ?? '—',
-              valeur: t.numero ?? '',
+              texte: elt.numero ?? '—',
+              valeur: elt.numero ?? '',
               // Le reçu s'ouvre d'un clic : devant une remise qui interroge,
               // la question suivante est toujours « sur quoi ? ».
-              lien: `/${restaurant}/recus?ticket=${t.id}`,
+              lien: `/${restaurant}/recus?ticket=${elt.id}`,
             },
-            vendeur: { texte: t.vendeur },
-            brut: celluleMontant(t.brutMillimes),
-            remise: celluleMontant(t.remiseMillimes),
+            vendeur: { texte: elt.vendeur },
+            brut: celluleMontant(elt.brutMillimes),
+            remise: celluleMontant(elt.remiseMillimes),
             taux: {
               texte:
-                t.brutMillimes === 0
+                elt.brutMillimes === 0
                   ? '—'
                   : `${formaterPourcentage(
-                      Math.round((t.remiseMillimes / t.brutMillimes) * 10_000),
+                      Math.round((elt.remiseMillimes / elt.brutMillimes) * 10_000),
                     )} %`,
-              valeur: t.brutMillimes === 0 ? 0 : t.remiseMillimes / t.brutMillimes,
+              valeur: elt.brutMillimes === 0 ? 0 : elt.remiseMillimes / elt.brutMillimes,
             },
-            paye: celluleMontant(t.totalMillimes),
+            paye: celluleMontant(elt.totalMillimes),
           },
         }))}
-        vide="Aucune réduction accordée sur cette période."
+        vide={t('Aucune réduction accordée sur cette période.')}
         colonnes={[
-          { cle: 'numero', titre: 'Reçu', sansTri: true },
-          { cle: 'vendeur', titre: 'Employé' },
-          { cle: 'brut', titre: 'Avant réduction', nombre: true },
-          { cle: 'remise', titre: 'Réduction', nombre: true },
-          { cle: 'taux', titre: 'Taux', nombre: true },
-          { cle: 'paye', titre: 'Payé', nombre: true, secondaire: true },
+          { cle: 'numero', titre: t('Reçu'), sansTri: true },
+          { cle: 'vendeur', titre: t('Employé') },
+          { cle: 'brut', titre: t('Avant réduction'), nombre: true },
+          { cle: 'remise', titre: t('Réduction'), nombre: true },
+          { cle: 'taux', titre: t('Taux'), nombre: true },
+          { cle: 'paye', titre: t('Payé'), nombre: true, secondaire: true },
         ]}
       />
     </>

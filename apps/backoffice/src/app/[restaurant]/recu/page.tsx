@@ -8,6 +8,7 @@
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { ReglagesRecu } from '../../../composants/ReglagesRecu.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +17,7 @@ export default async function PageRecu({
 }: {
   params: Promise<{ restaurant: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
@@ -29,14 +31,10 @@ export default async function PageRecu({
 
   return (
     <>
-      <h1>Reçu</h1>
-      <p className="sous-titre">
-        Ce qui s’imprime en haut et en bas du ticket client. Les valeurs
-        descendent aux caisses comme un changement de prix — les tickets déjà
-        imprimés ne changent pas.
-      </p>
+      <h1>{t('Reçu')}</h1>
+      <p className="sous-titre">{t('Ce qui s’imprime en haut et en bas du ticket client. Les valeurs descendent aux caisses comme un changement de prix — les tickets déjà imprimés ne changent pas.')}</p>
 
-      {error && <p className="message erreur">Lecture impossible : {error.message}</p>}
+      {error && <p className="message erreur">{t('Lecture impossible :')}{' '}{error.message}</p>}
 
       <ReglagesRecu
         restaurantId={restaurant}

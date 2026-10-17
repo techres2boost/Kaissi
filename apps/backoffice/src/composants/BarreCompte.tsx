@@ -1,8 +1,12 @@
 import { seDeconnecter } from '../app/connexion/actions.js'
 import type { SessionBackoffice } from '../serveur/session.js'
+import { traduction } from '../i18n/serveur.js'
+import { ChoixLangue } from '../i18n/client.js'
+import { use } from 'react'
 
 /** Bandeau minimal, sans navigation : utilisé hors d'un établissement. */
 export function BarreCompte({ session }: { session: SessionBackoffice }) {
+  const t = use(traduction())
   return (
     <header className="barre">
       <span className="marque">Kaissi</span>
@@ -15,10 +19,9 @@ export function BarreCompte({ session }: { session: SessionBackoffice }) {
         <span className="etiquette" title={session.email}>
           {session.email}
         </span>
+        <ChoixLangue />
         <form action={seDeconnecter}>
-          <button type="submit" className="discret">
-            Se déconnecter
-          </button>
+          <button type="submit" className="discret">{t('Se déconnecter')}</button>
         </form>
       </div>
     </header>

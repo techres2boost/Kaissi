@@ -1,3 +1,5 @@
+import { traduction } from '../../i18n/serveur.js'
+import { use } from 'react'
 /**
  * Ce qui s'affiche PENDANT que la page se calcule côté serveur.
  *
@@ -10,9 +12,10 @@
  * Aucune donnée ici, à dessein : rien à attendre, donc rien à rater.
  */
 export default function Chargement() {
+  const t = use(traduction())
   return (
     <div className="chargement-page" role="status" aria-live="polite">
-      <span className="visuellement-cache">Chargement…</span>
+      <span className="visuellement-cache">{t('Chargement…')}</span>
       <div className="chargement-titre" />
       <div className="chargement-cartes">
         <div />

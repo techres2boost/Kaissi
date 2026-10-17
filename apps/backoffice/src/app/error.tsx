@@ -28,6 +28,7 @@
  */
 
 import { useEffect } from 'react'
+import { useT } from '../i18n/client.js'
 
 export default function ErreurEcran({
   error,
@@ -36,6 +37,7 @@ export default function ErreurEcran({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  const t = useT()
   useEffect(() => {
     /*
      * Le journal du NAVIGATEUR, en plus de celui du serveur.
@@ -50,35 +52,20 @@ export default function ErreurEcran({
   return (
     <main className="enveloppe">
       <section className="carte">
-        <h1>Cette page n’a pas pu s’afficher</h1>
+        <h1>{t('Cette page n’a pas pu s’afficher')}</h1>
         <p className="message avertissement">
-          <strong>Vos données ne sont pas perdues.</strong> Aucune vente, aucun
-          réglage n’a été modifié : c’est l’affichage qui a échoué, pas
-          l’enregistrement.
-        </p>
+          <strong>{t('Vos données ne sont pas perdues.')}</strong>{' '}{t('Aucune vente, aucun réglage n’a été modifié : c’est l’affichage qui a échoué, pas l’enregistrement.')}</p>
 
-        <p>Ce que vous pouvez faire, dans l’ordre :</p>
+        <p>{t('Ce que vous pouvez faire, dans l’ordre :')}</p>
         <ol>
           <li>
-            <button type="button" className="principal" onClick={() => reset()}>
-              Réessayer
-            </button>{' '}
-            — une coupure réseau passagère suffit à provoquer cet écran.
-          </li>
-          <li>
-            Choisir une <strong>période plus courte</strong> si vous étiez sur un
-            rapport : une période très longue peut dépasser ce qu’une page peut
-            charger.
-          </li>
-          <li>
-            Revenir à l’<a href="/">accueil</a>, puis rouvrir l’écran.
-          </li>
+            <button type="button" className="principal" onClick={() => reset()}>{t('Réessayer')}</button>{' '}{t('— une coupure réseau passagère suffit à provoquer cet écran.')}</li>
+          <li>{t('Choisir une')}{' '}<strong>{t('période plus courte')}</strong>{' '}{t('si vous étiez sur un rapport : une période très longue peut dépasser ce qu’une page peut charger.')}</li>
+          <li>{t('Revenir à l’')}<a href="/">{t('accueil')}</a>{t(', puis rouvrir l’écran.')}</li>
         </ol>
 
         {error.digest && (
-          <p className="indication">
-            Si cela se reproduit, communiquez ce code au support — c’est lui qui
-            relie cet écran à la trace enregistrée côté serveur :{' '}
+          <p className="indication">{t('Si cela se reproduit, communiquez ce code au support — c’est lui qui relie cet écran à la trace enregistrée côté serveur :')}{' '}
             <code className="mono">{error.digest}</code>
           </p>
         )}

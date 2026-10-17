@@ -25,6 +25,7 @@ import { useEffect, useState } from 'react'
 import { ecartSignificatif, formaterTND, millimes } from '@kaissi/domain'
 import type { PeriodeTravail } from '@kaissi/db-local'
 import { useApp } from '../etat/contexte.js'
+import { dateLocale, t } from '../i18n.js'
 
 export function EcranPeriodes({ onRetour }: { readonly onRetour: () => void }) {
   const { app, version } = useApp()
@@ -41,21 +42,16 @@ export function EcranPeriodes({ onRetour }: { readonly onRetour: () => void }) {
   return (
     <div className="periodes">
       <div className="barre-salle">
-        <button type="button" className="lien" onClick={onRetour}>
-          ‹ Salle
-        </button>
-        <strong>Périodes de travail</strong>
+        <button type="button" className="lien" onClick={onRetour}>{t('‹ Salle')}</button>
+        <strong>{t('Périodes de travail')}</strong>
       </div>
 
-      <p className="portee-caisse">
-        Les services de <strong>cette caisse</strong> uniquement. Le total de
-        l’établissement, toutes caisses confondues, est au back-office.
-      </p>
+      <p className="portee-caisse">{t('Les services de')}{' '}<strong>{t('cette caisse')}</strong>{' '}{t('uniquement. Le total de l’établissement, toutes caisses confondues, est au back-office.')}</p>
 
       {periodes === null ? (
-        <p className="indication-vide">Lecture des services…</p>
+        <p className="indication-vide">{t('Lecture des services…')}</p>
       ) : periodes.length === 0 ? (
-        <p className="indication-vide">Aucun service ouvert sur cette caisse pour l’instant.</p>
+        <p className="indication-vide">{t('Aucun service ouvert sur cette caisse pour l’instant.')}</p>
       ) : (
         <ul className="liste-periodes">
           {periodes.map((p) => {
@@ -65,20 +61,18 @@ export function EcranPeriodes({ onRetour }: { readonly onRetour: () => void }) {
               <li key={p.id} className={enCours ? 'en-cours' : ''}>
                 <div className="entete">
                   <strong>{plage(p.ouverteA, p.fermeeA)}</strong>
-                  {enCours && <span className="badge ouverte">en cours</span>}
+                  {enCours && <span className="badge ouverte">{t('en cours')}</span>}
                   {p.enAttente && !enCours && (
                     <span
                       className="badge attente"
-                      title="Ce service n’est pas encore remonté au back-office."
-                    >
-                      en attente
-                    </span>
+                      title={t('Ce service n’est pas encore remonté au back-office.')}
+                    >{t('en attente')}</span>
                   )}
                 </div>
 
                 <dl className="chiffres">
                   <div>
-                    <dt>Ouvert par</dt>
+                    <dt>{t('Ouvert par')}</dt>
                     <dd>{p.ouvertePar ?? '—'}</dd>
                   </div>
                   <div>
@@ -91,25 +85,25 @@ export function EcranPeriodes({ onRetour }: { readonly onRetour: () => void }) {
                       migration : recopier l'autre nom inventerait une donnée
                       fausse qui aurait l'air juste.
                     */}
-                    <dt>Compté par</dt>
+                    <dt>{t('Compté par')}</dt>
                     <dd>{p.fermeePar ?? '—'}</dd>
                   </div>
                   <div>
-                    <dt>Ventes</dt>
+                    <dt>{t('Ventes')}</dt>
                     <dd>{p.nombreVentes}</dd>
                   </div>
                   <div>
-                    <dt>Encaissé</dt>
+                    <dt>{t('Encaissé')}</dt>
                     <dd>{formaterTND(millimes(p.chiffreAffairesMillimes))}</dd>
                   </div>
                   <div>
-                    <dt>Fond de caisse</dt>
+                    <dt>{t('Fond de caisse')}</dt>
                     <dd>{formaterTND(millimes(p.fondDeCaisseMillimes))}</dd>
                   </div>
                   {!enCours && (
                     <>
                       <div>
-                        <dt>Attendu</dt>
+                        <dt>{t('Attendu')}</dt>
                         <dd>
                           {p.attenduMillimes === null
                             ? '—'
@@ -117,7 +111,7 @@ export function EcranPeriodes({ onRetour }: { readonly onRetour: () => void }) {
                         </dd>
                       </div>
                       <div>
-                        <dt>Compté</dt>
+                        <dt>{t('Compté')}</dt>
                         <dd>
                           {p.compteMillimes === null
                             ? '—'
@@ -125,7 +119,7 @@ export function EcranPeriodes({ onRetour }: { readonly onRetour: () => void }) {
                         </dd>
                       </div>
                       <div className={classeEcart(ecart)}>
-                        <dt>Écart</dt>
+                        <dt>{t('Écart')}</dt>
                         <dd>{ecart === null ? '—' : signe(ecart)}</dd>
                       </div>
                     </>
@@ -165,12 +159,16 @@ function plage(ouverte: string, fermee: string | null): string {
   const d = new Date(ouverte)
   const jour = Number.isNaN(d.getTime())
     ? ouverte
-    : d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+    : dateLocale(d, { day: '2-digit', month: '2-digit' })
   const h = (iso: string) => {
     const x = new Date(iso)
     return Number.isNaN(x.getTime())
       ? '?'
-      : x.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      : dateLocale(x, { hour: '2-digit', minute: '2-digit' })
   }
-  return `${jour} ${h(ouverte)} → ${fermee ? h(fermee) : '…'}`
+  // Une PLAGE horaire se lit de gauche à droite dans les deux langues : la
+  // flèche n'est pas un caractère miroir, et en arabe « 10:00 → 18:00 »
+  // s'afficherait inversé, flèche pointant vers l'heure d'ouverture. On
+  // l'isole (LRI … PDI) pour qu'elle reste un bloc.
+  return `${jour} \u2066${h(ouverte)} → ${fermee ? h(fermee) : '…'}\u2069`
 }

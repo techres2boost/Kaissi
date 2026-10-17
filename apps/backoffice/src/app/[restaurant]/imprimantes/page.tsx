@@ -25,6 +25,7 @@ import {
   GestionImprimantes,
   type PosteImprimante,
 } from '../../../composants/GestionImprimantes.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +34,7 @@ export default async function PageImprimantes({
 }: {
   params: Promise<{ restaurant: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
@@ -97,13 +99,9 @@ export default async function PageImprimantes({
 
   return (
     <>
-      <h1>Imprimantes cuisine</h1>
-      <p className="sous-titre">
-        À quelle adresse réseau chaque poste envoie ses bons. Le poste
-        lui-même — son nom, ce qu’il prépare — se règle dans{' '}
-        <Link href={{ pathname: `/${restaurant}/categories` }}>Catégories</Link>{' '}
-        : c’est la catégorie qui décide du poste, pas l’article.
-      </p>
+      <h1>{t('Imprimantes cuisine')}</h1>
+      <p className="sous-titre">{t('À quelle adresse réseau chaque poste envoie ses bons. Le poste lui-même — son nom, ce qu’il prépare — se règle dans')}{' '}
+        <Link href={{ pathname: `/${restaurant}/categories` }}>{t('Catégories')}</Link>{' '}{t(': c’est la catégorie qui décide du poste, pas l’article.')}</p>
 
       {/*
         ── La mention la plus importante de l'écran ────────────────────────
@@ -115,21 +113,13 @@ export default async function PageImprimantes({
       */}
       <div className="message info">
         <Info size={16} strokeWidth={2} aria-hidden="true" />{' '}
-        <strong>Dans la version actuelle des caisses, rien ne s’imprime.</strong>{' '}
-        Le bon de cuisine et le ticket client s’affichent à l’écran de la
-        tablette, et la cuisine lit ses commandes dans{' '}
-        <Link href={{ pathname: `/${restaurant}/preparation` }}>Préparation</Link>.
-        Les adresses saisies ici sont conservées et descendent déjà aux caisses :
-        elles serviront telles quelles le jour où l’impression sera activée.
-      </div>
+        <strong>{t('Dans la version actuelle des caisses, rien ne s’imprime.')}</strong>{' '}{t('Le bon de cuisine et le ticket client s’affichent à l’écran de la tablette, et la cuisine lit ses commandes dans')}{' '}
+        <Link href={{ pathname: `/${restaurant}/preparation` }}>{t('Préparation')}</Link>{t('. Les adresses saisies ici sont conservées et descendent déjà aux caisses : elles serviront telles quelles le jour où l’impression sera activée.')}</div>
 
-      {erreur && <p className="message erreur">Lecture impossible : {erreur.message}</p>}
+      {erreur && <p className="message erreur">{t('Lecture impossible :')}{' '}{erreur.message}</p>}
 
       {!etablissement.gestionnaire && (
-        <p className="sous-titre">
-          Consultation seule : le rôle « {etablissement.role} » ne modifie pas
-          les imprimantes.
-        </p>
+        <p className="sous-titre">{t('Consultation seule : le rôle «')}{' '}{etablissement.role}{' '}{t('» ne modifie pas les imprimantes.')}</p>
       )}
 
       <GestionImprimantes
@@ -139,19 +129,11 @@ export default async function PageImprimantes({
       />
 
       <div className="carte note-imprimantes">
-        <h2>Deux réglages à faire côté imprimante</h2>
+        <h2>{t('Deux réglages à faire côté imprimante')}</h2>
         <p>
-          <strong>Une adresse IP fixe.</strong> Une imprimante en DHCP change
-          d’adresse au redémarrage de la box, et les bons cessent d’arriver
-          sans qu’aucun message ne le dise. Réservez-lui son adresse dans le
-          routeur, ou fixez-la sur l’imprimante.
-        </p>
+          <strong>{t('Une adresse IP fixe.')}</strong>{' '}{t('Une imprimante en DHCP change d’adresse au redémarrage de la box, et les bons cessent d’arriver sans qu’aucun message ne le dise. Réservez-lui son adresse dans le routeur, ou fixez-la sur l’imprimante.')}</p>
         <p>
-          <strong>Le même réseau que les tablettes.</strong> La caisse parle
-          directement à l’imprimante, en ESC/POS sur le port {9100} — rien ne
-          passe par Internet. Une imprimante sur le Wi-Fi « invités » est
-          injoignable, même quand elle répond au téléphone du gérant.
-        </p>
+          <strong>{t('Le même réseau que les tablettes.')}</strong>{' '}{t('La caisse parle directement à l’imprimante, en ESC/POS sur le port')}{' '}{9100}{' '}{t('— rien ne passe par Internet. Une imprimante sur le Wi-Fi « invités » est injoignable, même quand elle répond au téléphone du gérant.')}</p>
       </div>
     </>
   )

@@ -23,6 +23,7 @@
 import { etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { TableauCuisine, type CommandeCuisine } from '../../../composants/TableauCuisine.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 /**
  * Jamais de rendu mis en cache : une cuisine qui regarde une page figée
@@ -42,6 +43,7 @@ export default async function PageCuisine({
   params: Promise<{ restaurant: string }>
   searchParams: Promise<{ poste?: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { poste } = await searchParams
   const { etablissement } = await etablissementObligatoire(restaurant)
@@ -59,8 +61,8 @@ export default async function PageCuisine({
   if (error) {
     return (
       <section className="bloc">
-        <h1>Cuisine</h1>
-        <p className="message erreur">Impossible de lire les commandes : {error.message}</p>
+        <h1>{t('Cuisine')}</h1>
+        <p className="message erreur">{t('Impossible de lire les commandes :')}{' '}{error.message}</p>
       </section>
     )
   }
@@ -104,7 +106,7 @@ export default async function PageCuisine({
           .in('order_id', ids),
   ])
 
-  const libelleTable = new Map((tables.data ?? []).map((t) => [t.id, t.label]))
+  const libelleTable = new Map((tables.data ?? []).map((elt) => [elt.id, elt.label]))
   // Les postes de préparation : le POS émet DÉJÀ un bon par poste (Cuisine,
   // Bar). Sans ce filtre ici, le barman lisait les pizzas et le cuisinier
   // les cafés — les deux faisaient le tri à l'œil sur le même écran.
@@ -179,8 +181,8 @@ export default async function PageCuisine({
         posteEpingle
           ? (etablissement.stationNom ??
              listePostes.find((s) => s.id === posteEpingle)?.nom ??
-             'Préparation')
-          : 'Préparation'
+             t('Préparation'))
+          : t('Préparation')
       }
     />
   )

@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { ecranReserve, etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { GestionModesPaiement } from '../../../composants/GestionModesPaiement.js'
+import { traduction } from '../../../i18n/serveur.js'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +18,7 @@ export default async function PageModesPaiement({
 }: {
   params: Promise<{ restaurant: string }>
 }) {
+  const t = await traduction()
   const { restaurant } = await params
   const { etablissement } = await etablissementObligatoire(restaurant)
   ecranReserve(etablissement, 'gestion')
@@ -30,16 +32,11 @@ export default async function PageModesPaiement({
 
   return (
     <>
-      <h1>Modes de paiement</h1>
-      <p className="sous-titre">
-        Ce que le caissier peut choisir à l’encaissement. Le rapport{' '}
-        <Link href={{ pathname: `/${restaurant}/ventes-par-paiement` }}>
-          Ventes par mode de paiement
-        </Link>{' '}
-        dit ce que chacun a rapporté.
-      </p>
+      <h1>{t('Modes de paiement')}</h1>
+      <p className="sous-titre">{t('Ce que le caissier peut choisir à l’encaissement. Le rapport')}{' '}
+        <Link href={{ pathname: `/${restaurant}/ventes-par-paiement` }}>{t('Ventes par mode de paiement')}</Link>{' '}{t('dit ce que chacun a rapporté.')}</p>
 
-      {error && <p className="message erreur">Lecture impossible : {error.message}</p>}
+      {error && <p className="message erreur">{t('Lecture impossible :')}{' '}{error.message}</p>}
 
       <GestionModesPaiement
         restaurantId={restaurant}

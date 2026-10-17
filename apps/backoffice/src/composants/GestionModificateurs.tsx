@@ -34,6 +34,8 @@ import {
   rattacherGroupe,
   type Resultat,
 } from '../app/[restaurant]/modificateurs/actions.js'
+import { useT } from '../i18n/client.js'
+import type { Traduction } from '../i18n/commun.js'
 
 export interface ChoixModificateur {
   id: string
@@ -60,15 +62,15 @@ export interface ArticleSimple {
 }
 
 /** « 0 » veut dire « sans limite » côté base ; on le dit en toutes lettres. */
-function reglesDuGroupe(g: GroupeModificateurs): string {
+function reglesDuGroupe(t: Traduction, g: GroupeModificateurs): string {
   const min =
     g.minSelect === 0
-      ? 'facultatif'
+      ? t('facultatif')
       : g.minSelect === 1
-        ? 'un choix obligatoire'
-        : `${g.minSelect} choix obligatoires`
-  const max = g.maxSelect === 0 ? 'sans maximum' : `${g.maxSelect} au plus`
-  return `${min}, ${max}`
+        ? t('un choix obligatoire')
+        : t('{n} choix obligatoires', { n: g.minSelect })
+  const max = g.maxSelect === 0 ? t('sans maximum') : t('{n} au plus', { n: g.maxSelect })
+  return t('{min}, {max}', { min, max })
 }
 
 /** Le montant tel qu'un champ de saisie doit l'afficher : « 1.500 », « -0.500 ». */
@@ -87,6 +89,7 @@ function LigneChoix({
   choix: ChoixModificateur
   modifiable: boolean
 }) {
+  const t = useT()
   const [resultat, action] = useActionState(
     modifierModificateur.bind(null, restaurantId, choix.id),
     null as Resultat | null,
@@ -100,7 +103,7 @@ function LigneChoix({
         <input
           name="nom"
           defaultValue={choix.nom}
-          aria-label="Nom du choix"
+          aria-label={t('Nom du choix')}
           maxLength={100}
           disabled={choix.archive || !modifiable}
         />
@@ -108,16 +111,14 @@ function LigneChoix({
           <input
             name="prix"
             defaultValue={pourChampPrix(choix.deltaMillimes)}
-            aria-label={`Supplément de ${choix.nom}`}
+            aria-label={t('Supplément de {nom}', { nom: choix.nom })}
             inputMode="decimal"
             disabled={choix.archive || !modifiable}
           />
           <span className="detail">TND</span>
         </span>
         {modifiable && (
-          <button type="submit" className="discret" disabled={choix.archive}>
-            Enregistrer
-          </button>
+          <button type="submit" className="discret" disabled={choix.archive}>{t('Enregistrer')}</button>
         )}
         {modifiable && (
           <button
@@ -132,13 +133,13 @@ function LigneChoix({
               })
             }
           >
-            {choix.archive ? 'Remettre' : 'Archiver'}
+            {choix.archive ? t('Remettre') : t('Archiver')}
           </button>
         )}
       </form>
-      {resultat?.erreur && <p className="message erreur">{resultat.erreur}</p>}
-      {resultat?.succes && <p className="message succes">{resultat.succes}</p>}
-      {retour?.erreur && <p className="message erreur">{retour.erreur}</p>}
+      {resultat?.erreur && <p className="message erreur">{t.m(resultat.erreur)}</p>}
+      {resultat?.succes && <p className="message succes">{t.m(resultat.succes)}</p>}
+      {retour?.erreur && <p className="message erreur">{t.m(retour.erreur)}</p>}
     </li>
   )
 }
@@ -161,6 +162,7 @@ function Rattachement({
   articles: ArticleSimple[]
   modifiable: boolean
 }) {
+  const t = useT()
   const [filtre, setFiltre] = useState('')
   const [enCours, demarrer] = useTransition()
   const [retour, setRetour] = useState<Resultat | null>(null)
@@ -180,11 +182,10 @@ function Rattachement({
       <summary>
         <UtensilsCrossed size={15} strokeWidth={1.9} aria-hidden="true" />{' '}
         {groupe.produits.length === 0 ? (
-          <strong>Aucun article — ce groupe ne s’affichera nulle part</strong>
+          <strong>{t('Aucun article — ce groupe ne s’affichera nulle part')}</strong>
         ) : (
           <>
-            {groupe.produits.length} article(s) rattaché(s)
-          </>
+            {groupe.produits.length}{' '}{t('article(s) rattaché(s)')}</>
         )}
       </summary>
 
@@ -193,8 +194,8 @@ function Rattachement({
           className="filtre-articles"
           value={filtre}
           onChange={(e) => setFiltre(e.target.value)}
-          placeholder="Filtrer par nom ou catégorie…"
-          aria-label="Filtrer les articles"
+          placeholder={t('Filtrer par nom ou catégorie…')}
+          aria-label={t('Filtrer les articles')}
         />
       )}
 
@@ -225,9 +226,9 @@ function Rattachement({
         })}
       </ul>
       {visibles.length === 0 && (
-        <p className="indication">Aucun article ne correspond à ce filtre.</p>
+        <p className="indication">{t('Aucun article ne correspond à ce filtre.')}</p>
       )}
-      {retour?.erreur && <p className="message erreur">{retour.erreur}</p>}
+      {retour?.erreur && <p className="message erreur">{t.m(retour.erreur)}</p>}
     </details>
   )
 }
@@ -243,6 +244,7 @@ function CarteGroupe({
   articles: ArticleSimple[]
   modifiable: boolean
 }) {
+  const t = useT()
   const [resultatGroupe, actionGroupe] = useActionState(
     modifierGroupe.bind(null, restaurantId, groupe.id),
     null as Resultat | null,
@@ -262,36 +264,34 @@ function CarteGroupe({
         <input
           name="nom"
           defaultValue={groupe.nom}
-          aria-label="Nom du groupe"
+          aria-label={t('Nom du groupe')}
           maxLength={100}
           disabled={groupe.archive || !modifiable}
         />
         <span className="champ-taux">
-          <span className="detail">min</span>
+          <span className="detail">{t('min')}</span>
           <input
             name="min"
             defaultValue={String(groupe.minSelect)}
-            aria-label={`Minimum de ${groupe.nom}`}
+            aria-label={t('Minimum de {nom}', { nom: groupe.nom })}
             inputMode="numeric"
             maxLength={2}
             disabled={groupe.archive || !modifiable}
           />
         </span>
         <span className="champ-taux">
-          <span className="detail">max</span>
+          <span className="detail">{t('max')}</span>
           <input
             name="max"
             defaultValue={String(groupe.maxSelect)}
-            aria-label={`Maximum de ${groupe.nom}`}
+            aria-label={t('Maximum de {nom}', { nom: groupe.nom })}
             inputMode="numeric"
             maxLength={2}
             disabled={groupe.archive || !modifiable}
           />
         </span>
         {modifiable && (
-          <button type="submit" className="discret" disabled={groupe.archive}>
-            Enregistrer
-          </button>
+          <button type="submit" className="discret" disabled={groupe.archive}>{t('Enregistrer')}</button>
         )}
         {modifiable && (
           <button
@@ -304,26 +304,21 @@ function CarteGroupe({
               })
             }
           >
-            {groupe.archive ? 'Remettre en service' : 'Archiver'}
+            {groupe.archive ? t('Remettre en service') : t('Archiver')}
           </button>
         )}
       </form>
       <p className="indication">
-        {reglesDuGroupe(groupe)}. <strong>min</strong> : combien de choix le
-        caissier DOIT faire (0 = facultatif). <strong>max</strong> : combien il
-        PEUT en faire au plus (0 = autant qu’il veut).
-      </p>
-      {resultatGroupe?.erreur && <p className="message erreur">{resultatGroupe.erreur}</p>}
-      {resultatGroupe?.succes && <p className="message succes">{resultatGroupe.succes}</p>}
-      {retour?.erreur && <p className="message erreur">{retour.erreur}</p>}
-      {retour?.succes && <p className="message succes">{retour.succes}</p>}
+        {reglesDuGroupe(t, groupe)}. <strong>{t('min')}</strong>{' '}{t(': combien de choix le caissier DOIT faire (0 = facultatif).')}{' '}<strong>{t('max')}</strong>{' '}{t(': combien il PEUT en faire au plus (0 = autant qu’il veut).')}</p>
+      {resultatGroupe?.erreur && <p className="message erreur">{t.m(resultatGroupe.erreur)}</p>}
+      {resultatGroupe?.succes && <p className="message succes">{t.m(resultatGroupe.succes)}</p>}
+      {retour?.erreur && <p className="message erreur">{t.m(retour.erreur)}</p>}
+      {retour?.succes && <p className="message succes">{t.m(retour.succes)}</p>}
 
       {actifs.length === 0 && (
         <p className="message avertissement">
           <TriangleAlert size={15} strokeWidth={2} aria-hidden="true" />{' '}
-          <strong>Aucun choix.</strong> Un groupe vide n’apparaît pas en caisse —
-          il n’y aurait rien à proposer.
-        </p>
+          <strong>{t('Aucun choix.')}</strong>{' '}{t('Un groupe vide n’apparaît pas en caisse — il n’y aurait rien à proposer.')}</p>
       )}
 
       <ul className="liste-taux">
@@ -336,23 +331,22 @@ function CarteGroupe({
         <form action={actionChoix} className="ligne-imprimante ajout-choix">
           <input
             name="nom"
-            placeholder="Nom du choix"
+            placeholder={t('Nom du choix')}
             maxLength={100}
-            aria-label={`Nom du choix à ajouter à ${groupe.nom}`}
+            aria-label={t('Nom du choix à ajouter à {nom}', { nom: groupe.nom })}
           />
           <span className="champ-taux">
             <input
               name="prix"
               placeholder="0.000"
               inputMode="decimal"
-              aria-label="Supplément"
+              aria-label={t('Supplément')}
             />
             <span className="detail">TND</span>
           </span>
           <button type="submit" className="discret">
-            <Plus size={15} strokeWidth={2.2} aria-hidden="true" /> Ajouter le choix
-          </button>
-          {resultatChoix?.erreur && <p className="message erreur">{resultatChoix.erreur}</p>}
+            <Plus size={15} strokeWidth={2.2} aria-hidden="true" />{' '}{t('Ajouter le choix')}</button>
+          {resultatChoix?.erreur && <p className="message erreur">{t.m(resultatChoix.erreur)}</p>}
         </form>
       )}
 
@@ -377,6 +371,7 @@ export function GestionModificateurs({
   groupes: GroupeModificateurs[]
   articles: ArticleSimple[]
 }) {
+  const t = useT()
   const [resultat, action] = useActionState(
     creerGroupe.bind(null, restaurantId),
     null as Resultat | null,
@@ -386,11 +381,7 @@ export function GestionModificateurs({
     <>
       {groupes.length === 0 && (
         <div className="message info">
-          <strong>Aucun groupe de modificateurs.</strong> Un groupe rassemble des
-          choix qui vont ensemble — « Cuisson » avec saignant, à point, bien cuit ;
-          « Suppléments » avec fromage, œuf, harissa. La caisse les propose quand
-          on touche un article qui les porte.
-        </div>
+          <strong>{t('Aucun groupe de modificateurs.')}</strong>{' '}{t('Un groupe rassemble des choix qui vont ensemble — « Cuisson » avec saignant, à point, bien cuit ; « Suppléments » avec fromage, œuf, harissa. La caisse les propose quand on touche un article qui les porte.')}</div>
       )}
 
       {groupes.map((g) => (
@@ -405,45 +396,32 @@ export function GestionModificateurs({
 
       {modifiable && (
         <form action={action} className="carte formulaire-taux">
-          <h2>Nouveau groupe</h2>
-          <label htmlFor="grp-nom">Nom</label>
-          <input id="grp-nom" name="nom" maxLength={100} placeholder="Cuisson" />
+          <h2>{t('Nouveau groupe')}</h2>
+          <label htmlFor="grp-nom">{t('Nom')}</label>
+          <input id="grp-nom" name="nom" maxLength={100} placeholder={t('Cuisson')} />
 
-          <label htmlFor="grp-min">Choix obligatoires (0 = facultatif)</label>
+          <label htmlFor="grp-min">{t('Choix obligatoires (0 = facultatif)')}</label>
           <input id="grp-min" name="min" defaultValue="0" inputMode="numeric" maxLength={2} />
 
-          <label htmlFor="grp-max">Choix au maximum (0 = sans limite)</label>
+          <label htmlFor="grp-max">{t('Choix au maximum (0 = sans limite)')}</label>
           <input id="grp-max" name="max" defaultValue="0" inputMode="numeric" maxLength={2} />
 
           <p className="indication">
-            <Check size={14} strokeWidth={2.2} aria-hidden="true" /> « Cuisson »
-            se règle sur 1 et 1 : un choix, un seul. « Suppléments » sur 0 et 0 :
-            autant qu’on veut, ou aucun.
-          </p>
+            <Check size={14} strokeWidth={2.2} aria-hidden="true" />{' '}{t('« Cuisson » se règle sur 1 et 1 : un choix, un seul. « Suppléments » sur 0 et 0 : autant qu’on veut, ou aucun.')}</p>
 
-          <button type="submit" className="principal">
-            Créer le groupe
-          </button>
-          {resultat?.erreur && <p className="message erreur">{resultat.erreur}</p>}
-          {resultat?.succes && <p className="message succes">{resultat.succes}</p>}
+          <button type="submit" className="principal">{t('Créer le groupe')}</button>
+          {resultat?.erreur && <p className="message erreur">{t.m(resultat.erreur)}</p>}
+          {resultat?.succes && <p className="message succes">{t.m(resultat.succes)}</p>}
         </form>
       )}
 
       {/* Le rappel qui évite un ticket de support. */}
       <div className="carte note-imprimantes">
-        <h2>Ce qu’un modificateur fait au prix</h2>
-        <p>
-          Il s’ajoute au prix de la ligne :{' '}
-          <strong>prix de l’article + somme des choix</strong>, puis la quantité.
-          Un choix peut être <strong>négatif</strong> (« sans fromage −
-          {formaterTND(millimes(500))} ») ou à zéro (« Bien cuit », qui ne coûte
-          rien mais doit figurer sur le bon de cuisine).
-        </p>
-        <p>
-          Le <strong>taux de taxe reste celui de l’article</strong> : un
-          supplément n’a pas de taxe à lui. Et il ne touche pas au{' '}
-          <strong>stock</strong> — un supplément n’est pas un article vendu.
-        </p>
+        <h2>{t('Ce qu’un modificateur fait au prix')}</h2>
+        <p>{t('Il s’ajoute au prix de la ligne :')}{' '}
+          <strong>{t('prix de l’article + somme des choix')}</strong>{t(', puis la quantité. Un choix peut être')}{' '}<strong>{t('négatif')}</strong>{' '}{t('(« sans fromage −')}{formaterTND(millimes(500))}{' '}{t('») ou à zéro (« Bien cuit », qui ne coûte rien mais doit figurer sur le bon de cuisine).')}</p>
+        <p>{t('Le')}{' '}<strong>{t('taux de taxe reste celui de l’article')}</strong>{' '}{t(': un supplément n’a pas de taxe à lui. Et il ne touche pas au')}{' '}
+          <strong>{t('stock')}</strong>{' '}{t('— un supplément n’est pas un article vendu.')}</p>
       </div>
     </>
   )

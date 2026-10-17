@@ -17,22 +17,26 @@
 import { formaterPourcentage, formaterTND, millimes } from '@kaissi/domain'
 import type { Ventilation } from '../serveur/rapports.js'
 import type { Cellule, ColonneRapport, LigneRapport } from './TableauRapport.js'
+import { traduction } from '../i18n/serveur.js'
+import { use } from 'react'
+import { aTraduire } from '@kaissi/i18n'
 
 /** Les cinq premiers, en toutes lettres — ce que Loyverse montre en tête. */
 export function TopCinq({ lignes, entete }: { lignes: readonly Ventilation[]; entete: string }) {
+  const t = use(traduction())
   const cinq = lignes.slice(0, 5)
   if (cinq.length === 0) return null
   return (
     <section className="bloc">
       <div className="entete-bloc">
-        <h2>Top 5 · {entete}</h2>
-        <span className="detail">Ventes nettes</span>
+        <h2>{t('Top 5 ·')}{' '}{entete}</h2>
+        <span className="detail">{t('Ventes nettes')}</span>
       </div>
       <ul className="top-cinq">
         {cinq.map((l, rang) => (
           <li key={l.cle}>
             <span className="rang">{rang + 1}</span>
-            <span className="nom">{l.libelle}</span>
+            <span className="nom">{t.donnee(l.libelle)}</span>
             <span className="valeur">
               {formaterTND(l.marge.caMillimes)}
               <small className="detail"> {formaterPourcentage(l.part)} %</small>
@@ -54,21 +58,21 @@ export function cellulePourcent(bp: number | null): Cellule {
   // Afficher 0 % ferait passer le premier pour le second, et le total
   // paraîtrait juste.
   return bp === null
-    ? { texte: '—', classe: 'detail', aide: 'Coût d’achat non saisi', valeur: -1 }
+    ? { texte: '—', classe: 'detail', aide: aTraduire('Coût d’achat non saisi'), valeur: -1 }
     : { texte: `${formaterPourcentage(bp)} %`, valeur: bp }
 }
 
 /** Les colonnes chiffrées communes à toutes les ventilations. */
 export const COLONNES_VENTILATION: readonly ColonneRapport[] = [
-  { cle: 'quantite', titre: 'Articles vendus', nombre: true },
-  { cle: 'brut', titre: 'Ventes brutes', nombre: true, secondaire: true },
-  { cle: 'remises', titre: 'Réductions', nombre: true, secondaire: true },
-  { cle: 'net', titre: 'Ventes nettes', nombre: true },
-  { cle: 'cout', titre: 'Coût des marchandises', nombre: true, secondaire: true },
-  { cle: 'marge', titre: 'Marge brute', nombre: true },
-  { cle: 'margeBp', titre: 'Marge', nombre: true },
-  { cle: 'taxes', titre: 'Taxes', nombre: true, secondaire: true },
-  { cle: 'part', titre: 'Part du CA', nombre: true },
+  { cle: 'quantite', titre: aTraduire('Articles vendus'), nombre: true },
+  { cle: 'brut', titre: aTraduire('Ventes brutes'), nombre: true, secondaire: true },
+  { cle: 'remises', titre: aTraduire('Réductions'), nombre: true, secondaire: true },
+  { cle: 'net', titre: aTraduire('Ventes nettes'), nombre: true },
+  { cle: 'cout', titre: aTraduire('Coût des marchandises'), nombre: true, secondaire: true },
+  { cle: 'marge', titre: aTraduire('Marge brute'), nombre: true },
+  { cle: 'margeBp', titre: aTraduire('Marge'), nombre: true },
+  { cle: 'taxes', titre: aTraduire('Taxes'), nombre: true, secondaire: true },
+  { cle: 'part', titre: aTraduire('Part du CA'), nombre: true },
 ]
 
 /** Les cellules chiffrées d'une ventilation, dans l'ordre ci-dessus. */

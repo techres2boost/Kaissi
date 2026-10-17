@@ -29,43 +29,43 @@ import { expliquerEchecReseau } from '../donnees/diagnostic-reseau.js'
 import { estNatif } from '../donnees/sqlite.js'
 import { identifiantInstallation } from '../donnees/installation.js'
 import { URL_SYNC_PAR_DEFAUT } from '../config.js'
+import { dateLocale, t, tm } from '../i18n.js'
 
 const LIBELLES_ETAT: Record<ResumeSync['etat'], string> = {
-  inactif: 'En veille',
-  en_cours: 'Synchronisation…',
-  a_jour: 'À jour',
-  hors_ligne: 'Hors ligne',
-  erreur: 'Erreur',
-  bloque: 'Action requise',
+  inactif: t('En veille'),
+  en_cours: t('Synchronisation…'),
+  a_jour: t('À jour'),
+  hors_ligne: t('Hors ligne'),
+  erreur: t('Erreur'),
+  bloque: t('Action requise'),
 }
 
 const EXPLICATIONS: Record<ResumeSync['etat'], string> = {
-  inactif: "La synchronisation n'a pas encore démarré.",
-  en_cours: 'Envoi des ventes et récupération des autres terminaux.',
-  a_jour: 'Toutes les ventes sont enregistrées sur le serveur.',
-  hors_ligne:
-    "Le serveur est injoignable. La caisse fonctionne normalement : les ventes " +
-    'sont conservées et repartiront seules au retour du réseau.',
+  inactif: t("La synchronisation n'a pas encore démarré."),
+  en_cours: t('Envoi des ventes et récupération des autres terminaux.'),
+  a_jour: t('Toutes les ventes sont enregistrées sur le serveur.'),
+  hors_ligne: t(
+    'Le serveur est injoignable. La caisse fonctionne normalement : les ventes sont conservées et repartiront seules au retour du réseau.',
+  ),
   // Le serveur a RÉPONDU — par une erreur. Ce n'est pas le réseau : c'est
   // chez lui qu'il faut regarder, et le message ci-dessous le dit.
-  erreur:
-    'Le serveur répond, mais n’a pas pu enregistrer ces opérations. Les ventes ' +
-    'sont conservées et repartiront seules dès que ce sera corrigé. Si cela ' +
-    'dure, transmettez au support le message ci-dessous.',
-  bloque:
-    "Le serveur a refusé cet appareil. Les ventes sont conservées, mais elles ne " +
-    'partiront pas tant que le problème n’est pas réglé avec le gérant.',
+  erreur: t(
+    'Le serveur répond, mais n’a pas pu enregistrer ces opérations. Les ventes sont conservées et repartiront seules dès que ce sera corrigé. Si cela dure, transmettez au support le message ci-dessous.',
+  ),
+  bloque: t(
+    'Le serveur a refusé cet appareil. Les ventes sont conservées, mais elles ne partiront pas tant que le problème n’est pas réglé avec le gérant.',
+  ),
 }
 
 /** Libellés des codes de rejet, en français, destinés au gérant. */
 const LIBELLES_REJET: Record<string, string> = {
-  commande_close: 'Commande déjà encaissée sur un autre terminal',
-  commande_annulee: 'Commande annulée entre-temps',
-  produit_inconnu: 'Produit retiré du catalogue',
-  appareil_etranger: 'Événement signé par un autre appareil',
-  charge_invalide: 'Données incohérentes',
-  type_inconnu: 'Opération inconnue du serveur — mise à jour requise',
-  lot_trop_grand: 'Trop d’opérations envoyées d’un coup',
+  commande_close: t('Commande déjà encaissée sur un autre terminal'),
+  commande_annulee: t('Commande annulée entre-temps'),
+  produit_inconnu: t('Produit retiré du catalogue'),
+  appareil_etranger: t('Événement signé par un autre appareil'),
+  charge_invalide: t('Données incohérentes'),
+  type_inconnu: t('Opération inconnue du serveur — mise à jour requise'),
+  lot_trop_grand: t('Trop d’opérations envoyées d’un coup'),
 }
 
 export function EcranSync() {
@@ -123,7 +123,7 @@ export function EcranSync() {
   const decrire = (enregistrement: EnregistrementOutbox): string => {
     try {
       const e = JSON.parse(enregistrement.payload) as { type: string; clientTs: string }
-      return `${e.type} · ${new Date(e.clientTs).toLocaleString('fr-FR')}`
+      return `${e.type} · ${dateLocale(e.clientTs, { dateStyle: 'short', timeStyle: 'medium' })}`
     } catch {
       return enregistrement.eventId
     }
@@ -159,48 +159,48 @@ export function EcranSync() {
   return (
     <div className="diagnostic">
       <section className="bloc">
-        <h2>État de la synchronisation</h2>
+        <h2>{t('État de la synchronisation')}</h2>
         <div className={`verdict ${resumeSync.etat === 'a_jour' ? 'ok' : resumeSync.etat === 'bloque' ? 'ko' : ''}`}>
           <strong>{LIBELLES_ETAT[resumeSync.etat]}.</strong> {EXPLICATIONS[resumeSync.etat]}
         </div>
 
         <dl>
-          <dt>Opérations en attente</dt>
+          <dt>{t('Opérations en attente')}</dt>
           <dd className={resumeSync.enAttente > 0 ? 'attention' : 'ok'}>
             {resumeSync.enAttente}
           </dd>
-          <dt>Opérations refusées</dt>
+          <dt>{t('Opérations refusées')}</dt>
           <dd className={resumeSync.rejetes > 0 ? 'attention' : ''}>{resumeSync.rejetes}</dd>
-          <dt>Dernière synchronisation</dt>
+          <dt>{t('Dernière synchronisation')}</dt>
           <dd>
             {resumeSync.derniereSyncA
-              ? new Date(resumeSync.derniereSyncA).toLocaleString('fr-FR')
-              : 'jamais'}
+              ? dateLocale(resumeSync.derniereSyncA, { dateStyle: 'short', timeStyle: 'short' })
+              : t('jamais')}
           </dd>
-          <dt>Dernier changement reçu</dt>
+          <dt>{t('Dernier changement reçu')}</dt>
           <dd>
             {catalogue.recuA
-              ? `${new Date(catalogue.recuA).toLocaleString('fr-FR')} · ${catalogue.employes} employé(s)`
-              : 'aucun — catalogue local d’origine'}
+              ? `${dateLocale(catalogue.recuA, { dateStyle: 'short', timeStyle: 'short' })} · ${t('{n} employé(s)', { n: catalogue.employes })}`
+              : t('aucun — catalogue local d’origine')}
           </dd>
           {resumeSync.tentatives > 0 && (
             <>
-              <dt>Tentatives échouées</dt>
+              <dt>{t('Tentatives échouées')}</dt>
               <dd className="attention">{resumeSync.tentatives}</dd>
             </>
           )}
         </dl>
 
         {resumeSync.derniereErreur && (
-          <p className="note">Dernier message du serveur : {resumeSync.derniereErreur}</p>
+          <p className="note">{t('Dernier message du serveur :')}{' '}{tm(resumeSync.derniereErreur)}</p>
         )}
 
         <details className="details-techniques">
-          <summary>Détails techniques — à lire au support, si on vous les demande</summary>
+          <summary>{t('Détails techniques — à lire au support, si on vous les demande')}</summary>
           <dl>
-            <dt>Curseur événements</dt>
+            <dt>{t('Curseur événements')}</dt>
             <dd className="mono">{resumeSync.curseurEvenements}</dd>
-            <dt>Curseur catalogue</dt>
+            <dt>{t('Curseur catalogue')}</dt>
             <dd className="mono">{resumeSync.curseurCatalogue}</dd>
           </dl>
         </details>
@@ -214,11 +214,7 @@ export function EcranSync() {
           Le présenter comme l'action principale laissait croire que rien ne
           partait sans lui.
         */}
-        <p className="note">
-          L'envoi se fait <strong>tout seul</strong>, en continu, dès qu'il y a
-          du réseau. Vous n'avez rien à déclencher : ce bouton ne sert qu'à ne
-          pas attendre les quelques secondes du prochain cycle.
-        </p>
+        <p className="note">{t('L\'envoi se fait')}{' '}<strong>{t('tout seul')}</strong>{t(', en continu, dès qu\'il y a du réseau. Vous n\'avez rien à déclencher : ce bouton ne sert qu\'à ne pas attendre les quelques secondes du prochain cycle.')}</p>
 
         <div className="actions">
           <button
@@ -227,60 +223,37 @@ export function EcranSync() {
             disabled={resumeSync.etat === 'en_cours' || !sync}
             onClick={() => void sync?.cycle()}
           >
-            {resumeSync.etat === 'en_cours' ? 'Envoi en cours…' : 'Ne pas attendre — envoyer maintenant'}
+            {resumeSync.etat === 'en_cours' ? t('Envoi en cours…') : t('Ne pas attendre — envoyer maintenant')}
           </button>
         </div>
       </section>
 
       <section className="bloc">
-        <h2>Identité de cet appareil</h2>
+        <h2>{t('Identité de cet appareil')}</h2>
         <dl>
-          <dt>Identifiant</dt>
+          <dt>{t('Identifiant')}</dt>
           <dd className="mono">{identite.deviceId || '—'}</dd>
         </dl>
-        <p className="note">
-          Le serveur fait autorité : au démarrage, le terminal adopte
-          automatiquement l’identité que son jeton désigne. Si des ventes sont
-          refusées pour « appareil étranger », c’est que cette adoption n’a pas
-          encore eu lieu — relancez l’application, ou ré-appairez ci-dessous.
-        </p>
+        <p className="note">{t('Le serveur fait autorité : au démarrage, le terminal adopte automatiquement l’identité que son jeton désigne. Si des ventes sont refusées pour « appareil étranger », c’est que cette adoption n’a pas encore eu lieu — relancez l’application, ou ré-appairez ci-dessous.')}</p>
         <p>
-          <button type="button" onClick={() => void oublierAppairage()}>
-            Ré-appairer — ou changer d’établissement
-          </button>
+          <button type="button" onClick={() => void oublierAppairage()}>{t('Ré-appairer — ou changer d’établissement')}</button>
         </p>
+        <p className="note">{t('Le formulaire réapparaîtra. Reconnectez-vous avec le compte du gérant : si celui-ci gère')}{' '}<strong>{t('plusieurs établissements')}</strong>{t(', la liste s’affichera et vous choisirez celui de cette caisse.')}</p>
         <p className="note">
-          Le formulaire réapparaîtra. Reconnectez-vous avec le compte du
-          gérant : si celui-ci gère <strong>plusieurs établissements</strong>,
-          la liste s’affichera et vous choisirez celui de cette caisse.
-        </p>
-        <p className="note">
-          <strong>Changer d’établissement vide la base locale</strong> — carte,
-          employés, stock et ventes de l’ancien. C’est indispensable : les
-          curseurs de synchronisation sont communs à toute la base, et sans
-          remise à zéro le catalogue du nouvel établissement ne serait jamais
-          reçu. Rien n’est perdu côté serveur, où tout a déjà été remonté.
-        </p>
-        <p className="note">
-          Le changement est <strong>refusé</strong> tant qu’il reste des ventes
-          à envoyer : elles portent l’identité de l’ancien terminal et seraient
-          refusées définitivement. Synchronisez d’abord.
-        </p>
+          <strong>{t('Changer d’établissement vide la base locale')}</strong>{' '}{t('— carte, employés, stock et ventes de l’ancien. C’est indispensable : les curseurs de synchronisation sont communs à toute la base, et sans remise à zéro le catalogue du nouvel établissement ne serait jamais reçu. Rien n’est perdu côté serveur, où tout a déjà été remonté.')}</p>
+        <p className="note">{t('Le changement est')}{' '}<strong>{t('refusé')}</strong>{' '}{t('tant qu’il reste des ventes à envoyer : elles portent l’identité de l’ancien terminal et seraient refusées définitivement. Synchronisez d’abord.')}</p>
       </section>
 
       {rejets.length > 0 && (
         <section className="bloc">
-          <h2>Opérations refusées — votre attention est requise</h2>
-          <p className="note">
-            Ces opérations ne repartiront pas toutes seules. Chacune traduit une
-            règle métier, pas une panne de réseau.
-          </p>
+          <h2>{t('Opérations refusées — votre attention est requise')}</h2>
+          <p className="note">{t('Ces opérations ne repartiront pas toutes seules. Chacune traduit une règle métier, pas une panne de réseau.')}</p>
           <table>
             <thead>
               <tr>
-                <th>Opération</th>
-                <th>Motif</th>
-                <th>Détail</th>
+                <th>{t('Opération')}</th>
+                <th>{t('Motif')}</th>
+                <th>{t('Détail')}</th>
               </tr>
             </thead>
             <tbody>
@@ -296,16 +269,8 @@ export function EcranSync() {
 
           {rejets.some((r) => r.codeRejet === 'appareil_etranger') && (
             <div className="note" style={{ marginTop: '0.75rem' }}>
-              <p>
-                Les opérations « {LIBELLES_REJET['appareil_etranger']} » viennent
-                d’un appairage précédent : elles portent l’ancien identifiant de
-                ce terminal et ne pourront jamais partir. La vente reste
-                enregistrée localement ; seule sa remontée au serveur est
-                abandonnée.
-              </p>
-              <button type="button" onClick={() => void abandonnerEtrangers()}>
-                Abandonner ces opérations d’un ancien appairage
-              </button>
+              <p>{t('Les opérations «')}{' '}{LIBELLES_REJET['appareil_etranger']}{' '}{t('» viennent d’un appairage précédent : elles portent l’ancien identifiant de ce terminal et ne pourront jamais partir. La vente reste enregistrée localement ; seule sa remontée au serveur est abandonnée.')}</p>
+              <button type="button" onClick={() => void abandonnerEtrangers()}>{t('Abandonner ces opérations d’un ancien appairage')}</button>
             </div>
           )}
         </section>
@@ -313,16 +278,13 @@ export function EcranSync() {
 
       {enAttente.length > 0 && (
         <section className="bloc">
-          <h2>En attente d’envoi ({enAttente.length})</h2>
-          <p className="note">
-            Ces opérations sont enregistrées localement et partiront dès que le
-            serveur sera joignable. Aucune n’est perdue.
-          </p>
+          <h2>{t('En attente d’envoi ({n})', { n: enAttente.length })}</h2>
+          <p className="note">{t('Ces opérations sont enregistrées localement et partiront dès que le serveur sera joignable. Aucune n’est perdue.')}</p>
           <table>
             <thead>
               <tr>
-                <th>Opération</th>
-                <th>Tentatives</th>
+                <th>{t('Opération')}</th>
+                <th>{t('Tentatives')}</th>
               </tr>
             </thead>
             <tbody>
@@ -340,9 +302,7 @@ export function EcranSync() {
       {rejets.length === 0 && enAttente.length === 0 && (
         <section className="bloc">
           <div className="verdict ok">
-            <strong>Rien en attente.</strong> Toutes les ventes de ce terminal sont
-            enregistrées sur le serveur.
-          </div>
+            <strong>{t('Rien en attente.')}</strong>{' '}{t('Toutes les ventes de ce terminal sont enregistrées sur le serveur.')}</div>
         </section>
       )}
     </div>
@@ -468,7 +428,7 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
           // Le nom vient de la liste qu'on vient d'afficher : à cet instant,
           // le serveur n'a encore rien dit de l'établissement visé.
           const nom = choix.find((e) => e.restaurantId === restaurantId)?.nom
-          if (!(await bascultePossible(restaurantId, nom ?? 'cet établissement'))) return
+          if (!(await bascultePossible(restaurantId, nom ?? t('cet établissement')))) return
         }
       }
 
@@ -514,7 +474,7 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
 
       if (!reponse.ok) {
         setEtat('erreur')
-        setMessage(corps?.message ?? `Le serveur a répondu ${reponse.status}.`)
+        setMessage(corps?.message ? tm(corps.message) : t('Le serveur a répondu {statut}.', { statut: reponse.status }))
         return
       }
 
@@ -528,8 +488,7 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
       if (!corps?.jeton || !corps.deviceId) {
         setEtat('erreur')
         setMessage(
-          "Le serveur n'a pas renvoyé de jeton. Mets à jour l'API de " +
-            'synchronisation (elle doit exposer /appairage).',
+          t("Le serveur n'a pas renvoyé de jeton. Mets à jour l'API de synchronisation (elle doit exposer /appairage)."),
         )
         return
       }
@@ -572,7 +531,7 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
          * ne s'affiche, et c'est la réponse du serveur qui désigne la cible.
          * On ne pouvait donc pas la connaître plus tôt.
          */
-        const nom = corps.nomEtablissement ?? 'cet établissement'
+        const nom = corps.nomEtablissement ?? t('cet établissement')
         if (!(await bascultePossible(corps.restaurantId, nom))) return
 
         // Rien en attente — ou un « oui » explicite sur des opérations qui
@@ -656,14 +615,15 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
       const locale = erreur instanceof ErreurSqlite
       setMessage(
         expire
-          ? `Le serveur n'a pas répondu en 15 secondes. Il est probablement en ` +
-            `cours de redéploiement — vérifie que ${base}/sante répond, puis ` +
-            `réessaie. La caisse fonctionne normalement en attendant.`
+          ? t(
+              "Le serveur n'a pas répondu en 15 secondes. Il est probablement en cours de redéploiement — vérifie que {adresse}/sante répond, puis réessaie. La caisse fonctionne normalement en attendant.",
+              { adresse: base },
+            )
           : locale
-            ? `La base locale de cette caisse a refusé l'opération : ` +
-              `${erreur.message}\n\nRien n'a été modifié — la transaction a été ` +
-              `annulée. Le serveur n'est pas en cause. Relevez ce message sur ` +
-              `l'écran Diagnostic avant de recommencer.`
+            ? t(
+                "La base locale de cette caisse a refusé l'opération : {detail}\n\nRien n'a été modifié — la transaction a été annulée. Le serveur n'est pas en cause. Relevez ce message sur l'écran Diagnostic avant de recommencer.",
+                { detail: erreur.message },
+              )
             : expliquerEchecReseau(erreur, url, estNatif()),
       )
     }
@@ -678,11 +638,11 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
    */
   const manquant =
     url.trim() === ''
-      ? "l'adresse du serveur de synchronisation"
+      ? t("l'adresse du serveur de synchronisation")
       : email.trim() === ''
-        ? "l'e-mail du gérant"
+        ? t("l'e-mail du gérant")
         : motDePasse === ''
-          ? 'le mot de passe'
+          ? t('le mot de passe')
           : null
 
   const pretASoumettre = manquant === null && etat !== 'test'
@@ -690,15 +650,9 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
   return (
     <div className="diagnostic">
       <section className="bloc">
-        <h2>Mettre cette caisse en service</h2>
-        <p className="note">
-          Connectez-vous avec le compte du gérant. Ce terminal recevra
-          automatiquement son identité — il n’y a aucun code à recopier.
-        </p>
-        <p className="note">
-          La caisse fonctionne déjà en local : cette étape ajoute la
-          synchronisation entre terminaux et l’accès au back-office.
-        </p>
+        <h2>{t('Mettre cette caisse en service')}</h2>
+        <p className="note">{t('Connectez-vous avec le compte du gérant. Ce terminal recevra automatiquement son identité — il n’y a aucun code à recopier.')}</p>
+        <p className="note">{t('La caisse fonctionne déjà en local : cette étape ajoute la synchronisation entre terminaux et l’accès au back-office.')}</p>
 
         {/*
           Le message d'erreur est AU-DESSUS de la bifurcation, et c'est tout
@@ -723,10 +677,7 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
 
         {choix.length > 0 ? (
           <>
-            <p className="note">
-              Ce compte gère plusieurs établissements. Choisissez celui de
-              cette caisse — ses ventes y seront rattachées.
-            </p>
+            <p className="note">{t('Ce compte gère plusieurs établissements. Choisissez celui de cette caisse — ses ventes y seront rattachées.')}</p>
             <div className="actions" style={{ flexDirection: 'column' }}>
               {choix.map((e) => (
                 <button
@@ -756,28 +707,22 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
                   setAEffacer(null)
                   setEtat('saisie')
                 }}
-              >
-                ‹ Changer de compte
-              </button>
+              >{t('‹ Changer de compte')}</button>
             </div>
           </>
         ) : (
           <>
-            <label className="champ-note">
-              E-mail du gérant
-              <input
+            <label className="champ-note">{t('E-mail du gérant')}<input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="gerant@monresto.tn"
+                placeholder={t('gerant@monresto.tn')}
                 autoComplete="username"
                 spellCheck={false}
               />
             </label>
 
-            <label className="champ-note">
-              Mot de passe
-              <input
+            <label className="champ-note">{t('Mot de passe')}<input
                 type="password"
                 value={motDePasse}
                 onChange={(e) => setMotDePasse(e.target.value)}
@@ -789,35 +734,26 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
             </label>
 
             {url.trim() === '' ? (
-              <label className="champ-note">
-                Adresse du serveur de synchronisation
-                <input
+              <label className="champ-note">{t('Adresse du serveur de synchronisation')}<input
                   type="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://…"
+                  placeholder={t('https://…')}
                   autoComplete="off"
                   spellCheck={false}
                 />
-                <span className="note">
-                  L’adresse de l’API de synchronisation, fournie par
-                  l’installateur — elle se termine souvent par
-                  <span className="mono"> .up.railway.app</span>. À saisir une
-                  seule fois : elle sera mémorisée sur ce terminal.
-                </span>
+                <span className="note">{t('L’adresse de l’API de synchronisation, fournie par l’installateur — elle se termine souvent par')}<span className="mono">{' '}{t('.up.railway.app')}</span>{t('. À saisir une seule fois : elle sera mémorisée sur ce terminal.')}</span>
               </label>
             ) : (
               // Renseignée : on la replie, elle n'intéresse plus personne.
               <details>
-                <summary className="note">
-                  Serveur : <span className="mono">{url}</span> — modifier
-                </summary>
+                <summary className="note">{t('Serveur :')}{' '}<span className="mono">{url}</span>{' '}{t('— modifier')}</summary>
                 <label className="champ-note">
                   <input
                     type="url"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
-                    placeholder="https://…"
+                    placeholder={t('https://…')}
                     autoComplete="off"
                     spellCheck={false}
                   />
@@ -832,11 +768,11 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
                 disabled={!pretASoumettre}
                 onClick={() => void appairer()}
               >
-                {etat === 'test' ? 'Connexion…' : 'Mettre en service'}
+                {etat === 'test' ? t('Connexion…') : t('Mettre en service')}
               </button>
             </div>
             {manquant && (
-              <p className="note">Il manque encore {manquant}.</p>
+              <p className="note">{t('Il manque encore {quoi}.', { quoi: manquant })}</p>
             )}
           </>
         )}
@@ -847,19 +783,15 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
           écran qui ne répond pas au clic est pire qu'un écran qui refuse —
           on reclique, et on conclut que l'établissement n'existe pas.
         */}
-        {etat === 'test' && <p className="note">Connexion au serveur…</p>}
+        {etat === 'test' && <p className="note">{t('Connexion au serveur…')}</p>}
 
         {aEffacer && (
           <div className="bloc">
             <p className="erreur" style={{ whiteSpace: 'pre-line' }}>
-              {`Cette caisse a servi en local avant d’être mise en service.\n\n` +
-                `Elle contient ${aEffacer.enAttente + aEffacer.rejetes} opération(s) ` +
-                `qui n’ont jamais été envoyées — et qui ne peuvent plus l’être : ` +
-                `elles portent l’identité de la caisse de démonstration, qu’aucun ` +
-                `serveur ne connaît.\n\n` +
-                `La mise en service repart d’une base vide : la carte, les employés ` +
-                `et le stock viendront de « ${aEffacer.nom} ». Les commandes et les ` +
-                `services de caisse enregistrés ici seront effacés.`}
+              {t(
+                'Cette caisse a servi en local avant d’être mise en service.\n\nElle contient {n} opération(s) qui n’ont jamais été envoyées — et qui ne peuvent plus l’être : elles portent l’identité de la caisse de démonstration, qu’aucun serveur ne connaît.\n\nLa mise en service repart d’une base vide : la carte, les employés et le stock viendront de « {nom} ». Les commandes et les services de caisse enregistrés ici seront effacés.',
+                { n: aEffacer.enAttente + aEffacer.rejetes, nom: aEffacer.nom },
+              )}
             </p>
             <div className="actions">
               <button
@@ -867,17 +799,13 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
                 className="principal"
                 disabled={etat === 'test'}
                 onClick={() => void appairer(aEffacer.restaurantId, true)}
-              >
-                Effacer et mettre en service
-              </button>
+              >{t('Effacer et mettre en service')}</button>
               <button
                 type="button"
                 className="secondaire"
                 disabled={etat === 'test'}
                 onClick={() => setAEffacer(null)}
-              >
-                Annuler
-              </button>
+              >{t('Annuler')}</button>
             </div>
           </div>
         )}

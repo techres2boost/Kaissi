@@ -12,7 +12,7 @@
     "dev": "turbo run dev",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
-    "test:rapide": "turbo run test --filter=@kaissi/domain --filter=@kaissi/db-local --filter=@kaissi/printing",
+    "test:rapide": "turbo run test --filter=@kaissi/domain --filter=@kaissi/db-local --filter=@kaissi/printing --filter=@kaissi/i18n",
     "db:test": "bash ./scripts/postgres-test.sh",
     "db:test:stop": "bash ./scripts/postgres-test.sh --stop",
     "test:domain": "pnpm --filter @kaissi/domain test",

@@ -32,7 +32,7 @@ const config = {
   },
   reactStrictMode: true,
   // Les paquets du monorepo sont consommés en SOURCE TypeScript.
-  transpilePackages: ['@kaissi/domain'],
+  transpilePackages: ['@kaissi/domain', '@kaissi/i18n'],
   // Routes typées : un lien vers une page qui n'existe pas casse la
   // compilation. Les gabarits `/${restaurant}/journee` sont bien vérifiés ;
   // seule une destination venue de l'extérieur exige un filtrage explicite

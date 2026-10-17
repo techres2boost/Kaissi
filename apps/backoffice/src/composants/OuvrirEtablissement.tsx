@@ -27,12 +27,14 @@ import Link from 'next/link'
  */
 import { ouvrirEtablissement } from '../app/administration/actions.js'
 import { FUSEAUX, type Resultat } from '../app/administration/fuseaux.js'
+import { useT } from '../i18n/client.js'
 
 export function OuvrirEtablissement({
   modeles,
 }: {
   modeles: readonly { id: string; nom: string }[]
 }) {
+  const t = useT()
   const [resultat, action, enCours] = useActionState(
     ouvrirEtablissement,
     null as Resultat | null,
@@ -40,29 +42,23 @@ export function OuvrirEtablissement({
 
   return (
     <section className="carte">
-      <h2>Ouvrir un établissement</h2>
+      <h2>{t('Ouvrir un établissement')}</h2>
 
-      {resultat?.erreur && <p className="message erreur">{resultat.erreur}</p>}
+      {resultat?.erreur && <p className="message erreur">{t.m(resultat.erreur)}</p>}
       {resultat?.succes && (
         <p className="message succes">
-          {resultat.succes}{' '}
+          {t.m(resultat.succes)}{' '}
           {resultat.restaurantId && (
-            <Link href={{ pathname: `/${resultat.restaurantId}/catalogue` }}>
-              Saisir la carte →
-            </Link>
+            <Link href={{ pathname: `/${resultat.restaurantId}/catalogue` }}>{t('Saisir la carte →')}</Link>
           )}
         </p>
       )}
 
       <form action={action}>
         <div className="champs deux">
-          <label className="champ">
-            Nom de l’établissement
-            <input name="nom" placeholder="Snack Lac 2" maxLength={200} required />
+          <label className="champ">{t('Nom de l’établissement')}<input name="nom" placeholder={t('Snack Lac 2')} maxLength={200} required />
           </label>
-          <label className="champ">
-            Reprendre les réglages de
-            <select name="modele" defaultValue={modeles[0]?.id ?? ''}>
+          <label className="champ">{t('Reprendre les réglages de')}<select name="modele" defaultValue={modeles[0]?.id ?? ''}>
               {modeles.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.nom}
@@ -73,9 +69,7 @@ export function OuvrirEtablissement({
         </div>
 
         <div className="champs deux">
-          <label className="champ">
-            Fuseau horaire
-            <select name="timezone" defaultValue="Africa/Tunis">
+          <label className="champ">{t('Fuseau horaire')}<select name="timezone" defaultValue="Africa/Tunis">
               {FUSEAUX.map((f) => (
                 <option key={f} value={f}>
                   {f}
@@ -83,27 +77,16 @@ export function OuvrirEtablissement({
               ))}
             </select>
           </label>
-          <label className="champ">
-            Bascule de la journée commerciale
-            <input name="bascule" defaultValue="04:00" pattern="\d{2}:\d{2}" required />
-            <span className="indication">
-              Une vente encaissée <strong>avant</strong> cette heure appartient à
-              la journée de la veille. 04:00 est l’usage courant, pas une règle :
-              un salon de thé qui ouvre à 6 h la voudra plus tôt.
-            </span>
+          <label className="champ">{t('Bascule de la journée commerciale')}<input name="bascule" defaultValue="04:00" pattern="\d{2}:\d{2}" required />
+            <span className="indication">{t('Une vente encaissée')}{' '}<strong>{t('avant')}</strong>{' '}{t('cette heure appartient à la journée de la veille. 04:00 est l’usage courant, pas une règle : un salon de thé qui ouvre à 6 h la voudra plus tôt.')}</span>
           </label>
         </div>
 
-        <p className="indication">
-          Sont repris du modèle : <strong>taux de taxe</strong>,{' '}
-          <strong>modes de paiement</strong> et <strong>postes de préparation</strong>{' '}
-          — sans eux, une caisse ne peut rien encaisser. La <strong>carte</strong>{' '}
-          n’est pas copiée : elle se saisit, et vous en devenez automatiquement
-          administrateur.
-        </p>
+        <p className="indication">{t('Sont repris du modèle :')}{' '}<strong>{t('taux de taxe')}</strong>,{' '}
+          <strong>{t('modes de paiement')}</strong>{' '}{t('et')}{' '}<strong>{t('postes de préparation')}</strong>{' '}{t('— sans eux, une caisse ne peut rien encaisser. La')}{' '}<strong>{t('carte')}</strong>{' '}{t('n’est pas copiée : elle se saisit, et vous en devenez automatiquement administrateur.')}</p>
 
         <button type="submit" className="principal" disabled={enCours}>
-          {enCours ? 'Ouverture…' : 'Ouvrir l’établissement'}
+          {enCours ? t('Ouverture…') : t('Ouvrir l’établissement')}
         </button>
       </form>
     </section>

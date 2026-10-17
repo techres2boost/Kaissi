@@ -19,12 +19,14 @@ import {
 } from '../app/[restaurant]/stock/actions.js'
 import type { ProduitStock } from '../app/[restaurant]/stock/page.js'
 import { grouperParCategorie } from './grouper.js'
+import { useT } from '../i18n/client.js'
+import { aTraduire } from '@kaissi/i18n'
 
 const LIBELLE_ETAT: Record<string, string> = {
-  rupture: 'Rupture',
-  faible: 'Faible',
-  ok: 'OK',
-  non_suivi: 'Non suivi',
+  rupture: aTraduire('Rupture'),
+  faible: aTraduire('Faible'),
+  ok: aTraduire('stock|OK'),
+  non_suivi: aTraduire('Non suivi'),
 }
 
 export function TableauStock({
@@ -44,6 +46,7 @@ export function TableauStock({
    */
   fournisseurs: readonly string[]
 }) {
+  const t = useT()
   const router = useRouter()
   const [ouvert, setOuvert] = useState<string | null>(null)
   const [message, setMessage] = useState<{ texte: string; erreur: boolean } | null>(null)
@@ -55,7 +58,7 @@ export function TableauStock({
       setMessage(
         r.erreur
           ? { texte: r.erreur, erreur: true }
-          : { texte: r.succes ?? 'Enregistré.', erreur: false },
+          : { texte: r.succes ?? t('Enregistré.'), erreur: false },
       )
       if (!r.erreur) {
         setOuvert(null)
@@ -66,7 +69,7 @@ export function TableauStock({
 
   return (
     <section className="bloc">
-      <h2>Tous les produits</h2>
+      <h2>{t('Tous les produits')}</h2>
 
       {/*
         La liste est déclarée UNE fois pour tout l'écran, et non dans chaque
@@ -82,24 +85,24 @@ export function TableauStock({
       )}
 
       {message && (
-        <p className={`message ${message.erreur ? 'erreur' : 'succes'}`}>{message.texte}</p>
+        <p className={`message ${message.erreur ? 'erreur' : 'succes'}`}>{t.m(message.texte)}</p>
       )}
 
       <table>
         <thead>
           <tr>
-            <th>Produit</th>
-            <th className="nombre">Prix</th>
-            <th className="nombre">Coût</th>
-            <th className="nombre">Marge</th>
+            <th>{t('Produit')}</th>
+            <th className="nombre">{t('Prix')}</th>
+            <th className="nombre">{t('Coût')}</th>
+            <th className="nombre">{t('Marge')}</th>
             {/* Deux colonnes s'appelaient « Stock » : la quantité et l'état
                 de la carte. On nomme donc la première par ce qu'elle est —
                 une quantité — et la seconde garde « Stock », qui est la
                 question posée à la caisse : en reste-t-il ? */}
-            <th className="nombre">Quantité</th>
-            <th className="nombre">Seuil</th>
-            <th>État</th>
-            <th>Stock</th>
+            <th className="nombre">{t('Quantité')}</th>
+            <th className="nombre">{t('Seuil')}</th>
+            <th>{t('État')}</th>
+            <th>{t('Stock')}</th>
             <th />
           </tr>
         </thead>
@@ -113,7 +116,7 @@ export function TableauStock({
         <tbody key={groupe.cle}>
           <tr className="ligne-groupe">
             <td colSpan={9}>
-              {groupe.titre} <span className="compte">· {groupe.lignes.length}</span>
+              {t.donnee(groupe.titre)} <span className="compte">· {groupe.lignes.length}</span>
             </td>
           </tr>
           {groupe.lignes.map((p) => (
@@ -123,7 +126,7 @@ export function TableauStock({
                 <td className="nombre">{formaterTND(millimes(p.prixMillimes))}</td>
                 <td className="nombre">
                   {p.coutUnitaire === null ? (
-                    <span className="detail">non saisi</span>
+                    <span className="detail">{t('non saisi')}</span>
                   ) : (
                     formaterTND(millimes(Math.round(p.coutUnitaire)))
                   )}
@@ -137,7 +140,7 @@ export function TableauStock({
                 <td className="nombre">{p.suivi ? p.quantite : '—'}</td>
                 <td className="nombre">{p.seuil ?? '—'}</td>
                 <td>
-                  <span className={`etiquette etat-${p.etat}`}>{LIBELLE_ETAT[p.etat]}</span>
+                  <span className={`etiquette etat-${p.etat}`}>{t(LIBELLE_ETAT[p.etat] ?? p.etat)}</span>
                 </td>
                 <td>
                   {/*
@@ -153,17 +156,17 @@ export function TableauStock({
                     onClick={() => agir(() => basculerDisponibilite(restaurantId, p.id, !p.enVente))}
                     title={
                       p.enVente
-                        ? 'Retirer ce produit de la carte des caisses'
+                        ? t('Retirer ce produit de la carte des caisses')
                         : p.motifRetrait === 'stock'
-                          ? 'Retiré automatiquement : stock à zéro. Il reviendra seul à la première réception.'
-                          : 'Retiré à la main. L’automatisme ne le remettra jamais en vente tout seul.'
+                          ? t('Retiré automatiquement : stock à zéro. Il reviendra seul à la première réception.')
+                          : t('Retiré à la main. L’automatisme ne le remettra jamais en vente tout seul.')
                     }
                   >
                     {p.enVente
-                      ? 'En stock'
+                      ? t('En stock')
                       : p.motifRetrait === 'stock'
-                        ? 'Rupture (auto)'
-                        : 'Rupture (manuel)'}
+                        ? t('Rupture (auto)')
+                        : t('Rupture (manuel)')}
                   </button>
                   {/*
                     « Épuisé et toujours en vente » — la contradiction, DITE.
@@ -181,7 +184,7 @@ export function TableauStock({
                   */}
                   {p.suivi && p.enVente && (p.quantite ?? 0) <= 0 && (
                     <div className="rappel-rupture">
-                      <span className="etiquette etat-rupture">Épuisé, toujours en vente</span>
+                      <span className="etiquette etat-rupture">{t('Épuisé, toujours en vente')}</span>
                       {!p.ruptureAuto && (
                         <button
                           type="button"
@@ -190,10 +193,8 @@ export function TableauStock({
                           onClick={() =>
                             agir(() => basculerRuptureAuto(restaurantId, p.id, true))
                           }
-                          title="Le retrait automatique est coupé pour ce produit : le remettre le sortira de la carte tout de suite, et l’y remettra à la première réception."
-                        >
-                          Rétablir le retrait automatique
-                        </button>
+                          title={t('Le retrait automatique est coupé pour ce produit : le remettre le sortira de la carte tout de suite, et l’y remettra à la première réception.')}
+                        >{t('Rétablir le retrait automatique')}</button>
                       )}
                     </div>
                   )}
@@ -204,7 +205,7 @@ export function TableauStock({
                     className="discret"
                     onClick={() => setOuvert(ouvert === p.id ? null : p.id)}
                   >
-                    {ouvert === p.id ? 'Fermer' : p.suivi ? 'Ajuster' : 'Saisir le stock'}
+                    {ouvert === p.id ? t('Fermer') : p.suivi ? t('Ajuster') : t('Saisir le stock')}
                   </button>
                 </td>
               </tr>
@@ -218,26 +219,17 @@ export function TableauStock({
                           agir(() => activerSuivi(restaurantId, p.id, null, donnees))
                         }
                       >
-                        <h3>{p.suivi ? 'Recompter le stock' : 'Saisir le stock'}</h3>
-                        <p className="indication">
-                          Saisir la quantité <strong>constatée maintenant</strong>. Les
-                          ventes antérieures sont réputées déjà déduites : sans cela,
-                          le premier comptage retrancherait tout l’historique d’un coup.
-                          À zéro, le produit sort de la carte tout seul.
-                        </p>
+                        <h3>{p.suivi ? t('Recompter le stock') : t('Saisir le stock')}</h3>
+                        <p className="indication">{t('Saisir la quantité')}{' '}<strong>{t('constatée maintenant')}</strong>{t('. Les ventes antérieures sont réputées déjà déduites : sans cela, le premier comptage retrancherait tout l’historique d’un coup. À zéro, le produit sort de la carte tout seul.')}</p>
                         <div className="champs deux">
-                          <label className="champ">
-                            Quantité en stock
-                            <input
+                          <label className="champ">{t('Quantité en stock')}<input
                               name="quantite"
                               inputMode="decimal"
                               defaultValue={p.suivi ? String(p.quantite) : '0'}
                               required
                             />
                           </label>
-                          <label className="champ">
-                            Seuil d’alerte (facultatif)
-                            <input
+                          <label className="champ">{t('Seuil d’alerte (facultatif)')}<input
                               name="seuil"
                               inputMode="decimal"
                               defaultValue={p.seuil === null ? '' : String(p.seuil)}
@@ -251,7 +243,7 @@ export function TableauStock({
                           reste.
                         */}
                         <button type="submit" className="principal" disabled={enCours}>
-                          {p.suivi ? 'Enregistrer le comptage' : 'Enregistrer le stock'}
+                          {p.suivi ? t('Enregistrer le comptage') : t('Enregistrer le stock')}
                         </button>
 
                         {p.suivi && (
@@ -270,16 +262,7 @@ export function TableauStock({
                               }
                               style={{ width: 'auto', marginTop: '0.2rem' }}
                             />
-                            <span>
-                              Retirer ce produit de la carte <strong>dès qu’il atteint
-                              zéro</strong>, et l’y remettre à la première réception.
-                              <span className="indication">
-                                À décocher pour un produit dont le comptage n’est
-                                qu’indicatif — un plat dont on ne compte pas les
-                                ingrédients ne doit pas disparaître de la carte pour une
-                                erreur d’inventaire. Décoché, il reste vendable même à
-                                zéro.
-                              </span>
+                            <span>{t('Retirer ce produit de la carte')}{' '}<strong>{t('dès qu’il atteint zéro')}</strong>{t(', et l’y remettre à la première réception.')}<span className="indication">{t('À décocher pour un produit dont le comptage n’est qu’indicatif — un plat dont on ne compte pas les ingrédients ne doit pas disparaître de la carte pour une erreur d’inventaire. Décoché, il reste vendable même à zéro.')}</span>
                             </span>
                           </label>
                         )}
@@ -291,20 +274,12 @@ export function TableauStock({
                             agir(() => enregistrerMouvement(restaurantId, p.id, null, donnees))
                           }
                         >
-                          <h3>Mouvement</h3>
-                          <p className="indication">
-                            Une réception ajoute, une perte retranche. Saisissez
-                            toujours un nombre <strong>positif</strong> : le signe
-                            découle du motif.
-                          </p>
+                          <h3>{t('Mouvement')}</h3>
+                          <p className="indication">{t('Une réception ajoute, une perte retranche. Saisissez toujours un nombre')}{' '}<strong>{t('positif')}</strong>{' '}{t(': le signe découle du motif.')}</p>
                           <div className="champs deux">
-                            <label className="champ">
-                              Quantité
-                              <input name="delta" inputMode="decimal" required />
+                            <label className="champ">{t('Quantité')}<input name="delta" inputMode="decimal" required />
                             </label>
-                            <label className="champ">
-                              Motif
-                              {/*
+                            <label className="champ">{t('Motif')}{/*
                                 Deux motifs, pas trois. « Correction » attirait
                                 tout ce qu'on n'avait pas envie de qualifier, et
                                 l'historique perdait ce qu'on lui demande :
@@ -313,15 +288,13 @@ export function TableauStock({
                                 référence — c'est le geste juste.
                               */}
                               <select name="raison" defaultValue="reception">
-                                <option value="reception">Réception</option>
-                                <option value="perte">Perte / casse</option>
+                                <option value="reception">{t('Réception')}</option>
+                                <option value="perte">{t('Perte / casse')}</option>
                               </select>
                             </label>
                           </div>
                           <div className="champs deux">
-                            <label className="champ">
-                              Fournisseur (facultatif)
-                              {/*
+                            <label className="champ">{t('Fournisseur (facultatif)')}{/*
                                 Un `datalist`, et surtout pas un `select`.
 
                                 Une liste fermée obligerait à créer une fiche
@@ -338,7 +311,7 @@ export function TableauStock({
                               */}
                               <input
                                 name="fournisseur"
-                                placeholder="Sfax Primeurs"
+                                placeholder={t('Sfax Primeurs')}
                                 list={
                                   fournisseurs.length > 0
                                     ? 'liste-fournisseurs'
@@ -347,29 +320,23 @@ export function TableauStock({
                                 autoComplete="off"
                               />
                             </label>
-                            <label className="champ">
-                              Note (facultatif)
-                              <input name="note" placeholder="Facture 128" />
+                            <label className="champ">{t('Note (facultatif)')}<input name="note" placeholder={t('Facture 128')} />
                             </label>
                           </div>
-                          <button type="submit" className="principal" disabled={enCours}>
-                            Enregistrer le mouvement
-                          </button>
+                          <button type="submit" className="principal" disabled={enCours}>{t('Enregistrer le mouvement')}</button>
                         </form>
                       )}
                     </div>
 
                     {p.suivi && (
-                      <p className="indication">
-                        Depuis le comptage : {p.vendue} vendu(s).
-                        {p.compteA &&
-                          ` Dernier comptage le ${new Date(p.compteA).toLocaleString('fr-FR', {
+                      <p className="indication">{t('Depuis le comptage :')}{' '}{p.vendue}{' '}{t('vendu(s).')}{p.compteA &&
+                          t(' Dernier comptage le {valeur}.', { valeur: new Date(p.compteA).toLocaleString('fr-FR', {
                             day: '2-digit',
                             month: '2-digit',
                             year: 'numeric',
                             hour: '2-digit',
                             minute: '2-digit',
-                          })}.`}
+                          }) })}
                       </p>
                     )}
                   </td>

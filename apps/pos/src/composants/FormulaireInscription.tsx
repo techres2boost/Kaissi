@@ -31,6 +31,7 @@ import {
   reinitialiserPourAutreEtablissement,
 } from '@kaissi/db-local'
 import { hacherPin, pinTropFaible } from '@kaissi/domain'
+import { t, tm } from '../i18n.js'
 
 export function FormulaireInscription({
   onInscrit,
@@ -65,7 +66,7 @@ export function FormulaireInscription({
 
     if (pinTropFaible(pin)) {
       setEtat('erreur')
-      setMessage(`« ${pin} » est trop facile à deviner. Choisissez un autre code.`)
+      setMessage(t('« {code} » est trop facile à deviner. Choisissez un autre code.', { code: pin }))
       return
     }
 
@@ -121,7 +122,7 @@ export function FormulaireInscription({
 
       if (!reponse.ok || !corps?.jeton || !corps.deviceId) {
         setEtat('erreur')
-        setMessage(corps?.message ?? `Le serveur a répondu ${reponse.status}.`)
+        setMessage(corps?.message ? tm(corps.message) : t('Le serveur a répondu {statut}.', { statut: reponse.status }))
         return
       }
 
@@ -181,7 +182,7 @@ export function FormulaireInscription({
        * alors l'identité de la graine, et les ventes suivantes partaient
        * signées par un appareil que le serveur refuse.
        */
-      setARegler(corps.message ?? 'Votre restaurant est ouvert.')
+      setARegler(corps.message ? tm(corps.message) : t('Votre restaurant est ouvert.'))
       setEtat('saisie')
     } catch (erreur) {
       setEtat('erreur')
@@ -191,7 +192,7 @@ export function FormulaireInscription({
         (erreur.name === 'TimeoutError' || erreur.name === 'AbortError')
       setMessage(
         expire
-          ? 'Le serveur n’a pas répondu en 20 secondes. Réessayez : rien n’a été créé.'
+          ? t('Le serveur n’a pas répondu en 20 secondes. Réessayez : rien n’a été créé.')
           : expliquerEchecReseau(erreur, base, estNatif()),
       )
     }
@@ -200,17 +201,14 @@ export function FormulaireInscription({
   if (aRegler !== null) {
     return (
       <section className="carte-action">
-        <h1>C’est ouvert.</h1>
+        <h1>{t('C’est ouvert.')}</h1>
         <p>{aRegler}</p>
         {/*
           L'avertissement du taux à zéro, en évidence. Le serveur refuse
           d'inventer un taux ; le taire ici reviendrait à le faire pour lui.
         */}
         <p className="aide avertissement-demo">
-          <TriangleAlert size={15} strokeWidth={2} aria-hidden="true" /> Réglez le
-          taux de taxe au back-office avant d’encaisser. Kaissi ne le devine
-          pas : une règle fiscale se vérifie, elle ne se suppose pas.
-        </p>
+          <TriangleAlert size={15} strokeWidth={2} aria-hidden="true" />{' '}{t('Réglez le taux de taxe au back-office avant d’encaisser. Kaissi ne le devine pas : une règle fiscale se vérifie, elle ne se suppose pas.')}</p>
         <button
           type="button"
           className="principal"
@@ -225,53 +223,48 @@ export function FormulaireInscription({
             onInscrit()
             window.location.reload()
           }}
-        >
-          Commencer
-        </button>
+        >{t('Commencer')}</button>
       </section>
     )
   }
 
   return (
     <section className="carte-action">
-      <h1>Ouvrir mon restaurant</h1>
-      <p>
-        Un seul compte, pour la caisse et pour le back-office. Cette tablette
-        sera rattachée automatiquement — il n’y a rien d’autre à régler ensuite.
-      </p>
+      <h1>{t('Ouvrir mon restaurant')}</h1>
+      <p>{t('Un seul compte, pour la caisse et pour le back-office. Cette tablette sera rattachée automatiquement — il n’y a rien d’autre à régler ensuite.')}</p>
 
-      <label htmlFor="insc-resto">Nom du restaurant</label>
+      <label htmlFor="insc-resto">{t('Nom du restaurant')}</label>
       <input
         id="insc-resto"
         type="text"
         value={nomRestaurant}
         onChange={(e) => setNomRestaurant(e.target.value)}
-        placeholder="Snack du Lac"
+        placeholder={t('Snack du Lac')}
         autoComplete="organization"
       />
 
-      <label htmlFor="insc-gerant">Votre nom</label>
+      <label htmlFor="insc-gerant">{t('Votre nom')}</label>
       <input
         id="insc-gerant"
         type="text"
         value={nomGerant}
         onChange={(e) => setNomGerant(e.target.value)}
-        placeholder="Fatma Ben Salah"
+        placeholder={t('Fatma Ben Salah')}
         autoComplete="name"
       />
 
-      <label htmlFor="insc-email">E-mail</label>
+      <label htmlFor="insc-email">{t('E-mail')}</label>
       <input
         id="insc-email"
         type="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        placeholder="gerant@monresto.tn"
+        placeholder={t('gerant@monresto.tn')}
         autoComplete="email"
         inputMode="email"
       />
 
-      <label htmlFor="insc-mdp">Mot de passe</label>
+      <label htmlFor="insc-mdp">{t('Mot de passe')}</label>
       <input
         id="insc-mdp"
         type="password"
@@ -284,7 +277,7 @@ export function FormulaireInscription({
       />
       {/* Le minimum est dit AVANT le refus : le découvrir après la saisie
           fait recommencer, clavier ouvert, sur une tablette. */}
-      <p className="aide">Huit caractères au moins.</p>
+      <p className="aide">{t('Huit caractères au moins.')}</p>
 
       {/*
         Le PIN de CAISSE, distinct du mot de passe : le mot de passe ouvre le
@@ -292,7 +285,7 @@ export function FormulaireInscription({
         caisse qu'on vient d'ouvrir n'aurait personne à qui ouvrir la prise
         de poste.
       */}
-      <label htmlFor="insc-pin">Votre code PIN de caisse</label>
+      <label htmlFor="insc-pin">{t('Votre code PIN de caisse')}</label>
       <input
         id="insc-pin"
         type="password"
@@ -302,7 +295,7 @@ export function FormulaireInscription({
         value={pin}
         onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
       />
-      <label htmlFor="insc-pin2">Confirmer le code PIN</label>
+      <label htmlFor="insc-pin2">{t('Confirmer le code PIN')}</label>
       <input
         id="insc-pin2"
         type="password"
@@ -315,10 +308,7 @@ export function FormulaireInscription({
           if (e.key === 'Enter' && pret && etat !== 'envoi') void inscrire()
         }}
       />
-      <p className="aide">
-        4 à 8 chiffres. C’est avec lui que vous ouvrirez la caisse — le mot de
-        passe, lui, sert au back-office.
-        {confirmationPin !== '' && pin !== confirmationPin && ' Les deux codes diffèrent.'}
+      <p className="aide">{t('4 à 8 chiffres. C’est avec lui que vous ouvrirez la caisse — le mot de passe, lui, sert au back-office.')}{confirmationPin !== '' && pin !== confirmationPin && ` ${t('Les deux codes diffèrent.')}`}
       </p>
 
       <button
@@ -328,7 +318,7 @@ export function FormulaireInscription({
         onClick={() => void inscrire()}
       >
         <Store size={18} strokeWidth={2} aria-hidden="true" />{' '}
-        {etat === 'envoi' ? 'Création…' : 'Ouvrir mon restaurant'}
+        {etat === 'envoi' ? t('Création…') : t('Ouvrir mon restaurant')}
       </button>
 
       {etat === 'erreur' && message && (
@@ -337,9 +327,7 @@ export function FormulaireInscription({
         </p>
       )}
 
-      <button type="button" className="lien-discret" onClick={onDejaUnCompte}>
-        J’ai déjà un compte — me connecter
-      </button>
+      <button type="button" className="lien-discret" onClick={onDejaUnCompte}>{t('J’ai déjà un compte — me connecter')}</button>
     </section>
   )
 }

@@ -15,6 +15,7 @@
 import { useActionState } from 'react'
 import { TriangleAlert } from 'lucide-react'
 import { enregistrerRecu, type Resultat } from '../app/[restaurant]/recu/actions.js'
+import { useT } from '../i18n/client.js'
 
 export interface Recu {
   nom: string
@@ -28,6 +29,7 @@ export interface Recu {
 const LARGEUR_TICKET = 42
 
 function Apercu({ recu }: { recu: Recu }) {
+  const t = useT()
   const lignes = [
     recu.nom,
     ...(recu.adresse ? recu.adresse.split('\n') : []),
@@ -37,14 +39,14 @@ function Apercu({ recu }: { recu: Recu }) {
   const pied = (recu.pied ?? '').split('\n').filter((l) => l.trim() !== '')
 
   return (
-    <div className="apercu-ticket" aria-label="Aperçu du ticket">
+    <div className="apercu-ticket" aria-label={t('Aperçu du ticket')}>
       {lignes.map((l, i) => (
         <div key={`h${i}`} className={l.length > LARGEUR_TICKET ? 'trop-long' : ''}>
           {l}
         </div>
       ))}
       <div className="apercu-separateur">{'─'.repeat(LARGEUR_TICKET)}</div>
-      <div className="apercu-corps">… articles, total, paiement …</div>
+      <div className="apercu-corps">{t('… articles, total, paiement …')}</div>
       <div className="apercu-separateur">{'─'.repeat(LARGEUR_TICKET)}</div>
       {pied.length === 0 ? (
         <div className="apercu-defaut">Merci de votre visite !</div>
@@ -68,6 +70,7 @@ export function ReglagesRecu({
   modifiable: boolean
   recu: Recu
 }) {
+  const t = useT()
   const [resultat, action] = useActionState(
     enregistrerRecu.bind(null, restaurantId),
     null as Resultat | null,
@@ -76,7 +79,7 @@ export function ReglagesRecu({
   return (
     <div className="reglages-recu">
       <form action={action} className="carte formulaire-taux">
-        <label htmlFor="recu-adresse">Adresse</label>
+        <label htmlFor="recu-adresse">{t('Adresse')}</label>
         <textarea
           id="recu-adresse"
           name="adresse"
@@ -84,10 +87,10 @@ export function ReglagesRecu({
           maxLength={200}
           defaultValue={recu.adresse ?? ''}
           disabled={!modifiable}
-          placeholder="12 rue du Lac, Tunis"
+          placeholder={t('12 rue du Lac, Tunis')}
         />
 
-        <label htmlFor="recu-tel">Téléphone</label>
+        <label htmlFor="recu-tel">{t('Téléphone')}</label>
         <input
           id="recu-tel"
           name="telephone"
@@ -97,7 +100,7 @@ export function ReglagesRecu({
           placeholder="+216 71 000 000"
         />
 
-        <label htmlFor="recu-fiscal">Identifiant fiscal</label>
+        <label htmlFor="recu-fiscal">{t('Identifiant fiscal')}</label>
         <input
           id="recu-fiscal"
           name="fiscal"
@@ -111,12 +114,9 @@ export function ReglagesRecu({
             pour acquis.
         */}
         <p className="aide">
-          <TriangleAlert size={14} strokeWidth={2} aria-hidden="true" /> Kaissi
-          n’impose aucun format et n’affirme pas que cette mention est
-          obligatoire — vérifiez-le avec votre comptable.
-        </p>
+          <TriangleAlert size={14} strokeWidth={2} aria-hidden="true" />{' '}{t('Kaissi n’impose aucun format et n’affirme pas que cette mention est obligatoire — vérifiez-le avec votre comptable.')}</p>
 
-        <label htmlFor="recu-pied">Pied de page</label>
+        <label htmlFor="recu-pied">{t('Pied de page')}</label>
         <textarea
           id="recu-pied"
           name="pied"
@@ -126,23 +126,18 @@ export function ReglagesRecu({
           disabled={!modifiable}
           placeholder="Merci de votre visite !"
         />
-        <p className="aide">Une ligne par retour à la ligne. Vide : « Merci de votre visite ! ».</p>
+        <p className="aide">{t('Une ligne par retour à la ligne. Vide : « Merci de votre visite ! ».')}</p>
 
         {modifiable && (
-          <button type="submit" className="principal">
-            Enregistrer
-          </button>
+          <button type="submit" className="principal">{t('Enregistrer')}</button>
         )}
-        {resultat?.erreur && <p className="message erreur">{resultat.erreur}</p>}
-        {resultat?.succes && <p className="message succes">{resultat.succes}</p>}
+        {resultat?.erreur && <p className="message erreur">{t.m(resultat.erreur)}</p>}
+        {resultat?.succes && <p className="message succes">{t.m(resultat.succes)}</p>}
       </form>
 
       <div className="carte">
-        <h2>Aperçu</h2>
-        <p className="aide">
-          Largeur réelle d’un rouleau de 80 mm. Une ligne trop longue est
-          signalée : à l’impression, elle repart à la ligne.
-        </p>
+        <h2>{t('Aperçu')}</h2>
+        <p className="aide">{t('Largeur réelle d’un rouleau de 80 mm. Une ligne trop longue est signalée : à l’impression, elle repart à la ligne.')}</p>
         <Apercu recu={recu} />
       </div>
     </div>

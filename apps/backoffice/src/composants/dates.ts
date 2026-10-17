@@ -7,10 +7,21 @@
  * hebdomadaire à sa caisse.
  */
 
-export const JOURS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+import { aTraduire } from '@kaissi/i18n'
+
+/*
+ * Les initiales des jours portent un CONTEXTE (`mardi|M`, `mercredi|M`) :
+ * deux « M » en français sont deux lettres différentes en arabe (ث, ر). Le
+ * contexte ne s'affiche jamais — `t()` le retire.
+ */
+export const JOURS = [
+  aTraduire('lundi|L'), aTraduire('mardi|M'), aTraduire('mercredi|M'), aTraduire('jeudi|J'),
+  aTraduire('vendredi|V'), aTraduire('samedi|S'), aTraduire('dimanche|D'),
+]
 export const MOIS = [
-  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+  aTraduire('janvier'), aTraduire('février'), aTraduire('mars'), aTraduire('avril'),
+  aTraduire('mai'), aTraduire('juin'), aTraduire('juillet'), aTraduire('août'),
+  aTraduire('septembre'), aTraduire('octobre'), aTraduire('novembre'), aTraduire('décembre'),
 ]
 
 /** « AAAA-MM-JJ » → « JJ/MM/AAAA ». Aucune dépendance au fuseau. */
