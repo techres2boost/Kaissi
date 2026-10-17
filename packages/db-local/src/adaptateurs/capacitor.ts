@@ -1,5 +1,5 @@
 /**
- * Adaptateur @capacitor-community/sqlite — le chemin de PRODUCTION (Android).
+ * Adaptateur @capacitor-community/sqlite — le chemin de PRODUCTION (Android et iOS).
  *
  * Ce fichier vit dans `db-local` et NON dans `apps/pos` pour une seule
  * raison : il doit être testable sans émulateur Android. Il ne dépend
@@ -24,6 +24,7 @@
  */
 
 import { ErreurSqlite, type AdaptateurSqlite, type ValeurSql } from '../adaptateur.js'
+import { aplatirScript } from './aplatir.js'
 
 /**
  * La part de `SQLiteDBConnection` que l'adaptateur utilise réellement.
@@ -81,7 +82,9 @@ export function adaptateurCapacitor(db: ConnexionCapacitor): AdaptateurSqlite {
 
     async executerScript(sql: string) {
       try {
-        await db.execute(sql, false)
+        // Une instruction par ligne : la seule forme que les greffons iOS
+        // ET Android lisent sans l'abîmer (voir `aplatir.ts`).
+        await db.execute(aplatirScript(sql), false)
       } catch (e) {
         throw new ErreurSqlite("Échec de l'exécution du script SQL", e)
       }
