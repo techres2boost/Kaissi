@@ -137,7 +137,7 @@ const produitsStock = produits.map((p, i) => ({
 /** La coquille de la vraie page : barre « Menu » du téléphone, puis le contenu. */
 function page(contenu: ReactElement): string {
   return (
-    `<aside class="laterale"></aside><button class="bouton-menu">☰ Menu</button>` +
+    `<aside class="laterale"></aside><div class="barre-mobile"><button class="bouton-menu" aria-label="Menu">☰</button><div class="barre-mobile-titre"><strong>Liste d’articles</strong><span>Snack Lac 1 — Les Berges du Lac</span></div></div>` +
     `<main class="enveloppe">${rendre(contenu)}</main>`
   )
 }
@@ -267,7 +267,7 @@ const ECRANS: { nom: string; html: () => string; saisie: boolean }[] = [
     nom: 'Journée / Tableau de bord (tableau écrit dans la page)',
     saisie: false,
     html: () =>
-      `<aside class="laterale"></aside><button class="bouton-menu">☰ Menu</button>` +
+      `<aside class="laterale"></aside><div class="barre-mobile"><button class="bouton-menu" aria-label="Menu">☰</button><div class="barre-mobile-titre"><strong>Liste d’articles</strong><span>Snack Lac 1 — Les Berges du Lac</span></div></div>` +
       `<main class="enveloppe"><h1>Journée</h1><section class="carte"><table><thead><tr>` +
       ['Caisse', 'Ouverte par', 'Fermée par', 'Fond', 'Espèces', 'Attendu', 'Compté', 'Écart']
         .map((h) => `<th>${h}</th>`)

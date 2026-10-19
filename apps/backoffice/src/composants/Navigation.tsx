@@ -284,16 +284,42 @@ export function Navigation({
       ? o.chemin === 'preparation'
       : !o.gestionnaire || etablissement.gestionnaire
 
+  /*
+   * L'écran COURANT, pour la barre du téléphone. Le plus long chemin qui
+   * correspond l'emporte : « reductions/gestion » avant « reductions ».
+   */
+  const ongletCourant = GROUPES.flatMap((g): readonly Onglet[] => g.onglets)
+    .filter((o) => {
+      const href = `/${etablissement.id}/${o.chemin}`
+      return cheminActuel === href || cheminActuel?.startsWith(`${href}/`)
+    })
+    .sort((a, b) => b.chemin.length - a.chemin.length)[0]
+
   return (
     <>
-      <button
-        type="button"
-        className="bouton-menu"
-        aria-expanded={ouvert}
-        aria-controls="navigation-laterale"
-        onClick={() => setOuvert((o) => !o)}
-      >
-        <Menu size={17} strokeWidth={1.75} aria-hidden="true" />{t('Menu')}</button>
+      {/*
+        ── La barre du téléphone : OÙ l'on est, pas seulement « Menu » ──────
+        Elle disait « ☰ Menu » sur toute la largeur, et rien d'autre : on
+        ouvrait un écran sans savoir lequel avant d'avoir fait défiler. Elle
+        porte maintenant le nom de l'écran et de l'établissement, comme la
+        barre d'une application native — le menu reste au pouce, à gauche.
+      */}
+      <div className="barre-mobile">
+        <button
+          type="button"
+          className="bouton-menu"
+          aria-expanded={ouvert}
+          aria-controls="navigation-laterale"
+          aria-label={t('Menu')}
+          onClick={() => setOuvert((o) => !o)}
+        >
+          <Menu size={20} strokeWidth={1.75} aria-hidden="true" />
+        </button>
+        <div className="barre-mobile-titre">
+          <strong>{ongletCourant ? t(ongletCourant.libelle) : 'Kaissi'}</strong>
+          <span>{etablissement.nom}</span>
+        </div>
+      </div>
 
       <aside
         id="navigation-laterale"

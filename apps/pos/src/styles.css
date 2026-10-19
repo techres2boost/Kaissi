@@ -89,7 +89,22 @@
   --fond-or: #FAF0DA;
   --fond-accent: #E7F0EB;
 
-  --rayon: 10px;
+  --rayon: 12px;
+  --rayon-s: 8px;
+
+  /*
+   * ── Trois élévations, et pas une de plus ──────────────────────────────
+   * `--ombre-1` pose (une tuile au repos), `--ombre-2` détache (une carte,
+   * un panneau), `--ombre-3` fait flotter (une modale, une feuille). Avant
+   * cette échelle, la même ombre était recopiée à la main quarante-sept
+   * fois — et quarante-sept copies finissent par diverger.
+   */
+  --ombre-1: 0 1px 1px rgba(27, 31, 28, 0.04), 0 1px 3px rgba(27, 31, 28, 0.06);
+  --ombre-2: 0 1px 2px rgba(27, 31, 28, 0.05), 0 10px 24px -14px rgba(27, 31, 28, 0.28);
+  --ombre-3: 0 2px 6px rgba(27, 31, 28, 0.08), 0 28px 64px -24px rgba(27, 31, 28, 0.5);
+  /* L'anneau de mise au point : visible sur le blanc ET sur le beige. */
+  --anneau: 0 0 0 3px rgba(23, 70, 52, 0.28);
+  --transition: 120ms cubic-bezier(0.2, 0, 0, 1);
 }
 
 * { box-sizing: border-box; }
@@ -143,9 +158,23 @@ body {
   /* Pas de sélection accidentelle en tapant vite sur une tablette. */
   -webkit-user-select: none;
   user-select: none;
-  /* Zone sûre sous l'encoche / la barre de navigation Android. */
-  padding: env(safe-area-inset-top) env(safe-area-inset-right)
-           env(safe-area-inset-bottom) env(safe-area-inset-left);
+  /*
+   * ── Aucune marge de zone sûre ICI ─────────────────────────────────────
+   *
+   * PANNE OBSERVÉE sur iPhone : une bande beige, plate, sous l'indicateur
+   * d'accueil — et une autre au-dessus du bandeau vert, sous l'horloge. La
+   * zone sûre était posée en `padding` sur `body` : c'est donc le fond de
+   * `body`, un aplat crème, qui la peignait, alors que l'écran au-dessus
+   * portait le vert du bandeau ou le dégradé de la zone de travail. Une
+   * marge qui n'appartient à rien se voit comme une erreur.
+   *
+   * Chaque zone sûre est maintenant portée par la surface qui la JOUXTE :
+   * le haut par le bandeau (le vert monte sous l'horloge, comme une barre
+   * d'application native), le bas par `.contenu` et, sur l'écran de
+   * commande, par la barre du ticket elle-même. Le fond continue jusqu'au
+   * bord ; seul le CONTENU s'arrête avant l'indicateur.
+   */
+  padding: 0;
 }
 
 button { font: inherit; color: inherit; cursor: pointer; }
@@ -230,6 +259,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   --fond-or: rgba(201, 168, 107, 0.16);
   --fond-alerte: rgba(228, 117, 106, 0.16);
   --accent: #9BE3AE;
+  --ok: #9BE3AE;
   --or: #D8BE86;
   --alerte: #F0A099;
   color: var(--texte);
@@ -238,34 +268,46 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .bandeau {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.6rem 1rem;
+  gap: 0.75rem;
+  /* Le vert monte SOUS l'horloge de l'iPhone : c'est le bandeau, et non
+     `body`, qui porte la zone sûre du haut (voir `body`). */
+  padding: calc(0.5rem + env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+           0.5rem max(1rem, env(safe-area-inset-left));
+  min-height: 3.5rem;
   background: linear-gradient(180deg, #0b2016 0%, #0f2e1f 55%, #123725 100%);
   border-bottom: 1px solid rgba(126, 198, 148, 0.12);
+  box-shadow: 0 8px 20px -16px rgba(11, 32, 22, 0.9);
+  position: relative; z-index: 2;
   flex-shrink: 0;
 }
-.bandeau-marque { display: flex; flex-direction: column; line-height: 1.2; }
+.bandeau-marque { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; gap: 0.1rem; }
+.bandeau-sous-titre { display: flex; align-items: center; gap: 0.45rem; min-width: 0; max-width: 100%; align-self: stretch; }
 /* `align-items: flex-start` : dans une colonne flex, l'étiquette s'étirait
    sur toute la largeur du bandeau — une pastille de la largeur de l'écran ne
    se lit plus comme une pastille. */
 .bandeau-marque { align-items: flex-start; }
 /* La menthe RESTE la marque : elle n'était illisible que sur du clair. Sur le
    vert forêt du bandeau, elle est chez elle. */
-.logo { font-weight: 800; letter-spacing: -0.02em; color: #7EC694; }
-.etablissement { font-size: 0.75rem; color: var(--texte-2); }
+.logo { font-weight: 800; letter-spacing: -0.03em; color: #7EC694; font-size: 1.05rem; }
+.etablissement {
+  font-size: 0.75rem; color: var(--texte-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
 
 
 
 .etat-reseau {
   display: flex; align-items: center; gap: 0.45rem;
-  font-size: 0.8rem;
-  padding: 0.45rem 0.8rem;
+  font-size: 0.78rem; font-weight: 550;
+  padding: 0 0.75rem; min-height: 32px;
   border-radius: 999px;
   border: 1px solid var(--bordure);
+  white-space: nowrap;
 }
-.etat-reseau .point { width: 8px; height: 8px; border-radius: 50%; }
+.etat-reseau .point { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .etat-reseau.en-ligne { color: var(--ok); }
-.etat-reseau.en-ligne .point { background: var(--ok); }
+/* Le point d'un état SAIN a un halo : il se lit vivant, sans clignoter. */
+.etat-reseau.en-ligne .point { background: var(--ok); box-shadow: 0 0 0 3px rgba(155, 227, 174, 0.18); }
 .etat-reseau.hors-ligne { color: var(--accent); }
 .etat-reseau.hors-ligne .point { background: var(--accent); }
 
@@ -317,7 +359,21 @@ button { font: inherit; color: inherit; cursor: pointer; }
     linear-gradient(150deg, #f2eddd 0%, #f4efe1 50%, #ece4cf 100%);
 }
 
-.contenu { flex: 1; min-height: 0; overflow: hidden; }
+.contenu {
+  flex: 1; min-height: 0; overflow: hidden;
+  /* La zone sûre du bas et des côtés (voir `body`) : le dégradé descend
+     jusqu'au bord de l'écran, le contenu s'arrête avant l'indicateur. */
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+/*
+ * Commande et encaissement : leurs PANNEAUX blancs vont jusqu'en bas, et
+ * se chargent eux-mêmes de la zone sûre. Sinon le panneau s'arrêterait
+ * net au-dessus d'une bande de dégradé — la même faute, ailleurs.
+ */
+.contenu:has(> .commande),
+.contenu:has(> .paiement) { padding-bottom: 0; }
+
+.ecran-bloquant { padding-top: max(2rem, env(safe-area-inset-top)); }
 
 /* ── Caisse ─────────────────────────────────────────────────────────────── */
 .caisse { height: 100%; display: grid; grid-template-columns: 1fr 22rem; }
@@ -350,18 +406,36 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .categories {
   display: flex; gap: 0.5rem;
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1rem 0.75rem;
   overflow-x: auto;
   flex-shrink: 0;
+  scrollbar-width: none;
 }
+.categories::-webkit-scrollbar { display: none; }
+/*
+ * Des PASTILLES, et la couleur de la catégorie en point.
+ *
+ * L'onglet portait un liseré de quatre pixels sur son bord : la couleur se
+ * voyait, mais coupait la forme en deux et faisait paraître chaque onglet
+ * mal fermé. Le point dit la même chose — « les boissons sont bleues » —
+ * sans abîmer la pastille, et il reste reconnaissable sur l'onglet actif.
+ */
 .categories button {
+  display: inline-flex; align-items: center; gap: 0.5rem;
   background: var(--surface);
   border: 1px solid var(--bordure);
-  border-radius: var(--rayon);
-  padding: 0.7rem 1.1rem;
+  border-radius: 999px;
+  padding: 0 1.1rem 0 0.9rem;
   white-space: nowrap;
-  min-height: 48px;
-  border-inline-start: 4px solid var(--teinte, var(--bordure));
+  min-height: 46px;
+  font-weight: 550;
+  box-shadow: var(--ombre-1);
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+:root[dir='rtl'] .categories button { padding: 0 0.9rem 0 1.1rem; }
+.categories button::before {
+  content: ''; inline-size: 8px; block-size: 8px; border-radius: 50%;
+  background: var(--teinte, var(--bordure)); flex-shrink: 0;
 }
 /*
  * ── La catégorie courante — un rapport INVERSÉ par le passage au clair ───
@@ -377,11 +451,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
  * qui s'inverse avec le thème.
  */
 .categories button.actif {
-  background: var(--fond-accent);
-  color: var(--accent);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--sur-accent);
   font-weight: 650;
-  box-shadow: inset 0 0 0 2px var(--accent);
+  box-shadow: 0 6px 16px -10px rgba(23, 70, 52, 0.9);
 }
+/* Le point garde sa couleur, cerclé de clair pour rester visible sur le vert. */
+.categories button.actif::before { box-shadow: 0 0 0 2px rgba(241, 250, 244, 0.85); }
 
 .grille-produits {
   flex: 1;
@@ -389,26 +466,52 @@ button { font: inherit; color: inherit; cursor: pointer; }
   overflow-y: auto;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
-  gap: 0.6rem;
-  padding: 0 1rem 1rem;
+  gap: 0.65rem;
+  padding: 0.15rem 1rem 1rem;
   align-content: start;
+  overscroll-behavior: contain;
 }
 
+/*
+ * ── La tuile d'article ────────────────────────────────────────────────────
+ * Le nom en haut, le prix en bas, et rien d'autre : c'est ce qu'on lit en
+ * une demi-seconde, debout, un client devant soi. Le trait de couleur en
+ * tête rappelle la catégorie sans la répéter en toutes lettres.
+ *
+ * L'appui ENFONCE la tuile (échelle 0,97) : sur une tablette, c'est le seul
+ * accusé de réception qui arrive avant que le ticket ait changé. Une
+ * transformation ne repeint rien — elle reste gratuite sur une tablette
+ * d'entrée de gamme.
+ */
 .carte-produit {
   /* 56 px minimum : on tape vite, parfois les mains grasses. */
-  min-height: 5.5rem;
+  min-height: 6rem;
+  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.6rem;
   text-align: start;
-  padding: 0.8rem;
+  padding: 1rem 0.9rem 0.85rem;
   background: var(--surface);
-  border: 1px solid var(--bordure);
+  border: 1px solid rgba(222, 215, 199, 0.9);
   border-radius: var(--rayon);
-  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
+  box-shadow: var(--ombre-1);
+  overflow: hidden;
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+  -webkit-tap-highlight-color: transparent;
 }
-.carte-produit:active { background: var(--surface-2); }
+.carte-produit::before {
+  content: '';
+  position: absolute; inset-inline-start: 0.9rem; top: 0;
+  inline-size: 1.75rem; block-size: 3px; border-radius: 0 0 3px 3px;
+  background: var(--teinte, var(--accent)); opacity: 0.85;
+}
+@media (hover: hover) {
+  .carte-produit:hover { border-color: #CFC6B2; box-shadow: var(--ombre-2); }
+}
+.carte-produit:active { transform: scale(0.97); background: var(--surface-2); box-shadow: none; }
+.carte-produit:focus-visible { outline: none; box-shadow: var(--anneau); }
 .carte-produit:disabled { opacity: 0.4; }
 /*
   Rupture déclarée au back-office : le produit reste VISIBLE et cliquable —
@@ -427,11 +530,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
   letter-spacing: 0.04em;
   font-size: 0.8em;
 }
-.carte-produit .nom { font-weight: 600; line-height: 1.25; }
+.carte-produit .nom { font-weight: 620; line-height: 1.25; font-size: 0.98rem; letter-spacing: -0.005em; }
 .carte-produit .prix {
   color: var(--accent);
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
+  font-weight: 750;
+  font-size: 0.95rem;
 }
 
 /* ── Ticket ─────────────────────────────────────────────────────────────── */
@@ -444,14 +548,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
   border-inline-start: 1px solid var(--bordure);
   /* Un panneau collé au bord, pas une carte posée : une ombre portée vers la
      gauche le détache du fond ombré sans faire flotter un rectangle. */
-  box-shadow: -12px 0 28px -22px rgba(27, 31, 28, 0.5);
-  padding: 1rem;
+  box-shadow: calc(-12px * var(--sens)) 0 28px -22px rgba(27, 31, 28, 0.5);
+  /* Le panneau descend jusqu'au bord ; ses boutons s'arrêtent avant
+     l'indicateur d'accueil (voir `body`). */
+  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   overflow-y: auto;
 }
 .ticket h2 { margin: 0; font-size: 1rem; }
+/* Un chevron « retour » suit le sens de lecture. */
+:root[dir='rtl'] .sens { transform: scaleX(-1); }
 .vide { color: var(--texte-2); font-size: 0.85rem; line-height: 1.5; margin: 0; }
 
 .lignes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
@@ -478,7 +586,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   padding-top: 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.3rem;
 }
 .remise {
   display: flex; justify-content: space-between; align-items: center;
@@ -500,9 +608,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ligne-total.taxe { color: var(--texte-2); font-size: 0.8rem; }
 .ligne-total.remise-appliquee { color: var(--accent); }
 .ligne-total.grand-total {
-  font-size: 1.25rem; font-weight: 800;
-  border-top: 1px solid var(--bordure);
-  padding-top: 0.5rem; margin-top: 0.35rem;
+  font-size: 1.35rem; font-weight: 800; letter-spacing: -0.015em;
+  align-items: baseline;
+  padding-top: 0.55rem; margin-top: 0.3rem;
+  border-top: 1px dashed var(--bordure);
 }
 .note-arrondi { font-size: 0.72rem; color: var(--texte-2); margin: 0.25rem 0 0; }
 .compteur-evenements {
@@ -620,17 +729,30 @@ button { font: inherit; color: inherit; cursor: pointer; }
  */
 .bandeau-etats { display: flex; align-items: center; gap: 0.5rem; margin-inline-start: auto; }
 .bandeau-etats .employe {
-  display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15;
-  background: var(--surface-2); border: 1px solid var(--bordure);
-  border-radius: var(--rayon); padding: 0.4rem 0.8rem; min-height: 44px;
+  display: flex; align-items: center; gap: 0.6rem;
+  background: var(--surface); border: 1px solid var(--bordure);
+  border-radius: 999px; padding: 0.25rem 0.9rem 0.25rem 0.25rem; min-height: 44px;
+  text-align: start;
+  transition: background var(--transition);
 }
-.bandeau-etats .employe small { color: var(--texte-2); font-size: 0.65rem; }
+:root[dir='rtl'] .bandeau-etats .employe { padding: 0.25rem 0.25rem 0.25rem 0.9rem; }
+.bandeau-etats .employe:active { background: var(--surface-2); }
+.bandeau-etats .employe-texte { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; font-size: 0.88rem; font-weight: 600; }
+.bandeau-etats .employe small { color: var(--texte-2); font-size: 0.66rem; font-weight: 400; }
+/* Les initiales : un disque terracotta, la couleur de « où l'on est ». */
+.avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  inline-size: 34px; block-size: 34px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--orange-clair), var(--orange));
+  color: #fff; font-size: 0.78rem; font-weight: 750; letter-spacing: 0.02em;
+}
 
 /* Le bouton du tiroir : première chose à gauche, avant la marque. */
 .ouvrir-tiroir {
   display: inline-flex; align-items: center; justify-content: center;
-  background: transparent; border: 1px solid var(--bordure);
+  background: transparent; border: 1px solid transparent;
   border-radius: var(--rayon);
+  transition: background var(--transition);
   /* 44 px : la cible d'un pouce, pas celle d'un curseur. */
   min-width: 44px; min-height: 44px;
   color: var(--texte-2);
@@ -752,8 +874,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .principal, .secondaire {
   border-radius: var(--rayon); padding: 0.85rem 1.2rem;
   min-height: var(--cible-tactile, 56px); font-weight: 700; border: 1px solid transparent;
+  transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+  -webkit-tap-highlight-color: transparent;
 }
-.principal { background: var(--accent); color: var(--sur-accent); }
+.principal:not(:disabled):active, .secondaire:not(:disabled):active { transform: scale(0.98); }
+.principal:focus-visible, .secondaire:focus-visible { outline: none; box-shadow: var(--anneau); }
+/* Un léger reflet en haut : le bouton d'action se lit comme un objet qu'on enfonce. */
+.principal {
+  background: var(--accent); color: var(--sur-accent);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 8px 18px -12px rgba(23, 70, 52, 0.9);
+}
 .principal:active { background: var(--accent-clair); }
 .principal:disabled { opacity: 0.35; }
 .principal.grand { width: 100%; font-size: 1.1rem; min-height: 64px; }
@@ -862,17 +993,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .carte-action {
   background: var(--surface); border: 1px solid var(--bordure);
-  border-radius: var(--rayon); padding: 1.5rem; width: min(26rem, 100%);
-  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
+  border-radius: calc(var(--rayon) + 4px); padding: 1.75rem; width: min(26rem, 100%);
+  box-shadow: var(--ombre-3);
 }
-.carte-action h1 { margin: 0 0 0.5rem; font-size: 1.3rem; }
+.carte-action h1 { margin: 0 0 0.5rem; font-size: 1.35rem; letter-spacing: -0.02em; }
 .aide { color: var(--texte-2); font-size: 0.85rem; line-height: 1.5; margin: 0 0 1rem; }
 .erreur { color: var(--alerte); font-size: 0.85rem; margin: 0.5rem 0; }
 
 .montant-saisi {
-  display: flex; justify-content: space-between; align-items: baseline;
-  background: var(--surface-2); border-radius: var(--rayon);
-  padding: 0.9rem 1rem; margin-bottom: 1rem;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem;
+  background: var(--fond); border: 1px solid var(--bordure); border-radius: var(--rayon);
+  padding: 0.9rem 1rem; margin-bottom: 0.75rem;
 }
 .montant-saisi .libelle { color: var(--texte-2); font-size: 0.85rem; }
 .montant-saisi .valeur { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -880,10 +1011,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ── Pavé numérique ──────────────────────────────────────────────────────── */
 .pave { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
 .pave button {
-  min-height: 60px; font-size: 1.35rem; font-weight: 600;
-  background: var(--surface-2); border: 1px solid var(--bordure); border-radius: var(--rayon);
+  min-height: 60px; font-size: 1.4rem; font-weight: 600;
+  background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--rayon);
+  box-shadow: 0 1px 0 rgba(27, 31, 28, 0.06);
+  font-variant-numeric: tabular-nums;
+  transition: background var(--transition), transform var(--transition);
+  -webkit-tap-highlight-color: transparent;
 }
-.pave button:active { background: var(--bordure); }
+.pave button:active { background: var(--surface-2); transform: scale(0.96); }
 .pave button.inactif { opacity: 0.25; }
 .pave .effacer { color: var(--accent); }
 .pave .valider { grid-column: 1 / -1; background: var(--accent); color: var(--sur-accent); }
@@ -891,20 +1026,26 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ── Modale ──────────────────────────────────────────────────────────────── */
 .voile {
-  position: fixed; inset: 0; background: rgba(6, 8, 10, 0.75);
+  position: fixed; inset: 0; background: rgba(11, 32, 22, 0.55);
+  backdrop-filter: blur(2px);
   display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 50;
 }
 .modale {
-  background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--rayon);
-  width: min(30rem, 100%); max-height: 92vh; display: flex; flex-direction: column;
-  box-shadow: 0 24px 60px -20px rgba(27, 31, 28, 0.45);
+  background: var(--surface); border: 1px solid var(--bordure); border-radius: calc(var(--rayon) + 4px);
+  width: min(30rem, 100%); max-height: 92vh; max-height: 92dvh; display: flex; flex-direction: column;
+  box-shadow: var(--ombre-3);
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .modale { animation: modale-entre 0.16s cubic-bezier(0.2, 0, 0, 1); }
+  @keyframes modale-entre { from { transform: translateY(8px) scale(0.985); opacity: 0; } }
 }
 .modale.large { width: min(52rem, 100%); }
 .modale header {
   display: flex; align-items: flex-start; gap: 1rem;
   padding: 1rem; border-bottom: 1px solid var(--bordure);
 }
-.modale header h2 { margin: 0; font-size: 1.05rem; }
+.modale header h2 { margin: 0; font-size: 1.1rem; letter-spacing: -0.01em; }
 .modale .sous-titre { margin: 0.25rem 0 0; color: var(--texte-2); font-size: 0.82rem; line-height: 1.45; }
 .modale .fermer {
   margin-inline-start: auto; background: transparent; border: none;
@@ -912,7 +1053,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .modale .corps { padding: 1rem; overflow-y: auto; }
 .modale footer {
-  display: flex; gap: 0.5rem; padding: 1rem; border-top: 1px solid var(--bordure);
+  display: flex; gap: 0.5rem; padding: 0.85rem 1rem; border-top: 1px solid var(--bordure);
+  background: var(--fond);
 }
 .modale footer > * { flex: 1; }
 
@@ -925,7 +1067,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background: var(--surface-2); border: 1px solid var(--bordure);
   border-radius: var(--rayon); padding: 0.7rem 1rem; min-height: 52px;
 }
-.options button.actif { border-color: var(--accent); background: var(--fond-accent); }
+.options button.actif {
+  border-color: var(--accent); background: var(--fond-accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
 .options button small { color: var(--texte-2); font-size: 0.72rem; }
 .options.grand button { flex: 1 1 5rem; align-items: center; font-size: 1.05rem; min-height: 60px; }
 
@@ -938,10 +1083,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ── PIN ─────────────────────────────────────────────────────────────────── */
 .liste-employes { display: flex; flex-direction: column; gap: 0.5rem; }
 .liste-employes button {
-  display: flex; justify-content: space-between; align-items: center;
-  background: var(--surface-2); border: 1px solid var(--bordure);
-  border-radius: var(--rayon); padding: 1rem; min-height: 60px; text-align: start;
+  display: flex; justify-content: space-between; align-items: center; gap: 0.75rem;
+  background: var(--surface); border: 1px solid var(--bordure);
+  border-radius: var(--rayon); padding: 0.85rem 1rem; min-height: 60px; text-align: start;
+  font-weight: 600; box-shadow: var(--ombre-1);
+  transition: border-color var(--transition), background var(--transition);
 }
+.liste-employes button:active { background: var(--surface-2); }
+@media (hover: hover) { .liste-employes button:hover { border-color: rgba(23, 70, 52, 0.45); } }
 .liste-employes .role { color: var(--texte-2); font-size: 0.78rem; }
 
 .saisie-pin { display: flex; flex-direction: column; gap: 1rem; }
@@ -954,9 +1103,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .points { display: flex; gap: 0.6rem; justify-content: center; padding: 0.5rem 0; }
 .points span {
   width: 14px; height: 14px; border-radius: 50%;
-  border: 2px solid var(--bordure);
+  border: 2px solid #C9BFA8;
+  transition: background var(--transition), border-color var(--transition), transform var(--transition);
 }
-.points span.plein { background: var(--accent); border-color: var(--accent); }
+.points span.plein { background: var(--accent); border-color: var(--accent); transform: scale(1.1); }
 
 /* ── Salle ───────────────────────────────────────────────────────────────── */
 .salle { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
@@ -965,36 +1115,64 @@ button { font: inherit; color: inherit; cursor: pointer; }
    2,9:1, l'onglet courant 2,4:1. */
 .barre-salle {
   display: flex; align-items: center; gap: 0.75rem;
-  padding: 0.75rem 1rem; border-bottom: 1px solid var(--bordure); flex-shrink: 0;
+  padding: 0.65rem 1rem; border-bottom: 1px solid var(--bordure); flex-shrink: 0;
   background: var(--surface);
 }
-.onglets-vue { display: flex; gap: 0.25rem; }
+.barre-salle .principal { min-height: 46px; padding: 0 1.2rem; }
+/* Un contrôle SEGMENTÉ : deux vues d'une même chose, pas deux destinations. */
+.onglets-vue {
+  display: flex; gap: 0.2rem; padding: 0.2rem;
+  background: var(--surface-2); border-radius: calc(var(--rayon) + 2px);
+}
 .onglets-vue button {
   background: transparent; border: 1px solid transparent; border-radius: var(--rayon);
-  padding: 0.6rem 1rem; color: var(--texte-2); min-height: 44px;
+  padding: 0 1.1rem; color: var(--texte-2); min-height: 42px; font-weight: 550;
+  transition: background var(--transition), color var(--transition);
 }
 /* Même terracotta que le bandeau, en version LISIBLE sur clair : le #FFB694
    du bandeau y ferait 1,9:1. C'est à ça que sert `--orange-texte`. */
 .onglets-vue button.actif {
-  background: rgba(196, 86, 43, 0.1);
-  border-color: rgba(196, 86, 43, 0.35);
+  background: var(--surface);
+  border-color: rgba(196, 86, 43, 0.25);
   color: var(--orange-texte);
   font-weight: 650;
+  box-shadow: var(--ombre-1);
 }
 .barre-salle .principal { margin-inline-start: auto; }
 
 .grille-tables {
   flex: 1; min-height: 0; overflow-y: auto;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
-  gap: 0.6rem; padding: 1rem; align-content: start;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: 0.75rem; padding: 1rem; align-content: start;
 }
+/*
+ * ── La tuile de table ─────────────────────────────────────────────────────
+ * Une table LIBRE est calme : numéro, couverts, rien d'autre — elle ne
+ * réclame rien. Une table OCCUPÉE prend l'accent sur toute sa bordure et
+ * porte son montant : c'est elle qu'on cherche du regard en traversant la
+ * salle. Le contraste entre les deux états vaut mieux qu'un mot répété
+ * douze fois (« Libre », « Libre », « Libre »…).
+ */
 .grille-tables .table {
-  display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start;
-  min-height: 6.5rem; padding: 0.8rem;
-  background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--rayon);
-  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
+  display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto 1fr auto;
+  column-gap: 0.5rem; align-items: start; text-align: start;
+  min-height: 6.75rem; padding: 0.85rem 0.9rem;
+  background: var(--surface); border: 1px solid rgba(222, 215, 199, 0.9); border-radius: var(--rayon);
+  box-shadow: var(--ombre-1);
+  transition: transform var(--transition), box-shadow var(--transition);
+  -webkit-tap-highlight-color: transparent;
 }
-.grille-tables .table.occupee { border-color: var(--accent); background: var(--fond-accent); }
+.grille-tables .table:active { transform: scale(0.97); box-shadow: none; }
+.grille-tables .table:focus-visible { outline: none; box-shadow: var(--anneau); }
+.grille-tables .table > .numero { grid-column: 1; grid-row: 1; }
+.grille-tables .table > .places { grid-column: 2; grid-row: 1; padding-top: 0.35rem; }
+.grille-tables .table > .badge { grid-column: 1 / -1; grid-row: 2; justify-self: start; align-self: end; margin-top: 0.35rem; }
+.grille-tables .table > .montant,
+.grille-tables .table > .libre-libelle { grid-column: 1 / -1; grid-row: 3; }
+.grille-tables .table.occupee {
+  border-color: rgba(23, 70, 52, 0.55); background: var(--fond-accent);
+  box-shadow: inset 0 0 0 1px rgba(23, 70, 52, 0.35), var(--ombre-2);
+}
 /*
  * La tuile ENTIÈRE change quand le plat est prêt.
  *
@@ -1004,14 +1182,21 @@ button { font: inherit; color: inherit; cursor: pointer; }
  * information pour tout le monde.
  */
 .grille-tables .table.prete { border-color: var(--ok); background: var(--fond-ok); }
-.grille-tables .numero { font-size: 1.4rem; font-weight: 800; }
-.grille-tables .places, .grille-tables .libre-libelle { color: var(--texte-2); font-size: 0.72rem; }
+.grille-tables .numero { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.grille-tables .places {
+  color: var(--texte-2); font-size: 0.72rem; font-weight: 600;
+  padding: 0.1rem 0.45rem; border-radius: 999px; background: var(--surface-2);
+}
+.grille-tables .table.occupee .places { background: rgba(255, 255, 255, 0.7); }
+.grille-tables .libre-libelle { color: var(--texte-2); font-size: 0.75rem; align-self: end; }
 .grille-tables .montant {
-  margin-top: auto; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent);
+  align-self: end; font-variant-numeric: tabular-nums; font-weight: 750; color: var(--accent);
+  font-size: 1.05rem;
 }
 
 .badge {
-  font-size: 0.66rem; padding: 0.15rem 0.45rem; border-radius: 999px;
+  font-size: 0.68rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 999px;
+  letter-spacing: 0.01em;
   background: var(--surface-3, var(--bordure)); color: var(--texte-2);
 }
 .badge.envoyee { background: var(--fond-ok); color: var(--ok); }
@@ -1059,7 +1244,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: grid; grid-template-columns: 1fr auto auto auto; gap: 1rem; align-items: center;
   background: var(--surface); border: 1px solid var(--bordure);
   border-radius: var(--rayon); padding: 0.9rem 1rem; min-height: 60px; text-align: start;
-  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
+  box-shadow: var(--ombre-2);
 }
 .liste-commandes .ref { display: flex; flex-direction: column; }
 .liste-commandes .ref small { color: var(--texte-2); font-size: 0.7rem; }
@@ -1080,7 +1265,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 /* ── Commande ────────────────────────────────────────────────────────────── */
-.commande { height: 100%; display: grid; grid-template-columns: 1fr 23rem; }
+.commande { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) clamp(22rem, 32vw, 27rem); }
 
 /*
  * ── Sur tablette, le résumé n'existe pas ──────────────────────────────────
@@ -1139,7 +1324,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .ouvrir-ticket .chevron { grid-column: 2; grid-row: 1 / span 2; color: var(--texte-2); }
 
   .actions-rapides { display: grid; grid-template-columns: 1fr 1.6fr; gap: 0.5rem; }
-  .actions-rapides button { min-height: 48px; }
+  .actions-rapides button {
+    min-height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  }
+  .ouvrir-ticket { background: var(--surface); box-shadow: var(--ombre-1); }
+  .ouvrir-ticket:active { background: var(--surface-2); }
 
   /* Replié : le résumé et les deux gestes, rien d'autre. */
   .ticket.replie > :not(.resume-ticket):not(.actions-rapides) { display: none; }
@@ -1154,49 +1343,167 @@ button { font: inherit; color: inherit; cursor: pointer; }
   @keyframes battement { 0% { transform: scale(1.25); color: var(--accent); } 100% { transform: scale(1); } }
 }
 
-.entete-ticket { display: flex; flex-direction: column; gap: 0.2rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--bordure); }
-.entete-ticket .titre { font-weight: 700; display: flex; justify-content: space-between; align-items: baseline; }
-.entete-ticket small { color: var(--texte-2); font-weight: 400; font-size: 0.72rem; }
-
-.ticket .lignes li { display: flex; flex-direction: column; gap: 0.3rem; }
-.ticket .lignes .haut { display: grid; grid-template-columns: 2.2rem 1fr auto; gap: 0.5rem; align-items: baseline; }
-.ticket .lignes .details, .ticket .lignes .note { font-size: 0.72rem; color: var(--texte-2); padding-inline-start: 2.7rem; }
-.ticket .lignes .note { color: var(--accent); }
-.actions-ligne { display: flex; gap: 0.35rem; padding-inline-start: 2.7rem; }
-.actions-ligne button {
-  background: var(--surface); border: 1px solid var(--bordure); border-radius: 6px;
-  min-width: 40px; min-height: 36px; font-size: 0.85rem; color: var(--texte-2);
+.entete-ticket { display: flex; flex-direction: column; gap: 0.15rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--bordure); }
+.entete-ticket .retour {
+  display: inline-flex; align-items: center; gap: 0.2rem; align-self: flex-start;
+  margin-inline-start: -0.35rem; padding: 0 0.5rem 0 0.25rem; border-radius: var(--rayon-s);
+  font-weight: 550;
 }
-.actions-ligne .retirer { color: var(--alerte); padding: 0 0.6rem; }
-/* Ligne retirée : visible, barrée, hors du total — jamais effacée. */
-.ticket .lignes li.retiree { background: transparent; border: 1px dashed var(--bordure); opacity: 0.75; }
-.ticket .lignes li.retiree .designation { text-decoration: line-through; color: var(--texte-2); }
-.ticket .lignes li.retiree .montant { font-size: 0.72rem; color: var(--alerte); }
+.entete-ticket .retour:active { background: var(--surface-2); }
+.entete-ticket .titre {
+  font-weight: 750; font-size: 1.2rem; letter-spacing: -0.015em;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem;
+}
+.entete-ticket small {
+  color: var(--texte-2); font-weight: 500; font-size: 0.72rem;
+  font-variant-numeric: tabular-nums; letter-spacing: 0.02em;
+}
 
-.actions-commande { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: auto; padding-top: 0.75rem; }
-.actions-commande .principal { grid-column: 1 / -1; }
+/*
+ * ── Les lignes du ticket : une LISTE, pas une pile de cartes ─────────────
+ *
+ * Chaque ligne était un pavé beige, centré, sous lequel « Retirer » en
+ * rouge occupait plus de place que le plat. On lit maintenant un ticket
+ * comme on lit une addition : quantité, désignation, montant aligné à
+ * droite, un filet entre deux plats. Les gestes (−, +, corbeille) sont en
+ * dessous, plus petits, et la corbeille au bout — on ne la touche pas en
+ * visant « + ».
+ */
+.ticket .lignes { gap: 0; }
+.ticket .lignes li {
+  display: flex; flex-direction: column; gap: 0.35rem;
+  /* `stretch` : la règle générique de `.lignes li` centrait, et en colonne
+     flex « centrer » veut dire centrer HORIZONTALEMENT chaque rangée. */
+  align-items: stretch;
+  background: transparent; border-radius: 0;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid #EEE9DE;
+}
+.ticket .lignes li:last-child { border-bottom: 0; }
+.ticket .lignes .haut {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.65rem; align-items: start;
+}
+/* La quantité en PASTILLE : elle change à chaque « + », elle doit se voir. */
+.ticket .lignes .qte {
+  min-inline-size: 1.75rem; block-size: 1.6rem; padding: 0 0.35rem;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 6px; background: var(--fond-accent); color: var(--accent);
+  font-weight: 750; font-size: 0.82rem;
+}
+.ticket .lignes .designation { font-weight: 560; line-height: 1.35; padding-top: 0.1rem; overflow-wrap: anywhere; }
+.ticket .lignes .montant { font-weight: 650; padding-top: 0.1rem; }
+.ticket .lignes .details, .ticket .lignes .note { font-size: 0.75rem; color: var(--texte-2); padding-inline-start: 2.4rem; line-height: 1.4; }
+.ticket .lignes .note { color: var(--accent); font-style: italic; }
+.actions-ligne { display: flex; align-items: center; gap: 0.5rem; padding-inline-start: 2.4rem; }
+/* − et + en un seul contrôle : deux boutons collés se lisent comme un réglage. */
+.actions-ligne .pas {
+  display: inline-flex; border: 1px solid var(--bordure); border-radius: var(--rayon-s);
+  background: var(--surface); overflow: hidden;
+}
+.actions-ligne .pas button + button { border-inline-start: 1px solid var(--bordure); }
+.actions-ligne button {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 0;
+  min-width: 44px; min-height: 36px; color: var(--texte);
+  transition: background var(--transition);
+}
+.actions-ligne button:active { background: var(--surface-2); }
+.actions-ligne .retirer {
+  margin-inline-start: auto; color: var(--texte-2);
+  border-radius: var(--rayon-s); min-width: 40px;
+}
+.actions-ligne .retirer:active { color: var(--alerte); background: var(--fond-alerte); }
+/* Ligne retirée : visible, barrée, hors du total — jamais effacée. */
+.ticket .lignes li.retiree { background: transparent; opacity: 0.7; }
+.ticket .lignes li.retiree .qte { background: var(--surface-2); color: var(--texte-2); }
+.ticket .lignes li.retiree .designation { text-decoration: line-through; color: var(--texte-2); }
+.ticket .lignes li.retiree .montant { font-size: 0.72rem; color: var(--alerte); font-weight: 600; }
+
+/*
+ * ── Les gestes de la commande, par ordre d'importance ────────────────────
+ * Remise et Client sont des RÉGLAGES : petits, au trait. Cuisine est une
+ * action ; Encaisser est LA action, deux fois plus large, et porte le total.
+ */
+.actions-commande {
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.5rem;
+  margin-top: auto; padding-top: 0.75rem;
+}
+.actions-commande > * { grid-column: span 3; }
+.actions-commande > .cuisine { grid-column: span 2; }
+.actions-commande > .principal { grid-column: span 4; }
+.actions-commande button { display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; min-width: 0; }
+.actions-commande button svg { flex-shrink: 0; }
+.actions-commande .secondaire:not(.cuisine) {
+  min-height: 44px; padding: 0.5rem 0.75rem; font-weight: 600; font-size: 0.9rem;
+  background: var(--surface); color: var(--texte-2);
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.actions-commande .cuisine { min-height: 60px; padding-inline: 0.5rem; gap: 0.35rem; }
+.actions-commande .principal {
+  min-height: 60px; justify-content: space-between; gap: 0.5rem;
+  padding-inline: 1rem 0.5rem; font-size: 1.05rem; white-space: nowrap;
+}
+.actions-commande .principal .montant {
+  font-variant-numeric: tabular-nums; font-weight: 700; font-size: 0.9rem;
+  padding: 0.3rem 0.5rem; border-radius: var(--rayon-s);
+  background: rgba(241, 250, 244, 0.14);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis;
+}
+.actions-commande .principal:only-child,
+.actions-commande .principal:not(:has(.montant)) { justify-content: center; }
 
 /* ── Paiement ────────────────────────────────────────────────────────────── */
 .paiement { height: 100%; display: grid; grid-template-columns: 1fr 22rem; gap: 0; }
 @media (max-width: 900px) { .paiement { grid-template-columns: 1fr; grid-template-rows: auto 1fr; } }
-.colonne-recap { padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; overflow-y: auto; }
+.colonne-recap {
+  padding: 1rem 1.5rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 0.75rem; overflow-y: auto;
+}
+/* Une colonne de lecture, pas une page entière : au-delà de 36 rem, l'œil
+   fait l'aller-retour entre le libellé et le montant. */
+.colonne-recap { align-items: center; }
+.colonne-recap > * { inline-size: 100%; max-inline-size: 36rem; }
 .colonne-saisie {
   background: var(--surface); border-inline-start: 1px solid var(--bordure);
-  box-shadow: -12px 0 28px -22px rgba(27, 31, 28, 0.5);
-  padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; overflow-y: auto;
+  box-shadow: calc(-12px * var(--sens)) 0 28px -22px rgba(27, 31, 28, 0.5);
+  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 0.75rem; overflow-y: auto;
 }
+
+.recap-commande {
+  background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--rayon);
+  box-shadow: var(--ombre-1); padding: 0.4rem 1.1rem 0.6rem;
+}
+.recap-commande .recap-titre {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem;
+  padding: 0.6rem 0; border-bottom: 1px solid var(--bordure);
+}
+.recap-commande .recap-titre small { color: var(--texte-2); font-size: 0.72rem; font-variant-numeric: tabular-nums; }
+.recap-commande ul { list-style: none; margin: 0; padding: 0; }
+.recap-commande li {
+  display: grid; grid-template-columns: 1.6rem minmax(0, 1fr) auto; gap: 0.5rem;
+  padding: 0.5rem 0; font-size: 0.9rem; border-bottom: 1px solid #EEE9DE;
+}
+.recap-commande li:last-child { border-bottom: 0; }
+.recap-commande .qte { color: var(--texte-2); font-variant-numeric: tabular-nums; font-weight: 650; }
+.recap-commande .designation { overflow-wrap: anywhere; }
+.recap-commande .montant { font-variant-numeric: tabular-nums; font-weight: 600; }
 
 .bloc-total, .bloc-reste {
   background: var(--surface); border: 1px solid var(--bordure);
   border-radius: var(--rayon); padding: 1.1rem;
-  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
+  box-shadow: var(--ombre-2);
   display: flex; flex-direction: column; gap: 0.3rem;
 }
-.bloc-total .libelle, .bloc-reste .libelle { color: var(--texte-2); font-size: 0.82rem; }
-.bloc-total .valeur { font-size: 2rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-.bloc-reste .valeur { font-size: 1.8rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--accent); }
-.bloc-reste.solde { border-color: var(--ok); }
-.bloc-reste.solde .valeur { color: var(--ok); }
+.bloc-total .libelle, .bloc-reste .libelle {
+  color: var(--texte-2); font-size: 0.75rem; font-weight: 650;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.bloc-total .valeur { font-size: 2.6rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; line-height: 1.1; }
+.bloc-reste .valeur { font-size: 1.9rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--accent); letter-spacing: -0.02em; }
+/* Soldé : la carte entière passe au vert — la monnaie à rendre est LE chiffre. */
+.bloc-reste.solde { border-color: var(--ok); background: var(--fond-ok); }
+.bloc-reste.solde .valeur { color: var(--ok); font-size: 2.4rem; }
 
 .paiements-faits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
 .paiements-faits li {
@@ -1205,19 +1512,30 @@ button { font: inherit; color: inherit; cursor: pointer; }
   font-size: 0.88rem; font-variant-numeric: tabular-nums;
 }
 
-.modes { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.modes button {
-  flex: 1 1 6rem; background: var(--surface-2); border: 1px solid var(--bordure);
-  border-radius: var(--rayon); padding: 0.7rem; min-height: 52px;
+.modes {
+  display: flex; flex-wrap: wrap; gap: 0.2rem; padding: 0.2rem;
+  background: var(--surface-2); border-radius: calc(var(--rayon) + 2px);
 }
-.modes button.actif { border-color: var(--accent); background: var(--fond-accent); }
+.modes button {
+  flex: 1 1 6rem; background: transparent; border: 1px solid transparent;
+  border-radius: var(--rayon); padding: 0.5rem; min-height: 52px;
+  color: var(--texte-2); font-weight: 600; line-height: 1.2;
+  transition: background var(--transition), color var(--transition);
+}
+.modes button.actif {
+  background: var(--surface); color: var(--accent);
+  border-color: rgba(23, 70, 52, 0.35); box-shadow: var(--ombre-1);
+}
 
+/* Les billets qu'on tend : des RACCOURCIS, au trait, au-dessus du pavé. */
 .suggestions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .suggestions button {
-  flex: 1 1 5rem; background: var(--surface-2); border: 1px solid var(--bordure);
-  border-radius: var(--rayon); padding: 0.7rem; min-height: 52px;
-  font-variant-numeric: tabular-nums; font-weight: 600;
+  flex: 1 1 5rem; background: var(--surface); border: 1px solid var(--bordure);
+  border-radius: 999px; padding: 0.6rem; min-height: 48px;
+  font-variant-numeric: tabular-nums; font-weight: 650; color: var(--accent);
+  box-shadow: var(--ombre-1);
 }
+.suggestions button:active { background: var(--fond-accent); }
 
 /* ── Clôture ─────────────────────────────────────────────────────────────── */
 .cloture {
@@ -1228,7 +1546,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .bloc-cloture {
   background: var(--surface); border: 1px solid var(--bordure);
   border-radius: var(--rayon); padding: 1.2rem;
-  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
+  box-shadow: var(--ombre-2);
 }
 .bloc-cloture h1 { margin: 0 0 1rem; font-size: 1.25rem; }
 .bloc-cloture h2 { margin: 0 0 0.5rem; font-size: 1rem; }
@@ -1262,9 +1580,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ── Badge de synchronisation (Phase 2) ──────────────────────────────────── */
 .badge-sync {
   display: inline-flex; align-items: center; gap: 0.3rem;
-  padding: 0.4rem 0.7rem; border-radius: 999px;
+  padding: 0 0.8rem; border-radius: 999px;
   background: var(--fond-accent); color: var(--accent);
-  border: 1px solid rgba(23, 70, 52, 0.3); font-size: 0.8rem; min-height: 40px;
+  border: 1px solid rgba(155, 227, 174, 0.3); font-size: 0.8rem; font-weight: 600;
+  min-height: 36px; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .badge-sync.alerte {
   background: var(--fond-alerte); color: var(--alerte);
@@ -1274,10 +1594,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* Signale sans ambiguïté une base en mémoire : ni persistance, ni
    synchronisation. Or l'écran, lui, ressemble en tout point à la production. */
 .etiquette-demo {
-  margin-inline-start: 0.6rem;
-  padding: 0.15rem 0.55rem;
+  padding: 0.05rem 0.5rem;
   border-radius: 999px;
-  font-size: 0.7rem;
+  font-size: 0.66rem; white-space: nowrap; flex-shrink: 0;
   letter-spacing: 0.02em;
   background: var(--fond-or);
   color: var(--or);
@@ -1385,7 +1704,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .liste-periodes li {
   background: var(--surface); border: 1px solid var(--bordure);
   border-radius: var(--rayon); padding: 0.9rem 1rem;
-  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
+  box-shadow: var(--ombre-2);
 }
 .liste-periodes li.en-cours { border-color: var(--accent); background: var(--fond-accent); }
 .liste-periodes .entete {
@@ -1420,11 +1739,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
  * que les plats serait touché par erreur en plein service.
  */
 .carte-produit.nouvel-article {
-  background: transparent;
-  border: 2px dashed var(--bordure);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1.5px dashed #C9BFA8;
   box-shadow: none;
   color: var(--texte-2);
 }
+.carte-produit.nouvel-article::before { display: none; }
 .carte-produit.nouvel-article .nom { color: var(--accent); font-weight: 700; }
 .carte-produit.nouvel-article .prix { font-size: 0.75rem; font-weight: 400; }
 
@@ -1460,7 +1780,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .liste-recus li {
   background: var(--surface); border: 1px solid var(--bordure);
   border-radius: var(--rayon);
-  box-shadow: 0 1px 2px rgba(27, 31, 28, 0.05), 0 6px 16px -10px rgba(27, 31, 28, 0.18);
+  box-shadow: var(--ombre-2);
 }
 /* Toute la ligne s'ouvre : c'est elle qu'on vise, pas un lien en bout. */
 .liste-recus .ouvrir-recu {
@@ -1571,35 +1891,34 @@ button { font: inherit; color: inherit; cursor: pointer; }
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 @media (max-width: 720px) {
+  /*
+   * ── UNE rangée, toujours ────────────────────────────────────────────────
+   * Le bandeau passait sur deux lignes et prenait 125 px de haut — un
+   * sixième d'un iPhone, pris à la carte. Il garde maintenant une seule
+   * rangée de 56 px : menu, marque, puis des états réduits à leur SIGNE
+   * (pastille d'initiales, point du réseau). Les libellés restent dans le
+   * DOM, et l'`aria-label` de chaque élément les dit à voix haute.
+   */
   .bandeau {
-    flex-wrap: wrap;
-    gap: 0.5rem 0.75rem;
-    padding: 0.5rem 0.75rem;
+    gap: 0.5rem;
+    padding-inline: max(0.5rem, env(safe-area-inset-left)) max(0.75rem, env(safe-area-inset-right));
   }
 
   /* `min-width: 0` sur un enfant flex : sans lui, le nom de l'établissement
      impose sa largeur intrinsèque et l'ellipse ne se déclenche jamais. */
   .bandeau-marque { min-width: 0; flex: 1 1 auto; }
-  .etablissement { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  /*
-   * ── La rangée d'états ne déborde plus, et n'a plus à défiler ───────────
-   *
-   * Elle portait sept liens d'écran plus trois états : la seule façon de les
-   * tenir sur 390 px était de la faire glisser pour elle-même, donc la
-   * moitié des écrans n'existait qu'après un geste qui ne s'annonce pas. Les
-   * liens sont dans le tiroir ; il reste trois éléments, qui tiennent.
-   *
-   * Le nom de l'employé, lui, peut être long : il s'abrège plutôt que de
-   * pousser l'indicateur de réseau hors de l'écran.
-   */
-  .bandeau-etats { flex: 0 1 auto; min-width: 0; }
-  .bandeau-etats .employe { min-width: 0; }
-  .bandeau-etats .employe,
-  .bandeau-etats .employe small {
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    display: block;
-  }
+  .bandeau-etats { flex: 0 0 auto; gap: 0.4rem; }
+  .bandeau-etats .employe { padding: 0.2rem; min-width: 44px; justify-content: center; }
+  :root[dir='rtl'] .bandeau-etats .employe { padding: 0.2rem; }
+  /* Masqués à l'œil seulement : chaque bouton porte son `aria-label`. */
+  .bandeau-etats .employe-texte,
+  .etat-reseau .libelle-reseau { display: none; }
+  .etat-reseau { padding: 0; min-width: 32px; justify-content: center; border-color: transparent; }
+  /* L'étiquette « démo » s'abrège avant de passer SOUS les badges voisins. */
+  .etiquette-demo { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .etat-reseau .point { width: 10px; height: 10px; }
+  .badge-sync { padding: 0 0.6rem; }
 
   /* Même traitement pour la barre de la salle : ses onglets plus le bouton
      « À emporter » dépassent aussi, et ce bouton est le plus utilisé de

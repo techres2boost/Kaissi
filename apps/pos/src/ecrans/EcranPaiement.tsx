@@ -209,6 +209,39 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
             {enCours ? t('Clôture…') : IMPRESSION_ACTIVE ? t('Encaisser et imprimer') : t('Encaisser')}
           </button>
         )}
+
+        {/*
+          Ce qu'on encaisse, sous les yeux. La colonne de gauche n'affichait
+          que deux montants sur un écran vide ; le client, lui, demande
+          « qu'est-ce que j'ai pris ? » au moment de payer — et la réponse
+          était un écran plus loin.
+        */}
+        <div className="recap-commande">
+          <div className="recap-titre">
+            <strong>
+              {etat.tableId
+                ? t('Table {numero}', { numero: tables.find((elt) => elt.id === etat.tableId)?.label ?? '?' })
+                : t('À emporter')}
+            </strong>
+            <small>{etat.numeroTicket}</small>
+          </div>
+          <ul>
+            {etat.lignes
+              .filter((l) => !l.annulee)
+              .map((l) => (
+                <li key={l.id}>
+                  <span className="qte">{l.quantite}</span>
+                  <span className="designation">{l.designation}</span>
+                  <span className="montant">
+                    {formaterTND(
+                      totaux.lignes.find((x) => x.id === l.id)?.totalBrutMillimes ?? millimes(0),
+                      { symbole: false },
+                    )}
+                  </span>
+                </li>
+              ))}
+          </ul>
+        </div>
       </section>
 
       <section className="colonne-saisie">

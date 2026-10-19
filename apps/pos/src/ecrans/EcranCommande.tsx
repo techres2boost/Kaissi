@@ -7,7 +7,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { UserRound } from 'lucide-react'
+import { ChefHat, ChevronLeft, Minus, Percent, Plus, Trash2, UserRound } from 'lucide-react'
 import {
   calculerTotaux,
   formaterPourcentage,
@@ -276,7 +276,11 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
           ))}
         </div>
 
-        <div className="grille-produits">
+        <div
+          className="grille-produits"
+          // La couleur de la catégorie ouverte, reprise en tête de chaque tuile.
+          style={{ '--teinte': categories.find((c) => c.id === categorieActive)?.couleur ?? undefined } as React.CSSProperties}
+        >
           {produits
             .filter((p) => !categorieActive || p.categorieId === categorieActive)
             .map((p) => (
@@ -370,7 +374,9 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
             className="secondaire"
             disabled={!modifiable || !nonEnvoyees}
             onClick={() => void envoyerCuisine()}
-          >{t('Cuisine')}</button>
+          >
+            <ChefHat size={18} strokeWidth={2} aria-hidden="true" /> {t('Cuisine')}
+          </button>
           <button
             type="button"
             className="principal"
@@ -380,7 +386,10 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
         </div>
 
         <header className="entete-ticket">
-          <button type="button" className="retour" onClick={onRetour}>{t('‹ Salle')}</button>
+          <button type="button" className="retour" onClick={onRetour}>
+            <ChevronLeft size={18} strokeWidth={2} aria-hidden="true" className="sens" />
+            {t('Salle')}
+          </button>
           <div className="titre">
             {titreTicket}
             <small>{etat?.numeroTicket}</small>
@@ -396,7 +405,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
               return (
                 <li key={l.id}>
                   <div className="haut">
-                    <span className="qte">{l.quantite}×</span>
+                    <span className="qte">{l.quantite}</span>
                     <span className="designation">{l.designation}</span>
                     <span className="montant">
                       {formaterTND(detail?.totalBrutMillimes ?? millimes(0), { symbole: false })}
@@ -410,6 +419,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                   {l.note && <div className="note">{l.note}</div>}
                   {modifiable && (
                     <div className="actions-ligne">
+                      <span className="pas">
                       {/*
                        * À 1, « − » RETIRE la ligne. Il était borné à 1 et ne
                        * faisait donc rien : le bouton le plus naturel pour
@@ -428,7 +438,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                         }
                         aria-label={l.quantite <= 1 ? t('Retirer {nom}', { nom: l.designation }) : t('Diminuer')}
                       >
-                        −
+                        <Minus size={16} strokeWidth={2.25} aria-hidden="true" />
                       </button>
                       <button
                         type="button"
@@ -441,14 +451,23 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                         }
                         aria-label={t('Augmenter')}
                       >
-                        +
+                        <Plus size={16} strokeWidth={2.25} aria-hidden="true" />
                       </button>
+                      </span>
+                      {/*
+                        Une corbeille, discrète et au BOUT de la ligne : le mot
+                        « Retirer » en rouge, en gros, sous chaque plat, était
+                        l'élément le plus voyant du ticket — plus que le total.
+                      */}
                       <button
                         type="button"
                         className="retirer"
                         onClick={() => void retirerLigne(l.id)}
                         aria-label={t('Retirer {nom}', { nom: l.designation })}
-                      >{t('Retirer')}</button>
+                        title={t('Retirer')}
+                      >
+                        <Trash2 size={16} strokeWidth={2} aria-hidden="true" />
+                      </button>
                     </div>
                   )}
                 </li>
@@ -457,7 +476,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
             {lignesRetirees.map((l) => (
               <li key={l.id} className="retiree" aria-label={t('{nom}, retiré', { nom: l.designation })}>
                 <div className="haut">
-                  <span className="qte">{l.quantite}×</span>
+                  <span className="qte">{l.quantite}</span>
                   <span className="designation">{l.designation}</span>
                   <span className="montant">{t('retiré')}</span>
                 </div>
@@ -497,7 +516,9 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
             className="secondaire"
             disabled={!modifiable || lignesActives.length === 0}
             onClick={() => setRemiseOuverte(true)}
-          >{t('Remise')}</button>
+          >
+            <Percent size={15} strokeWidth={2} aria-hidden="true" /> {t('Remise')}
+          </button>
           {/*
             « Client » à côté de « Remise », pas dans un menu.
             
@@ -517,21 +538,31 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                 <UserRound size={15} strokeWidth={2} aria-hidden="true" /> {etat.clientNom}
               </>
             ) : (
-              t('Client')
+              <>
+                <UserRound size={15} strokeWidth={2} aria-hidden="true" /> {t('Client')}
+              </>
             )}
           </button>
           <button
             type="button"
-            className="secondaire"
+            className="secondaire cuisine"
             disabled={!modifiable || !nonEnvoyees}
             onClick={() => void envoyerCuisine()}
-          >{t('Cuisine')}</button>
+          >
+            <ChefHat size={18} strokeWidth={2} aria-hidden="true" /> {t('Cuisine')}
+          </button>
+          {/* Le total SUR le bouton : on lit ce qu'on va encaisser en le touchant. */}
           <button
             type="button"
             className="principal"
             disabled={!modifiable || lignesActives.length === 0}
             onClick={() => onEncaisser(orderId)}
-          >{t('Encaisser')}</button>
+          >
+            <span>{t('Encaisser')}</span>
+            {lignesActives.length > 0 && totaux && (
+              <span className="montant">{formaterTND(totaux.totalMillimes)}</span>
+            )}
+          </button>
         </div>
       </aside>
 

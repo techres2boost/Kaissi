@@ -462,10 +462,20 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
 
 // ─── Bandeaux ───────────────────────────────────────────────────────────────
 
+/** « Ahmed Ben Salah » → « AB ». Un nom d'un seul mot donne sa première lettre. */
+function initiales(nom: string | null | undefined): string {
+  const mots = (nom ?? '').trim().split(/\s+/).filter(Boolean)
+  if (mots.length === 0) return '—'
+  const premiere = (mot: string) => Array.from(mot)[0]?.toLocaleUpperCase('fr') ?? ''
+  return mots.length === 1 ? premiere(mots[0]!) : premiere(mots[0]!) + premiere(mots[1]!)
+}
+
 function IndicateurReseau({ reseau }: { reseau: { connecte: boolean; type: string } }) {
   return (
     <div
       className={`etat-reseau ${reseau.connecte ? 'en-ligne' : 'hors-ligne'}`}
+      role="status"
+      aria-label={reseau.connecte ? t('En ligne') : t('Hors ligne')}
       title={
         reseau.connecte
           ? t('Connecté ({type}) — les ventes seront synchronisées', { type: reseau.type })
@@ -473,7 +483,8 @@ function IndicateurReseau({ reseau }: { reseau: { connecte: boolean; type: strin
       }
     >
       <span className="point" aria-hidden="true" />
-      {reseau.connecte ? t('En ligne') : t('Hors ligne')}
+      {/* Sur téléphone, le point seul : le libellé reste lu à voix haute. */}
+      <span className="libelle-reseau">{reseau.connecte ? t('En ligne') : t('Hors ligne')}</span>
     </div>
   )
 }
@@ -543,6 +554,7 @@ function Bandeau({
 
       <div className="bandeau-marque">
         <span className="logo">Kaissi</span>
+        <span className="bandeau-sous-titre">
         <span className="etablissement">{etablissement.nom}</span>
         {/*
           Base en mémoire = « pnpm pos:dev » dans un navigateur. Le catalogue
@@ -559,6 +571,7 @@ function Bandeau({
             )}
           >{t('démo — mémoire')}</span>
         )}
+        </span>
       </div>
 
       {/*
@@ -647,9 +660,23 @@ function Bandeau({
           </button>
         )}
 
-        <button type="button" className="employe" onClick={onVerrouiller}>
-          {employe?.nom ?? '—'}
-          <small>{t('verrouiller')}</small>
+        {/*
+          Les INITIALES d'abord : sur un téléphone, le nom complet poussait
+          l'état du réseau hors de l'écran ; on reconnaît sa pastille comme
+          on reconnaît son casier. Le nom reste à côté dès qu'il y a la place.
+        */}
+        <button
+          type="button"
+          className="employe"
+          onClick={onVerrouiller}
+          title={t('verrouiller')}
+          aria-label={`${employe?.nom ?? '—'} — ${t('verrouiller')}`}
+        >
+          <span className="avatar" aria-hidden="true">{initiales(employe?.nom)}</span>
+          <span className="employe-texte">
+            {employe?.nom ?? '—'}
+            <small>{t('verrouiller')}</small>
+          </span>
         </button>
         <IndicateurReseau reseau={reseau} />
       </div>

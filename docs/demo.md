@@ -1139,3 +1139,44 @@ faisait dézoomer Safari et paraître « tout décalé ».
 
 [`android-sur-pc.md`](android-sur-pc.md) : la tablette virtuelle, la mise en
 service, une journée de service complète et la coupure d'Internet.
+
+## 21. La nouvelle interface (19 octobre)
+
+### 21.1 Plus de bande crème en bas de l'écran
+
+Sur iPhone, la caisse et le back-office laissaient une bande unie sous
+l'indicateur d'accueil (et une autre sous l'horloge). Le vert du bandeau monte
+désormais jusqu'en haut, le fond dégradé descend jusqu'en bas ; seuls les
+boutons s'arrêtent avant l'indicateur.
+
+### 21.2 La caisse
+
+- **Bandeau** : une seule rangée. Les initiales de l'employé dans une
+  pastille (touchez-la pour verrouiller) ; sur téléphone, le réseau n'est plus
+  qu'un point vert.
+- **Catégories** en pastilles, avec leur couleur en point ; la catégorie
+  ouverte est pleine.
+- **Tuiles** : nom, prix, et un trait de la couleur de la catégorie. Elles
+  s'enfoncent au toucher.
+- **Ticket** : quantité en pastille, nom, montant aligné à droite ; − et +
+  groupés, une corbeille discrète au bout. « Encaisser » porte le total.
+- **Encaissement** : le détail de la commande est affiché à gauche, sous les
+  montants — le client demande « qu'est-ce que j'ai pris ? » au moment de payer.
+- **Salle** : les tables libres sont calmes, les tables occupées portent
+  l'accent et leur montant.
+
+### 21.3 Le back-office
+
+- **Sur téléphone**, la barre du haut dit OÙ l'on est (« Liste d'articles —
+  Snack Lac 1 ») au lieu de « ☰ Menu ».
+- **Liste d'articles** sur téléphone : une ligne par article — le nom et le
+  prix, puis coût, marge et état en petit, puis les actions. Trois fois plus
+  d'articles à l'écran qu'avant.
+- **Tableau de bord** : les indicateurs portent leur état en point, le chiffre
+  est plus grand ; les périodes sont un sélecteur segmenté.
+
+### 21.4 Est-on prêt à vendre ?
+
+[`pret-pour-la-production.md`](pret-pour-la-production.md) — la réponse
+courte : prêt pour un pilote payant encadré, pas encore pour une vente
+ouverte. Cinq points à régler, et le plan sur quatre semaines.

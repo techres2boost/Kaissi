@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useState } from 'react'
+import { Archive, ChevronDown, ChevronUp } from 'lucide-react'
 import {
   archiverProduit,
   basculerDisponibilite,
@@ -292,7 +293,7 @@ export function EditeurCatalogue({
         {produits.length === 0 ? (
           <p className="vide">{t('Aucun produit. La carte est vide.')}</p>
         ) : (
-          <table className="tableau-pile" style={{ marginTop: '1rem' }}>
+          <table className="tableau-pile tableau-articles" style={{ marginTop: '1rem' }}>
             <thead>
               <tr>
                 <th>{t('Produit')}</th>
@@ -319,22 +320,22 @@ export function EditeurCatalogue({
                 </tr>
               {groupe.lignes.map((produit) => (
                 <tr key={produit.id}>
-                  <td>
+                  <td className="nom-article">
                     {produit.nom}
                     {produit.description && (
                       <div className="indication">{produit.description}</div>
                     )}
                   </td>
-                  <td className="nombre" data-label={t('Prix')}>{produit.prixAffiche}</td>
-                  <td className="nombre" data-label={t('Coût')}>
+                  <td className="nombre prix-article" data-label={t('Prix')}>{produit.prixAffiche}</td>
+                  <td className="nombre cout-article" data-label={t('Coût')}>
                     {produit.coutUnitaire === null ? (
                       <span className="detail">—</span>
                     ) : (
                       formaterTND(millimes(Math.round(produit.coutUnitaire)))
                     )}
                   </td>
-                  <td className="nombre" data-label={t('Marge')}>{margeAffichee(produit)}</td>
-                  <td data-label={t('État')}>
+                  <td className="nombre marge-article" data-label={t('Marge')}>{margeAffichee(produit)}</td>
+                  <td className="etat-article" data-label={t('État')}>
                     <span className={`etiquette ${produit.disponible ? 'actif' : 'inactif'}`}>
                       {produit.disponible ? t('en vente') : t('retiré')}
                     </span>
@@ -353,18 +354,20 @@ export function EditeurCatalogue({
                         className="discret"
                         disabled={rangDansCategorie(produit) === 0}
                         title={t('Monter')}
+                        aria-label={t('Monter')}
                         onClick={() => void deplacerProduit(restaurantId, produit.id, 'haut')}
                       >
-                        ↑
+                        <ChevronUp size={16} strokeWidth={2} aria-hidden="true" />
                       </button>
                       <button
                         type="button"
                         className="discret"
                         disabled={rangDansCategorie(produit) === tailleCategorie(produit) - 1}
                         title={t('Descendre')}
+                        aria-label={t('Descendre')}
                         onClick={() => void deplacerProduit(restaurantId, produit.id, 'bas')}
                       >
-                        ↓
+                        <ChevronDown size={16} strokeWidth={2} aria-hidden="true" />
                       </button>
                       <button
                         type="button"
@@ -387,9 +390,17 @@ export function EditeurCatalogue({
                       >
                         {produit.disponible ? t('Retirer') : t('Remettre')}
                       </button>
+                      {/*
+                        Archiver est une ICÔNE, au bout : le geste le plus
+                        rare de la ligne ne doit pas en être le plus large.
+                        Sur téléphone, le mot « Archiver » passait seul à la
+                        ligne et doublait la hauteur de chaque article.
+                      */}
                       <button
                         type="button"
-                        className="discret danger"
+                        className="discret danger icone-seule"
+                        title={t('Archiver')}
+                        aria-label={t('Archiver')}
                         onClick={() => {
                           if (
                             confirm(
@@ -402,7 +413,9 @@ export function EditeurCatalogue({
                             void archiverProduit(restaurantId, produit.id)
                           }
                         }}
-                      >{t('Archiver')}</button>
+                      >
+                        <Archive size={16} strokeWidth={1.9} aria-hidden="true" />
+                      </button>
                     </td>
                   )}
                 </tr>

@@ -503,6 +503,17 @@ parce qu'il est rendu par le serveur et doit naître dans le bon sens.
 - La mise en page s'écrit en propriétés LOGIQUES (`margin-inline-start`,
   `text-align: start`) : elle se retourne seule en `dir="rtl"`.
 
+### La zone sûre appartient à la surface qui la JOUXTE, jamais à `body`
+
+Posée en `padding` sur `body`, la zone sûre de l'iPhone se peignait du fond
+de `body` — un aplat crème sous l'indicateur d'accueil et sous l'horloge,
+alors que l'écran portait le vert du bandeau ou le dégradé. Vu en
+démonstration, sur la caisse ET le back-office. La règle : le bandeau (ou
+`.barre-mobile`) porte `safe-area-inset-top`, `.contenu` et les panneaux
+(ticket, encaissement) portent `safe-area-inset-bottom` ; le fond va
+jusqu'au bord, le contenu s'arrête avant. Au back-office, le dégradé fixe
+prend `100lvh` : `inset: 0` s'arrête au-dessus des barres de Safari.
+
 ### Le greffon SQLite d'iOS réécrit le SQL — l'adaptateur l'aplatit
 
 `@capacitor-community/sqlite` retire, sur iOS, les « \n » d'un script qui
