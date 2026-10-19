@@ -54,6 +54,18 @@ import {
 
 const LOURD = process.env['KAISSI_STRESS'] === '1'
 
+/**
+ * Les caisses sont créées UNE PAR UNE. `creerAppareil` ouvre une connexion
+ * à chaque appel : cent créations en parallèle dépassaient les cent
+ * connexions de la base de CI (« sorry, too many clients already ») — une
+ * limite du banc, pas du service, qui n'en tient que dix.
+ */
+async function creerCaisses(n: number, fabrique: (i: number) => Promise<Caisse>): Promise<Caisse[]> {
+  const liste: Caisse[] = []
+  for (let i = 0; i < n; i += 1) liste.push(await fabrique(i))
+  return liste
+}
+
 /** Le comportement de la VRAIE caisse face à un serveur qui peine. */
 const COMME_LA_CAISSE: Comportement = { tolerante: true, delaiMs: 15_000, tentativesMax: 40 }
 
@@ -110,11 +122,9 @@ describe('STRESS', () => {
     'E. 1000 commandes dans UN établissement, 10 caisses, 5 gérants sur le tableau de bord',
     async () => {
       const config = await configCalcul()
-      const caisses = await Promise.all(
-        Array.from({ length: 10 }, async (_, i) =>
+      const caisses = await creerCaisses(10, async (i) =>
           new Caisse(await creerAppareil(`E${i + 1}`), hasard(5000 + i), base),
-        ),
-      )
+        )
       let fini = false
       const latencesRapports: number[] = []
       const gerants = Array.from({ length: 5 }, () =>
@@ -164,11 +174,9 @@ describe('STRESS', () => {
       const paliers = LOURD ? [25, 50, 100, 200, 400] : [25, 50, 100]
       for (const n of paliers) {
         await nettoyer()
-        const caisses = await Promise.all(
-          Array.from({ length: n }, async (_, i) =>
-            // Préfixe de tickets : quatre caractères au plus (contrainte 0002).
+        const caisses = await creerCaisses(n, async (i) =>
+          // Préfixe de tickets : quatre caractères au plus (contrainte 0002).
             new Caisse(await creerAppareil(`F${i.toString(36).toUpperCase()}`), hasard(7000 * n + i), base, COMME_LA_CAISSE),
-          ),
         )
         const debut = performance.now()
         await Promise.all(
@@ -197,11 +205,9 @@ describe('STRESS', () => {
     async () => {
       const config = await configCalcul()
       const nombre = LOURD ? 100 : 50
-      const caisses = await Promise.all(
-        Array.from({ length: nombre }, async (_, i) =>
+      const caisses = await creerCaisses(nombre, async (i) =>
           new Caisse(await creerAppareil(`G${i + 1}`), hasard(9000 + i), base, COMME_LA_CAISSE),
-        ),
-      )
+        )
       for (const c of caisses) {
         for (let i = 0; i < 20; i += 1) await c.commande(config, false)
       }
