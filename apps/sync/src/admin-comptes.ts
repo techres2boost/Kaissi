@@ -210,11 +210,43 @@ export async function changerMotDePasse(
   }
 }
 
+/**
+ * Les mots de passe qu'un attaquant essaie EN PREMIER.
+ *
+ * La protection « mot de passe compromis » de Supabase (HaveIBeenPwned)
+ * exige l'offre Pro. Sans elle, rien ne refusait « 12345678 » ou
+ * « azerty123 » — et c'est avec ce mot de passe qu'un gérant ouvre ses
+ * caisses et son chiffre d'affaires. Cette liste ne remplace pas la base
+ * d'HaveIBeenPwned : elle écarte les quelques dizaines de mots de passe qui
+ * représentent à eux seuls l'essentiel des comptes devinés, dont ceux
+ * qu'on tape en français sur un clavier AZERTY. La limitation de débit de
+ * `/appairage` (audit C-1) fait le reste.
+ */
+const MOTS_DE_PASSE_COURANTS = new Set([
+  '12345678', '123456789', '1234567890', '87654321', '11111111', '00000000',
+  '12341234', '12121212', '11223344', '01234567', '123123123', 'password',
+  'password1', 'password123', 'passw0rd', 'motdepasse', 'motdepasse1',
+  'motdepasse123', 'azerty', 'azertyui', 'azertyuiop', 'azerty123',
+  'azerty1234', 'qwerty', 'qwertyuiop', 'qwerty123', 'abcd1234', 'abc12345',
+  'aaaaaaaa', 'iloveyou', 'sunshine', 'football', 'baseball', 'welcome1',
+  'bienvenue', 'bienvenue1', 'soleil123', 'tunisie', 'tunisia', 'tunis123',
+  'restaurant', 'restaurant1', 'kaissi', 'kaissi123', 'admin123', 'administrateur',
+])
+
 /** Validation commune aux deux gestes, avant toute écriture. */
 export function verifierMotDePasse(motDePasse: unknown): string {
   if (typeof motDePasse !== 'string' || motDePasse.length < LONGUEUR_MOT_DE_PASSE) {
     throw new ErreurAuth(
       `Le mot de passe doit faire au moins ${LONGUEUR_MOT_DE_PASSE} caractères.`,
+      401,
+    )
+  }
+  const minuscule = motDePasse.toLowerCase()
+  // Un seul caractère répété (« aaaaaaaa », « 99999999 ») vaut un mot de
+  // passe d'une lettre, quelle que soit sa longueur.
+  if (MOTS_DE_PASSE_COURANTS.has(minuscule) || new Set(minuscule).size <= 2) {
+    throw new ErreurAuth(
+      'Ce mot de passe fait partie des plus courants : choisissez-en un autre.',
       401,
     )
   }

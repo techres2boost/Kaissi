@@ -283,10 +283,27 @@ export interface Alerte {
  * bout d'une semaine : personne ne sait si 61 % de cache est grave. Chaque
  * seuil dit ce qu'il protège ; les valeurs sont prudentes et se règlent ici.
  */
+/**
+ * Le plafond de taille de la base, en octets — `KAISSI_LIMITE_BASE_MO`.
+ *
+ * 500 Mo par défaut : celui de l'offre gratuite de Supabase au moment où
+ * ces lignes sont écrites (à revérifier sur leur page de tarifs, et à
+ * relever dans l'environnement dès le passage à une offre payante). La base
+ * ne se purge pas de ses ventes — ce sont des pièces comptables — donc ce
+ * plafond se voit venir des semaines à l'avance, ou se découvre le jour où
+ * Supabase passe la base en lecture seule. Vendredi soir, en plein service.
+ * `0` : aucune alerte.
+ */
+export function limiteBaseDepuisEnvironnement(env: NodeJS.ProcessEnv = process.env): number {
+  const mo = Number(env['KAISSI_LIMITE_BASE_MO'] ?? 500)
+  return Number.isFinite(mo) && mo > 0 ? mo * 1024 * 1024 : 0
+}
+
 export function evaluerAlertes(
   m: InstantaneMetriques,
   base: MesuresBase | null,
   migrationsManquantes: readonly string[],
+  limiteBaseOctets: number = limiteBaseDepuisEnvironnement(),
 ): Alerte[] {
   const alertes: Alerte[] = []
   const critique = (sujet: string, message: string) => alertes.push({ niveau: 'critique', sujet, message })
@@ -333,6 +350,16 @@ export function evaluerAlertes(
   }
 
   if (base) {
+    if (limiteBaseOctets > 0) {
+      const part = base.tailleOctets / limiteBaseOctets
+      const mo = (o: number) => Math.round(o / (1024 * 1024))
+      const texte =
+        `La base occupe ${mo(base.tailleOctets)} Mo sur ${mo(limiteBaseOctets)} Mo ` +
+        `(${Math.round(part * 100)} %). Les ventes ne se purgent pas : passer à l’offre ` +
+        'supérieure, puis relever KAISSI_LIMITE_BASE_MO.'
+      if (part >= 0.9) critique('Espace disque', texte)
+      else if (part >= 0.7) attention('Espace disque', texte)
+    }
     if (base.pool.enAttente > 0) {
       attention('Connexions', `${base.pool.enAttente} requête(s) attendent une connexion libre au pool.`)
     }

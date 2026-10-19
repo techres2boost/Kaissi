@@ -46,7 +46,7 @@
  * tour précédent ; si elle avait besoin d'être réparée, elle l'a été.
  */
 
-import type { DepotSync } from './depot.js'
+import type { DepotSync, RetentionRegistre } from './depot.js'
 import { journal } from './journal.js'
 
 /** Nombre d'événements récents examinés. Environ deux semaines de service. */
@@ -65,6 +65,13 @@ export interface OptionsReparation {
    * (0029). 0 ou négatif : aucune purge.
    */
   readonly retentionPretsJours?: number
+  /** Conservation du registre d'idempotence. `null` : aucune purge. */
+  readonly retentionRegistre?: RetentionRegistre | null
+  /**
+   * Instant du dernier ménage du registre — injectable pour les tests. Le
+   * ménage n'a lieu qu'une fois par jour, pas à chaque tour de 30 minutes.
+   */
+  readonly horloge?: () => number
 }
 
 export interface ResultatReparation {
@@ -113,6 +120,8 @@ export async function reparerProjectionsOrphelines(
         journal.avertissement('purge des marqueurs « prêt » impossible', { erreur })
       }
     }
+
+    await purgerRegistreUneFoisParJour(depot, options, dire)
 
     const orphelines = await depot.projectionsOrphelines(fenetre, plafond)
     if (orphelines.length === 0) return { examinees: 0, reparees: 0 }
@@ -163,6 +172,63 @@ export async function reparerProjectionsOrphelines(
  * longtemps, et la commande encaissée.
  */
 export const RETENTION_PRETS_JOURS = 7
+
+/**
+ * ── Le registre d'idempotence, et pourquoi on n'y purge PAS les ventes ────
+ *
+ * Question posée en démonstration : « on ne purge pas les tickets chaque
+ * semaine ? la base va déborder ». Non — et c'est voulu. Une vente est une
+ * pièce comptable et la source de vérité : la supprimer effacerait les
+ * rapports, l'historique des clients, la preuve d'un écart de caisse. ⚠ Sa
+ * durée de conservation légale relève de l'expert-comptable, pas de nous.
+ *
+ * Ce qui grossit SANS rien protéger, en revanche, c'est ce registre : une
+ * ligne par événement reçu (environ 20 % du volume d'une vente), dont
+ * l'idempotence est déjà tenue par la clé primaire de `order_events`.
+ * Mesuré en production le 19/10 : 151 octets par ligne, six par commande.
+ *
+ * Le volume des ventes elles-mêmes se règle par l'offre de la base, puis par
+ * un archivage des exercices clos — pas par une purge. Voir
+ * docs/pret-pour-la-production.md §2.6.
+ */
+export const RETENTION_REGISTRE_DEFAUT: RetentionRegistre = {
+  // Un reçu, rien de plus : l'idempotence est dans `order_events`.
+  evenementsJours: 30,
+  // Ici le registre EST la garantie : plus long que toute déconnexion
+  // plausible d'une caisse (une tablette rangée trois mois dans un tiroir).
+  catalogueJours: 180,
+  // Remontés au gérant au moment du rejet ; gardés six mois pour l'enquête.
+  rejetsJours: 180,
+}
+
+const UN_JOUR_MS = 24 * 60 * 60 * 1000
+let dernierMenageRegistre = Number.NEGATIVE_INFINITY
+
+/** Pour les tests : le prochain tour refera le ménage. */
+export function oublierDernierMenage(): void {
+  dernierMenageRegistre = Number.NEGATIVE_INFINITY
+}
+
+async function purgerRegistreUneFoisParJour(
+  depot: DepotSync,
+  options: OptionsReparation,
+  dire: (message: string) => void,
+): Promise<void> {
+  const retention =
+    options.retentionRegistre === undefined ? RETENTION_REGISTRE_DEFAUT : options.retentionRegistre
+  if (!retention || !depot.purgerRegistreSynchronisation) return
+  const maintenant = (options.horloge ?? Date.now)()
+  if (maintenant - dernierMenageRegistre < UN_JOUR_MS) return
+  dernierMenageRegistre = maintenant
+  // Jamais fatal, comme la purge des « prêt » : un ménage manqué attend
+  // simplement le jour suivant.
+  try {
+    const retirees = await depot.purgerRegistreSynchronisation(retention)
+    if (retirees > 0) dire(`  🧹 ${retirees} accusé(s) de synchronisation périmé(s) retiré(s) du registre.`)
+  } catch (erreur) {
+    journal.avertissement('ménage du registre de synchronisation impossible', { erreur })
+  }
+}
 
 /** Intervalle par défaut entre deux balayages, en minutes. */
 export const INTERVALLE_DEFAUT_MINUTES = 30

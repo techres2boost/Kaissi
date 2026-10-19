@@ -475,8 +475,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /*
  * ── La tuile d'article ────────────────────────────────────────────────────
  * Le nom en haut, le prix en bas, et rien d'autre : c'est ce qu'on lit en
- * une demi-seconde, debout, un client devant soi. Le trait de couleur en
- * tête rappelle la catégorie sans la répéter en toutes lettres.
+ * une demi-seconde, debout, un client devant soi.
+ *
+ * La couleur de la catégorie reste sur son ONGLET, et seulement là. Un
+ * trait de couleur en tête de tuile a été essayé : à trois pixels, sous le
+ * bord arrondi, il se lisait comme une pastille coupée — un défaut, pas un
+ * repère (vu sur tablette et sur PC). La catégorie ouverte se voit déjà à
+ * l'onglet plein, juste au-dessus.
  *
  * L'appui ENFONCE la tuile (échelle 0,97) : sur une tablette, c'est le seul
  * accusé de réception qui arrive avant que le ticket ait changé. Une
@@ -486,7 +491,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .carte-produit {
   /* 56 px minimum : on tape vite, parfois les mains grasses. */
   min-height: 6rem;
-  position: relative;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -497,15 +501,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   border: 1px solid rgba(222, 215, 199, 0.9);
   border-radius: var(--rayon);
   box-shadow: var(--ombre-1);
-  overflow: hidden;
   transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
   -webkit-tap-highlight-color: transparent;
-}
-.carte-produit::before {
-  content: '';
-  position: absolute; inset-inline-start: 0.9rem; top: 0;
-  inline-size: 1.75rem; block-size: 3px; border-radius: 0 0 3px 3px;
-  background: var(--teinte, var(--accent)); opacity: 0.85;
 }
 @media (hover: hover) {
   .carte-produit:hover { border-color: #CFC6B2; box-shadow: var(--ombre-2); }
@@ -857,6 +854,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
   border-radius: var(--rayon);
   padding: 0.75rem 0.85rem; min-height: 48px;
   color: var(--texte-2);
+}
+
+.tiroir-version {
+  margin: 0 0.5rem 0.75rem; padding-inline: 0.85rem;
+  font-size: 0.68rem; color: var(--texte-2);
+  font-family: ui-monospace, monospace; letter-spacing: 0.02em;
+  unicode-bidi: isolate; direction: ltr; text-align: start;
 }
 
 .badge-impression {
@@ -1744,7 +1748,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
   box-shadow: none;
   color: var(--texte-2);
 }
-.carte-produit.nouvel-article::before { display: none; }
 .carte-produit.nouvel-article .nom { color: var(--accent); font-weight: 700; }
 .carte-produit.nouvel-article .prix { font-size: 0.75rem; font-weight: 400; }
 

@@ -110,6 +110,13 @@ export interface ProduitEnAlerte {
 }
 
 /** Un envoi en cuisine NOUVEAU, à annoncer aux postes de préparation (0047). */
+/** Durées de conservation du registre d'idempotence, en jours. */
+export interface RetentionRegistre {
+  readonly evenementsJours: number
+  readonly catalogueJours: number
+  readonly rejetsJours: number
+}
+
 export interface EnvoiCuisine {
   readonly restaurantId: string
   readonly orderId: string
@@ -441,6 +448,29 @@ export interface DepotSync {
    * changement de prix à un appareil en retard, ce qui est tout autre chose.
    */
   purgerJournalPrets(jours: number): Promise<number>
+
+  /**
+   * Allège le registre d'idempotence (`sync_mutations`) de ce qui n'y
+   * protège plus rien. Rend le nombre de lignes retirées.
+   *
+   * ── Ce qu'on retire, et pourquoi c'est sans risque ─────────────────────
+   *
+   *   • les accusés d'ÉVÉNEMENTS DE COMMANDE (accepte, doublon) : leur
+   *     idempotence est portée par la clé primaire de `order_events`, qui
+   *     ne se purge jamais (`evenementsConnus` la lit, pas ce registre). La
+   *     ligne de `sync_mutations` n'est plus qu'un reçu ;
+   *   • les créations de CATALOGUE acceptées, après bien plus longtemps : ici
+   *     le registre EST la garantie, et il doit survivre à la plus longue
+   *     déconnexion plausible d'une caisse ;
+   *   • les REJETS, après six mois : ils sont remontés au gérant.
+   *
+   * ── Ce qu'on ne retire JAMAIS ──────────────────────────────────────────
+   *
+   * Une vente. `order_events`, `orders`, `payments`, `audit_events` : ce sont
+   * des pièces comptables, et la source de vérité. ⚠ Leur durée de
+   * conservation légale est une question d'expert-comptable.
+   */
+  purgerRegistreSynchronisation?(retention: RetentionRegistre): Promise<number>
 
   /**
    * Produits en alerte pour lesquels rien n'a ENCORE été annoncé.

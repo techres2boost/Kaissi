@@ -87,8 +87,8 @@ Tunisie, en Wi-Fi et en Ethernet, une semaine de service. Puis
 
 | Sujet | État | À faire |
 |---|---|---|
-| Sauvegardes | Quotidiennes Supabase | **Restaurer une fois pour de vrai** (`docs/deploiement.md` §8) ; activer le **PITR** avant le premier client payant |
-| Mots de passe compromis | ❌ désactivé — seul avis de sécurité Supabase restant | Authentication → Policies → *Leaked password protection*. Coût : zéro |
+| Sauvegardes | Selon l'offre Supabase | **Restaurer une fois pour de vrai** (`docs/deploiement.md` §8) ; le **PITR** et les sauvegardes téléchargeables exigent une offre payante |
+| Mots de passe compromis | La vérification HaveIBeenPwned de Supabase exige l'offre **Pro** | En attendant : le service refuse lui-même les mots de passe les plus courants et ceux d'un seul caractère répété (`verifierMotDePasse`), et `/appairage` est limité en débit (audit C-1). À activer au passage en Pro |
 | Collecte d'erreurs | Journaux structurés, écran Surveillance | Sentry sur le back-office (audit M-6) — aujourd'hui, on apprend une erreur par le client |
 | Alerte active | L'écran Surveillance montre, il ne prévient pas | Une sonde externe sur `/sante` qui vous envoie un SMS ou une notification |
 | Astreinte | — | Qui répond le samedi soir ? Un numéro, un nom, écrit dans le contrat |
@@ -105,6 +105,43 @@ Tunisie, en Wi-Fi et en Ethernet, une semaine de service. Puis
   `pnpm sync:acces`). C'est cohérent avec une vente accompagnée ; ce n'est
   pas une inscription en libre-service. Pour un pilote, c'est un avantage :
   chaque installation est vue par quelqu'un.
+
+### 2.6 Le volume de la base — on ne purge PAS les ventes
+
+« On ne purge pas les tickets chaque semaine ? la base va déborder. » Non,
+et c'est voulu : une vente est une **pièce comptable** et la source de
+vérité. La supprimer effacerait les rapports, l'historique des clients et
+la preuve d'un écart de caisse. ⚠ Sa durée de conservation légale relève de
+l'expert-comptable.
+
+**Ce qui est purgé, automatiquement** (boucle de maintenance du service, une
+fois par jour) : les reçus du registre d'idempotence (`sync_mutations`) —
+30 jours pour les ventes, dont l'idempotence est déjà tenue par
+`order_events` ; 180 jours pour les créations de catalogue et les rejets.
+Les marqueurs « prêt » sortent du journal de catalogue après 7 jours. Test :
+`apps/sync/test/menage-registre.test.ts` — une vente renvoyée après la purge
+reste comptée une fois, au millime.
+
+**Ce que pèse une vente**, mesuré en production le 19/10 : environ 6
+événements de 392 octets, la commande (540), ses lignes (277 chacune), le
+paiement (176) — de l'ordre de **7 à 10 Ko par ticket** avec les index.
+Estimation, à recaler sur les chiffres réels :
+
+| Restaurant | Tickets/jour | Par mois | Par an |
+|---|---|---|---|
+| Petit snack | 100 | ~25 Mo | ~300 Mo |
+| Restaurant actif | 300 | ~75 Mo | ~900 Mo |
+
+**Conséquence** : l'offre gratuite de Supabase (500 Mo de base à ce jour —
+à revérifier sur leur page de tarifs) tient la démonstration et deux ou
+trois pilotes quelques mois, pas une clientèle. Le passage à l'offre Pro
+(8 Go inclus) est la première dépense à prévoir — elle débloque aussi la
+protection des mots de passe et les sauvegardes. Plus tard, les exercices
+clos s'**archivent** (export, puis stockage froid) ; ils ne se suppriment pas.
+
+**On le voit venir** : l'écran Surveillance alerte à 70 % puis 90 % du
+plafond (`KAISSI_LIMITE_BASE_MO`, 500 par défaut — à relever dans Railway
+au passage en Pro).
 
 ---
 
@@ -133,7 +170,7 @@ deux documentés dans `docs/stores.md` §étapes 9–10 :
 
 | Semaine | Quoi |
 |---|---|
-| 1 | Expert-comptable (§2.1) · protection des mots de passe · PITR · restauration testée |
+| 1 | Expert-comptable (§2.1) · passage à l'offre Pro (§2.6 : volume, mots de passe, PITR) · restauration testée |
 | 2 | CGV/CGU et contrat de traitement (§2.3) · processus de facturation (§2.5) |
 | 2–3 | Impression validée sur 2–3 imprimantes du marché (§2.2) |
 | 3 | Sentry + sonde externe sur `/sante` · numéro d'astreinte |

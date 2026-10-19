@@ -209,5 +209,15 @@ describe('surveillance — les seuils deviennent des phrases', () => {
       },
     }
     expect(evaluerAlertes(m.instantane(), base, [])).toEqual([])
+
+    // La base approche du plafond de l'offre : on le voit venir.
+    const Mo = 1024 * 1024
+    const pleine = { ...base, tailleOctets: 380 * Mo }
+    expect(evaluerAlertes(m.instantane(), pleine, [], 500 * Mo)).toEqual([
+      expect.objectContaining({ niveau: 'attention', sujet: 'Espace disque' }),
+    ])
+    expect(evaluerAlertes(m.instantane(), { ...base, tailleOctets: 460 * Mo }, [], 500 * Mo)[0])
+      .toMatchObject({ niveau: 'critique', message: expect.stringMatching(/460 Mo sur 500 Mo \(92 %\)/) })
+    expect(evaluerAlertes(m.instantane(), pleine, [], 0), 'plafond désactivé').toEqual([])
   })
 })

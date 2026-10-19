@@ -37,7 +37,8 @@ import {
   X,
 } from 'lucide-react'
 import type { Vue } from '../navigation.js'
-import { t } from '../i18n.js'
+import { dateLocale, t } from '../i18n.js'
+import { BUILD_COMMIT, BUILD_DATE } from '../config.js'
 import { ChoixLangue } from './ChoixLangue.js'
 
 export interface EntreeTiroir {
@@ -189,6 +190,20 @@ export function TiroirNavigation({
           <Lock size={17} strokeWidth={1.9} aria-hidden="true" />
           <span>{t('Verrouiller la caisse')}</span>
         </button>
+
+        {/*
+          L'empreinte du build, en tout petit, sous le dernier bouton. « Est-ce
+          la dernière version ? » se demandait en ouvrant Diagnostic, puis en
+          dépliant ses détails techniques ; on comparait des écrans à des
+          souvenirs. Le commit se compare à celui de GitHub, sans chercher.
+        */}
+        {(BUILD_COMMIT || BUILD_DATE) && (
+          <p className="tiroir-version">
+            {[BUILD_COMMIT, BUILD_DATE ? dateLocale(BUILD_DATE, { dateStyle: 'short', timeStyle: 'short' }) : '']
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        )}
       </nav>
     </>
   )

@@ -1181,3 +1181,49 @@ boutons s'arrêtent avant l'indicateur.
 [`pret-pour-la-production.md`](pret-pour-la-production.md) — la réponse
 courte : prêt pour un pilote payant encadré, pas encore pour une vente
 ouverte. Cinq points à régler, et le plan sur quatre semaines.
+
+## 22. Purge, version de la caisse, mots de passe (19 octobre)
+
+### 22.1 On ne purge pas les ventes — et la base ne déborde pas en silence
+
+Les tickets ne sont jamais purgés : ce sont des pièces comptables. Ce qui
+l'est, une fois par jour et tout seul, c'est le registre technique des
+synchronisations. La taille de la base apparaît dans **Éditeur →
+Surveillance**, avec une alerte à 70 % puis 90 % du plafond de l'offre.
+Détail et volumes : [`pret-pour-la-production.md`](pret-pour-la-production.md) §2.6.
+
+### 22.2 Quelle version tourne sur la tablette ?
+
+En bas du menu ☰, sous « Verrouiller la caisse » : le commit et la date du
+build (par exemple `e2215c5 · 19/10/2026 16:40`). Compare-le au dernier commit
+sur GitHub.
+
+⚠ **`git pull` ne met pas la tablette à jour.** Le code de la caisse est
+CONSTRUIT puis copié dans le projet Android ; un `pull` change les sources,
+pas ce que l'émulateur exécute. Après chaque `pull` :
+
+```powershell
+pnpm --filter @kaissi/pos cap:sync
+```
+
+puis ▶ dans Android Studio. Sans cette étape, l'émulateur garde la caisse
+d'il y a plusieurs semaines — bandeau à liens, données de démonstration, et
+aucun écran « Mettre cette caisse en service ».
+
+Le numéro de version affiché par `node ../scripts/version.mjs` (versionCode
+102) n'est **pas** celui du magasin (128) : sur Play, c'est la CI qui demande
+le numéro suivant au moment de publier. Un build local garde celui de
+`package.json` — ce n'est pas le signe d'une vieille version.
+
+### 22.3 Les mots de passe trop courants sont refusés
+
+`azerty123`, `12345678`, `motdepasse`… : refusés à la création d'un compte
+et au changement de mot de passe, avec le message « Ce mot de passe fait
+partie des plus courants ». La vérification complète (HaveIBeenPwned) viendra
+avec l'offre Pro de Supabase.
+
+### 22.4 Les tuiles d'articles n'ont plus de trait de couleur
+
+La couleur reste sur les onglets de catégorie. Le trait en tête de tuile se
+lisait comme une pastille coupée.
+

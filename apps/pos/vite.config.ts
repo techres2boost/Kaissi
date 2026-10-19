@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -148,6 +149,28 @@ function manifesteWeb(actif: boolean): Plugin {
  * Aucun rendu serveur, aucune Server Action, aucun appel réseau au
  * démarrage : le bundle produit ici est empaqueté tel quel dans l'APK.
  */
+/**
+ * Le commit de CE build — l'environnement d'abord (Vercel, CI), puis git.
+ *
+ * Sans le repli sur git, un build fait sur un poste (`pnpm pos:android`)
+ * ne portait AUCUN commit : l'écran Diagnostic disait « — », et la question
+ * « est-ce que l'émulateur fait tourner la dernière version ? » restait sans
+ * réponse. Vu en démonstration : un `git pull` à jour, et sur l'émulateur
+ * une caisse vieille de plusieurs semaines, parce que le bundle n'avait pas
+ * été reconstruit.
+ */
+function commitDuBuild(): string {
+  const env = process.env['VERCEL_GIT_COMMIT_SHA'] ?? process.env['GIT_COMMIT'] ?? ''
+  if (env) return env.slice(0, 7)
+  try {
+    return execSync('git rev-parse --short=7 HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim()
+  } catch {
+    return ''
+  }
+}
+
 export default defineConfig(({ command, mode }) => {
   // La cible vient de l'environnement, avec Android par défaut : oublier la
   // variable donne le build le plus contraint, jamais le plus permissif.
@@ -157,9 +180,8 @@ export default defineConfig(({ command, mode }) => {
   // Empreinte de CE build : le commit s'il existe, sinon l'horodatage. Elle
   // nomme le cache du service worker, donc elle DOIT changer à chaque
   // déploiement — c'est ce qui permet à une correction d'atteindre la caisse.
-  const versionBuild =
-    (process.env['VERCEL_GIT_COMMIT_SHA'] ?? process.env['GIT_COMMIT'] ?? '').slice(0, 7) ||
-    String(Date.now())
+  const commit = commitDuBuild()
+  const versionBuild = commit || String(Date.now())
 
   return {
     plugins: [
@@ -183,9 +205,7 @@ export default defineConfig(({ command, mode }) => {
       // n'est pas celui qui tourne. Le bundle porte donc sa propre date et
       // son commit. Vercel fournit VERCEL_GIT_COMMIT_SHA ; ailleurs, la
       // date suffit à trancher.
-      'import.meta.env.VITE_BUILD_COMMIT': JSON.stringify(
-        (process.env['VERCEL_GIT_COMMIT_SHA'] ?? process.env['GIT_COMMIT'] ?? '').slice(0, 7),
-      ),
+      'import.meta.env.VITE_BUILD_COMMIT': JSON.stringify(commit),
       'import.meta.env.VITE_BUILD_DATE': JSON.stringify(new Date().toISOString()),
       // Pré-remplit l'adresse du serveur de synchronisation. Voir
       // `deploiement.json` : c'est une DONNÉE, pas un `server.url`.

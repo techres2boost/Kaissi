@@ -30,6 +30,7 @@ import type { MutationCatalogue } from '@kaissi/domain'
 import type {
   AbonnementPush,
   EnvoiCuisine,
+  RetentionRegistre,
   AppareilAuthentifie,
   AppareilEnrole,
   DemandeEnrolement,
@@ -2108,6 +2109,37 @@ export class DepotPostgres implements DepotSync {
       [String(jours)],
     )
     return rowCount ?? 0
+  }
+
+  async purgerRegistreSynchronisation(retention: RetentionRegistre): Promise<number> {
+    /*
+     * Par LOTS de 20 000 : un seul `delete` de plusieurs millions de lignes
+     * tiendrait des verrous et gonflerait le WAL pendant le service. Le
+     * plafond de tours borne un passage ; le suivant reprendra le reste.
+     */
+    let total = 0
+    for (let tour = 0; tour < 50; tour += 1) {
+      const { rowCount } = await this.pool.query(
+        `delete from kaissi.sync_mutations
+          where event_id in (
+            select event_id from kaissi.sync_mutations
+             where (kind = 'order_event' and status in ('accepte', 'doublon')
+                    and received_at < now() - ($1 || ' days')::interval)
+                or (kind = 'catalogue' and status = 'accepte'
+                    and received_at < now() - ($2 || ' days')::interval)
+                or (status = 'rejete'
+                    and received_at < now() - ($3 || ' days')::interval)
+             limit 20000)`,
+        [
+          String(retention.evenementsJours),
+          String(retention.catalogueJours),
+          String(retention.rejetsJours),
+        ],
+      )
+      total += rowCount ?? 0
+      if ((rowCount ?? 0) < 20_000) break
+    }
+    return total
   }
 
   // ── Alertes de stock (0028) ───────────────────────────────────────────────

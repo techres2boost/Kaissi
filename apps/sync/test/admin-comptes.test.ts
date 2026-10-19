@@ -135,7 +135,7 @@ describe('POST /admin/comptes', () => {
   it('répond 501 quand la clé de service manque — sans rien casser d’autre', async () => {
     const reponse = await ouvrir(
       gerant.jeton,
-      { restaurantId: DEMO_RESTO, email: 'x@nouveau.tn', motDePasse: 'motdepasse1', role: 'cuisine' },
+      { restaurantId: DEMO_RESTO, email: 'x@nouveau.tn', motDePasse: 'SauceHarissa-26', role: 'cuisine' },
       '/admin/comptes',
       appSansCle,
     )
@@ -156,7 +156,7 @@ describe('POST /admin/comptes', () => {
     const reponse = await ouvrir('jeton-inventé', {
       restaurantId: DEMO_RESTO,
       email: 'x@nouveau.tn',
-      motDePasse: 'motdepasse1',
+      motDePasse: 'SauceHarissa-26',
       role: 'cuisine',
     })
     expect(reponse.status).toBe(401)
@@ -168,7 +168,7 @@ describe('POST /admin/comptes', () => {
     const reponse = await ouvrir(caissier.jeton, {
       restaurantId: DEMO_RESTO,
       email: 'refus@nouveau.tn',
-      motDePasse: 'motdepasse1',
+      motDePasse: 'SauceHarissa-26',
       role: 'cuisine',
     })
     expect(reponse.status).toBe(401)
@@ -189,7 +189,7 @@ describe('POST /admin/comptes', () => {
       const reponse = await ouvrir(gerant.jeton, {
         restaurantId: autre,
         email: 'ailleurs@nouveau.tn',
-        motDePasse: 'motdepasse1',
+        motDePasse: 'SauceHarissa-26',
         role: 'cuisine',
       })
       expect(reponse.status).toBe(401)
@@ -204,7 +204,7 @@ describe('POST /admin/comptes', () => {
     const reponse = await ouvrir(gerant.jeton, {
       restaurantId: DEMO_RESTO,
       email,
-      motDePasse: 'motdepasse1',
+      motDePasse: 'SauceHarissa-26',
       nom: 'Nabil le cuisinier',
       role: 'cuisine',
     })
@@ -228,7 +228,7 @@ describe('POST /admin/comptes', () => {
     const reponse = await ouvrir(gerant.jeton, {
       restaurantId: DEMO_RESTO,
       email: 'promu@nouveau.tn',
-      motDePasse: 'motdepasse1',
+      motDePasse: 'SauceHarissa-26',
       role: 'gerant',
     })
     expect(reponse.status).toBe(401)
@@ -240,7 +240,7 @@ describe('POST /admin/comptes', () => {
     const reponse = await ouvrir(admin.jeton, {
       restaurantId: DEMO_RESTO,
       email,
-      motDePasse: 'motdepasse1',
+      motDePasse: 'SauceHarissa-26',
       role: 'gerant',
     })
     expect(reponse.status).toBe(200)
@@ -250,7 +250,7 @@ describe('POST /admin/comptes', () => {
     const email = `existant-${Date.now()}@nouveau.tn`
     // Premier passage : le compte est créé.
     expect((await ouvrir(gerant.jeton, {
-      restaurantId: DEMO_RESTO, email, motDePasse: 'motdepasse1', role: 'cuisine',
+      restaurantId: DEMO_RESTO, email, motDePasse: 'SauceHarissa-26', role: 'cuisine',
     })).status).toBe(200)
 
     motsDePasseChanges = []
@@ -283,13 +283,26 @@ describe('POST /admin/comptes', () => {
     })
     expect(reponse.status).toBe(401)
   })
+
+  it('refuse un mot de passe parmi les plus courants — sans l’offre Pro de Supabase', async () => {
+    for (const motDePasse of ['azerty123', 'MotDePasse', '12345678', 'aaaaaaaaaa']) {
+      const reponse = await ouvrir(gerant.jeton, {
+        restaurantId: DEMO_RESTO,
+        email: `courant-${Date.now()}@nouveau.tn`,
+        motDePasse,
+        role: 'cuisine',
+      })
+      expect(reponse.status, motDePasse).toBe(401)
+      expect(await reponse.text()).toMatch(/plus courants/)
+    }
+  })
 })
 
 describe('POST /admin/mot-de-passe', () => {
   it('change le mot de passe d’un employé de l’équipe', async () => {
     const email = `perdu-${Date.now()}@nouveau.tn`
     const creation = await ouvrir(gerant.jeton, {
-      restaurantId: DEMO_RESTO, email, motDePasse: 'motdepasse1', role: 'cuisine',
+      restaurantId: DEMO_RESTO, email, motDePasse: 'SauceHarissa-26', role: 'cuisine',
     })
     const { employeId } = (await creation.json()) as { employeId: string }
 

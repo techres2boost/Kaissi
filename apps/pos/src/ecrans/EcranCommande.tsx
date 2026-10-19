@@ -276,11 +276,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
           ))}
         </div>
 
-        <div
-          className="grille-produits"
-          // La couleur de la catégorie ouverte, reprise en tête de chaque tuile.
-          style={{ '--teinte': categories.find((c) => c.id === categorieActive)?.couleur ?? undefined } as React.CSSProperties}
-        >
+        <div className="grille-produits">
           {produits
             .filter((p) => !categorieActive || p.categorieId === categorieActive)
             .map((p) => (

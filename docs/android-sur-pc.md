@@ -50,6 +50,12 @@ Lance-la avec ▶. Une tablette démarre dans une fenêtre.
 
 ## 3. Installer Kaissi sur la tablette · 5 min (puis 1 min)
 
+> ⚠ **À refaire après CHAQUE `git pull`.** Le pull change les sources ; ce
+> que l'émulateur exécute est le bundle CONSTRUIT puis copié dans
+> `android/app/src/main/assets/public` — un dossier que git ignore. Sans
+> reconstruction, tu testes la caisse d'il y a plusieurs semaines. Pour
+> vérifier : le commit du build est écrit en bas du menu ☰.
+
 ```powershell
 pnpm pos:android
 ```
@@ -154,4 +160,4 @@ serveur y est écrit en clair (par exemple « une migration manque (0046) »).
 | L'émulateur reste noir ou « System UI isn't responding » | Image **Android Open Source**, pas *Google Play* ; *Graphics : Hardware* |
 | `ERR_SDK_NOT_FOUND` | Chemin Android Studio du §3 |
 | « Connection refused » à la mise en service | L'émulateur n'a pas Internet : redémarre-le (*Cold Boot Now*) |
-| L'application montre une ancienne version | `pnpm --filter @kaissi/pos cap:sync` puis ▶ — le bundle n'avait pas été recopié |
+| L'application montre une ancienne version (bandeau à liens, pas d'écran « Mettre cette caisse en service ») | `git pull` ne suffit PAS : `pnpm --filter @kaissi/pos cap:sync` puis ▶. Le commit du build est écrit en bas du menu ☰ |
