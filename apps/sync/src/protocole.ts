@@ -191,6 +191,14 @@ export type CodeErreur =
    */
   | 'base_non_a_jour'
   /**
+   * Plus aucune connexion libre au pool dans le délai imparti : le serveur
+   * est saturé, pas en panne. 503 — la caisse garde ses ventes et réessaie.
+   * Mesuré par `test/stress.test.ts` (scénario G) : c'est la première chose
+   * qui cède quand cent caisses d'un même établissement se reconnectent à
+   * la même seconde.
+   */
+  | 'serveur_occupe'
+  /**
    * Trop de tentatives — sur les IDENTIFIANTS seulement.
    *
    * Jamais rendu par `/sync/*` : une caisse qui rattrape trois semaines hors

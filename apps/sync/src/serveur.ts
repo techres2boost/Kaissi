@@ -257,7 +257,7 @@ export function creerServeur({
     if (!(erreur instanceof ErreurSync)) {
       metriques.noterErreur(
         c.req.path,
-        estSchemaEnRetard(erreur) ? 503 : 500,
+        estSchemaEnRetard(erreur) || estPoolSature(erreur) ? 503 : 500,
         erreur instanceof Error ? erreur.message : String(erreur),
       )
     }
@@ -720,7 +720,18 @@ export function creerServeur({
       const corps: ReponseErreur = { erreur: 'jeton_absent', message: "Jeton d'appareil absent." }
       return c.json(corps, 401)
     }
-    const appareil = await depot.appareilParJeton(empreinteDe(jeton))
+    /*
+     * Lue SOUS try : c'est la première requête de chaque appel, donc la
+     * première à attendre une connexion quand le pool est saturé. Hors du
+     * try, l'erreur tombait dans le gestionnaire par défaut de Hono — un
+     * 500 en texte brut, sans le message que la caisse affiche.
+     */
+    let appareil: Awaited<ReturnType<typeof depot.appareilParJeton>>
+    try {
+      appareil = await depot.appareilParJeton(empreinteDe(jeton))
+    } catch (erreur) {
+      return repondreErreur(c, erreur)
+    }
     if (!appareil) {
       // Message identique à celui d'un jeton révoqué : ne pas dire à un
       // curieux si le jeton existe.
@@ -1401,7 +1412,27 @@ export function creerServeur({
     }
   })
 
+  /*
+   * Le filet : une route qui laisserait échapper une exception rend quand
+   * même une réponse JSON du protocole — 503 si le pool est saturé, 500
+   * sinon — et jamais la page texte par défaut de Hono, que la caisse ne
+   * sait pas lire.
+   */
+  app.onError((erreur, c) => repondreErreur(c, erreur))
+
   return app
+}
+
+/**
+ * L'attente d'une connexion au pool a dépassé `connectionTimeoutMillis`.
+ * `pg-pool` ne pose pas de code : on reconnaît son message, le seul repère
+ * stable qu'il donne.
+ */
+export function estPoolSature(erreur: unknown): boolean {
+  return (
+    erreur instanceof Error &&
+    /timeout exceeded when trying to connect/i.test(erreur.message)
+  )
 }
 
 function reponseErreur(c: ContexteKaissi, erreur: unknown) {
@@ -1409,6 +1440,27 @@ function reponseErreur(c: ContexteKaissi, erreur: unknown) {
     const corps: ReponseErreur = { erreur: erreur.code, message: erreur.message }
     return c.json(corps, erreur.statut as 400)
   }
+  /*
+   * Saturé n'est pas cassé. Sous une vague de reconnexions, une requête
+   * peut attendre une connexion libre plus longtemps que le délai du pool :
+   * rien n'a été écrit (la transaction n'a même pas commencé), et la caisse
+   * n'a qu'à réessayer. Un « erreur inattendue » en rouge dans les journaux
+   * ferait chercher une panne là où il n'y a qu'une file d'attente.
+   */
+  if (estPoolSature(erreur)) {
+    journal.avertissement('pool saturé : requête renvoyée à la caisse pour réessai', {
+      route: c.req.path,
+    })
+    const corps: ReponseErreur = {
+      erreur: 'serveur_occupe',
+      message:
+        'Le serveur de synchronisation est très sollicité. Vos ventes sont conservées sur ' +
+        'cette caisse et partiront d’elles-mêmes dans quelques secondes.',
+    }
+    c.header('Retry-After', '5')
+    return c.json(corps, 503)
+  }
+
   // Une erreur inattendue ne fuite JAMAIS sa trace vers l'appareil : elle
   // part dans les journaux du serveur, où le support saura la lire.
   journal.erreur('erreur inattendue', { erreur })

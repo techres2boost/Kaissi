@@ -469,6 +469,49 @@ a { color: var(--accent); }
   .laterale-icone { animation: none; transition: none; }
 }
 
+/*
+ * ── La colonne DÉFILE, et ça doit se VOIR ────────────────────────────────
+ *
+ * PANNE OBSERVÉE sur une tablette Android en paysage (650 px de haut) :
+ * « je ne vois pas les onglets à gauche, il n'y a pas de scroll ». La
+ * colonne défilait — mesuré : 1 770 px de contenu pour 650 visibles, et le
+ * doigt la fait bien glisser. Mais Android MASQUE les barres de défilement
+ * au repos : rien ne disait qu'il restait Articles, Paramètres et « Se
+ * déconnecter » sous le bord de l'écran. Une navigation qu'on ne sait pas
+ * faire défiler est une navigation coupée.
+ *
+ * Trois réponses, chacune à une part du problème :
+ *   1. une barre fine et PERMANENTE (le même choix que l'écran Diagnostic
+ *      de la caisse) — elle dit « il y a une suite » ;
+ *   2. un fondu en bas tant qu'il reste du contenu (sticky, il disparaît
+ *      en fin de course parce qu'il rejoint sa place naturelle) ;
+ *   3. sur un écran court, des entrées plus serrées : à 650 px, on passe de
+ *      onze à quinze entrées visibles sans défiler.
+ * Et l'onglet courant est ramené dans le champ au chargement (Navigation).
+ */
+.laterale {
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(126, 198, 148, 0.45) transparent;
+}
+.laterale::-webkit-scrollbar { width: 6px; }
+.laterale::-webkit-scrollbar-track { background: transparent; }
+.laterale::-webkit-scrollbar-thumb { background: rgba(126, 198, 148, 0.45); border-radius: 999px; }
+.laterale::after {
+  content: '';
+  position: sticky; bottom: -1rem;
+  flex-shrink: 0;
+  block-size: 2.25rem; margin-top: -2.25rem; margin-inline: -0.75rem;
+  background: linear-gradient(180deg, rgba(18, 55, 37, 0), #123725 85%);
+  pointer-events: none;
+}
+@media (max-height: 760px) and (min-width: 60.01rem) {
+  .laterale { gap: 0.6rem; padding-block: 0.75rem; }
+  .laterale nav { gap: 0.6rem; }
+  .laterale-groupe { gap: 0.1rem; }
+  .laterale nav a { padding-block: 0.45rem; }
+}
+
 .bouton-menu, .barre-mobile { display: none; }
 .voile { display: none; }
 

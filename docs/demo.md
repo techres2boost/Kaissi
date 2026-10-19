@@ -1227,3 +1227,20 @@ avec l'offre Pro de Supabase.
 La couleur reste sur les onglets de catégorie. Le trait en tête de tuile se
 lisait comme une pastille coupée.
 
+## 23. Tablette, 1000 commandes par heure (19 octobre)
+
+### 23.1 La colonne du back-office sur une tablette en paysage
+
+Sur un écran de 650 px de haut, la colonne de gauche ne montre pas tout :
+Articles, Paramètres et « Se déconnecter » sont plus bas. Elle se fait
+défiler au doigt — et ça se VOIT maintenant : une barre fine permanente, un
+fondu en bas tant qu'il reste des onglets, des entrées plus serrées sur un
+écran court, et l'onglet ouvert ramené dans le champ.
+
+### 23.2 1000 commandes par heure
+
+`docs/charge-et-securite.md` : 1000 commandes dans UN restaurant, dix
+caisses, cinq gérants sur le tableau de bord — 36 secondes de travail pour
+le serveur, zéro erreur. Et le stress jusqu'à 400 caisses simultanées :
+aucune vente perdue ni doublée, même au-delà de la limite.
+

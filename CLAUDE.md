@@ -645,6 +645,11 @@ pnpm pos:version [--monter]
 # sécurité, contre un vrai PostgreSQL. Résultats : docs/charge-et-securite.md
 pnpm --filter @kaissi/sync test:charge     # KAISSI_CHARGE=lourd pour ×5
 
+# Stress : 1000 commandes dans UN établissement avec le tableau de bord
+# ouvert, montée jusqu'à 400 caisses (KAISSI_STRESS=1), tempête de
+# reconnexion. Même au-delà de la limite : aucune vente perdue ni doublée.
+pnpm --filter @kaissi/sync exec vitest run test/stress.test.ts --silent=false
+
 # Le plugin Java d'impression compile — un JDK suffit, aucun SDK Android
 pnpm verifier:natif
 

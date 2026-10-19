@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   BookOpen,
   Boxes,
@@ -278,6 +278,18 @@ export function Navigation({
    * chaque ouverture.
    */
   const [ouvert, setOuvert] = useState(false)
+
+  /*
+   * L'onglet courant, ramené dans le champ de la colonne. Sur une tablette
+   * en paysage, « Périodes de travail » ou « Caisses » sont SOUS le bord :
+   * on ouvrait l'écran, et la colonne montrait le haut de la liste, sans
+   * l'onglet allumé — on ne savait plus où l'on était.
+   */
+  useEffect(() => {
+    document
+      .querySelector('.laterale [aria-current="page"]')
+      ?.scrollIntoView({ block: 'nearest' })
+  }, [cheminActuel])
 
   const visible = (o: Onglet) =>
     etablissement.preparation

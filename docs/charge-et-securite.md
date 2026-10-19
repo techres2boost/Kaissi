@@ -59,6 +59,77 @@ un seul restaurant est un cas d'école.
 > et de doublon sous concurrence, et la forme de la courbe. La vérité de
 > production se lit dans l'écran **Surveillance** (`docs/deploiement.md` § 6).
 
+## 1000 commandes par heure, et le stress jusqu'à la rupture
+
+> « Fais des tests comme si on avait 1000 commandes par heure, et des stress
+> tests. »
+
+```bash
+pnpm --filter @kaissi/sync exec vitest run test/stress.test.ts --silent=false
+KAISSI_STRESS=1 pnpm --filter @kaissi/sync exec vitest run test/stress.test.ts --silent=false   # jusqu'à 400 caisses
+```
+
+`apps/sync/test/stress.test.ts`, même banc que la charge
+(`test/banc-charge.ts` : la caisse simulée parle le protocole du POS). En
+stress, elle se comporte comme la VRAIE caisse : délai de 15 s, outbox
+intacte sur une erreur, nouvel essai. Au-delà de la limite, des requêtes
+peuvent échouer ; ce qui ne se négocie jamais, même là : **aucune vente
+perdue, aucune dupliquée, totaux au millime** — vérifié à chaque palier.
+
+### Résultats (19 octobre 2026, base locale, pool de 10 connexions)
+
+| Scénario | Caisses | Commandes | Durée | Push p50 | Push p95 | Erreurs 5xx | Sans réponse (15 s) |
+|---|---|---|---|---|---|---|---|
+| **E — 1000 commandes, UN établissement**, 5 gérants sur le tableau de bord | 10 | 1 000 | 36,6 s | 76 ms | 101 ms | 0 | 0 |
+| F — 25 caisses simultanées | 25 | 75 | 3,6 s | 201 ms | 377 ms | 0 | 0 |
+| F — 50 caisses | 50 | 150 | 6,9 s | 375 ms | 656 ms | 0 | 0 |
+| F — 100 caisses | 100 | 300 | 15,2 s | 851 ms | 1,4 s | 0 | 0 |
+| F — 200 caisses | 200 | 600 | 38,2 s | 2,2 s | 3,4 s | 0 | 0 |
+| F — 400 caisses | 400 | 1 200 | 84 s | 4,3 s | 6,8 s | 0 | 0 |
+| G — tempête : 50 caisses × 20 ventes, même seconde | 50 | 1 000 | 17,5 à 18,4 s | 5,0 à 5,5 s | 11,7 à 15 s | 0 | 3 à 6 (deux passages) |
+| G — tempête : 100 caisses × 20 ventes | 100 | 2 000 | 38,7 s | 10,2 s | 15 s | 0 | 102 |
+
+**Lecture.**
+
+- **1000 commandes par heure : 36 secondes de travail.** Le service absorbe
+  donc environ **98 heures de pointe de ce volume en une heure**, dans le
+  pire cas — un seul établissement, où toutes les caisses se rangent
+  derrière le même verrou de numérotation (0043) — et pendant que cinq
+  gérants rafraîchissent le tableau de bord toutes les 250 ms (p95 des
+  rapports : 10 ms). Les lectures du back-office ne ralentissent pas les
+  encaissements.
+- **La montée en charge ne casse pas** : jusqu'à 400 caisses connectées
+  ensemble, zéro erreur, et le p95 reste sous le délai de 15 s de la caisse.
+  La latence croît linéairement avec le nombre de caisses : c'est la
+  signature d'une file d'attente sur le pool (10 connexions), pas d'un
+  effondrement.
+- **Ce qui cède en premier, c'est la tempête** : cent caisses DU MÊME
+  restaurant, chacune avec vingt ventes en retard, qui se reconnectent à la
+  même seconde. Certaines requêtes dépassent les 15 s de la caisse, qui
+  abandonne et réessaie — et la vague entière est quand même absorbée en
+  39 s, **sans une vente perdue ni doublée**. Cent caisses dans un seul
+  établissement n'existe pas ; la marge est dans ce chiffre.
+
+**Ce que le stress a trouvé, et qui est corrigé.**
+
+- Sous saturation, l'attente d'une connexion au pool rendait **500 « erreur
+  inattendue »** — en rouge dans les journaux, « Erreur interne du serveur »
+  sur l'écran de la caisse. Ce n'est pas une panne mais une file d'attente :
+  le service rend désormais **503 `serveur_occupe`**, avec `Retry-After` et
+  un message qui dit que les ventes sont conservées
+  (`test/serveur-occupe.test.ts`).
+- La recherche du jeton d'appareil, première requête de chaque appel,
+  n'était dans aucun `try` : sous saturation, Hono rendait un 500 en texte
+  brut que la caisse ne sait pas lire. Elle est protégée, et un `onError`
+  global garantit qu'aucune route ne rend plus autre chose qu'une réponse du
+  protocole.
+
+**Si un jour la tempête devient réelle** (un établissement à quinze
+caisses, une coupure d'une heure en plein service), le premier levier est le
+pool : `max` au-delà de 10, dans la limite des connexions de l'offre
+Supabase. Le second est le pooler de Supabase en mode transaction. Rien de
+cela n'est nécessaire au volume d'aujourd'hui.
+
 ## Ce que les tests ont TROUVÉ — et qui est corrigé
 
 1. **Interblocage du pool de connexions** (scénario C, palier 25 caisses).
