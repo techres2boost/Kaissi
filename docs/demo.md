@@ -1170,7 +1170,8 @@ boutons s'arrêtent avant l'indicateur.
 - **Sur téléphone**, la barre du haut dit OÙ l'on est (« Liste d'articles —
   Snack Lac 1 ») au lieu de « ☰ Menu ».
 - **Liste d'articles** sur téléphone : une ligne par article — le nom et le
-  prix, puis coût, marge et état en petit, puis les actions. Trois fois plus
+  prix, puis coût, marge et état en petit, puis les actions. Un article
+  prend environ 230 px de haut au lieu de 400 : près de deux fois plus
   d'articles à l'écran qu'avant.
 - **Tableau de bord** : les indicateurs portent leur état en point, le chiffre
   est plus grand ; les périodes sont un sélecteur segmenté.

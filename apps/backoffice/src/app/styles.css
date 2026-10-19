@@ -1826,8 +1826,8 @@ button.danger-plein:disabled { opacity: 0.55; cursor: not-allowed; }
    *        Couscous poulet                      19,000 TND
    *        Coût 7,200 · Marge 62 %  [en vente]   ↑ ↓ Modifier …
    *    Le nom et le prix d'abord, alignés — c'est ce qu'on cherche ; le
-   *    reste en petit, sur une seconde ligne. Trois fois plus d'articles
-   *    à l'écran, et rien de masqué.
+   *    reste en petit, sur une seconde ligne. Environ 230 px par article au
+   *    lieu de 400 — près du double à l'écran, et rien de masqué.
    */
   .enveloppe .tableau-articles tr:not(.ligne-groupe):not(.ligne-edition) {
     display: grid;
