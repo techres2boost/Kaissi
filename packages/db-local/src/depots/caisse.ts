@@ -416,6 +416,14 @@ export function depotCaisse(db: AdaptateurSqlite) {
          -- il ne doit plus rien allumer en salle.
          LEFT JOIN kitchen_ready k
                 ON k.order_id = o.id AND k.cleared_at IS NULL
+               -- « Prêt » couvre des ENVOIS (0046 / locale 017) : un envoi
+               -- postérieur au rang du marqueur — ou pas encore remonté, donc
+               -- sans rang — n'a pas été vu par la cuisine. Le badge s'éteint.
+               -- Un marqueur sans rang garde l'ancien sens : il couvre tout.
+               AND (k.sent_seq IS NULL OR NOT EXISTS (
+                     SELECT 1 FROM order_events e
+                      WHERE e.order_id = o.id AND e.type = 'order.sent'
+                        AND (e.server_seq IS NULL OR e.server_seq > k.sent_seq)))
          WHERE o.status IN ('ouverte','envoyee')
          ORDER BY o.opened_at`,
       )

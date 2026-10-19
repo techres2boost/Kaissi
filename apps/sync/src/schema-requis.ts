@@ -116,6 +116,18 @@ export const SONDES: readonly SondeMigration[] = [
            where conname = 'order_events_type_check'
              and pg_get_constraintdef(oid) like '%refund.recorded%'))`,
   },
+  {
+    migration: '0046',
+    objet: 'orders.last_sent_seq, order_items.sent_seq, kitchen_ready.sent_seq',
+    sql:
+      `(${colonne('orders', 'last_sent_seq')} and ${colonne('order_items', 'sent_seq')}` +
+      ` and ${colonne('kitchen_ready', 'sent_seq')})`,
+  },
+  {
+    migration: '0047',
+    objet: 'push_subscriptions.alertes_preparation',
+    sql: colonne('push_subscriptions', 'alertes_preparation'),
+  },
 ]
 
 /** La requête unique : un tableau de booléens, dans l'ordre de `SONDES`. */

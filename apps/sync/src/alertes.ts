@@ -32,7 +32,7 @@
  */
 
 import webpush from 'web-push'
-import type { AbonnementPush, DepotSync, ProduitEnAlerte } from './depot.js'
+import type { AbonnementPush, DepotSync, EnvoiCuisine, ProduitEnAlerte } from './depot.js'
 import { journal } from './journal.js'
 
 /**
@@ -424,6 +424,75 @@ export async function balayerAlertesStock(
     )
     return { ouvertes: 0, closes: 0, pushEnvoyes: 0, emailsEnvoyes: 0, erreur: message }
   }
+}
+
+// ── Arrivées en préparation (0047) ─────────────────────────────────────────
+
+const LIBELLE_TYPE: Record<string, string> = {
+  dine_in: 'Sur place',
+  takeaway: 'À emporter',
+  delivery: 'Livraison',
+}
+
+/**
+ * « Nouvelle commande — Table 3 » / « Ajout — Table 3 », et les plats.
+ *
+ * Le corps ne porte QUE les plats de cet envoi : sur un ajout, la cuisine
+ * n'a pas à relire ce qu'elle a déjà servi. Aucun montant — la cuisine
+ * prépare, elle n'encaisse pas.
+ */
+export function messagePreparation(envoi: EnvoiCuisine): { titre: string; corps: string } {
+  const ou = envoi.table
+    ? `Table ${envoi.table}`
+    : (LIBELLE_TYPE[envoi.type] ?? envoi.numero ?? 'Commande')
+  const plats = envoi.lignes.map((l) => `${l.quantite}× ${l.designation}`)
+  return {
+    titre: `${envoi.ajout ? 'Ajout' : 'Nouvelle commande'} — ${ou}`,
+    corps:
+      plats.length <= 4
+        ? plats.join(', ')
+        : `${plats.slice(0, 4).join(', ')} et ${plats.length - 4} autre(s)`,
+  }
+}
+
+/**
+ * Prévient la cuisine et le bar qu'un envoi les attend.
+ *
+ * Seuls les navigateurs qui l'ont DEMANDÉ (`alertes_preparation`), et
+ * seulement pour leur POSTE. Ne lance jamais : une notification perdue ne
+ * doit pas faire échouer le push d'une vente — l'écran de préparation, lui,
+ * fait foi et sonne de son côté.
+ */
+export async function notifierPreparation(
+  depot: DepotSync,
+  envois: readonly EnvoiCuisine[],
+  options: { readonly vapid?: ConfigVapid | null } = {},
+): Promise<number> {
+  const vapid = options.vapid ?? configVapidDepuisEnvironnement()
+  if (!vapid || !depot.abonnementsPreparation) return 0
+  webpush.setVapidDetails(vapid.sujet, vapid.clePublique, vapid.clePrivee)
+  let partis = 0
+  for (const envoi of envois) {
+    if (envoi.lignes.length === 0) continue
+    const postes = [
+      ...new Set(envoi.lignes.map((l) => l.stationId).filter((id): id is string => id !== null)),
+    ]
+    const abonnes = await depot.abonnementsPreparation(envoi.restaurantId, postes)
+    const { titre, corps } = messagePreparation(envoi)
+    for (const a of abonnes) {
+      const issue = await envoyerPush(a, {
+        titre,
+        corps,
+        url: `/${envoi.restaurantId}/preparation`,
+        // Une notification PAR commande : deux tables qui arrivent ensemble
+        // sont deux notifications, pas une qui écrase l'autre.
+        tag: `kaissi-preparation-${envoi.orderId}`,
+      })
+      if (issue === 'envoye') partis += 1
+      if (issue === 'expire') await depot.supprimerAbonnement(a.endpoint)
+    }
+  }
+  return partis
 }
 
 /** Intervalle par défaut entre deux balayages d'alertes, en minutes. */

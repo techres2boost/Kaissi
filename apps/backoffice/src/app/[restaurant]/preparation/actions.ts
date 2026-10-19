@@ -25,9 +25,17 @@ export interface Resultat {
  * conflit laisserait `cleared_at` posé, et le plat resterait éteint sur la
  * tablette du serveur alors que la cuisine vient de le déclarer prêt.
  */
+/**
+ * `rangEnvoi` : le dernier envoi que la cuisine avait À L'ÉCRAN (0046).
+ *
+ * Pas celui de la base au moment du clic : un ajout arrivé entre
+ * l'affichage et le clic n'a pas été vu, donc pas préparé. Le « prêt » ne le
+ * couvre pas, et la commande reviendra au prochain rafraîchissement.
+ */
 export async function marquerPrete(
   restaurantId: string,
   orderId: string,
+  rangEnvoi: number | null,
 ): Promise<Resultat> {
   try {
     const { session, etablissement } = await etablissementObligatoire(restaurantId)
@@ -41,6 +49,7 @@ export async function marquerPrete(
         ready_by: session.employeId,
         cleared_at: null,
         cleared_by: null,
+        sent_seq: rangEnvoi ?? 0,
       },
       { onConflict: 'order_id' },
     )

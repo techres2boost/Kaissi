@@ -366,6 +366,24 @@ comme celui du restaurant alors qu'il ne couvre qu'une caisse serait un chiffre
 **faux** — et l'écart de caisse est le chiffre que le patron regarde. La vue
 multi-caisses existe déjà au back-office, qui les reçoit tous.
 
+### « Prêt » couvre des ENVOIS, pas une commande pour toujours
+
+`kitchen_ready` est une ligne par commande ; elle porte depuis 0046 le rang
+(`sent_seq`) du dernier envoi que la cuisine avait À L'ÉCRAN en disant
+« prêt ». Une commande est prête si et seulement si
+`kitchen_ready.sent_seq >= orders.last_sent_seq` ; une ligne est NOUVELLE si
+`order_items.sent_seq > kitchen_ready.sent_seq`. Un rang serveur, jamais une
+heure (RÈGLE 4). La caisse applique la même règle sur son journal local : un
+envoi pas encore remonté n'a pas de rang, donc n'est couvert par aucun
+« prêt » (migration locale 017). Sans cela, un ajout envoyé après « prêt »
+arrivait en cuisine déjà coché — vu en démonstration.
+
+La reprojection rend les envois NOUVEAUX (rang supérieur à celui que la
+projection connaissait) : ce sont eux, et eux seuls, qui déclenchent la
+notification push des postes (`alertes_preparation`, 0047). Un renvoi du
+même lot ne re-sonne jamais ; une vente envoyée et encaissée dans le même
+lot ne sonne pas.
+
 ### Le poste de préparation appartient à la CATÉGORIE
 
 `categories.station_id` (migration 0025) est la source de vérité ;
@@ -449,6 +467,16 @@ Le gérant n'a donc rien d'autre à saisir que son e-mail et son mot de passe.
 Ce n'est pas un `server.url` : aucun code ne vient de cette adresse.
 
 ---
+
+### Sur téléphone, un tableau n'élargit JAMAIS la page
+
+Une page plus large que l'écran fait dézoomer Safari : tout paraît « décalé »,
+sur tous les onglets — vu en démonstration. Sous 60 rem, tout tableau défile
+DANS sa carte (`styles.css`, le filet), et les écrans de SAISIE portent
+`className="tableau-pile"` : chaque ligne devient une carte, chaque valeur
+son `data-label`, les actions dans `td.actions-ligne`. Un nouvel écran à
+tableau s'ajoute à `composants/Ecrans.largeur.test.tsx`, qui mesure à 390 et
+320 px, en français et en arabe.
 
 ### Deux langues : le français est la CLÉ, l'arabe une traduction
 

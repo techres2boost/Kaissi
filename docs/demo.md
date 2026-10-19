@@ -1080,3 +1080,62 @@ inexistante : ces chiffres traversent tous les restaurants.
 
 Les résultats mesurés, les quatre défauts que ces tests ont trouvés et
 corrigés, et comment les relancer : `docs/charge-et-securite.md`.
+
+## 20. La cuisine, la salle, et le téléphone
+
+### 20.1 Un ajout après « prêt » revient en cuisine
+
+1. Caisse : table 1, deux plats → **Cuisine**.
+2. Back-office → **Préparation** : **Prêt**. La caisse affiche *Prêt*.
+3. Caisse : ajoute deux plats à la table 1 → **Cuisine**.
+
+**Attendu** : en cuisine, la table 1 revient, marquée **« Ajout »** ; les deux
+nouveaux plats sont en gras avec *nouveau*, les anciens barrés. Sur la
+caisse, le badge *Prêt* s'éteint jusqu'au prochain « prêt ».
+
+C'était le défaut de la démonstration : l'ajout arrivait déjà coché.
+Désormais un « prêt » vaut **jusqu'à l'envoi que la cuisine avait à
+l'écran** (migration 0046) — un envoi postérieur rouvre la commande.
+
+### 20.2 La cuisine sonne quand une commande arrive
+
+1. Back-office → **Préparation** → **« Activer l'alerte sonore et les
+   notifications »** (un toucher, une fois par appareil : les navigateurs
+   l'exigent).
+2. Envoie une commande depuis la caisse.
+
+**Attendu** : en moins de 15 secondes, trois notes, une vibration sur
+téléphone, et une notification système si l'écran n'est pas au premier plan.
+
+**Écran éteint** : touche aussi **« Me notifier des nouvelles commandes, même
+écran éteint »**. La notification arrive alors par push, envoyée par le
+serveur au moment même où la vente est reçue — seulement pour le POSTE de
+l'employé (le barman ne reçoit pas les pizzas). Sur iPhone, il faut d'abord
+ajouter le back-office à l'écran d'accueil (Partager → *Sur l'écran
+d'accueil*) : Apple ne livre les notifications web qu'aux sites installés.
+
+### 20.3 La salle est prévenue quand c'est prêt
+
+La cuisine touche **Prêt** → sur la caisse, où qu'on soit : bandeau
+**« Table 1 — prête en cuisine »**, trois notes, vibration. Il s'efface seul
+au bout de 20 secondes ; le badge *Prêt* reste jusqu'à l'encaissement.
+
+### 20.4 « Back-office » depuis la caisse ne redemande plus le mot de passe
+
+Touche **Back-office** (menu ☰) une première fois : connexion. Reviens à la
+caisse, touche-le de nouveau. **Attendu** : directement l'accueil. Le
+formulaire ne reste que si la caisse a été mise en service avec un AUTRE
+compte que celui qui est ouvert.
+
+### 20.5 Le back-office sur téléphone
+
+Articles, Catégories, Stock, Caisses : chaque ligne devient une petite carte
+— le nom en entier, chaque valeur avec son libellé, les boutons en dessous.
+Les rapports (Tableau de bord, Journée, Ventes…) défilent **dans** leur
+carte. La page ne dépasse plus jamais l'écran : c'était ce dépassement qui
+faisait dézoomer Safari et paraître « tout décalé ».
+
+### 20.6 Tester Android sur ton PC
+
+[`android-sur-pc.md`](android-sur-pc.md) : la tablette virtuelle, la mise en
+service, une journée de service complète et la coupure d'Internet.

@@ -457,6 +457,66 @@ describe('« prêt » annoncé par la cuisine', () => {
     const [commande] = await depotCaisse(db).commandesOuvertes()
     expect(commande!.preteA).toBe('2026-09-04T19:30:00.000Z')
   })
+
+  describe('« prêt » couvre des ENVOIS (Postgres 0046, locale 017)', () => {
+    /*
+     * PANNE OBSERVÉE en démonstration : la cuisine marque la table 1 prête, le
+     * serveur ajoute deux plats et les envoie — la salle voyait toujours
+     * « Prêt », et la cuisine aussi. Le marqueur dit désormais JUSQU'À QUEL
+     * envoi il vaut.
+     */
+    async function envoyer(orderId: string, rangServeur: number | null): Promise<void> {
+      const e = ev(orderId, 'order.sent', { stationIds: [] })
+      await depotJournal(db).ajouter(e)
+      if (rangServeur !== null) {
+        await db.executer('UPDATE order_events SET server_seq = ? WHERE event_id = ?', [
+          rangServeur,
+          e.eventId,
+        ])
+      }
+    }
+    async function pret(orderId: string, rang: number | null): Promise<void> {
+      await db.executer(
+        `INSERT INTO kitchen_ready (order_id, restaurant_id, ready_at, sent_seq) VALUES (?, ?, ?, ?)`,
+        [orderId, 'resto', '2026-09-04T19:30:00.000Z', rang],
+      )
+    }
+
+    it('allumé quand le « prêt » couvre le dernier envoi', async () => {
+      const { orderId } = await commandeALaTable()
+      await envoyer(orderId, 10)
+      await pret(orderId, 10)
+      const [commande] = await depotCaisse(db).commandesOuvertes()
+      expect(commande!.preteA).toBe('2026-09-04T19:30:00.000Z')
+    })
+
+    it('ÉTEINT quand un ajout est envoyé APRÈS le « prêt »', async () => {
+      const { orderId } = await commandeALaTable()
+      await envoyer(orderId, 10)
+      await pret(orderId, 10)
+      await envoyer(orderId, 12)
+      const [commande] = await depotCaisse(db).commandesOuvertes()
+      expect(commande!.preteA).toBeNull()
+    })
+
+    it('ÉTEINT aussi quand cet envoi n’est pas encore remonté (pas de rang)', async () => {
+      const { orderId } = await commandeALaTable()
+      await envoyer(orderId, 10)
+      await pret(orderId, 10)
+      await envoyer(orderId, null)
+      const [commande] = await depotCaisse(db).commandesOuvertes()
+      expect(commande!.preteA).toBeNull()
+    })
+
+    it('un marqueur SANS rang (serveur antérieur) garde l’ancien sens', async () => {
+      const { orderId } = await commandeALaTable()
+      await envoyer(orderId, 10)
+      await pret(orderId, null)
+      await envoyer(orderId, 12)
+      const [commande] = await depotCaisse(db).commandesOuvertes()
+      expect(commande!.preteA).toBe('2026-09-04T19:30:00.000Z')
+    })
+  })
 })
 
 describe('envoi en cuisine', () => {

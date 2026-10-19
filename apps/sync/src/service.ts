@@ -22,7 +22,8 @@ import {
   type EvenementCommande,
   type MutationCatalogue,
 } from '@kaissi/domain'
-import type { AppareilAuthentifie, DepotSync } from './depot.js'
+import type { AppareilAuthentifie, DepotSync, EnvoiCuisine } from './depot.js'
+import { journal } from './journal.js'
 import {
   ErreurSync,
   protocoleSupporte,
@@ -212,9 +213,19 @@ export class ServiceSync {
   // main garde le runtime dans son mode le plus stable, sans flag de
   // transformation expérimentale.
   private readonly depot: DepotSync
+  private readonly surEnvoiCuisine: ((envois: readonly EnvoiCuisine[]) => Promise<unknown>) | null
 
-  constructor(depot: DepotSync) {
+  /**
+   * `surEnvoiCuisine` : prévenir la cuisine et le bar (0047). Appelé APRÈS
+   * la réponse calculée et sans être attendu — une notification ne doit
+   * jamais retarder l'accusé d'une vente, ni le faire échouer.
+   */
+  constructor(
+    depot: DepotSync,
+    surEnvoiCuisine: ((envois: readonly EnvoiCuisine[]) => Promise<unknown>) | null = null,
+  ) {
     this.depot = depot
+    this.surEnvoiCuisine = surEnvoiCuisine
   }
 
   async push(appareil: AppareilAuthentifie, requete: RequetePush): Promise<ReponsePush> {
@@ -341,7 +352,12 @@ export class ServiceSync {
       ]),
     ]
     if (touchees.length > 0) {
-      await this.depot.reprojeter(appareil.restaurantId, touchees)
+      const envois = await this.depot.reprojeter(appareil.restaurantId, touchees)
+      if (envois && envois.length > 0 && this.surEnvoiCuisine) {
+        void this.surEnvoiCuisine(envois).catch((erreur: unknown) =>
+          journal.avertissement('notification de préparation non délivrée', { erreur }),
+        )
+      }
     }
 
     await this.depot.majCurseurs(appareil, { evenements: resultat.curseur }, 'push')

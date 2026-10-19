@@ -28,6 +28,7 @@ import {
   envoyerNotificationTest,
   retirerAbonnement,
   type ResultatAbonnement,
+  type SujetAlerte,
 } from '../app/[restaurant]/stock/notifications.js'
 import { useT } from '../i18n/client.js'
 
@@ -60,10 +61,20 @@ type Etat = 'inconnu' | 'indisponible' | 'refuse' | 'inactif' | 'actif'
 export function BoutonNotifications({
   restaurant,
   clePublique,
+  sujet = 'stock',
+  endpointsActifs,
 }: {
   restaurant: string
   /** `null` : aucune clé VAPID configurée côté serveur. */
   clePublique: string | null
+  /** Ruptures de stock (0028) ou arrivées en préparation (0047). */
+  sujet?: SujetAlerte
+  /**
+   * Les navigateurs de cette personne abonnés à CE sujet, lus en base. Un
+   * navigateur abonné aux ruptures ne l'est pas pour autant à la cuisine :
+   * sans cette liste, le bouton dirait « actif » à tort.
+   */
+  endpointsActifs?: readonly string[]
 }) {
   const t = useT()
   const [etat, setEtat] = useState<Etat>('inconnu')
@@ -87,13 +98,18 @@ export function BoutonNotifications({
       }
       const enregistrement = await navigator.serviceWorker.getRegistration('/sw-alertes.js')
       const abonnement = await enregistrement?.pushManager.getSubscription()
-      if (vivant) setEtat(abonnement ? 'actif' : 'inactif')
+      const actif =
+        !!abonnement && (!endpointsActifs || endpointsActifs.includes(abonnement.endpoint))
+      if (vivant) setEtat(actif ? 'actif' : 'inactif')
     }
     void lire()
     return () => {
       vivant = false
     }
-  }, [])
+    // La liste est relue par le serveur à chaque rendu : on compare son
+    // CONTENU, pas l'identité du tableau.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [endpointsActifs?.join('|')])
 
   const activer = () => {
     setMessage({})
@@ -126,10 +142,11 @@ export function BoutonNotifications({
           setMessage({ erreur: t('Le navigateur n’a pas fourni de clés d’abonnement.') })
           return
         }
-        const resultat = await enregistrerAbonnement(restaurant, {
-          endpoint: abonnement.endpoint,
-          ...cles,
-        })
+        const resultat = await enregistrerAbonnement(
+          restaurant,
+          { endpoint: abonnement.endpoint, ...cles },
+          sujet,
+        )
         setMessage(resultat)
         if (resultat.succes) setEtat('actif')
         // L'abonnement local est ANNULÉ si le serveur n'a pas pu l'écrire :
@@ -156,10 +173,12 @@ export function BoutonNotifications({
       // On prévient le serveur AVANT de se désabonner : l'inverse laisserait
       // une ligne morte en base si l'appel échouait, et le service
       // retenterait indéfiniment un canal qui n'existe plus.
-      const resultat = await retirerAbonnement(restaurant, abonnement.endpoint)
+      const resultat = await retirerAbonnement(restaurant, abonnement.endpoint, sujet)
       setMessage(resultat)
       if (!resultat.erreur) {
-        await abonnement.unsubscribe().catch(() => undefined)
+        // Le navigateur reste abonné s'il sert encore l'AUTRE sujet : le
+        // désabonner couperait aussi les ruptures, ou la cuisine.
+        if (!resultat.restant) await abonnement.unsubscribe().catch(() => undefined)
         setEtat('inactif')
       }
     })
@@ -194,7 +213,11 @@ export function BoutonNotifications({
         <p className="detail">{t('Les notifications ont été refusées pour ce site. Réautorise-les dans les réglages du navigateur (cadenas à gauche de l’adresse), puis recharge la page.')}</p>
       )}
       {etat === 'inactif' && (
-        <button type="button" onClick={activer} disabled={enCours || !clePublique}>{t('🔔 M’alerter des ruptures sur ce navigateur')}</button>
+        <button type="button" onClick={activer} disabled={enCours || !clePublique}>
+          {sujet === 'stock'
+            ? t('🔔 M’alerter des ruptures sur ce navigateur')
+            : t('📲 Me notifier des nouvelles commandes, même écran éteint')}
+        </button>
       )}
       {etat === 'actif' && (
         <span style={{ display: 'inline-flex', gap: '0.5rem', flexWrap: 'wrap' }}>

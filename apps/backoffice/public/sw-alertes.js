@@ -29,15 +29,19 @@ self.addEventListener('push', (evenement) => {
     charge = {}
   }
 
-  const titre = charge.titre || 'Kaissi — alerte de stock'
+  const titre = charge.titre || 'Kaissi'
   evenement.waitUntil(
     self.registration.showNotification(titre, {
-      body: charge.corps || 'Un produit a franchi son seuil de stock.',
-      // `tag` : une nouvelle alerte REMPLACE la précédente au lieu de
-      // s'empiler. Dix notifications non lues ne se lisent pas, elles se
-      // balaient — et on balaie alors aussi la vraie.
-      tag: 'kaissi-stock',
+      body: charge.corps || 'Ouvrez Kaissi pour voir le détail.',
+      // `tag` : une nouvelle alerte de stock REMPLACE la précédente au lieu
+      // de s'empiler — dix notifications non lues ne se lisent pas, elles se
+      // balaient, et on balaie alors aussi la vraie. Les arrivées en
+      // préparation (0047) portent leur propre tag, PAR COMMANDE : deux
+      // tables arrivées ensemble sont deux plateaux à préparer.
+      tag: charge.tag || 'kaissi-stock',
       renotify: true,
+      // Une commande à préparer insiste jusqu'à ce qu'on la touche.
+      requireInteraction: typeof charge.tag === 'string' && charge.tag.startsWith('kaissi-preparation'),
       data: { url: charge.url || '/' },
     }),
   )

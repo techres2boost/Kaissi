@@ -23,6 +23,7 @@
 import { etablissementObligatoire } from '../../../serveur/session.js'
 import { supabaseServeur } from '../../../serveur/supabase.js'
 import { TableauCuisine, type CommandeCuisine } from '../../../composants/TableauCuisine.js'
+import { BoutonNotifications } from '../../../composants/BoutonNotifications.js'
 import { traduction } from '../../../i18n/serveur.js'
 
 /**
@@ -51,7 +52,7 @@ export default async function PageCuisine({
 
   const { data: commandes, error } = await supabase
     .from('orders')
-    .select('id, table_id, type, ticket_number, covers, opened_at, sent_at')
+    .select('id, table_id, type, ticket_number, covers, opened_at, sent_at, last_sent_seq')
     .eq('restaurant_id', restaurant)
     .eq('status', 'envoyee')
     // Les plus ANCIENNES d'abord : une cuisine sert dans l'ordre d'arrivée.
@@ -72,13 +73,13 @@ export default async function PageCuisine({
   // Trois lectures parallèles plutôt qu'une jointure imbriquée : PostgREST
   // sait le faire, mais la requête imbriquée devient illisible dès qu'on y
   // ajoute un filtre, et le gain est nul à soixante lignes.
-  const [lignes, tables, postes, pretes] = await Promise.all([
+  const [lignes, tables, postes, pretes, abonnements] = await Promise.all([
     ids.length === 0
       ? { data: [] }
       : supabase
           .from('order_items')
           .select(
-            'id, order_id, designation, qty, modifiers, note, position, voided_at, station_id',
+            'id, order_id, designation, qty, modifiers, note, position, voided_at, station_id, sent_seq',
           )
           .in('order_id', ids)
           .is('voided_at', null)
@@ -98,12 +99,19 @@ export default async function PageCuisine({
       ? { data: [] }
       : supabase
           .from('kitchen_ready')
-          .select('order_id, ready_at')
+          .select('order_id, ready_at, sent_seq')
           // `cleared_at is null` : un « prêt » retiré reste en base pour que
           // le retrait descende jusqu'aux tablettes (0029), mais il ne doit
           // plus rien allumer ici.
           .is('cleared_at', null)
           .in('order_id', ids),
+    // Les navigateurs de CETTE personne abonnés aux arrivées (0047). RLS ne
+    // rend que les siens : pas de filtre sur l'utilisateur à écrire ici.
+    supabase
+      .from('push_subscriptions')
+      .select('endpoint')
+      .eq('restaurant_id', restaurant)
+      .eq('alertes_preparation', true),
   ])
 
   const libelleTable = new Map((tables.data ?? []).map((elt) => [elt.id, elt.label]))
@@ -133,7 +141,24 @@ export default async function PageCuisine({
     : null
 
   const posteActif = posteEpingle ?? (listePostes.some((s) => s.id === poste) ? (poste as string) : null)
-  const preteA = new Map((pretes.data ?? []).map((p) => [p.order_id, p.ready_at]))
+  /*
+   * ── « Prêt » couvre des ENVOIS (0046) ────────────────────────────────
+   *
+   * Un marqueur dont le rang est inférieur au dernier envoi est PÉRIMÉ : le
+   * serveur a ajouté des plats après que la cuisine a dit « prêt ». La
+   * commande redevient à préparer, et seules les lignes de l'envoi nouveau
+   * sont signalées comme telles — la cuisine ne refait pas ce qui est parti.
+   *
+   * Un marqueur sans rang (antérieur à 0046 et non repris) garde l'ancien
+   * sens : il couvre tout.
+   */
+  const marqueurs = new Map((pretes.data ?? []).map((p) => [p.order_id, p]))
+  const dernierEnvoi = new Map((commandes ?? []).map((c) => [c.id, c.last_sent_seq ?? null]))
+  const couvre = (orderId: string) => {
+    const m = marqueurs.get(orderId)
+    if (!m) return false
+    return m.sent_seq === null || m.sent_seq >= (dernierEnvoi.get(orderId) ?? 0)
+  }
 
   const parCommande = new Map<string, CommandeCuisine['lignes'][number][]>()
   for (const l of lignes.data ?? []) {
@@ -149,6 +174,13 @@ export default async function PageCuisine({
         .map((m) => (typeof m?.nom === 'string' ? m.nom : null))
         .filter((m): m is string => m !== null),
       note: l.note,
+      // NOUVELLE : partie après le dernier « prêt ». Les autres ont déjà été
+      // servies — elles restent affichées, en retrait, pour que la cuisine
+      // sache à quelle table s'ajoute ce qu'elle prépare.
+      nouvelle: (() => {
+        const m = marqueurs.get(l.order_id)
+        return !!m && m.sent_seq !== null && l.sent_seq !== null && l.sent_seq > m.sent_seq
+      })(),
     })
     parCommande.set(l.order_id, liste)
   }
@@ -164,12 +196,41 @@ export default async function PageCuisine({
       type: c.type,
       couverts: c.covers,
       envoyeeA: c.sent_at ?? c.opened_at,
-      preteA: preteA.get(c.id) ?? null,
+      /*
+       * Sur un écran FILTRÉ par poste, un ajout qui ne concerne que l'autre
+       * poste ne rouvre pas la commande ici : le barman n'a rien de neuf à
+       * faire pour deux pizzas de plus.
+       */
+      preteA:
+        couvre(c.id) ||
+        (posteActif !== null &&
+          marqueurs.has(c.id) &&
+          !(parCommande.get(c.id) ?? []).some((l) => l.nouvelle))
+          ? (marqueurs.get(c.id)?.ready_at ?? null)
+          : null,
+      ajout:
+        !couvre(c.id) &&
+        marqueurs.has(c.id) &&
+        (posteActif === null || (parCommande.get(c.id) ?? []).some((l) => l.nouvelle)),
+      rangEnvoi: c.last_sent_seq ?? null,
       lignes: parCommande.get(c.id) ?? [],
     }))
 
   return (
     <TableauCuisine
+      notifications={
+        /*
+         * Le téléphone de cuisine posé écran éteint : seul un push le
+         * réveille. L'alerte sonore de l'écran, elle, ne vaut que tant que
+         * la page est ouverte et au premier plan.
+         */
+        <BoutonNotifications
+          restaurant={restaurant}
+          clePublique={process.env['VAPID_PUBLIC_KEY']?.trim() || null}
+          sujet="preparation"
+          endpointsActifs={(abonnements.data ?? []).map((a) => a.endpoint)}
+        />
+      }
       restaurantId={restaurant}
       commandes={aPreparer}
       plafond={PLAFOND}

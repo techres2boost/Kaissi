@@ -77,6 +77,8 @@ select case
   ('0042', exists (select 1 from pg_policies where schemaname = 'kaissi' and tablename = 'subscriptions' and policyname = 'subscriptions_lecture')),
   ('0043', exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'kaissi' and p.proname = 'numerote_evenement_sous_verrou')),
   ('0044', exists (select 1 from pg_policies where schemaname = 'kaissi' and tablename = 'categories' and policyname = 'categories_creation_caisse')),
-  ('0045', (exists (select 1 from information_schema.columns where table_schema = 'kaissi' and table_name = 'refunds' and column_name = 'order_id') and exists ( select 1 from pg_constraint where conname = 'order_events_type_check' and pg_get_constraintdef(oid) like '%refund.recorded%')))
+  ('0045', (exists (select 1 from information_schema.columns where table_schema = 'kaissi' and table_name = 'refunds' and column_name = 'order_id') and exists ( select 1 from pg_constraint where conname = 'order_events_type_check' and pg_get_constraintdef(oid) like '%refund.recorded%'))),
+  ('0046', (exists (select 1 from information_schema.columns where table_schema = 'kaissi' and table_name = 'orders' and column_name = 'last_sent_seq') and exists (select 1 from information_schema.columns where table_schema = 'kaissi' and table_name = 'order_items' and column_name = 'sent_seq') and exists (select 1 from information_schema.columns where table_schema = 'kaissi' and table_name = 'kitchen_ready' and column_name = 'sent_seq'))),
+  ('0047', exists (select 1 from information_schema.columns where table_schema = 'kaissi' and table_name = 'push_subscriptions' and column_name = 'alertes_preparation'))
 ) as t(migration, presente)
  where not presente;

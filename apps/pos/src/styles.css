@@ -1759,3 +1759,31 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .tiroir-langue .choix-langue button.actif {
   background: rgba(126, 198, 148, 0.16); color: #fff; border-color: rgba(126, 198, 148, 0.6);
 }
+
+/* ── « Table 3 — prête » ─────────────────────────────────────────────────
+ * Par-dessus tout, en haut, centré : on le voit en prenant une autre
+ * commande. Il s'efface seul ; le badge « Prêt » de la salle reste. */
+.alerte-prete {
+  position: fixed; z-index: 60;
+  inset-inline: 0; top: calc(env(safe-area-inset-top, 0px) + 0.5rem);
+  display: grid; justify-items: center; gap: 0.4rem;
+  padding-inline: 0.75rem; pointer-events: none;
+}
+.alerte-prete .annonce {
+  pointer-events: auto;
+  display: flex; align-items: center; gap: 0.6rem;
+  max-width: min(32rem, 100%);
+  padding: 0.65rem 0.75rem 0.65rem 1rem; border-radius: var(--rayon);
+  background: var(--accent); color: #fff; font-weight: 700;
+  box-shadow: 0 10px 28px -10px rgba(0, 0, 0, 0.45);
+}
+.alerte-prete .texte { min-width: 0; overflow-wrap: anywhere; }
+.alerte-prete button {
+  margin-inline-start: auto; min-height: 40px; padding: 0 0.9rem;
+  border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.6);
+  background: transparent; color: inherit; font-weight: 700;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .alerte-prete .annonce { animation: arrivee-annonce 0.25s ease-out; }
+  @keyframes arrivee-annonce { from { transform: translateY(-0.75rem); opacity: 0; } }
+}

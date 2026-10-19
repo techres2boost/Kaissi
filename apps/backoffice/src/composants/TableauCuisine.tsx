@@ -14,13 +14,14 @@
  *     ce que la caisse encaisse la commande et la fasse sortir de la liste.
  */
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { destinationSure } from '../serveur/redirection.js'
 import { marquerPrete, retirerPrete } from '../app/[restaurant]/preparation/actions.js'
 import { useT } from '../i18n/client.js'
 import { aTraduire } from '@kaissi/i18n'
+import { activerAlerte, alerteActivee, alerter, desactiverAlerte } from './alerteArrivee.js'
 
 export interface CommandeCuisine {
   id: string
@@ -30,12 +31,21 @@ export interface CommandeCuisine {
   couverts: number | null
   envoyeeA: string
   preteA: string | null
+  /**
+   * Des plats ajoutés APRÈS un « prêt » (0046) : la commande revient, et
+   * l'écran le dit, plutôt que de la montrer comme une neuve.
+   */
+  ajout: boolean
+  /** Le dernier envoi affiché — c'est lui que « Prêt » couvrira. */
+  rangEnvoi: number | null
   lignes: {
     id: string
     designation: string
     quantite: number
     options: string[]
     note: string | null
+    /** Partie après le dernier « prêt » : c'est elle qu'il faut préparer. */
+    nouvelle: boolean
   }[]
 }
 
@@ -56,6 +66,7 @@ function minutesDepuis(iso: string, maintenant: number): number {
 }
 
 export function TableauCuisine({
+  notifications,
   restaurantId,
   commandes,
   plafond,
@@ -63,6 +74,8 @@ export function TableauCuisine({
   posteActif,
   titre,
 }: {
+  /** Le bouton d'abonnement aux notifications push (0047), rendu par la page. */
+  notifications?: React.ReactNode
   restaurantId: string
   commandes: CommandeCuisine[]
   plafond: number
@@ -105,6 +118,44 @@ export function TableauCuisine({
     return () => clearInterval(minuteur)
   }, [router])
 
+  /*
+   * ── L'alerte d'arrivée ──────────────────────────────────────────────
+   *
+   * Une cuisine regarde ses casseroles, pas son écran. À chaque commande
+   * NOUVELLE à préparer — ou chaque ajout sur une commande déjà prête — le
+   * poste sonne, vibre, et notifie s'il n'est pas au premier plan.
+   *
+   * La clé est « commande : rang du dernier envoi » : un ajout change le
+   * rang, donc la clé, donc sonne — exactement comme une commande neuve.
+   * Le premier affichage ne sonne pas : ce qui était déjà là n'est pas une
+   * nouvelle.
+   */
+  const [sonActif, setSonActif] = useState(false)
+  useEffect(() => setSonActif(alerteActivee()), [])
+  const vues = useRef<Set<string> | null>(null)
+  const aFaire = commandes.filter((c) => !c.preteA)
+  const cles = aFaire.map((c) => `${c.id}:${c.rangEnvoi ?? 0}`)
+  useEffect(() => {
+    const precedentes = vues.current
+    vues.current = new Set(cles)
+    if (precedentes === null) return
+    const arrivees = aFaire.filter((c) => !precedentes.has(`${c.id}:${c.rangEnvoi ?? 0}`))
+    if (arrivees.length === 0) return
+    const premiere = arrivees[0]!
+    const ou = premiere.table
+      ? t('Table {table}', { table: premiere.table })
+      : t(LIBELLE_TYPE[premiere.type] ?? premiere.type)
+    alerter(
+      premiere.ajout ? t('Ajout — {ou}', { ou }) : t('Nouvelle commande — {ou}', { ou }),
+      premiere.lignes
+        .filter((l) => !premiere.ajout || l.nouvelle)
+        .map((l) => `${l.quantite}× ${l.designation}`)
+        .join(', '),
+    )
+    // `cles` résume `aFaire` : le tableau lui-même change à chaque rendu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cles.join('|')])
+
   const agir = (action: () => Promise<{ erreur?: string }>) => {
     setErreur(null)
     demarrer(async () => {
@@ -114,7 +165,7 @@ export function TableauCuisine({
     })
   }
 
-  const enAttente = commandes.filter((c) => !c.preteA)
+  const enAttente = aFaire
 
   return (
     <section className="cuisine">
@@ -123,6 +174,32 @@ export function TableauCuisine({
           {titre} <span className="compteur">{enAttente.length}</span>
         </h1>
         <p className="note">{t('Mise à jour automatique toutes les')}{' '}{PERIODE_MS / 1000}{' '}{t('secondes. Une commande sort de cet écran quand la caisse l\'encaisse ou l\'annule.')}</p>
+
+        {/*
+          Le son exige un premier toucher (politique des navigateurs), et la
+          notification une permission : un bouton, une fois par appareil.
+        */}
+        <p>
+          {sonActif ? (
+            <button
+              type="button"
+              className="discret"
+              onClick={() => {
+                desactiverAlerte()
+                setSonActif(false)
+              }}
+            >{t('🔔 Alerte sonore activée — couper')}</button>
+          ) : (
+            <button
+              type="button"
+              className="principal"
+              onClick={() => {
+                void activerAlerte().then(() => setSonActif(true))
+              }}
+            >{t('🔕 Activer l’alerte sonore et les notifications')}</button>
+          )}
+        </p>
+        {notifications}
 
         {/*
           La caisse émet DÉJÀ un bon par poste (Cuisine, Bar). Ce filtre rend
@@ -162,11 +239,12 @@ export function TableauCuisine({
             return (
               <article
                 key={commande.id}
-                className={`bon ${commande.preteA ? 'prete' : ''} ${urgence}`}
+                className={`bon ${commande.preteA ? 'prete' : ''} ${commande.ajout ? 'ajout' : ''} ${urgence}`}
               >
                 <header>
                   <span className="place">
                     {commande.table ? t('Table {table}', { table: commande.table }) : t(LIBELLE_TYPE[commande.type] ?? commande.type)}
+                    {commande.ajout && <span className="etiquette-ajout">{t('Ajout')}</span>}
                   </span>
                   <span className="attente">
                     {attente === null ? '—' : t('{attente} min', { attente })}
@@ -180,7 +258,13 @@ export function TableauCuisine({
 
                 <ul className="plats">
                   {commande.lignes.map((ligne) => (
-                    <li key={ligne.id}>
+                    <li
+                      key={ligne.id}
+                      // Sur un AJOUT, ce qui est déjà parti reste lisible mais
+                      // en retrait : la cuisine prépare le nouveau, et sait à
+                      // quelle table il s'ajoute.
+                      className={commande.ajout ? (ligne.nouvelle ? 'nouvelle' : 'deja-servie') : undefined}
+                    >
                       <span className="quantite">{ligne.quantite}×</span>
                       <span className="designation">
                         {ligne.designation}
@@ -189,6 +273,7 @@ export function TableauCuisine({
                         )}
                         {ligne.note && <small className="note-plat">« {ligne.note} »</small>}
                       </span>
+                      {commande.ajout && ligne.nouvelle && <span className="badge-nouveau">{t('nouveau')}</span>}
                     </li>
                   ))}
                   {commande.lignes.length === 0 && (
@@ -208,7 +293,7 @@ export function TableauCuisine({
                     type="button"
                     className="principal"
                     disabled={enCours}
-                    onClick={() => agir(() => marquerPrete(restaurantId, commande.id))}
+                    onClick={() => agir(() => marquerPrete(restaurantId, commande.id, commande.rangEnvoi))}
                   >{t('Prêt')}</button>
                 )}
               </article>

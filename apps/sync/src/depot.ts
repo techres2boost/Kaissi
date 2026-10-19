@@ -109,6 +109,19 @@ export interface ProduitEnAlerte {
   readonly seuil: number | null
 }
 
+/** Un envoi en cuisine NOUVEAU, à annoncer aux postes de préparation (0047). */
+export interface EnvoiCuisine {
+  readonly restaurantId: string
+  readonly orderId: string
+  readonly numero: string | null
+  readonly table: string | null
+  readonly type: string
+  /** Un envoi précédent existait : ce sont des plats AJOUTÉS. */
+  readonly ajout: boolean
+  /** Les seules lignes de CET envoi. */
+  readonly lignes: readonly { designation: string; quantite: number; stationId: string | null }[]
+}
+
 /** L'abonnement d'un NAVIGATEUR aux notifications (migration 0028). */
 export interface AbonnementPush {
   readonly id: string
@@ -258,8 +271,18 @@ export interface DepotSync {
     quoi: 'push' | 'pull',
   ): Promise<void>
 
-  /** Reprojette une commande côté serveur depuis son journal. */
-  reprojeter(restaurantId: string, orderIds: readonly string[]): Promise<void>
+  /**
+   * Reprojette une commande côté serveur depuis son journal.
+   *
+   * Rend les envois en cuisine NOUVEAUX que cette reprojection a fait
+   * apparaître (0046/0047) — ceux dont le rang dépasse celui que la
+   * projection connaissait. Un renvoi du même lot n'en rend aucun : la
+   * cuisine n'est jamais notifiée deux fois pour le même envoi.
+   */
+  reprojeter(
+    restaurantId: string,
+    orderIds: readonly string[],
+  ): Promise<readonly EnvoiCuisine[] | void>
 
   /**
    * Commandes dont les événements sont arrivés mais dont la projection
@@ -456,6 +479,15 @@ export interface DepotSync {
 
   /** Canaux de notification actifs pour un établissement. */
   abonnementsPush(restaurantId: string): Promise<readonly AbonnementPush[]>
+
+  /**
+   * Les navigateurs abonnés aux arrivées en préparation (0047) dont le POSTE
+   * est concerné : celui de l'appartenance, et tous si elle n'en a pas.
+   */
+  abonnementsPreparation?(
+    restaurantId: string,
+    stationIds: readonly string[],
+  ): Promise<readonly AbonnementPush[]>
 
   /**
    * Change la formule de l'organisation qui possède cet établissement.

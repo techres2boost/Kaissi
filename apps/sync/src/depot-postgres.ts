@@ -29,6 +29,7 @@ import { estUuid, uuidV7 } from '@kaissi/domain'
 import type { MutationCatalogue } from '@kaissi/domain'
 import type {
   AbonnementPush,
+  EnvoiCuisine,
   AppareilAuthentifie,
   AppareilEnrole,
   DemandeEnrolement,
@@ -1138,10 +1139,15 @@ export class DepotPostgres implements DepotSync {
     return rows.map((l) => ({ restaurantId: l.restaurant_id, orderId: l.order_id }))
   }
 
-  async reprojeter(restaurantId: string, orderIds: readonly string[]): Promise<void> {
-    if (orderIds.length === 0) return
+  async reprojeter(
+    restaurantId: string,
+    orderIds: readonly string[],
+  ): Promise<readonly EnvoiCuisine[]> {
+    if (orderIds.length === 0) return []
     const client = await this.pool.connect()
     const produitsTouches = new Set<string>()
+    /** Les envois en cuisine que CETTE reprojection fait apparaître (0047). */
+    const envoisNouveaux: EnvoiCuisine[] = []
     /** Posé sous la connexion, lu une fois celle-ci rendue (voir plus bas). */
     let annonce: { carteChangee: boolean } | null = null
     try {
@@ -1156,6 +1162,7 @@ export class DepotPostgres implements DepotSync {
           [orderId, restaurantId],
         )
         if (rows.length === 0) continue
+        const envois = envoisEnCuisine(rows)
 
         /*
          * ── Une commande qu'on ne sait pas calculer ne bloque pas les autres
@@ -1214,6 +1221,14 @@ export class DepotPostgres implements DepotSync {
 
         await client.query('begin')
         try {
+          // Le rang que la projection connaissait AVANT : seul un envoi qui
+          // le dépasse est nouveau. Un renvoi du même lot ne notifie rien.
+          const { rows: avant } = await client.query<{ last_sent_seq: string | null }>(
+            'select last_sent_seq from kaissi.orders where id = $1',
+            [orderId],
+          )
+          const rangAvant = avant[0]?.last_sent_seq == null ? null : Number(avant[0].last_sent_seq)
+
           // Un numéro de ticket DÉJÀ PRIS ne fait pas disparaître la vente.
           //
           // C'est le défaut qui a rendu deux ventes réelles invisibles au
@@ -1271,9 +1286,9 @@ export class DepotPostgres implements DepotSync {
                stamp_duty_millimes, total_millimes, paid_millimes,
                tax_breakdown, exceptions, opened_at, sent_at, closed_at,
                cancelled_at, cancel_reason, last_event_seq, event_count,
-               discount_id, discount_label, customer_id, customer_name
+               discount_id, discount_label, customer_id, customer_name, last_sent_seq
              ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,
-                       $19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
+                       $19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)
              on conflict (id) do update set
                table_id = excluded.table_id,
                status = excluded.status,
@@ -1299,6 +1314,7 @@ export class DepotPostgres implements DepotSync {
                discount_label = excluded.discount_label,
                customer_id = excluded.customer_id,
                customer_name = excluded.customer_name,
+               last_sent_seq = excluded.last_sent_seq,
                updated_at = now()`,
             [
               etat.id, etat.organizationId, etat.restaurantId, commande.tableId,
@@ -1339,6 +1355,9 @@ export class DepotPostgres implements DepotSync {
                */
               commande.clientId,
               etat.clientNom ?? null,
+              // Le rang du dernier envoi en cuisine (0046) : c'est contre lui
+              // que se mesure un « prêt ».
+              envois.dernier,
             ],
           )
 
@@ -1352,8 +1371,8 @@ export class DepotPostgres implements DepotSync {
                  station_id, tax_rate_id, designation, qty, unit_price_millimes,
                  modifiers_millimes, line_gross_millimes, line_discount_millimes,
                  global_discount_share_millimes, line_total_millimes, line_tax_millimes,
-                 modifiers, note, position, voided_at, discount_id, discount_label
-               ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
+                 modifiers, note, position, voided_at, discount_id, discount_label, sent_seq
+               ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
               [
                 ligne.id, etat.organizationId, etat.restaurantId, orderId,
                 refs.garder('products', 'order_items.product_id', ligne.produitId),
@@ -1369,6 +1388,7 @@ export class DepotPostgres implements DepotSync {
                 ligne.annulee ? ligne.ajouteeA : null,
                 refs.garder('discounts', 'order_items.discount_id', ligne.remise?.reductionId),
                 ligne.remise?.motif ?? null,
+                envois.parLigne.get(ligne.id) ?? null,
               ],
             )
             position += 1
@@ -1458,6 +1478,44 @@ export class DepotPostgres implements DepotSync {
             ])
           }
           await client.query('commit')
+
+          /*
+           * Un envoi NOUVEAU, sur une commande encore en cuisine : on le rend
+           * pour que la cuisine et le bar soient notifiés (0047). Une vente
+           * envoyée ET encaissée dans le même lot — une caisse qui rattrape
+           * sa journée hors ligne — ne sonne pas : il n'y a plus rien à
+           * préparer.
+           */
+          if (
+            envois.dernier !== null &&
+            envois.dernier > (rangAvant ?? 0) &&
+            etat.statut === 'envoyee'
+          ) {
+            const lignesEnvoi = etat.lignes
+              .filter((l) => !l.annulee && envois.parLigne.get(l.id) === envois.dernier)
+              .map((l) => ({
+                designation: l.designation,
+                quantite: l.quantite,
+                stationId: refs.garder('stations', 'order_items.station_id', l.stationId),
+              }))
+            let table: string | null = null
+            if (commande.tableId) {
+              const { rows: t } = await client.query<{ label: string }>(
+                'select label from kaissi.tables where id = $1',
+                [commande.tableId],
+              )
+              table = t[0]?.label ?? null
+            }
+            envoisNouveaux.push({
+              restaurantId,
+              orderId,
+              numero,
+              table,
+              type: etat.type,
+              ajout: rangAvant !== null,
+              lignes: lignesEnvoi,
+            })
+          }
         } catch (erreur) {
           await client.query('rollback').catch(() => undefined)
           throw erreur
@@ -1576,6 +1634,7 @@ export class DepotPostgres implements DepotSync {
         })
       }
     }
+    return envoisNouveaux
   }
 
   // ── Accès au back-office ─────────────────────────────────────────────────
@@ -2200,6 +2259,28 @@ export class DepotPostgres implements DepotSync {
     }
   }
 
+  async abonnementsPreparation(
+    restaurantId: string,
+    stationIds: readonly string[],
+  ): Promise<readonly AbonnementPush[]> {
+    // Le poste vient de l'APPARTENANCE (0025), jamais du nom de la station.
+    // Sans poste rattaché — l'encadrement, un petit établissement — tout.
+    const { rows } = await this.pool.query<AbonnementPush>(
+      `select distinct s.id, s.endpoint, s.p256dh, s.auth
+         from kaissi.push_subscriptions s
+         -- Une appartenance ACTIVE : un employé parti ne reçoit plus rien,
+         -- même si son navigateur est resté abonné.
+         join kaissi.memberships m
+           on m.user_id = s.user_id and m.restaurant_id = s.restaurant_id
+          and m.revoked_at is null
+        where s.restaurant_id = $1
+          and s.alertes_preparation
+          and (m.station_id is null or m.station_id = any($2::uuid[]))`,
+      [restaurantId, stationIds],
+    )
+    return rows
+  }
+
   async abonnementsPush(restaurantId: string): Promise<readonly AbonnementPush[]> {
     const { rows } = await this.pool.query<AbonnementPush>(
       `select id, endpoint, p256dh, auth
@@ -2433,6 +2514,39 @@ interface LigneEvenement {
   payload: unknown
   actor_user_id: string | null
   client_ts: Date | string
+}
+
+/**
+ * Les envois en cuisine d'une commande, lus dans SON journal (0046).
+ *
+ * `dernier` : le `server_seq` du dernier `order.sent` — ce qu'un « prêt »
+ * doit couvrir pour que la commande soit prête.
+ * `parLigne` : pour chaque ligne, le rang de l'envoi qui l'a portée — le
+ * premier `order.sent` qui la SUIT dans l'ordre du serveur. La caisse envoie
+ * toutes les lignes en attente d'un coup ; une ligne ajoutée après le dernier
+ * envoi n'est pas encore partie, et n'a pas de rang.
+ *
+ * L'ordre est celui du SERVEUR (RÈGLE 4), jamais l'horloge des tablettes :
+ * les lignes arrivent ici triées par `server_seq`.
+ */
+export function envoisEnCuisine(
+  rows: readonly { type: string; server_seq: string | number; payload: unknown }[],
+): { dernier: number | null; parLigne: Map<string, number> } {
+  const enAttente: string[] = []
+  const parLigne = new Map<string, number>()
+  let dernier: number | null = null
+  for (const r of rows) {
+    if (r.type === 'line.added') {
+      const ligneId = (r.payload as { ligneId?: unknown } | null)?.ligneId
+      if (typeof ligneId === 'string' && !parLigne.has(ligneId)) enAttente.push(ligneId)
+    } else if (r.type === 'order.sent') {
+      const rang = Number(r.server_seq)
+      for (const id of enAttente) if (!parLigne.has(id)) parLigne.set(id, rang)
+      enAttente.length = 0
+      dernier = rang
+    }
+  }
+  return { dernier, parLigne }
 }
 
 function versEvenement(r: LigneEvenement): EvenementCommande {

@@ -149,7 +149,7 @@ function PostesPreparation({
       {stations.length === 0 ? (
         <p className="vide">{t('Aucun poste. Tant qu’il n’y en a pas, aucune catégorie ne peut être rattachée, et rien n’apparaît sur les écrans de préparation.')}</p>
       ) : (
-        <table>
+        <table className="tableau-pile">
           <thead>
             <tr>
               <th>{t('Poste')}</th>
@@ -169,7 +169,7 @@ function PostesPreparation({
                       poste.nom
                     )}
                   </td>
-                  <td className="nombre">
+                  <td className="nombre" data-label={t('Catégories')}>
                     {rattachees.length === 0 ? (
                       <span className="etiquette inactif">{t('aucune')}</span>
                     ) : (
@@ -177,7 +177,7 @@ function PostesPreparation({
                     )}
                   </td>
                   {modifiable && (
-                    <td style={{ textAlign: 'end', whiteSpace: 'nowrap' }}>
+                    <td className="actions-ligne" style={{ textAlign: 'end', whiteSpace: 'nowrap' }}>
                       <button
                         type="button"
                         className="discret danger"
@@ -260,7 +260,7 @@ export function GestionCategories({
         {categories.length === 0 ? (
           <p className="vide">{t('Aucune catégorie — les produits apparaîtront tous ensemble.')}</p>
         ) : (
-          <table>
+          <table className="tableau-pile">
             <thead>
               <tr>
                 <th>{t('Catégorie')}</th>
@@ -283,18 +283,18 @@ export function GestionCategories({
                       categorie.nom
                     )}
                   </td>
-                  <td>
+                  <td data-label={t('Poste de préparation')}>
                     {categorie.stationId === null ? (
                       <span className="etiquette inactif">{t('non réglé')}</span>
                     ) : (
                       (stations.find((s) => s.id === categorie.stationId)?.nom ?? '—')
                     )}
                   </td>
-                  <td className="nombre">
+                  <td className="nombre" data-label={t('Produits')}>
                     {produits.filter((p) => p.categorieId === categorie.id).length}
                   </td>
                   {modifiable && (
-                    <td style={{ textAlign: 'end', whiteSpace: 'nowrap' }}>
+                    <td className="actions-ligne" style={{ textAlign: 'end', whiteSpace: 'nowrap' }}>
                       <button
                         type="button"
                         className="discret"
@@ -355,12 +355,12 @@ export function GestionCategories({
         <section className="carte">
           <h2>{t('Catégories archivées')}</h2>
           <p className="indication">{t('Archiver n’est pas supprimer : l’historique des ventes garde la référence. Remettre une catégorie la replace en fin de liste.')}</p>
-          <table>
+          <table className="tableau-pile">
             <tbody>
               {archivees.map((categorie) => (
                 <tr key={categorie.id}>
                   <td>{categorie.nom}</td>
-                  <td style={{ textAlign: 'end' }}>
+                  <td className="actions-ligne" style={{ textAlign: 'end' }}>
                     <button
                       type="button"
                       className="discret"

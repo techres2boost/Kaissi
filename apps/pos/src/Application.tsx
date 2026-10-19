@@ -14,6 +14,7 @@ import { demarrer, type ContexteApplication } from './donnees/demarrage.js'
 import { useEtatReseau } from './donnees/reseau.js'
 import { FournisseurApp, useApp } from './etat/contexte.js'
 import { DemandePin } from './composants/DemandePin.js'
+import { AlertePrete } from './composants/AlertePrete.js'
 import { EcranSalle } from './ecrans/EcranSalle.js'
 import { EcranCommande } from './ecrans/EcranCommande.js'
 import { EcranPaiement } from './ecrans/EcranPaiement.js'
@@ -370,6 +371,8 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
         impression={etatImpression}
       />
       {tiroir}
+      {/* « Table 3 — prête » : la cuisine prévient la salle, où qu'on soit. */}
+      <AlertePrete />
 
       <main className="contenu">
         {vue.nom === 'salle' && (

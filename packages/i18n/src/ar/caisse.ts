@@ -521,4 +521,7 @@ export const AR_CAISSE: Readonly<Record<string, string>> = {
   "role|Serveur": "النادل",
   "role|Cuisine": "المطبخ",
   "role|Bar": "البار",
+  "{table} — prête en cuisine": "{table} — جاهزة في المطبخ",
+  "{ticket} — prête en cuisine": "{ticket} — جاهزة في المطبخ",
+  "Vu": "تمّ",
 }

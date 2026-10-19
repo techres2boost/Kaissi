@@ -208,7 +208,9 @@ export const TABLES_MIROIR: Record<
   kitchen_ready: {
     nom: 'kitchen_ready',
     cle: 'order_id',
-    colonnes: ['order_id', 'organization_id', 'restaurant_id', 'ready_at', 'cleared_at'],
+    // `sent_seq` (0046 / locale 017) : jusqu'à quel envoi la cuisine a dit
+    // « prêt ». Absent d'un serveur antérieur : il reste nul.
+    colonnes: ['order_id', 'organization_id', 'restaurant_id', 'ready_at', 'cleared_at', 'sent_seq'],
   },
 }
 

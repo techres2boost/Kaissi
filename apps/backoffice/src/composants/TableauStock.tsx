@@ -88,7 +88,7 @@ export function TableauStock({
         <p className={`message ${message.erreur ? 'erreur' : 'succes'}`}>{t.m(message.texte)}</p>
       )}
 
-      <table>
+      <table className="tableau-pile">
         <thead>
           <tr>
             <th>{t('Produit')}</th>
@@ -123,26 +123,29 @@ export function TableauStock({
             <>
               <tr key={p.id}>
                 <td>{p.nom}</td>
-                <td className="nombre">{formaterTND(millimes(p.prixMillimes))}</td>
-                <td className="nombre">
+                <td className="nombre" data-label={t('Prix')}>{formaterTND(millimes(p.prixMillimes))}</td>
+                <td className="nombre" data-label={t('Coût')}>
                   {p.coutUnitaire === null ? (
                     <span className="detail">{t('non saisi')}</span>
                   ) : (
                     formaterTND(millimes(Math.round(p.coutUnitaire)))
                   )}
                 </td>
-                <td className={`nombre ${p.margeMillimes < 0 ? 'ecart negatif' : ''}`}>
+                <td
+                  className={`nombre ${p.margeMillimes < 0 ? 'ecart negatif' : ''}`}
+                  data-label={t('Marge')}
+                >
                   {formaterTND(millimes(p.margeMillimes))}
                   {p.margeBp !== null && (
                     <small className="detail"> {formaterPourcentage(p.margeBp)} %</small>
                   )}
                 </td>
-                <td className="nombre">{p.suivi ? p.quantite : '—'}</td>
-                <td className="nombre">{p.seuil ?? '—'}</td>
-                <td>
+                <td className="nombre" data-label={t('Quantité')}>{p.suivi ? p.quantite : '—'}</td>
+                <td className="nombre" data-label={t('Seuil')}>{p.seuil ?? '—'}</td>
+                <td data-label={t('État')}>
                   <span className={`etiquette etat-${p.etat}`}>{t(LIBELLE_ETAT[p.etat] ?? p.etat)}</span>
                 </td>
-                <td>
+                <td data-label={t('Stock')}>
                   {/*
                     Deux informations en un bouton : l'état de la carte, et
                     QUI l'a décidé. « Rupture » seul laissait croire à un bug
@@ -199,7 +202,7 @@ export function TableauStock({
                     </div>
                   )}
                 </td>
-                <td>
+                <td className="actions-ligne">
                   <button
                     type="button"
                     className="discret"

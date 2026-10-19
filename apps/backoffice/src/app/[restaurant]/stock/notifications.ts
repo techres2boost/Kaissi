@@ -35,11 +35,25 @@ export interface AbonnementNavigateur {
 export interface ResultatAbonnement {
   erreur?: string
   succes?: string
+  /**
+   * Après un retrait : ce navigateur reste-t-il abonné à AUTRE CHOSE ? Le
+   * désabonnement du navigateur lui-même couperait aussi l'autre sujet.
+   */
+  restant?: boolean
 }
+
+/**
+ * Ce qu'un navigateur veut recevoir : les ruptures de stock (0028), ou les
+ * arrivées en préparation (0047). Un même navigateur peut vouloir les deux —
+ * le gérant qui garde l'écran cuisine ouvert — d'où deux colonnes et non
+ * une ligne par sujet.
+ */
+export type SujetAlerte = 'stock' | 'preparation'
 
 export async function enregistrerAbonnement(
   restaurantId: string,
   abonnement: AbonnementNavigateur,
+  sujet: SujetAlerte = 'stock',
 ): Promise<ResultatAbonnement> {
   const { session, etablissement } = await etablissementObligatoire(restaurantId)
   if (!session.employeId) {
@@ -67,7 +81,18 @@ export async function enregistrerAbonnement(
       endpoint: abonnement.endpoint,
       p256dh: abonnement.p256dh,
       auth: abonnement.auth,
-      alertes_stock: true,
+      /*
+       * On n'écrit QUE le sujet demandé : activer la cuisine ne doit pas
+       * couper les ruptures d'un gérant déjà abonné. Un poste de cuisine
+       * ou de bar, lui, ne reçoit pas les ruptures — elles ouvrent l'écran
+       * Stock, qui lui est fermé.
+       */
+      ...(sujet === 'stock'
+        ? { alertes_stock: true }
+        : {
+            alertes_preparation: true,
+            ...(etablissement.preparation ? { alertes_stock: false } : {}),
+          }),
       updated_at: new Date().toISOString(),
     },
     { onConflict: 'endpoint' },
@@ -87,22 +112,40 @@ export async function enregistrerAbonnement(
     return { erreur: `Abonnement impossible : ${error.message}` }
   }
 
-  revalidatePath(`/${restaurantId}/stock`)
+  revalidatePath(`/${restaurantId}/${sujet === 'stock' ? 'stock' : 'preparation'}`)
   return { succes: 'Alertes activées sur ce navigateur.' }
 }
 
 export async function retirerAbonnement(
   restaurantId: string,
   endpoint: string,
+  sujet: SujetAlerte = 'stock',
 ): Promise<ResultatAbonnement> {
   await etablissementObligatoire(restaurantId)
   const supabase = await supabaseServeur()
-  // RLS borne la suppression aux abonnements de l'appelant : impossible de
+  // RLS borne la modification aux abonnements de l'appelant : impossible de
   // couper les alertes d'un collègue en connaissant son endpoint.
-  const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint)
+  //
+  // On éteint le SUJET, puis on retire la ligne si plus rien n'y est
+  // demandé : couper la cuisine ne doit pas couper les ruptures.
+  const { error } = await supabase
+    .from('push_subscriptions')
+    .update(sujet === 'stock' ? { alertes_stock: false } : { alertes_preparation: false })
+    .eq('endpoint', endpoint)
   if (error) return { erreur: `Désactivation impossible : ${error.message}` }
-  revalidatePath(`/${restaurantId}/stock`)
-  return { succes: 'Alertes désactivées sur ce navigateur.' }
+  const { error: erreurMenage } = await supabase
+    .from('push_subscriptions')
+    .delete()
+    .eq('endpoint', endpoint)
+    .eq('alertes_stock', false)
+    .eq('alertes_preparation', false)
+  if (erreurMenage) return { erreur: `Désactivation impossible : ${erreurMenage.message}` }
+  const { data: reste } = await supabase
+    .from('push_subscriptions')
+    .select('id')
+    .eq('endpoint', endpoint)
+  revalidatePath(`/${restaurantId}/${sujet === 'stock' ? 'stock' : 'preparation'}`)
+  return { succes: 'Alertes désactivées sur ce navigateur.', restant: (reste ?? []).length > 0 }
 }
 
 /**

@@ -13,6 +13,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { clePublique, urlSupabase } from './serveur/supabase.js'
 import { estPublique } from './serveur/routes-publiques.js'
+import { destinationSure } from './serveur/redirection.js'
 
 /**
  * La politique de contenu, avec un nonce RENOUVELÉ à chaque réponse.
@@ -124,6 +125,29 @@ export async function middleware(requete: NextRequest) {
     // il allait, et non sur un accueil qui lui fait tout recommencer.
     versConnexion.searchParams.set('suite', requete.nextUrl.pathname)
     return NextResponse.redirect(versConnexion)
+  }
+
+  /*
+   * ── Déjà connecté : la page de connexion n'a rien à demander ──────────
+   *
+   * PANNE OBSERVÉE sur téléphone. Le bouton « Back-office » de la caisse
+   * ouvre `/connexion?email=…` — pour pré-remplir l'adresse la première
+   * fois. Mais la seconde fois, la session était bien là, et la page
+   * redemandait quand même le mot de passe : on croyait la session perdue.
+   *
+   * On renvoie donc vers la destination, SAUF si la caisse demande un
+   * AUTRE compte que celui qui est ouvert : le gérant à deux adresses doit
+   * alors pouvoir changer, et le formulaire reste — pré-rempli.
+   */
+  if (user && requete.nextUrl.pathname === '/connexion') {
+    const demande = (requete.nextUrl.searchParams.get('email') ?? '').trim().toLowerCase()
+    const ouvert = (user.email ?? '').trim().toLowerCase()
+    if (!demande || demande === ouvert) {
+      const destination = requete.nextUrl.clone()
+      destination.pathname = destinationSure(requete.nextUrl.searchParams.get('suite') ?? '/')
+      destination.search = ''
+      return NextResponse.redirect(destination)
+    }
   }
 
   return reponse

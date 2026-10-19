@@ -1434,4 +1434,11 @@ export const AR_BACKOFFICE: Readonly<Record<string, string>> = {
   "Erreurs récentes": "الأخطاء الأخيرة",
   "Aucune erreur serveur depuis le démarrage du service.": "لا أخطاء خادم منذ تشغيل الخدمة.",
   "Actualisé toutes les {n} s.": "يُحدَّث كل {n} ث.",
+  "Ajout — {ou}": "إضافة — {ou}",
+  "Nouvelle commande — {ou}": "طلب جديد — {ou}",
+  "🔔 Alerte sonore activée — couper": "🔔 التنبيه الصوتي مفعّل — إيقاف",
+  "🔕 Activer l’alerte sonore et les notifications": "🔕 تفعيل التنبيه الصوتي والإشعارات",
+  "Ajout": "إضافة",
+  "nouveau": "جديد",
+  "📲 Me notifier des nouvelles commandes, même écran éteint": "📲 أعلمني بالطلبات الجديدة، حتى والشاشة مطفأة",
 }

@@ -13,7 +13,7 @@ import { Hono, type Context } from 'hono'
 import { hacherPin, pinTropFaible, validerFormatPin, ErreurPin } from '@kaissi/domain'
 import { cors } from 'hono/cors'
 import { bodyLimit } from 'hono/body-limit'
-import type { AppareilAuthentifie, DepotSync } from './depot.js'
+import type { AppareilAuthentifie, DepotSync, EnvoiCuisine } from './depot.js'
 import { jetonDepuisEntete, empreinteDe } from './jeton.js'
 import {
   adresseClient,
@@ -51,6 +51,7 @@ import {
   configEmailDepuisEnvironnement,
   configVapidDepuisEnvironnement,
   notificationDeTest,
+  notifierPreparation,
 } from './alertes.js'
 
 /**
@@ -93,6 +94,11 @@ export interface OptionsServeur {
   readonly editeurs?: readonly string[]
   /** Injectable pour les tests ; par défaut, une instance par serveur. */
   readonly metriques?: Metriques
+  /**
+   * Prévenir la cuisine et le bar d'un envoi (0047). Par défaut : les
+   * notifications push, si les clés VAPID sont configurées. `null` coupe.
+   */
+  readonly surEnvoiCuisine?: ((envois: readonly EnvoiCuisine[]) => Promise<unknown>) | null
 }
 
 function editeursDepuisEnvironnement(): string[] {
@@ -110,9 +116,12 @@ export function creerServeur({
   cleService = cleServiceDepuisEnvironnement(),
   editeurs = editeursDepuisEnvironnement(),
   metriques = new Metriques(),
+  surEnvoiCuisine = configVapidDepuisEnvironnement()
+    ? (envois: readonly EnvoiCuisine[]) => notifierPreparation(depot, envois)
+    : null,
 }: OptionsServeur) {
   const estEditeur = (email: string) => editeurs.includes(email.trim().toLowerCase())
-  const service = new ServiceSync(depot)
+  const service = new ServiceSync(depot, surEnvoiCuisine)
   const app = new Hono<{ Variables: VariablesKaissi }>()
 
   // Les origines de la coque Capacitor sont TOUJOURS autorisées.

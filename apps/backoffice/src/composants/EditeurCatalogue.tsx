@@ -292,7 +292,7 @@ export function EditeurCatalogue({
         {produits.length === 0 ? (
           <p className="vide">{t('Aucun produit. La carte est vide.')}</p>
         ) : (
-          <table style={{ marginTop: '1rem' }}>
+          <table className="tableau-pile" style={{ marginTop: '1rem' }}>
             <thead>
               <tr>
                 <th>{t('Produit')}</th>
@@ -325,22 +325,22 @@ export function EditeurCatalogue({
                       <div className="indication">{produit.description}</div>
                     )}
                   </td>
-                  <td className="nombre">{produit.prixAffiche}</td>
-                  <td className="nombre">
+                  <td className="nombre" data-label={t('Prix')}>{produit.prixAffiche}</td>
+                  <td className="nombre" data-label={t('Coût')}>
                     {produit.coutUnitaire === null ? (
                       <span className="detail">—</span>
                     ) : (
                       formaterTND(millimes(Math.round(produit.coutUnitaire)))
                     )}
                   </td>
-                  <td className="nombre">{margeAffichee(produit)}</td>
-                  <td>
+                  <td className="nombre" data-label={t('Marge')}>{margeAffichee(produit)}</td>
+                  <td data-label={t('État')}>
                     <span className={`etiquette ${produit.disponible ? 'actif' : 'inactif'}`}>
                       {produit.disponible ? t('en vente') : t('retiré')}
                     </span>
                   </td>
                   {modifiable && (
-                    <td style={{ whiteSpace: 'nowrap' }}>
+                    <td className="actions-ligne" style={{ whiteSpace: 'nowrap' }}>
                       {/*
                         L'ordre se règle ici, d'un cran à la fois, DANS la
                         catégorie du produit. Les flèches sont grisées aux
@@ -427,7 +427,7 @@ export function EditeurCatalogue({
           <p className="indication">{t('Rien n’est supprimé : les commandes déjà passées mentionnent toujours ces lignes. Un produit remis revient')}{' '}<strong>{t('hors vente')}</strong>{' '}{t('— le remettre à la carte est une seconde décision.')}</p>
 
           {produitsArchives.length > 0 && (
-            <table style={{ marginTop: '1rem' }}>
+            <table className="tableau-pile" style={{ marginTop: '1rem' }}>
               <thead>
                 <tr>
                   <th>{t('Produit archivé')}</th>
@@ -439,8 +439,8 @@ export function EditeurCatalogue({
                 {produitsArchives.map((p) => (
                   <tr key={p.id}>
                     <td>{p.nom}</td>
-                    <td className="nombre">{p.prixAffiche}</td>
-                    <td style={{ textAlign: 'end' }}>
+                    <td className="nombre" data-label={t('Prix')}>{p.prixAffiche}</td>
+                    <td className="actions-ligne" style={{ textAlign: 'end' }}>
                       <button
                         type="button"
                         className="discret"

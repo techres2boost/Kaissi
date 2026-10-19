@@ -449,6 +449,11 @@ export type Commande = {
   opened_at: Horodatage
   /** Horodatage du premier envoi en cuisine. Alimente l'écran de cuisine. */
   sent_at: Horodatage | null
+  /**
+   * Rang serveur du DERNIER envoi en cuisine (0046). Un « prêt » qui ne le
+   * couvre pas est périmé : la commande est de nouveau à préparer.
+   */
+  last_sent_seq: number | null
   closed_at: Horodatage | null
 }
 
@@ -485,6 +490,8 @@ export type LigneCommande = {
   note: string | null
   position: number
   voided_at: Horodatage | null
+  /** Rang de l'envoi en cuisine qui a porté cette ligne (0046). Nul : pas encore partie. */
+  sent_seq: number | null
 }
 
 export type Remboursement = {
@@ -535,6 +542,8 @@ export type AbonnementPush = {
   p256dh: string
   auth: string
   alertes_stock: boolean
+  /** Notifié à chaque envoi en préparation qui concerne son poste (0047). */
+  alertes_preparation: boolean
   created_at: Horodatage
   updated_at: Horodatage
 }
@@ -621,6 +630,11 @@ export type CuisinePrete = {
    */
   cleared_at: Horodatage | null
   cleared_by: Uuid | null
+  /**
+   * Le dernier envoi que la cuisine avait À L'ÉCRAN en disant « prêt »
+   * (0046). Nul pour un marqueur antérieur à la migration.
+   */
+  sent_seq: number | null
 }
 
 export type Paiement = {

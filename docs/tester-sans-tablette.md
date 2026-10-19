@@ -4,10 +4,13 @@ Tu as un PC Windows et un iPhone. Ça suffit pour tout tester sauf le dernier
 maillon — le papier qui sort. Voici comment, et ce que chaque étape prouve
 réellement.
 
-> **L'iPhone ne servira pas.** Le POS est empaqueté pour Android uniquement.
-> Capacitor sait produire une application iOS, mais cela exige un Mac (Xcode
-> ne tourne pas sous Windows) et un compte développeur Apple. Ce n'est pas
-> prévu avant longtemps : le marché visé est Android.
+> **Pressé ?** Le guide court et à jour, sans l'imprimante :
+> [`android-sur-pc.md`](android-sur-pc.md). Celui-ci reste la référence pour
+> l'imprimante virtuelle — l'impression est éteinte en MVP (`IMPRESSION_ACTIVE`),
+> mais son module reste écrit et testé.
+>
+> **L'iPhone** : la caisse existe aussi sur iOS (TestFlight, construite par la
+> CI sur un Mac distant). Ce guide-ci ne concerne que l'émulateur Android.
 
 ---
 

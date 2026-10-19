@@ -702,6 +702,25 @@ li.note { font-style: italic; margin: 0; }
 }
 .bon.prete .plats { opacity: 0.75; }
 
+/*
+ * AJOUT après un « prêt » (0046) : la commande revient, et le dit. Le bord
+ * passe à l'accent, ce qui est déjà parti s'efface, le nouveau ressort.
+ */
+.bon.ajout { border-inline-start-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.etiquette-ajout {
+  margin-inline-start: 0.5rem; padding: 0.1rem 0.5rem; border-radius: 999px;
+  background: var(--accent); color: var(--sur-accent);
+  font-family: var(--texte, inherit); font-size: 0.75rem; font-weight: 700;
+  vertical-align: middle;
+}
+.bon .plats li.deja-servie { opacity: 0.45; }
+.bon .plats li.deja-servie .designation { text-decoration: line-through; }
+.bon .plats li.nouvelle .designation { font-weight: 700; }
+.badge-nouveau {
+  margin-inline-start: auto; padding: 0.05rem 0.45rem; border-radius: 999px;
+  background: var(--fond-succes); color: var(--succes);
+  font-size: 0.72rem; font-weight: 700; white-space: nowrap;
+}
 .bon > header { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
 .bon .place { font-family: var(--titre); font-size: 1.15rem; font-weight: 700; }
 .bon .attente { font-variant-numeric: tabular-nums; color: var(--attenue); font-size: 0.95rem; }
@@ -1617,3 +1636,86 @@ button.danger-plein:disabled { opacity: 0.55; cursor: not-allowed; }
 /* Le bouton de langue : une icône et le nom de l'AUTRE langue. */
 .choix-langue { display: inline-flex; align-items: center; gap: 0.35rem; }
 .choix-langue[lang='ar'] { font-family: var(--police-arabe), 'IBM Plex Sans Arabic', 'Noto Sans Arabic', Tahoma, sans-serif; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * TÉLÉPHONE — un tableau n'élargit JAMAIS la page
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * PANNE OBSERVÉE sur un iPhone : « tout est décalé », sur presque tous les
+ * onglets. Un tableau plus large que sa carte élargissait la PAGE ; Safari
+ * dézoomait alors pour la montrer en entier, et la barre « Menu », les
+ * cartes, les titres paraissaient rétrécis aux deux tiers de l'écran, avec
+ * un grand vide à droite. Une seule cause, dix écrans.
+ *
+ * Deux remèdes, selon ce qu'on fait du tableau.
+ */
+@media (max-width: 60rem) {
+  /*
+   * 1. LE FILET : tout tableau qui n'a pas mieux défile DANS son cadre.
+   *
+   *    Un tableau de chiffres (rapports, Journée, Reçus) se lit en colonnes :
+   *    le comprimer jusqu'à ce qu'il rentre le rendrait illisible, le
+   *    défilement latéral est la bonne réponse — à condition qu'il reste DANS
+   *    la carte. `display: block` donne au tableau une boîte qui peut
+   *    défiler ; ses lignes gardent leur disposition en colonnes.
+   */
+  .enveloppe table:not(.tableau-pile) {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /*
+   * 2. LES ÉCRANS DE SAISIE s'empilent : une ligne devient une carte.
+   *
+   *    Postes, catégories, articles, stock : on y TAPE un nom, on y touche
+   *    « Archiver ». Faire défiler latéralement pour atteindre un bouton, ou
+   *    saisir dans un champ écrasé à trente pixels — vu sur la capture, le
+   *    nom de la catégorie n'était même plus lisible — n'est pas une
+   *    solution. Chaque valeur porte alors son libellé (`data-label`), puisque
+   *    l'en-tête de colonne disparaît.
+   */
+  .enveloppe .tableau-pile,
+  .enveloppe .tableau-pile tbody { display: block; width: 100%; }
+  .enveloppe .tableau-pile thead { display: none; }
+  .enveloppe .tableau-pile tr {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: 0.35rem 1rem;
+    padding: 0.7rem 0;
+    border-bottom: 1px solid var(--bordure);
+  }
+  .enveloppe .tableau-pile tbody tr:last-child { border-bottom: none; }
+  .enveloppe .tableau-pile td {
+    display: block; border: none; padding: 0;
+    min-width: 0; text-align: start;
+  }
+  /* La première cellule — le nom, ou le formulaire du nom — prend la ligne. */
+  .enveloppe .tableau-pile td:first-child { flex: 1 1 100%; font-weight: 600; }
+  .enveloppe .tableau-pile td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--attenue); font-size: 0.7rem; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  /* Les actions prennent leur propre ligne, et passent à la ligne entre
+     elles plutôt que de pousser le dernier bouton hors de l'écran. Le
+     `!important` l'emporte sur le `white-space: nowrap` posé en ligne pour
+     l'écran large. */
+  .enveloppe .tableau-pile td.actions-ligne {
+    flex: 1 1 100%;
+    display: flex; flex-wrap: wrap; gap: 0.35rem;
+    white-space: normal !important;
+  }
+  /* Titre de groupe (catégorie) et ligne d'édition : toute la largeur. */
+  .enveloppe .tableau-pile tr.ligne-groupe td,
+  .enveloppe .tableau-pile tr.ligne-edition td { flex: 1 1 100%; }
+  .enveloppe .tableau-pile tr.ligne-groupe { padding: 0.9rem 0 0.2rem; border-bottom: none; }
+
+  /* Les formulaires de ligne (nom + poste + Enregistrer) passent à la ligne
+     au lieu d'écraser le champ du nom. */
+  .enveloppe .tableau-pile td form { flex-wrap: wrap; }
+  .enveloppe .tableau-pile td form input:not([type='checkbox']) {
+    flex: 1 1 10rem; min-width: 7rem; max-width: none !important;
+  }
+}
