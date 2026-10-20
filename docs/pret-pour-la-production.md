@@ -53,8 +53,18 @@ venir de nous** :
   logiciels de caisse** — si elle existe pour votre cible, elle conditionne
   la vente elle-même, pas un détail d'affichage.
 
+> **Mise à jour du 20 octobre — la quatrième question a très probablement une
+> réponse, et elle est « oui ».** D'après la presse tunisienne, un arrêté du
+> 14 octobre 2025 impose une caisse **homologuée NACEF** aux cafés et
+> restaurants, par étapes jusqu'en 2028 — et les sociétés y seraient déjà
+> soumises depuis le 1er juillet 2026. ⚠ Texte officiel non consulté : à
+> confirmer au JORT. Analyse, calendrier, sources et plan :
+> [`fonctionnalites-manquantes.md`](fonctionnalites-manquantes.md) §2. Ce
+> point passe désormais devant tous les autres.
+
 **Action** : une séance avec un expert-comptable, ces quatre questions
-écrites, ses réponses consignées dans le dépôt. Rien n'est à coder avant.
+écrites, ses réponses consignées dans le dépôt. Et, sans attendre, le cahier
+des charges du portail homologation.nacef.tn.
 
 ### 2.2 L'impression est éteinte
 

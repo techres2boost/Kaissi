@@ -748,6 +748,16 @@ Le modèle de données est conçu pour les accueillir (`tax_rates` paramétrable
 `fiscal_number` attribué côté serveur) — mais la règle exacte doit venir d'un
 professionnel.
 
+⚠ **La certification n'est probablement plus une hypothèse.** D'après la
+presse tunisienne (non vérifiée au JORT), un arrêté du 14 octobre 2025 impose
+une caisse **homologuée NACEF** — module de sécurisation des données
+fiscales, transmission à une plateforme du ministère, rapport journalier —
+aux cafés et restaurants, par étapes de novembre 2025 à juillet 2028. Avant
+toute fonction touchant au ticket, à la numérotation ou à la clôture, lire
+`docs/fonctionnalites-manquantes.md` §2 et le cahier des charges du portail
+homologation.nacef.tn. La question qui décide de tout : comment une vente
+faite HORS LIGNE y est sécurisée puis transmise.
+
 ---
 
 ## Jalon de décision — moteur de synchronisation : TENU
