@@ -572,4 +572,8 @@ export const AR_CAISSE: Readonly<Record<string, string>> = {
   "Une de moins": "واحدة أقلّ",
   "Une de plus": "واحدة أكثر",
   "{k} sur {n}": "{k} من {n}",
+  // ── Rapport de clôture (Z) ──
+  "Rapport de clôture (Z)": "تقرير الإغلاق (Z)",
+  "La caisse est close. Ce rapport se rouvre à tout moment depuis « Périodes de travail ».": "أُغلق الصندوق. يمكن إعادة فتح هذا التقرير في أيّ وقت من « فترات العمل ».",
+  "Rapport Z": "تقرير Z",
 }

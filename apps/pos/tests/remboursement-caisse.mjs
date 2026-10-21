@@ -245,6 +245,42 @@ await etape('à la clôture, l’argent rendu SORT du tiroir attendu', async () 
   }
 })
 
+await etape('la clôture affiche le rapport Z : TVA par taux et corrections', async () => {
+  // Comptage volontairement faux : l'écart exige alors un motif écrit.
+  await page.locator('.coupures input').first().fill('1')
+  const motif = await page.$('.motif textarea')
+  if (motif) await motif.fill('Test de clôture')
+  await page.click('.bloc-cloture .actions .principal')
+  await page.waitForSelector('.modale:has-text("Rapport de clôture (Z)") .ticket-ecran', { timeout: 15000 })
+  const z = await page.textContent('.modale .ticket-ecran')
+  for (const attendu of ['RAPPORT DE CLOTURE (Z)', 'Total TVA', 'CORRECTIONS', 'Remboursements (2)']) {
+    if (!z.includes(attendu)) throw new Error(`le Z ne contient pas « ${attendu} »`)
+  }
+  await page.click('.modale footer .principal:has-text("Terminer")')
+})
+
+await etape('le Z se rouvre le lendemain depuis « Périodes de travail »', async () => {
+  // La caisse fermée ramène à la prise de poste, Salma présélectionnée.
+  await page.waitForTimeout(800)
+  if (await page.$('text=Prise de poste')) {
+    await page.waitForSelector('.pave', { timeout: 10000 })
+    await pin('2468')
+  }
+  await page.waitForSelector('.ouvrir-tiroir, :text("Ouverture de caisse")', { timeout: 20000 })
+  if (await page.$(':text("Ouverture de caisse")')) {
+    for (const c of ['5', '0']) await page.click(`.pave button:text-is("${c}")`)
+    await page.click('.pave .valider')
+    await page.waitForSelector('.grille-tables', { timeout: 20000 })
+  }
+  await ouvrirTiroir()
+  await page.click('.tiroir-lien:has-text("Périodes de travail")')
+  await page.waitForSelector('.liste-periodes .ouvrir-z', { timeout: 15000 })
+  await page.locator('.liste-periodes .ouvrir-z').first().click()
+  await page.waitForSelector('.modale .ticket-ecran', { timeout: 10000 })
+  const z = await page.textContent('.modale .ticket-ecran')
+  if (!z.includes('Remboursements (2)')) throw new Error('le Z rouvert n’est pas celui de la clôture')
+})
+
 await nav.close()
 if (erreurs.length > 0) {
   console.log(`✗ erreurs de page :\n  ${erreurs.join('\n  ')}`)

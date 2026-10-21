@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
+  detaillerZ,
   millimes,
+  pointsDeBase,
   resumerShift,
   type Millimes,
   type TicketClient,
@@ -317,6 +319,66 @@ describe('rapport de shift', () => {
     const texte = apercuTexte(rendreTicketShift({ ...rapport, closA: null, resume: ouvert }))
     expect(texte).not.toContain('ÉCART')
     expect(texte).toContain('en cours')
+  })
+})
+
+describe('rapport de clôture (Z)', () => {
+  const tva = (nom: string, bp: number, base: number, taxe: number) => ({
+    tauxTaxeId: nom, nom, tauxBp: pointsDeBase(bp), incluse: false,
+    baseHtMillimes: m(base), taxeMillimes: m(taxe),
+  })
+  const resume = resumerShift({
+    shift: {
+      id: 's1', restaurantId: 'r', organizationId: 'o', deviceId: 'd', employeId: 'e',
+      ouvertA: '', fondDeCaisseMillimes: m(50_000),
+      closA: 'x', compteMillimes: m(77_200), noteCloture: null,
+    },
+    encaissements: [{ paiementId: 'p', mode: 'cash', montantMillimes: m(27_200), annule: false }],
+    mouvements: [],
+    nombreCommandes: 2,
+    chiffreAffairesMillimes: m(27_200),
+  })
+  const detail = detaillerZ({
+    ventes: [
+      { numeroTicket: 'P1-000012', totalMillimes: m(11_900), remisesMillimes: m(0), serviceMillimes: m(0), timbreMillimes: m(0), ventilationTaxes: [tva('TVA 19 %', 1900, 10_000, 1_900)] },
+      { numeroTicket: 'P1-000011', totalMillimes: m(15_300), remisesMillimes: m(1_000), serviceMillimes: m(0), timbreMillimes: m(0), ventilationTaxes: [tva('TVA 19 %', 1900, 5_000, 950), tva('TVA 7 %', 700, 8_738, 612)] },
+    ],
+    commandesAnnulees: 1,
+    lignesRetirees: 3,
+    remboursements: [{ montantMillimes: m(4_200) }],
+  })
+
+  it('additionne la TVA PAR TAUX, telle que les tickets l’ont arrondie', () => {
+    expect(detail.tva.map((t) => [t.nom, t.baseHtMillimes, t.taxeMillimes])).toEqual([
+      ['TVA 7 %', 8_738, 612],
+      ['TVA 19 %', 15_000, 2_850],
+    ])
+    expect(detail.totalTvaMillimes).toBe(3_462)
+    expect([detail.premierTicket, detail.dernierTicket]).toEqual(['P1-000011', 'P1-000012'])
+  })
+
+  it('imprime la ventilation et les corrections, même à zéro', () => {
+    const texte = apercuTexte(rendreTicketShift({
+      type: 'shift', etablissement, employe: 'Salma', ouvertA: '08:00', closA: '23:00', resume, detail,
+    }))
+    expect(texte).toContain('RAPPORT DE CLOTURE (Z)')
+    expect(texte).toContain('P1-000011 > P1-000012')
+    expect(texte).toContain('2,850')
+    expect(texte).toContain('Total TVA')
+    expect(texte).toContain('3,462')
+    expect(texte).toMatch(/Commandes annul.es\s+1/)
+    expect(texte).toMatch(/Lignes retir.es\s+3/)
+    expect(texte).toContain('-4,200')
+    // Chaque ligne tient dans la largeur du rouleau.
+    for (const ligne of texte.split('\n')) expect(ligne.length).toBeLessThanOrEqual(42)
+  })
+
+  it('sans détail, l’ancien rapport reste identique', () => {
+    const texte = apercuTexte(rendreTicketShift({
+      type: 'shift', etablissement, employe: 'Salma', ouvertA: '08:00', closA: '23:00', resume,
+    }))
+    expect(texte).toContain('RAPPORT DE CAISSE')
+    expect(texte).not.toContain('CORRECTIONS')
   })
 })
 

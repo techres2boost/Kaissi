@@ -2140,3 +2140,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .alerte-prete .annonce { animation: arrivee-annonce 0.25s ease-out; }
   @keyframes arrivee-annonce { from { transform: translateY(-0.75rem); opacity: 0; } }
 }
+
+/* « Rapport Z » sous un service clos : un geste du lendemain, discret. */
+.liste-periodes .ouvrir-z { margin-block-start: 0.6rem; min-height: 44px; }

@@ -250,7 +250,9 @@ export function rendreTicketShift(
 
   fragments.push(COMMANDES.aligner('centre'), COMMANDES.gras(true))
   fragments.push(normaliserTexte(ticket.etablissement.nom) + LF)
-  fragments.push('RAPPORT DE CAISSE' + LF)
+  // « Z » : le rapport de CLÔTURE, avec son détail. ⚠ Pas un Z fiscal
+  // homologué — voir `DetailZ` dans le domaine.
+  fragments.push((ticket.detail ? 'RAPPORT DE CLOTURE (Z)' : 'RAPPORT DE CAISSE') + LF)
   fragments.push(COMMANDES.gras(false), COMMANDES.aligner('gauche'), separateur(c) + LF)
 
   if (ticket.employe) fragments.push(ligneAlignee('Employé', ticket.employe, c) + LF)
@@ -262,6 +264,41 @@ export function rendreTicketShift(
   fragments.push(
     ligneAlignee("Chiffre d'affaires", mnt(r.chiffreAffairesMillimes), c) + LF,
   )
+  const d = ticket.detail
+  if (d) {
+    if (d.premierTicket) {
+      fragments.push(ligneAlignee('Tickets', `${d.premierTicket} > ${d.dernierTicket}`, c) + LF)
+    }
+    if (d.remisesMillimes > 0) fragments.push(ligneAlignee('Remises', `-${mnt(d.remisesMillimes)}`, c) + LF)
+    if (d.serviceMillimes > 0) fragments.push(ligneAlignee('Service', mnt(d.serviceMillimes), c) + LF)
+    if (d.timbreMillimes > 0) fragments.push(ligneAlignee('Droit de timbre', mnt(d.timbreMillimes), c) + LF)
+    fragments.push(separateur(c) + LF)
+
+    // La TVA par taux, telle que les TICKETS l'ont arrondie — jamais
+    // recalculée sur la base cumulée de la journée.
+    fragments.push(COMMANDES.gras(true), 'TVA' + LF, COMMANDES.gras(false))
+    for (const t of d.tva) {
+      fragments.push(normaliserTexte(`${t.nom}${t.incluse ? ' (incluse)' : ''}`).slice(0, c) + LF)
+      fragments.push(ligneAlignee('  Base HT', mnt(t.baseHtMillimes), c) + LF)
+      fragments.push(ligneAlignee('  Taxe', mnt(t.taxeMillimes), c) + LF)
+    }
+    fragments.push(ligneAlignee('Total TVA', mnt(d.totalTvaMillimes), c) + LF)
+    fragments.push(separateur(c) + LF)
+
+    // Les corrections : zéro partout est la journée normale. Elles sont
+    // imprimées MÊME à zéro — un chiffre absent ne se compare pas d'un soir
+    // à l'autre.
+    fragments.push(COMMANDES.gras(true), 'CORRECTIONS' + LF, COMMANDES.gras(false))
+    fragments.push(ligneAlignee('Commandes annulées', String(d.commandesAnnulees), c) + LF)
+    fragments.push(ligneAlignee('Lignes retirées', String(d.lignesRetirees), c) + LF)
+    fragments.push(
+      ligneAlignee(
+        `Remboursements (${d.remboursements.nombre})`,
+        d.remboursements.montantMillimes > 0 ? `-${mnt(d.remboursements.montantMillimes)}` : mnt(0 as Millimes),
+        c,
+      ) + LF,
+    )
+  }
   fragments.push(separateur(c) + LF)
 
   fragments.push(ligneAlignee('Fond de caisse', mnt(r.fondDeCaisseMillimes), c) + LF)

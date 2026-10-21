@@ -11,7 +11,7 @@
 import { formaterTND, type Millimes } from './monnaie.js'
 import type { EtatCommande } from './reduction.js'
 import type { TotauxCommande, Uuid } from './types.js'
-import type { ResumeShift } from './shift.js'
+import type { DetailZ, ResumeShift } from './shift.js'
 
 export interface EnteteEtablissement {
   readonly nom: string
@@ -91,6 +91,8 @@ export interface TicketShift {
   readonly ouvertA: string
   readonly closA: string | null
   readonly resume: ResumeShift
+  /** Le détail du rapport de clôture. Absent : l'ancien rapport, tel quel. */
+  readonly detail?: DetailZ
 }
 
 export type Ticket = TicketClient | TicketCuisine | TicketShift

@@ -25,11 +25,26 @@ import { useEffect, useState } from 'react'
 import { ecartSignificatif, formaterTND, millimes } from '@kaissi/domain'
 import type { PeriodeTravail } from '@kaissi/db-local'
 import { useApp } from '../etat/contexte.js'
+import { Modale } from '../composants/Modale.js'
+import { TicketEcran } from '../composants/TicketEcran.js'
+import { construireRapportZ } from '../donnees/rapport-z.js'
 import { dateLocale, t } from '../i18n.js'
 
 export function EcranPeriodes({ onRetour }: { readonly onRetour: () => void }) {
-  const { app, version } = useApp()
+  const { app, version, etablissement } = useApp()
   const [periodes, setPeriodes] = useState<PeriodeTravail[] | null>(null)
+  const [rapportZ, setRapportZ] = useState<Uint8Array | null>(null)
+
+  /** Rouvre le Z d'un service clos — le même papier qu'à la clôture. */
+  const ouvrirZ = async (p: PeriodeTravail) => {
+    const shift = await app.caisse.shiftParId(p.id)
+    if (!shift) return
+    const { charge } = await construireRapportZ(app, shift, {
+      etablissement,
+      employe: p.fermeePar ?? p.ouvertePar ?? null,
+    })
+    setRapportZ(charge)
+  }
 
   useEffect(() => {
     let vivant = true
@@ -125,10 +140,21 @@ export function EcranPeriodes({ onRetour }: { readonly onRetour: () => void }) {
                     </>
                   )}
                 </dl>
+                {!enCours && (
+                  <button type="button" className="secondaire ouvrir-z" onClick={() => void ouvrirZ(p)}>
+                    {t('Rapport Z')}
+                  </button>
+                )}
               </li>
             )
           })}
         </ul>
+      )}
+
+      {rapportZ && (
+        <Modale titre={t('Rapport de clôture (Z)')} onFermer={() => setRapportZ(null)}>
+          <TicketEcran charge={rapportZ} />
+        </Modale>
       )}
     </div>
   )

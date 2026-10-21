@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
+  detaillerZ,
   millimes,
   pointsDeBase,
   resumerShift,
@@ -229,6 +230,25 @@ describe('shift de caisse, de bout en bout', () => {
     )
     // Il manque 200 millimes : l'écart est NÉGATIF.
     expect(ligne?.variance_millimes).toBe(-200)
+  })
+
+  it('le détail du Z additionne ce que les tickets ont calculé, au millime', async () => {
+    const caisse = depotCaisse(db)
+    const shiftId = uuidV7()
+    const taxes = await depotCatalogue(db).tauxTaxes()
+    for (const prix of [14_500, 8_500, 4_200]) {
+      await projeterCommande(db, await commandePayee(uuidV7(), prix, taxes[0]!.id), config, { shiftId })
+    }
+    const detail = detaillerZ(await caisse.detailZDe(shiftId))
+    const somme = await db.lireUne<{ tva: number }>(
+      `SELECT SUM(tax_millimes) AS tva FROM orders WHERE shift_id = ? AND status = 'close'`,
+      [shiftId],
+    )
+    expect(detail.totalTvaMillimes).toBe(somme?.tva)
+    expect(detail.tva).toHaveLength(1)
+    expect(detail.commandesAnnulees).toBe(0)
+    expect(detail.lignesRetirees).toBe(0)
+    expect(detail.remboursements).toEqual({ nombre: 0, montantMillimes: 0 })
   })
 
   it('remonte le shift à l ouverture, PUIS à la clôture avec son écart', async () => {

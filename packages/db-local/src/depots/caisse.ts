@@ -10,8 +10,24 @@ import type {
   ModePaiement,
   MouvementCaisse,
   Shift,
+  VenteZ,
+  VentilationTaxe,
 } from '@kaissi/domain'
 import type { AdaptateurSqlite } from '../adaptateur.js'
+
+/**
+ * La ventilation de TVA écrite par la projection. Illisible, elle compte
+ * pour rien plutôt que de faire échouer un rapport de clôture : le total
+ * TTC reste juste, seule la ventilation de CE ticket manque.
+ */
+function lireVentilation(json: string): VentilationTaxe[] {
+  try {
+    const v = JSON.parse(json) as unknown
+    return Array.isArray(v) ? (v as VentilationTaxe[]) : []
+  } catch {
+    return []
+  }
+}
 
 /**
  * Une vente terminée, telle qu'elle apparaît dans « Reçus ».
@@ -376,6 +392,61 @@ export function depotCaisse(db: AdaptateurSqlite) {
         mode: l.type as ModePaiement,
         montantMillimes: l.amount_millimes as Millimes,
       }))
+    },
+
+    /**
+     * Ce que le rapport de clôture (« Z ») additionne : les ventes telles
+     * que la projection les a calculées, et les corrections du service.
+     * Aucun montant n'est recalculé ici — `detaillerZ` ne fait que sommer.
+     */
+    async detailZDe(shiftId: string): Promise<{
+      ventes: VenteZ[]
+      commandesAnnulees: number
+      lignesRetirees: number
+      remboursements: { montantMillimes: Millimes }[]
+    }> {
+      const [ventes, annulees, retirees, remboursements] = await Promise.all([
+        db.lire<{
+          ticket_number: string | null
+          total_millimes: number
+          discount_millimes: number
+          service_millimes: number
+          stamp_duty_millimes: number
+          tax_breakdown: string
+        }>(
+          `SELECT ticket_number, total_millimes, discount_millimes, service_millimes,
+                  stamp_duty_millimes, tax_breakdown
+           FROM orders WHERE shift_id = ? AND status = 'close'`,
+          [shiftId],
+        ),
+        db.lireUne<{ n: number }>(
+          `SELECT COUNT(*) AS n FROM orders WHERE shift_id = ? AND status = 'annulee'`,
+          [shiftId],
+        ),
+        db.lireUne<{ n: number }>(
+          `SELECT COUNT(*) AS n FROM order_items i
+           JOIN orders o ON o.id = i.order_id
+           WHERE o.shift_id = ? AND o.status = 'close' AND i.voided_at IS NOT NULL`,
+          [shiftId],
+        ),
+        db.lire<{ amount_millimes: number }>(
+          'SELECT amount_millimes FROM refunds WHERE shift_id = ?',
+          [shiftId],
+        ),
+      ])
+      return {
+        ventes: ventes.map((v) => ({
+          numeroTicket: v.ticket_number,
+          totalMillimes: v.total_millimes as Millimes,
+          remisesMillimes: v.discount_millimes as Millimes,
+          serviceMillimes: v.service_millimes as Millimes,
+          timbreMillimes: v.stamp_duty_millimes as Millimes,
+          ventilationTaxes: lireVentilation(v.tax_breakdown),
+        })),
+        commandesAnnulees: annulees?.n ?? 0,
+        lignesRetirees: retirees?.n ?? 0,
+        remboursements: remboursements.map((r) => ({ montantMillimes: r.amount_millimes as Millimes })),
+      }
     },
 
     async totauxDe(

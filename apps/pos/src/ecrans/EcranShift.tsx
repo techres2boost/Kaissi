@@ -19,10 +19,12 @@ import {
   type ResumeShift,
   type Shift,
 } from '@kaissi/domain'
-import { rendreTicketShift } from '@kaissi/printing'
 import { IMPRESSION_ACTIVE } from '../config.js'
 import { useApp } from '../etat/contexte.js'
 import { PaveNumerique } from '../composants/PaveNumerique.js'
+import { Modale } from '../composants/Modale.js'
+import { TicketEcran } from '../composants/TicketEcran.js'
+import { construireRapportZ } from '../donnees/rapport-z.js'
 import { t, tm } from '../i18n.js'
 
 interface Props {
@@ -100,6 +102,8 @@ export function EcranClotureShift({ shift, onFerme, onAnnuler }: PropsCloture) {
   const [comptage, setComptage] = useState<Record<number, number>>({})
   const [note, setNote] = useState('')
   const [enCours, setEnCours] = useState(false)
+  /** Le Z de ce service, affiché une fois la caisse close. */
+  const [rapportZ, setRapportZ] = useState<Uint8Array | null>(null)
 
   useEffect(() => {
     let vivant = true
@@ -152,37 +156,48 @@ export function EcranClotureShift({ shift, onFerme, onAnnuler }: PropsCloture) {
       )
       await app.etat.ecrire('shift_courant', '')
 
-      // Impression éteinte (MVP) : le rapport n'entre pas en file. Il reste
-      // consultable — la clôture est écrite dans `shifts`, et le back-office
-      // la restitue dans « Journée ». Rien n'est perdu, rien n'attend une
-      // imprimante qui n'existe pas encore.
+      /*
+       * Le Z se construit sur le service RELU en base, clos : c'est
+       * exactement celui que « Périodes de travail » rouvrira demain.
+       *
+       * Impression éteinte (MVP) : il s'affiche À L'ÉCRAN, et rien n'entre
+       * en file. Allumée, il part en plus à l'imprimante du bar, celle qui
+       * est près de la caisse.
+       */
+      const clos = (await app.caisse.shiftParId(shift.id)) ?? shift
+      const { charge } = await construireRapportZ(app, clos, {
+        etablissement,
+        employe: employe?.nom ?? null,
+      })
       if (IMPRESSION_ACTIVE) {
-        // Le rapport part à l'imprimante du bar, celle qui est près de la caisse.
         const imprimante = [...stations.values()].find((s) => s.hote) ?? null
         await impression.mettreEnFile({
           id: uuidV7(),
           restaurantId: identite.restaurantId,
           kind: 'rapport',
-          charge: rendreTicketShift({
-            type: 'shift',
-            etablissement,
-            employe: employe?.nom ?? null,
-            ouvertA: shift.ouvertA,
-            closA: new Date().toISOString(),
-            resume: {
-              ...resume,
-              compteMillimes: millimes(compte),
-              ecartMillimes: millimes(ecart),
-            },
-          }),
+          charge,
           hote: imprimante?.hote ?? null,
           port: imprimante?.port,
         })
       }
-      onFerme()
+      setRapportZ(charge)
     } finally {
       setEnCours(false)
     }
+  }
+
+  if (rapportZ) {
+    return (
+      <Modale
+        titre={t('Rapport de clôture (Z)')}
+        sousTitre={t('La caisse est close. Ce rapport se rouvre à tout moment depuis « Périodes de travail ».')}
+        pied={
+          <button type="button" className="principal" onClick={onFerme}>{t('Terminer')}</button>
+        }
+      >
+        <TicketEcran charge={rapportZ} />
+      </Modale>
+    )
   }
 
   if (!resume) {
