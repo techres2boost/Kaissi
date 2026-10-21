@@ -361,7 +361,10 @@ Les reçus couvrent tout l'établissement parce que les événements de commande
 (`POST /sync/shifts`) et **jamais retirés** : une tablette ne connaît que ses
 propres services.
 
-L'écran le dit en toutes lettres, une fois, en haut. Afficher un total présenté
+L'écran le dit en toutes lettres, une fois, en haut. Même règle pour la
+**Pointeuse** (0048, `POST /sync/pointages`) : la caisse ne connaît que ses
+pointages, les heures de l'équipe sont au back-office (« Heures
+travaillées »). Afficher un total présenté
 comme celui du restaurant alors qu'il ne couvre qu'une caisse serait un chiffre
 **faux** — et l'écart de caisse est le chiffre que le patron regarde. La vue
 multi-caisses existe déjà au back-office, qui les reçoit tous.
@@ -791,7 +794,8 @@ révélait autre chose.
 - **Les routes ADDITIVES échouent en silence côté client.** `POST /sync/shifts`
   remonte les services de caisse — sans elle, l'écran « Journée » n'a ni fond de
   caisse ni écart. Un serveur antérieur répond 404 : le moteur avale l'erreur et
-  réessaie au cycle suivant. Rien de ce qui n'est pas une vente ne doit pouvoir
+  réessaie au cycle suivant. `POST /sync/pointages` (0048) suit la même règle.
+  Rien de ce qui n'est pas une vente ne doit pouvoir
   mettre le cycle en échec, ni le bandeau en « bloqué ».
 - **Une connexion tenue n'en demande jamais une seconde.** Sous
   `this.pool.connect()` ou `sousIdentite()`, tout passe par CE client — jamais

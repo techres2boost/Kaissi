@@ -1741,14 +1741,20 @@ button { font: inherit; color: inherit; cursor: pointer; }
  * aplat de couleur. Elle vit au milieu de la carte, et un bouton plus voyant
  * que les plats serait touché par erreur en plein service.
  */
-.carte-produit.nouvel-article {
+.carte-produit.nouvel-article,
+.carte-produit.prix-libre {
   background: rgba(255, 255, 255, 0.72);
   border: 1.5px dashed #C9BFA8;
   box-shadow: none;
   color: var(--texte-2);
 }
-.carte-produit.nouvel-article .nom { color: var(--accent); font-weight: 700; }
-.carte-produit.nouvel-article .prix { font-size: 0.75rem; font-weight: 400; }
+.carte-produit.nouvel-article .nom,
+.carte-produit.prix-libre .nom { color: var(--accent); font-weight: 700; }
+.carte-produit.nouvel-article .prix,
+.carte-produit.prix-libre .prix { font-size: 0.75rem; font-weight: 400; }
+/* « Prix libre » est un geste de TOUS les rôles : une classe à lui, jamais
+   celle de « Nouvel article », dont l'absence prouve qu'un caissier ne crée
+   rien à la carte (tests/parcours-caisse.mjs). */
 .carte-produit.prix-libre { border-style: dotted; }
 
 /* Les gestes rares d'une commande (ModalesCommande.tsx). */

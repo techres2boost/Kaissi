@@ -352,7 +352,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
           */}
           <button
             type="button"
-            className="carte-produit nouvel-article prix-libre"
+            className="carte-produit prix-libre"
             disabled={!modifiable}
             onClick={() => setArticleLibre(true)}
           >

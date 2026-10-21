@@ -13,8 +13,8 @@ Ce qui vient de l'extérieur (le cadre légal) est cité avec sa source et marqu
 | | Combien | Ce que c'est |
 |---|---|---|
 | **Obligation légale probable** | 1 | La caisse **homologuée NACEF** (⚠ à confirmer). Elle passe devant tout le reste. |
-| **Gestes de caisse obligatoires** | 5 | Deux sont déjà codés mais **sans bouton** ; un est écrit mais éteint ; deux sont à écrire. |
-| **Attendus, pas bloquants** | 6 | Ce que la concurrence montre en démonstration. |
+| **Gestes de caisse obligatoires** | 5 | **Trois sont faits (21 octobre)** : annuler/libérer une table, transférer, prix libre. Reste l'impression (écrite, éteinte) et la division de l'addition. |
+| **Attendus, pas bloquants** | 6 | **Trois sont faits (21 octobre)** : pointeuse, remboursement d'une partie de ligne, ticket Z. |
 | **Exclus par vous** | 4 | Facturation client, fidélité, livraison et QR, vitrine — **d'accord**, avec une réserve sur le premier (§1). |
 
 ---
@@ -119,7 +119,13 @@ calendrier et la catégorie de chacun de vos futurs clients.
 
 Classés par gravité. Chaque ligne a été vérifiée dans le code.
 
-### 3.1 Annuler une commande, libérer une table ouverte par erreur 🔴
+### 3.1 Annuler une commande, libérer une table ouverte par erreur ✅ fait
+
+> **Fait le 21 octobre.** Ticket → « Plus » → « Libérer la table » (rien
+> saisi : sans gérant) ou « Annuler la commande » (motif, PIN d'un gérant).
+> Une commande qui a reçu un paiement ne s'annule plus : on encaisse le
+> reste, puis on rembourse. Test : `apps/pos/tests/gestes-commande.mjs`.
+
 
 **Le constat, reproduit dans un navigateur.** Un serveur touche la table 3
 par erreur, revient à la salle sans rien saisir : la table reste **« occupée ·
@@ -132,7 +138,11 @@ PIN d'un gérant si des articles ont déjà été envoyés en cuisine).
 
 **Effort** : 1 à 2 jours.
 
-### 3.2 Transférer une table 🔴
+### 3.2 Transférer une table ✅ fait
+
+> **Fait le 21 octobre.** Ticket → « Plus » → « Changer de table » ; les
+> tables occupées ne se choisissent pas. Passer en « à emporter » aussi.
+
 
 Le client change de table : c'est quotidien. **Même situation** :
 `SessionCaisse.transfererTable()` et l'événement `table.moved` existent et
@@ -167,7 +177,13 @@ sur la même note). Ce qui manque, c'est **« chacun paie sa part »** :
 Pour la restauration assise, c'est demandé à chaque service. Un snack au
 comptoir peut s'en passer : commencez par les parts égales.
 
-### 3.5 Article à prix libre (« divers ») 🟡
+### 3.5 Article à prix libre (« divers ») ✅ fait
+
+> **Fait le 21 octobre.** Tuile « Prix libre » en fin de carte, pour tous
+> les rôles : montant, désignation, taux de TVA, poste de préparation. La
+> ligne n'a pas de produit : aucun stock décompté, rangée en « coût non
+> saisi » dans les marges.
+
 
 Le client demande un supplément qui n'est pas à la carte : aujourd'hui, le
 caissier n'a aucun moyen de l'encaisser sans le créer d'abord. Toutes les
@@ -182,11 +198,11 @@ taux de TVA.
 
 | Fonction | Qui l'a | Pourquoi ça peut attendre | Effort |
 |---|---|---|---|
-| Pointeuse (heures travaillées) | Loyverse (payant), Toast, Lightspeed | Forte valeur en démonstration, aucune vente bloquée sans elle. Le PIN existe déjà. | Faible |
-| Rembourser une partie d'une ligne (1 pizza sur 3) | Loyverse, Square | Aujourd'hui une ligne se rembourse entière ; cas rare. | Faible |
+| ✅ Pointeuse (heures travaillées) — **fait le 21/10** | Loyverse (payant), Toast, Lightspeed | Au PIN sur la caisse (même verrouillée) ; « Heures travaillées » au back-office, sorties oubliées à corriger. Migration 0048. | — |
+| ✅ Rembourser une partie d'une ligne (1 pizza sur 3) — **fait le 21/10** | Loyverse, Square | Unités égales, l'écart d'arrondi à la dernière : rendre unité par unité rend le total au millime. | — |
 | Fusionner deux tables | Lightspeed, TouchBistro | Moins fréquent que le transfert (§3.2), qu'il faut faire d'abord. | Moyen |
 | Services (entrée, plat, dessert ; « envoyer la suite ») | Toast, Lightspeed | Restauration assise uniquement, pas notre première cible. | Moyen |
-| Rapport de clôture imprimé (« ticket Z ») | Tout le monde | Dépend de l'impression (§3.3) — et **peut devenir obligatoire** avec NACEF (§2). | Faible |
+| ✅ Rapport de clôture (« ticket Z ») — **fait le 21/10** | Tout le monde | À l'écran à la clôture, imprimé si l'impression est allumée, rouvrable depuis « Périodes de travail ». ⚠ **Pas un Z fiscal** : le Z homologué NACEF (compteurs cumulés, numéro de clôture) viendra du cahier des charges (§2). | — |
 | Pourboire, reçu par SMS ou e-mail | Square, Toast | Peu demandé en Tunisie ; le papier passe avant. | Faible |
 
 ---
@@ -244,7 +260,7 @@ un mois de plus pour des concurrents qui sont déjà homologués.
 
 | Semaine | Quoi |
 |---|---|
-| 1 | Annuler une commande et transférer une table (§3.1, §3.2) · article à prix libre (§3.5) |
+| 1 | ~~Annuler une commande et transférer une table (§3.1, §3.2) · article à prix libre (§3.5)~~ ✅ faits le 21/10 |
 | 2 | Diviser l'addition en parts égales (§3.4) · rallumer l'impression chez un premier client équipé (§3.3) |
 | 3–4 | **Pilote encadré** : 3 à 5 établissements, installés par vous, suivis chaque semaine — ⚠ choisis parmi ceux que l'obligation ne vise **pas encore** (a priori les personnes physiques, jusqu'en 2027 ou 2028 : à faire confirmer par l'expert-comptable pour chacun) |
 

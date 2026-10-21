@@ -272,6 +272,46 @@ Au back-office (§4) : **Reçus** → ticket 1 montre le remboursement et le
 > l'enregistre, le tiroir n'est pas concerné. En **espèces**, il sort du tiroir
 > — c'est ce que la clôture va vérifier.
 
+**Une partie d'une ligne (1 pizza sur 3).** Sur une ligne de plusieurs
+unités, coche-la : elle part entière ; « − » en retire une unité
+(« 1 sur 3 »). Le montant d'une unité est le tiers de ce que la ligne a
+coûté, l'écart d'arrondi part avec la dernière unité rendue — rendre les
+trois en trois fois rend exactement la ligne, au millime. La ligne indique
+ensuite « 1 déjà remboursé(s) » et reste cochable pour les deux autres.
+
+### 3.9 ter Les gestes rares d'une commande
+
+Tout est sous **Plus**, sur le ticket :
+
+1. **Table ouverte par erreur** : touche la table 7, reviens à la salle sans
+   rien saisir — elle est « occupée ». Rouvre-la → **Plus** → **Libérer la
+   table** : aucun code demandé (rien n'a été saisi), la table redevient
+   libre. Le journal garde qui l'a libérée.
+2. **Changer de table** : sur une commande en cours → **Plus** → **Changer de
+   table** → choisis une table libre (les occupées sont grisées). La
+   commande suit, envois en cuisine compris.
+3. **Annuler une commande** qui porte des articles : **Plus** → **Annuler la
+   commande** → un motif → **PIN d'un gérant**. Une commande déjà
+   (partiellement) payée ne s'annule pas : on encaisse, puis on rembourse.
+4. **Prix libre** : la tuile en fin de carte. Montant (TVA comprise ou
+   ajoutée selon le taux, l'écran le dit), désignation (« Divers » par
+   défaut), poste de préparation. Aucun stock n'est décompté.
+
+### 3.9 quater La pointeuse
+
+1. Verrouille la caisse (🔒). Sous la prise de poste : **Pointer mon arrivée
+   ou ma sortie** → Karim → `9753` → **Pointer l'arrivée**. Aucune caisse à
+   ouvrir, aucun réseau nécessaire.
+2. Menu ☰ → **Pointeuse** : Karim apparaît « présent ». **Pointer** → Karim →
+   **Pointer la sortie** : la durée s'affiche.
+3. Au back-office : **Rapports → Heures travaillées** — les heures par
+   employé, toutes caisses confondues. Un pointage resté ouvert plus de
+   16 h est « sortie oubliée » : il n'est **pas** compté tant qu'un gérant
+   n'a pas saisi la sortie sur la ligne (mention « corrigée »).
+
+> Les heures sont celles des tablettes : elles tracent, elles ne prouvent
+> pas. ⚠ Ce n'est pas un registre légal du temps de travail.
+
 ### 3.10 Clôturer la caisse
 
 Encaisse d'abord le **ticket 3** (table 8) par carte. Puis menu ☰ →
@@ -282,6 +322,13 @@ coupure par coupure.
 attendu), qui peut être négatif. Fais volontairement une erreur de 2 dinars
 pour le voir. Le remboursement en espèces du §3.9 bis est **déduit** de
 l'attendu : l'argent rendu est sorti du tiroir.
+
+Après **Clôturer**, le **rapport de clôture (Z)** s'affiche : premier et
+dernier ticket, remises, service, timbre, **TVA par taux** (la somme de ce
+que les tickets ont arrondi, jamais recalculée), puis les **corrections** —
+commandes annulées, lignes retirées, remboursements — imprimées même à zéro.
+Il se rouvre le lendemain : menu ☰ → **Périodes de travail** → **Rapport Z**.
+⚠ Ce n'est pas un Z fiscal homologué.
 
 ### 3.11 Synchroniser
 
@@ -876,7 +923,8 @@ dans le navigateur, puis refais le §2.
 
 | Quoi | Où en est-on |
 |---|---|
-| Rembourser **une partie** de la quantité d'une ligne (1 pizza sur 3) | Une ligne se rembourse entière. Pour une partie, annuler la ligne avant l'encaissement |
+| **Diviser l'addition** (chacun sa part) | Le paiement en plusieurs fois et plusieurs moyens existe ; « divisez par 4 » et « moi, la pizza » pas encore |
+| **Z fiscal homologué** (NACEF) | Le rapport de clôture existe (§3.10) ; le Z homologué attend le cahier des charges ⚠ |
 | **Ticket imprimé en arabe** | Le ticket reste en français : l'imprimante thermique (CP858) n'a pas de caractères arabes, et ses mentions fiscales ⚠ sont à valider par un expert-comptable |
 | **Exports CSV en arabe** | Les en-têtes de colonnes restent en français : ils sont lus par un tableur ou un comptable, et l'import de clients attend `nom`, `telephone`… |
 | **Impression** des tickets et bons | Écrite et testée, mais éteinte dans cette version : tout s'affiche à l'écran, la cuisine lit **Préparation**. Achat, branchement, mise en route et test sans imprimante : [`imprimante.md`](imprimante.md) |
