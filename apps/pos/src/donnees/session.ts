@@ -19,6 +19,8 @@ import {
   calculerTotaux,
   configEffective,
   ErreurRemboursement,
+  estCommandeVide,
+  millimes,
   paiementARembourser,
   construireTicketClient,
   configEtablissement,
@@ -185,7 +187,7 @@ export class SessionCaisse {
     acteur: Employe | null,
     orderId: string,
     ligne: {
-      produitId: string
+      produitId: string | null
       variantId?: string | null
       designation: string
       quantite: number
@@ -207,6 +209,41 @@ export class SessionCaisse {
       acteur,
     )
     return this.appliquer(orderId, [e])
+  }
+
+  /**
+   * Un article à PRIX LIBRE (« divers ») : un supplément qui n'est pas à la
+   * carte, saisi au montant. Sans lui, le caissier devait créer un article
+   * pour un extra d'une seule fois — ou ne pas l'encaisser.
+   *
+   * Il passe par la même règle de calcul que les autres lignes (règle 7) :
+   * seul son prix vient du caissier, la TVA vient du taux choisi. Le montant
+   * est en clair sur le ticket et dans le journal : c'est ce qui le trace.
+   */
+  async ajouterArticleLibre(
+    acteur: Employe | null,
+    orderId: string,
+    article: {
+      designation: string
+      prixMillimes: Millimes
+      tauxTaxeId: string
+      stationId?: string | null
+    },
+  ): Promise<EtatCommande> {
+    if (!Number.isSafeInteger(article.prixMillimes) || article.prixMillimes <= 0) {
+      throw new RefusOperation(t('Saisissez un montant supérieur à zéro.'), false)
+    }
+    // Une DONNÉE, pas un libellé : le ticket et le journal restent en français.
+    const designation = article.designation.trim() || 'Divers'
+    return this.ajouterLigne(acteur, orderId, {
+      produitId: null,
+      designation,
+      quantite: 1,
+      prixBaseMillimes: article.prixMillimes,
+      modificateursMillimes: millimes(0),
+      tauxTaxeId: article.tauxTaxeId,
+      stationId: article.stationId ?? null,
+    })
   }
 
   async changerQuantite(
@@ -554,6 +591,19 @@ export class SessionCaisse {
     // L'annulation d'une commande est une opération d'encadrement : c'est
     // celui qui AUTORISE qui doit en avoir le droit.
     this.garde(autorisePar, 'commande.annuler')
+    /*
+     * Une commande qui a déjà reçu de l'argent ne s'annule pas : l'annuler
+     * ferait disparaître un encaissement du calcul du tiroir, et l'écart de
+     * caisse du soir serait inexplicable. On l'encaisse, puis on rembourse —
+     * deux événements, chacun tracé.
+     */
+    const etat = await this.etatDe(orderId)
+    if (etat.paiements.some((p) => !p.annule)) {
+      throw new RefusOperation(
+        t('Cette commande a déjà reçu un paiement : encaissez le reste, puis remboursez ce qui doit l’être.'),
+        false,
+      )
+    }
     if (motif.trim() === '') {
       throw new RefusOperation(
         t("Une annulation exige un motif écrit : sans lui, le journal d'audit ne sert à rien."),
@@ -564,6 +614,43 @@ export class SessionCaisse {
       orderId,
       'order.cancelled',
       { motif, autorisePar: autorisePar.id },
+      acteur,
+    )
+    return this.appliquer(orderId, [e])
+  }
+
+  /**
+   * Libère une table ouverte PAR ERREUR — sans PIN de gérant.
+   *
+   * PANNE OBSERVÉE : un serveur touche la mauvaise table, revient à la
+   * salle ; la table restait « occupée · 0,000 TND » pour toujours, et
+   * aucun bouton ne la libérait. L'annulation exige un gérant (c'est une
+   * opération d'encadrement), ce qui est juste pour une commande qui a
+   * porté des plats ou de l'argent — et absurde pour une table vide.
+   *
+   * La règle tient donc en une ligne : AUCUN article n'a jamais été saisi
+   * (même retiré depuis — un plat retiré après envoi en cuisine a pu être
+   * servi) et AUCUN paiement n'a été enregistré. Il n'y a alors rien à
+   * protéger. Dans tous les autres cas, c'est `annulerCommande`, avec le
+   * PIN d'un gérant.
+   *
+   * Rien n'est effacé : un `order.cancelled` de plus dans le journal, avec
+   * son motif et le nom de qui a libéré la table.
+   */
+  async libererTableVide(acteur: Employe | null, orderId: string): Promise<EtatCommande> {
+    this.garde(acteur, 'commande.ouvrir')
+    const etat = await this.etatDe(orderId)
+    if (!estCommandeVide(etat)) {
+      throw new RefusOperation(
+        t('Cette commande a déjà des articles ou un paiement : son annulation demande un gérant.'),
+        true,
+      )
+    }
+    this.gardeTransition(etat, 'order.cancelled')
+    const e = await this.evenement(
+      orderId,
+      'order.cancelled',
+      { motif: 'Table ouverte par erreur', autorisePar: acteur!.id },
       acteur,
     )
     return this.appliquer(orderId, [e])

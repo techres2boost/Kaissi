@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  estCommandeVide,
   estFigee,
   estModifiable,
   libelleStatut,
@@ -70,5 +71,29 @@ describe('lignes à envoyer en cuisine', () => {
 
   it('ne rend rien quand tout est déjà envoyé', () => {
     expect(lignesAEnvoyer(lignes, new Set(['a', 'b']))).toHaveLength(0)
+  })
+})
+
+describe('commande vide — libérable sans gérant', () => {
+  const ligne = { annulee: false } as never
+  const paiement = { annule: false } as never
+
+  it('une table ouverte sans rien saisir est vide', () => {
+    expect(estCommandeVide({ statut: 'ouverte', lignes: [], paiements: [] })).toBe(true)
+  })
+
+  it('une ligne RETIRÉE compte : le plat a pu partir en cuisine', () => {
+    const retiree = { annulee: true } as never
+    expect(estCommandeVide({ statut: 'ouverte', lignes: [retiree], paiements: [] })).toBe(false)
+    expect(estCommandeVide({ statut: 'ouverte', lignes: [ligne], paiements: [] })).toBe(false)
+  })
+
+  it('un paiement, même annulé, compte', () => {
+    expect(estCommandeVide({ statut: 'ouverte', lignes: [], paiements: [paiement] })).toBe(false)
+  })
+
+  it('une commande close ou annulée n’est jamais « vide »', () => {
+    expect(estCommandeVide({ statut: 'annulee', lignes: [], paiements: [] })).toBe(false)
+    expect(estCommandeVide({ statut: 'close', lignes: [], paiements: [] })).toBe(false)
   })
 })

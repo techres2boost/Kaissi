@@ -7,13 +7,14 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChefHat, ChevronLeft, Minus, Percent, Plus, Trash2, UserRound } from 'lucide-react'
+import { ChefHat, ChevronLeft, Minus, MoreHorizontal, Percent, Plus, Trash2, UserRound } from 'lucide-react'
 import {
   calculerTotaux,
   formaterPourcentage,
   formaterTND,
   millimes,
   pointsDeBase,
+  estCommandeVide,
   estModifiable,
   peutModifierCatalogue,
   type EtatCommande,
@@ -36,6 +37,12 @@ import { Modale } from '../composants/Modale.js'
 import { DemandePin } from '../composants/DemandePin.js'
 import { TicketEcran } from '../composants/TicketEcran.js'
 import { ModaleNouvelArticle } from '../composants/ModaleNouvelArticle.js'
+import {
+  ModaleAnnulerCommande,
+  ModaleArticleLibre,
+  ModaleAutresActions,
+  ModaleChangerTable,
+} from '../composants/ModalesCommande.js'
 import { IMPRESSION_ACTIVE } from '../config.js'
 import type { Employe } from '@kaissi/domain'
 import { t, tm } from '../i18n.js'
@@ -69,6 +76,10 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
   const [remiseOuverte, setRemiseOuverte] = useState(false)
   const [nouvelArticle, setNouvelArticle] = useState(false)
   const [clientOuvert, setClientOuvert] = useState(false)
+  const [plusOuvert, setPlusOuvert] = useState(false)
+  const [changerTable, setChangerTable] = useState(false)
+  const [annulation, setAnnulation] = useState(false)
+  const [articleLibre, setArticleLibre] = useState(false)
   /*
    * Sur TÉLÉPHONE seulement, le ticket se replie en une barre.
    *
@@ -251,6 +262,27 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
       t('Annulation d’une ligne'),
     )
   const modifiable = etat ? estModifiable(etat.statut) : false
+  const vide = etat ? estCommandeVide(etat) : false
+
+  /*
+   * Annuler, puis revenir à la salle : la commande n'existe plus à l'écran,
+   * rester dessus montrerait un ticket figé qu'on ne peut plus toucher.
+   *
+   * Vide, c'est `libererTableVide` — le serveur qui s'est trompé de table
+   * n'a besoin de personne. Sinon `annulerCommande`, et c'est le droit de
+   * CELUI QUI AUTORISE qui compte : un serveur déclenche, un gérant pose
+   * son code (l'escalade de `executer`).
+   */
+  const annuler = (motif: string) =>
+    executer(async (manager) => {
+      if (vide) await session.libererTableVide(employe, orderId)
+      else {
+        const autorise = manager ?? employe
+        if (!autorise) throw new RefusOperation(t('Aucun employé identifié sur ce terminal.'), false)
+        await session.annulerCommande(employe, orderId, motif, autorise)
+      }
+      onRetour()
+    }, vide ? t('Libérer la table') : t('Annuler la commande'))
   const nonEnvoyees = lignesActives.length > 0
   const nombreArticles = lignesActives.reduce((somme, l) => somme + l.quantite, 0)
   const titreTicket = etat?.tableId
@@ -313,6 +345,20 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                 )}
               </button>
             ))}
+
+          {/*
+            « Prix libre » pour TOUS : c'est le serveur au comptoir qui en a
+            besoin, devant le client — pas le gérant au bureau.
+          */}
+          <button
+            type="button"
+            className="carte-produit nouvel-article prix-libre"
+            disabled={!modifiable}
+            onClick={() => setArticleLibre(true)}
+          >
+            <span className="nom">{t('Prix libre')}</span>
+            <span className="prix">{t('Article hors carte')}</span>
+          </button>
 
           {/*
             Une TUILE, en fin de grille, et pas un bouton dans une barre : on
@@ -541,6 +587,15 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
           </button>
           <button
             type="button"
+            className="secondaire plus"
+            disabled={!modifiable}
+            onClick={() => setPlusOuvert(true)}
+            aria-label={t('Autres actions')}
+          >
+            <MoreHorizontal size={16} strokeWidth={2} aria-hidden="true" /> {t('Plus')}
+          </button>
+          <button
+            type="button"
             className="secondaire cuisine"
             disabled={!modifiable || !nonEnvoyees}
             onClick={() => void envoyerCuisine()}
@@ -624,6 +679,63 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
              * geste de plus — en plein service, devant un client.
              */
             void nom
+          }}
+        />
+      )}
+
+      {plusOuvert && etat && (
+        <ModaleAutresActions
+          vide={vide}
+          surTable={etat.tableId !== null}
+          onFermer={() => setPlusOuvert(false)}
+          onChangerTable={() => {
+            setPlusOuvert(false)
+            setChangerTable(true)
+          }}
+          onAnnuler={() => {
+            setPlusOuvert(false)
+            setAnnulation(true)
+          }}
+        />
+      )}
+
+      {changerTable && etat && (
+        <ModaleChangerTable
+          orderId={orderId}
+          tableActuelle={etat.tableId}
+          tables={tables}
+          onFermer={() => setChangerTable(false)}
+          onChoisir={(tableId) => {
+            setChangerTable(false)
+            void executer(
+              () => session.transfererTable(employe, orderId, tableId),
+              t('Changement de table'),
+            )
+          }}
+        />
+      )}
+
+      {annulation && (
+        <ModaleAnnulerCommande
+          vide={vide}
+          onFermer={() => setAnnulation(false)}
+          onConfirmer={(motif) => {
+            setAnnulation(false)
+            void annuler(motif)
+          }}
+        />
+      )}
+
+      {articleLibre && (
+        <ModaleArticleLibre
+          stations={stations}
+          onFermer={() => setArticleLibre(false)}
+          onAjouter={async (article) => {
+            await executer(
+              () => session.ajouterArticleLibre(employe, orderId, article),
+              t('Ajout d’un article'),
+            )
+            setArticleLibre(false)
           }}
         />
       )}

@@ -31,6 +31,7 @@
     "test:inscription": "node tests/inscription-caisse.mjs",
     "test:carte": "node tests/carte-depuis-la-caisse.mjs",
     "test:remboursement": "node tests/remboursement-caisse.mjs",
+    "test:gestes": "node tests/gestes-commande.mjs",
     "test": "vitest run",
     "verifier:gradle": "node scripts/verifier-gradle.mjs",
     "aab": "node scripts/aab.mjs",

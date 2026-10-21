@@ -76,7 +76,13 @@ export interface ChargesUtiles {
   }
   'line.added': {
     ligneId: Uuid
-    produitId: Uuid
+    /**
+     * `null` pour un article à PRIX LIBRE (« divers ») : un supplément qui
+     * n'est pas à la carte, saisi au montant par le caissier. Il n'a ni
+     * stock, ni coût d'achat — les rapports le comptent parmi les lignes
+     * « coût non saisi », ce qui est exactement la vérité.
+     */
+    produitId: Uuid | null
     variantId?: Uuid | null
     designation: string
     quantite: number

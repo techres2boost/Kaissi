@@ -1432,8 +1432,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.5rem;
   margin-top: auto; padding-top: 0.75rem;
 }
-.actions-commande > * { grid-column: span 3; }
-.actions-commande > .cuisine { grid-column: span 2; }
+.actions-commande > * { grid-column: span 2; }
 .actions-commande > .principal { grid-column: span 4; }
 .actions-commande button { display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; min-width: 0; }
 .actions-commande button svg { flex-shrink: 0; }
@@ -1750,6 +1749,26 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .carte-produit.nouvel-article .nom { color: var(--accent); font-weight: 700; }
 .carte-produit.nouvel-article .prix { font-size: 0.75rem; font-weight: 400; }
+.carte-produit.prix-libre { border-style: dotted; }
+
+/* Les gestes rares d'une commande (ModalesCommande.tsx). */
+.autres-actions button { align-items: flex-start; text-align: start; }
+.autres-actions .nom-reduction { display: inline-flex; align-items: center; gap: 0.4rem; }
+.autres-actions .danger .nom-reduction { color: var(--alerte); }
+.grille-tables-choix {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr)); gap: 0.5rem;
+  margin-block-end: 0.75rem;
+}
+.grille-tables-choix button {
+  min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.15rem; background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--rayon-s);
+}
+.grille-tables-choix .numero { font-size: 1.15rem; font-weight: 700; }
+.grille-tables-choix small { font-size: 0.72rem; color: var(--texte-2); }
+.grille-tables-choix .actif { border-color: var(--accent); }
+.grille-tables-choix .occupee { opacity: 0.55; }
+.motif-libre { display: flex; gap: 0.5rem; margin-block-start: 0.75rem; flex-wrap: wrap; }
+.motif-libre input { flex: 1 1 12rem; min-width: 0; }
 
 /* L'état d'un article qui n'est pas encore remonté, sur sa tuile. */
 .carte-produit .badge { align-self: flex-start; margin-top: 0.2rem; }

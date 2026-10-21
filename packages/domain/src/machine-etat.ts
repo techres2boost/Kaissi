@@ -12,7 +12,7 @@
  */
 
 import type { TypeEvenement } from './evenements.js'
-import type { StatutCommande } from './reduction.js'
+import type { EtatCommande, StatutCommande } from './reduction.js'
 
 /** Transitions autorisées, par statut de départ. */
 const TRANSITIONS: Readonly<Record<StatutCommande, readonly TypeEvenement[]>> = {
@@ -135,3 +135,19 @@ export function lignesAEnvoyer<T extends { id: string; annulee?: boolean }>(
 ): T[] {
   return lignes.filter((l) => !l.annulee && !dejaEnvoyees.has(l.id))
 }
+
+/**
+ * Une commande VIDE : ouverte, mais rien n'y a jamais été saisi ni payé.
+ *
+ * C'est la seule qu'on puisse libérer sans l'accord d'un gérant (table
+ * ouverte par erreur) : il n'y a ni plat préparé, ni argent à protéger.
+ * Une ligne RETIRÉE compte comme saisie — un plat retiré après son envoi en
+ * cuisine a pu être servi, et c'est exactement le geste qu'un gérant doit
+ * voir. Un paiement ANNULÉ compte aussi : de l'argent a transité.
+ */
+export function estCommandeVide(
+  etat: Pick<EtatCommande, 'statut' | 'lignes' | 'paiements'>,
+): boolean {
+  return estModifiable(etat.statut) && etat.lignes.length === 0 && etat.paiements.length === 0
+}
+

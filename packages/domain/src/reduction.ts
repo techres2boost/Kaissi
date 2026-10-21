@@ -30,7 +30,8 @@ import type { LigneCalculable, Remise, Uuid } from './types.js'
 export type StatutCommande = 'ouverte' | 'envoyee' | 'close' | 'annulee'
 
 export interface LigneEtat extends LigneCalculable {
-  readonly produitId: Uuid
+  /** `null` : article à prix libre (« divers »), hors carte. */
+  readonly produitId: Uuid | null
   readonly variantId: Uuid | null
   readonly designation: string
   readonly modificateurs: { id: Uuid; nom: string; prixDeltaMillimes: Millimes }[]
