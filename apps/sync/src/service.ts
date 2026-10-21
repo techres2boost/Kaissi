@@ -102,6 +102,18 @@ function validerRemboursement(e: EvenementCommande): string | null {
   if (!Array.isArray(p.ligneIds) || p.ligneIds.some((id) => !estUuid(id))) {
     return 'Lignes remboursées invalides.'
   }
+  // Facultatif (une caisse antérieure ne l'envoie pas) ; présent, il ne
+  // nomme que des lignes remboursées, et des unités entières.
+  if (p.quantites != null) {
+    if (typeof p.quantites !== 'object' || Array.isArray(p.quantites)) {
+      return 'Quantités remboursées invalides.'
+    }
+    for (const [id, q] of Object.entries(p.quantites)) {
+      if (!p.ligneIds.includes(id) || !Number.isSafeInteger(q) || q < 1) {
+        return 'Quantités remboursées invalides.'
+      }
+    }
+  }
   if (typeof p.motif !== 'string' || p.motif.trim() === '') {
     return 'Un remboursement exige un motif.'
   }

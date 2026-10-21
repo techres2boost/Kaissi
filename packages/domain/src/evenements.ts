@@ -153,6 +153,13 @@ export interface ChargesUtiles {
     mode: ModePaiement
     montantMillimes: Millimes
     ligneIds: Uuid[]
+    /**
+     * Unités rendues, par ligne : « 1 pizza sur 3 ». Une ligne de `ligneIds`
+     * ABSENTE d'ici est rendue pour tout ce qui en restait — c'est le sens
+     * qu'avait `ligneIds` avant ce champ, et un événement ancien se relit
+     * donc à l'identique.
+     */
+    quantites?: Record<Uuid, number>
     motif: string
     shiftId?: Uuid | null
     autorisePar?: Uuid

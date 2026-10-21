@@ -31,11 +31,13 @@
  *   vente debout, et le droit de timbre porte sur la vente. Ce traitement
  *   est à faire valider par un expert-comptable tunisien.
  *
- * ── Ce qui n'est pas couvert ──────────────────────────────────────────────
+ * ── Une partie d'une ligne : « 1 pizza sur 3 » ─────────────────────────────
  *
- * On rembourse des LIGNES entières. Rendre un Coca sur une ligne de trois
- * demanderait une règle d'arrondi par unité qu'on n'invente pas en passant :
- * le cas se règle aujourd'hui en remboursant la ligne.
+ * La part de la ligne se divise en UNITÉS égales, à l'entier de millimes
+ * inférieur ; l'écart d'arrondi va à la DERNIÈRE unité rendue — la règle de
+ * l'étape 10 des totaux, appliquée aux unités. Trois pizzas pour 43,501 :
+ * 14,500 puis 14,500 puis 14,501. Rendre les trois en trois fois rend donc
+ * au millime la part de la ligne, et la propriété ci-dessus tient toujours.
  */
 
 import { ZERO, additionner, millimes, sommer, soustraire, type Millimes } from './monnaie.js'
@@ -57,7 +59,12 @@ export interface PartRemboursable {
   readonly quantite: number
   /** Ce que cette ligne a réellement coûté au client, TTC, remises et service compris. */
   readonly montantMillimes: Millimes
+  /** Unités déjà rendues, tous remboursements confondus. */
+  readonly quantiteRemboursee: number
+  /** `true` quand plus aucune unité ne reste à rendre. */
   readonly dejaRemboursee: boolean
+  /** `true` si la ligne se rend unité par unité (quantité entière, > 1). */
+  readonly divisible: boolean
 }
 
 export interface CalculRemboursement {
@@ -67,6 +74,8 @@ export interface CalculRemboursement {
   readonly timbreMillimes: Millimes
   /** `true` si, après ce remboursement, plus aucune ligne ne reste à rendre. */
   readonly ticketSolde: boolean
+  /** Unités rendues par ligne — ce qui voyage dans `refund.recorded`. */
+  readonly quantites: Readonly<Record<Uuid, number>>
 }
 
 /**
@@ -88,11 +97,40 @@ function repartirService(montant: Millimes, poids: readonly Millimes[]): Millime
   return poids.map((p, i) => millimes(p * passes + (fin[i] ?? 0)))
 }
 
-/** Les lignes déjà remboursées, tous remboursements confondus. */
+/** Unités déjà rendues par ligne, tous remboursements confondus. */
+export function unitesRemboursees(etat: EtatCommande): ReadonlyMap<Uuid, number> {
+  const rendues = new Map<Uuid, number>()
+  for (const r of etat.remboursements) {
+    for (const [id, q] of Object.entries(r.quantites)) rendues.set(id, (rendues.get(id) ?? 0) + q)
+  }
+  return rendues
+}
+
+/** Les lignes ENTIÈREMENT remboursées. */
 export function lignesRemboursees(etat: EtatCommande): ReadonlySet<Uuid> {
+  const quantites = new Map(etat.lignes.map((l) => [l.id, l.quantite]))
   const vues = new Set<Uuid>()
-  for (const r of etat.remboursements) for (const id of r.ligneIds) vues.add(id)
+  for (const [id, q] of unitesRemboursees(etat)) {
+    if (q >= (quantites.get(id) ?? 0)) vues.add(id)
+  }
   return vues
+}
+
+/**
+ * Ce que coûtent `k` unités d'une ligne quand `deja` sont déjà rendues.
+ *
+ * Unités égales à l'entier inférieur, l'écart à la dernière : la somme des
+ * unités rendues une à une est EXACTEMENT la part de la ligne.
+ */
+export function montantUnites(part: PartRemboursable, k: number): Millimes {
+  const reste = part.quantite - part.quantiteRemboursee
+  if (!part.divisible) {
+    // Indivisible : tout ce qui reste, ou rien.
+    return k >= reste && part.quantiteRemboursee === 0 ? part.montantMillimes : ZERO
+  }
+  const unite = Math.floor(part.montantMillimes / part.quantite)
+  const ecart = part.montantMillimes - unite * part.quantite
+  return millimes(unite * k + (part.quantiteRemboursee + k === part.quantite ? ecart : 0))
 }
 
 /** Somme de ce qui a déjà été rendu au client sur cette commande. */
@@ -135,20 +173,28 @@ export function partsRemboursables(
   }
   const partsService = repartirService(service, bases)
 
-  const rendues = lignesRemboursees(etat)
+  const rendues = unitesRemboursees(etat)
   const designations = new Map(etat.lignes.map((l) => [l.id, l.designation]))
 
-  return calculees.map((l, i) => ({
-    ligneId: l.id,
-    designation: designations.get(l.id) ?? '—',
-    quantite: l.quantite,
-    montantMillimes: additionner(lignesTtc[i] ?? ZERO, partsService[i] ?? ZERO),
-    dejaRemboursee: rendues.has(l.id),
-  }))
+  return calculees.map((l, i) => {
+    const quantiteRemboursee = rendues.get(l.id) ?? 0
+    return {
+      ligneId: l.id,
+      designation: designations.get(l.id) ?? '—',
+      quantite: l.quantite,
+      montantMillimes: additionner(lignesTtc[i] ?? ZERO, partsService[i] ?? ZERO),
+      quantiteRemboursee,
+      dejaRemboursee: quantiteRemboursee >= l.quantite,
+      divisible: Number.isInteger(l.quantite) && l.quantite > 1,
+    }
+  })
 }
 
 /**
- * Ce qu'il faut rendre pour ces lignes.
+ * Ce qu'il faut rendre pour ces lignes — ou ces UNITÉS de ces lignes.
+ *
+ * `quantites[ligneId]` : combien d'unités rendre. Absente, la ligne est
+ * rendue pour tout ce qui en reste.
  *
  * Refuse ce qui n'a pas de sens — une ligne inconnue, une ligne déjà rendue,
  * une sélection vide, une commande non encaissée. Ces refus sont faits pour
@@ -159,6 +205,7 @@ export function calculerRemboursement(
   etat: EtatCommande,
   totaux: TotauxCommande,
   ligneIds: readonly Uuid[],
+  quantites: Readonly<Record<Uuid, number>> = {},
 ): CalculRemboursement {
   if (etat.statut !== 'close') {
     throw new ErreurRemboursement(
@@ -171,21 +218,40 @@ export function calculerRemboursement(
 
   const parts = partsRemboursables(etat, totaux)
   const parId = new Map(parts.map((p) => [p.ligneId, p]))
-  const choisies = new Set<Uuid>()
+  const choisies = new Map<Uuid, number>()
   for (const id of ligneIds) {
     const part = parId.get(id)
     if (!part) throw new ErreurRemboursement(`Ligne absente du ticket : ${id}`)
     if (part.dejaRemboursee) {
       throw new ErreurRemboursement(`« ${part.designation} » a déjà été remboursé.`)
     }
-    choisies.add(id)
+    const reste = part.quantite - part.quantiteRemboursee
+    const k = quantites[id] ?? reste
+    if (!part.divisible && k !== reste) {
+      throw new ErreurRemboursement(`« ${part.designation} » se rembourse en entier.`)
+    }
+    if (part.divisible && (!Number.isInteger(k) || k < 1 || k > reste)) {
+      throw new ErreurRemboursement(
+        `« ${part.designation} » : entre 1 et ${reste} unité(s) à rembourser.`,
+      )
+    }
+    choisies.set(id, k)
   }
 
-  const ticketSolde = parts.every((p) => p.dejaRemboursee || choisies.has(p.ligneId))
+  const ticketSolde = parts.every(
+    (p) => p.dejaRemboursee || p.quantiteRemboursee + (choisies.get(p.ligneId) ?? 0) >= p.quantite,
+  )
   const timbre = ticketSolde ? totaux.timbreFiscalMillimes : ZERO
-  const lignes = sommer(parts.filter((p) => choisies.has(p.ligneId)).map((p) => p.montantMillimes))
+  const lignes = sommer(
+    parts.filter((p) => choisies.has(p.ligneId)).map((p) => montantUnites(p, choisies.get(p.ligneId)!)),
+  )
 
-  return { montantMillimes: additionner(lignes, timbre), timbreMillimes: timbre, ticketSolde }
+  return {
+    montantMillimes: additionner(lignes, timbre),
+    timbreMillimes: timbre,
+    ticketSolde,
+    quantites: Object.fromEntries(choisies),
+  }
 }
 
 /** Ce qui peut encore être rendu sur ce ticket. Jamais négatif. */

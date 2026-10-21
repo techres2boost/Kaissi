@@ -97,7 +97,12 @@ const rembourser = (
   journal: EvenementCommande[],
   ligneIds: string[],
   montant: number,
-  options: { id?: string; mode?: 'cash' | 'card'; shiftId?: string } = {},
+  options: {
+    id?: string
+    mode?: 'cash' | 'card'
+    shiftId?: string
+    quantites?: Record<string, number>
+  } = {},
 ) =>
   ev('refund.recorded', {
     remboursementId: options.id ?? `ref-${compteur + 1}`,
@@ -105,6 +110,7 @@ const rembourser = (
     mode: options.mode ?? 'cash',
     montantMillimes: m(montant),
     ligneIds,
+    ...(options.quantites ? { quantites: options.quantites } : {}),
     motif: 'Plat non conforme',
     shiftId: options.shiftId ?? 'shift-1',
   })
@@ -226,6 +232,109 @@ describe('remboursement — ce que coûte une ligne', () => {
     const etat = reduireEvenements(avecAnnulee)
     const parts = partsRemboursables(etat, totauxDe(etat, base))
     expect(parts.map((p) => p.ligneId)).toEqual(['a'])
+  })
+})
+
+describe('remboursement — une partie d’une ligne (1 pizza sur 3)', () => {
+  it('une unité vaut le tiers, l’écart d’arrondi part avec la DERNIÈRE', () => {
+    // 3 × 12,183 HT + 19 % : la part de la ligne ne se divise pas par trois.
+    const { journal, etat, config } = ticketEncaisse([{ id: 'a', prix: 12_183, qte: 3 }])
+    const totaux = totauxDe(etat, config)
+    const part = partsRemboursables(etat, totaux)[0]!
+    const unite = Math.floor(part.montantMillimes / 3)
+    expect(part.montantMillimes % 3).not.toBe(0)
+
+    const r1 = calculerRemboursement(etat, totaux, ['a'], { a: 1 })
+    expect(r1.montantMillimes).toBe(unite)
+    expect(r1.quantites).toEqual({ a: 1 })
+    expect(r1.ticketSolde).toBe(false)
+
+    const j2 = [...journal, rembourser(journal, ['a'], r1.montantMillimes, { quantites: { a: 1 } })]
+    const e2 = reduireEvenements(j2)
+    expect(partsRemboursables(e2, totaux)[0]!.quantiteRemboursee).toBe(1)
+    expect(partsRemboursables(e2, totaux)[0]!.dejaRemboursee).toBe(false)
+
+    // Les deux dernières : le reste EXACT de la ligne.
+    const r2 = calculerRemboursement(e2, totaux, ['a'], { a: 2 })
+    expect(r2.ticketSolde).toBe(true)
+    expect(r1.montantMillimes + r2.montantMillimes).toBe(part.montantMillimes)
+    expect(r1.montantMillimes + r2.montantMillimes).toBe(totaux.totalMillimes)
+  })
+
+  it('rendre unité par unité, sur des tickets tordus, rend EXACTEMENT le total', () => {
+    let graine = 11
+    const alea = (n: number) => {
+      graine = (graine * 1103515245 + 12345) % 2147483648
+      return graine % n
+    }
+    for (let essai = 0; essai < 60; essai += 1) {
+      const config: ConfigCalcul = {
+        ...base,
+        service: alea(2) ? { tauxBp: bp(alea(1500)), taxable: alea(2) === 1, tauxTaxeId: TVA_19.id } : undefined,
+        timbreFiscalMillimes: m(alea(2) ? 600 : 0),
+      }
+      const lignes = Array.from({ length: 1 + alea(4) }, (_, i) => ({
+        id: `l${i}`,
+        prix: 1 + alea(25_000),
+        qte: 1 + alea(5),
+        taux: alea(2) ? TVA_19.id : TVA_07_INCL.id,
+      }))
+      const t = ticketEncaisse(lignes, {
+        remiseGlobale: { type: 'pourcentage', valeurBp: bp(alea(5000)) },
+        config,
+      })
+      const totaux = totauxDe(t.etat, config)
+      let journal = t.journal
+      let rendu = 0
+      for (const l of lignes) {
+        for (let u = 0; u < l.qte; u += 1) {
+          const etat = reduireEvenements(journal)
+          const r = calculerRemboursement(etat, totaux, [l.id], { [l.id]: 1 })
+          rendu += r.montantMillimes
+          journal = [...journal, rembourser(journal, [l.id], r.montantMillimes, { quantites: r.quantites })]
+        }
+      }
+      expect(rendu, `essai ${essai}`).toBe(totaux.totalMillimes)
+      expect(reduireEvenements(journal).exceptions).toEqual([])
+    }
+  })
+
+  it('refuse zéro unité, plus que ce qui reste, et une fraction', () => {
+    const { etat, config } = ticketEncaisse([{ id: 'a', prix: 5_000, qte: 3 }])
+    const totaux = totauxDe(etat, config)
+    expect(() => calculerRemboursement(etat, totaux, ['a'], { a: 0 })).toThrow(ErreurRemboursement)
+    expect(() => calculerRemboursement(etat, totaux, ['a'], { a: 4 })).toThrow(ErreurRemboursement)
+    expect(() => calculerRemboursement(etat, totaux, ['a'], { a: 1.5 })).toThrow(ErreurRemboursement)
+  })
+
+  it('une ligne d’une seule unité se rend en entier, sans découpe', () => {
+    const { etat, config } = ticketEncaisse([{ id: 'a', prix: 5_000, qte: 1 }])
+    const totaux = totauxDe(etat, config)
+    const part = partsRemboursables(etat, totaux)[0]!
+    expect(part.divisible).toBe(false)
+    expect(calculerRemboursement(etat, totaux, ['a'], { a: 1 }).montantMillimes).toBe(part.montantMillimes)
+  })
+
+  it('un événement ANCIEN, sans quantités, rend la ligne entière', () => {
+    const { journal, etat, config } = ticketEncaisse([{ id: 'a', prix: 5_000, qte: 3 }])
+    const totaux = totauxDe(etat, config)
+    const r = calculerRemboursement(etat, totaux, ['a'])
+    const apres = reduireEvenements([...journal, rembourser(journal, ['a'], r.montantMillimes)])
+    expect(apres.remboursements[0]!.quantites).toEqual({ a: 3 })
+    expect(partsRemboursables(apres, totaux)[0]!.dejaRemboursee).toBe(true)
+  })
+
+  it('deux caisses qui rendent chacune 2 pizzas sur 3 : c’est SIGNALÉ', () => {
+    const { journal, etat, config } = ticketEncaisse([{ id: 'a', prix: 5_000, qte: 3 }])
+    const totaux = totauxDe(etat, config)
+    const r = calculerRemboursement(etat, totaux, ['a'], { a: 2 })
+    const apres = reduireEvenements([
+      ...journal,
+      rembourser(journal, ['a'], r.montantMillimes, { id: 'ref-x', quantites: { a: 2 } }),
+      rembourser(journal, ['a'], r.montantMillimes, { id: 'ref-y', quantites: { a: 2 } }),
+    ])
+    expect(apres.remboursements).toHaveLength(2)
+    expect(apres.exceptions.map((e) => e.type)).toContain('double_remboursement')
   })
 })
 

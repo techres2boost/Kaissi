@@ -15,12 +15,14 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
+import { Minus, Plus } from 'lucide-react'
 import {
   calculerRemboursement,
   calculerTotaux,
   configEffective,
   construireTicketClient,
   formaterTND,
+  montantUnites,
   partsRemboursables,
   resteRemboursable,
   totalRembourse,
@@ -69,7 +71,8 @@ export function ModaleRecu({ orderId, onFermer }: Props) {
   } = useApp()
   const [etat, setEtat] = useState<EtatCommande | null>(null)
   const [mode, setMode] = useState<'ticket' | 'remboursement'>('ticket')
-  const [choisies, setChoisies] = useState<Set<string>>(new Set())
+  /** Ligne choisie → unités à rendre (« 1 pizza sur 3 »). */
+  const [choisies, setChoisies] = useState<Map<string, number>>(new Map())
   const [modeRendu, setModeRendu] = useState<ModePaiement>('cash')
   const [motif, setMotif] = useState('')
   const [erreur, setErreur] = useState<string | null>(null)
@@ -124,7 +127,7 @@ export function ModaleRecu({ orderId, onFermer }: Props) {
   const calcul = useMemo(() => {
     if (!etat || !totaux || choisies.size === 0) return null
     try {
-      return calculerRemboursement(etat, totaux, [...choisies])
+      return calculerRemboursement(etat, totaux, [...choisies.keys()], Object.fromEntries(choisies))
     } catch {
       return null
     }
@@ -148,13 +151,17 @@ export function ModaleRecu({ orderId, onFermer }: Props) {
   const deja = totalRembourse(etat)
   const remboursable = etat.statut === 'close' && reste > 0 && parts.some((p) => !p.dejaRemboursee)
 
-  const basculer = (id: string) =>
+  // Cocher une ligne la prend pour TOUT ce qui en reste ; « − » en retire
+  // une unité. Le cas courant (rendre la ligne) reste donc un seul toucher.
+  const basculer = (id: string, reste: number) =>
     setChoisies((actuel) => {
-      const suivant = new Set(actuel)
+      const suivant = new Map(actuel)
       if (suivant.has(id)) suivant.delete(id)
-      else suivant.add(id)
+      else suivant.set(id, reste)
       return suivant
     })
+  const ajuster = (id: string, k: number) =>
+    setChoisies((actuel) => new Map(actuel).set(id, k))
 
   const confirmer = async (manager?: Employe) => {
     setErreur(null)
@@ -163,11 +170,16 @@ export function ModaleRecu({ orderId, onFermer }: Props) {
       const apres = await session.rembourser(
         employe,
         orderId,
-        { ligneIds: [...choisies], mode: modeRendu, motif },
+        {
+          ligneIds: [...choisies.keys()],
+          quantites: Object.fromEntries(choisies),
+          mode: modeRendu,
+          motif,
+        },
         manager,
       )
       setEtat(apres)
-      setChoisies(new Set())
+      setChoisies(new Map())
       setMotif('')
       setMode('ticket')
       rafraichir()
@@ -222,30 +234,75 @@ export function ModaleRecu({ orderId, onFermer }: Props) {
         }
       >
         <ul className="lignes-remboursables">
-          {parts.map((p) => (
-            <li key={p.ligneId} className={p.dejaRemboursee ? 'deja' : ''}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={choisies.has(p.ligneId)}
-                  disabled={p.dejaRemboursee}
-                  onChange={() => basculer(p.ligneId)}
-                />
-                <span className="designation">
-                  {p.quantite} × {p.designation}
-                </span>
-                <span className="montant">
-                  {p.dejaRemboursee ? t('déjà remboursé') : formaterTND(p.montantMillimes)}
-                </span>
-              </label>
-            </li>
-          ))}
+          {parts.map((p) => {
+            const reste = p.quantite - p.quantiteRemboursee
+            const k = choisies.get(p.ligneId)
+            return (
+              <li key={p.ligneId} className={p.dejaRemboursee ? 'deja' : ''}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={k !== undefined}
+                    disabled={p.dejaRemboursee}
+                    onChange={() => basculer(p.ligneId, reste)}
+                  />
+                  <span className="designation">
+                    {p.quantite} × {p.designation}
+                    {p.quantiteRemboursee > 0 && !p.dejaRemboursee && (
+                      <small>{t('{n} déjà remboursé(s)', { n: p.quantiteRemboursee })}</small>
+                    )}
+                  </span>
+                  <span className="montant">
+                    {p.dejaRemboursee
+                      ? t('déjà remboursé')
+                      : formaterTND(montantUnites(p, k ?? reste))}
+                  </span>
+                </label>
+                {/*
+                  Les unités, HORS du label : un bouton dans un label
+                  basculerait la case à chaque « + ». Le montant affiché
+                  vient de `montantUnites` — l'écart d'arrondi part avec la
+                  dernière unité, l'écran ne le recalcule pas.
+                */}
+                {k !== undefined && p.divisible && reste > 1 && (
+                  <div className="unites-rendues">
+                    <span>{t('Combien ?')}</span>
+                    <span className="pas">
+                      <button
+                        type="button"
+                        disabled={k <= 1}
+                        aria-label={t('Une de moins')}
+                        onClick={() => ajuster(p.ligneId, k - 1)}
+                      >
+                        <Minus size={16} strokeWidth={2.25} aria-hidden="true" />
+                      </button>
+                      <output className="compte">{t('{k} sur {n}', { k, n: reste })}</output>
+                      <button
+                        type="button"
+                        disabled={k >= reste}
+                        aria-label={t('Une de plus')}
+                        onClick={() => ajuster(p.ligneId, k + 1)}
+                      >
+                        <Plus size={16} strokeWidth={2.25} aria-hidden="true" />
+                      </button>
+                    </span>
+                  </div>
+                )}
+              </li>
+            )
+          })}
         </ul>
         <button
           type="button"
           className="lien tout-le-ticket"
           onClick={() =>
-            setChoisies(new Set(parts.filter((p) => !p.dejaRemboursee).map((p) => p.ligneId)))
+            setChoisies(
+              new Map(
+                parts
+                  .filter((p) => !p.dejaRemboursee)
+                  .map((p) => [p.ligneId, p.quantite - p.quantiteRemboursee] as const),
+              ),
+            )
           }
         >{t('Tout le ticket')}</button>
 

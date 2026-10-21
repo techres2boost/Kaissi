@@ -1868,6 +1868,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .tout-le-ticket { display: block; margin-block: 0.25rem 0.75rem; }
 /* Déjà rendue : barrée mais lisible, comme une ligne annulée — rien ne disparaît. */
 .lignes-remboursables li.deja { opacity: 0.6; }
+.lignes-remboursables .designation small { display: block; color: var(--texte-2); font-size: 0.75rem; }
+/* « 1 sur 3 » : sous la ligne cochée, seulement quand il y a à choisir. */
+.unites-rendues {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  padding: 0.4rem 0.8rem 0.2rem; padding-inline-start: 2.6rem; color: var(--texte-2); font-size: 0.85rem;
+}
+.unites-rendues .pas { display: inline-flex; align-items: center; gap: 0.5rem; }
+.unites-rendues .pas button {
+  min-width: 40px; min-height: 40px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--rayon-s);
+}
+.unites-rendues .compte { min-width: 4.5rem; text-align: center; font-weight: 650; color: var(--texte); font-variant-numeric: tabular-nums; }
 .lignes-remboursables li.deja .designation { text-decoration: line-through; }
 
 .charger-plus {

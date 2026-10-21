@@ -566,4 +566,10 @@ export const AR_CAISSE: Readonly<Record<string, string>> = {
   "Saisissez un montant supérieur à zéro.": "أدخِل مبلغًا أكبر من الصفر.",
   "Cette commande a déjà reçu un paiement : encaissez le reste, puis remboursez ce qui doit l’être.": "تلقّت هذه الطلبية دفعة: استخلص الباقي، ثم أرجِع ما يجب إرجاعه.",
   "Cette commande a déjà des articles ou un paiement : son annulation demande un gérant.": "تحتوي هذه الطلبية على أصناف أو دفعة: يتطلّب إلغاؤها المدير.",
+  // ── Remboursement d'une partie d'une ligne ──
+  "{n} déjà remboursé(s)": "{n} مُرجَع مسبقًا",
+  "Combien ?": "كم؟",
+  "Une de moins": "واحدة أقلّ",
+  "Une de plus": "واحدة أكثر",
+  "{k} sur {n}": "{k} من {n}",
 }

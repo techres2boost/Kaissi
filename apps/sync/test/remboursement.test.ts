@@ -237,6 +237,70 @@ describe('remboursement — synchronisation', () => {
     expect(JSON.stringify(cmd[0]!.exceptions)).toContain('double_remboursement')
   })
 
+  it('1 pizza sur 3, puis 2 : aucune anomalie ; une unité de trop est SIGNALÉE', async () => {
+    const a = await creerAppareil('R8')
+    const orderId = uuidV7()
+    const pizza = uuidV7()
+    const paiementId = uuidV7()
+    await push(a, [
+      ev(a, orderId, 'order.opened', { type: 'takeaway', ouvertePar: EMPLOYE_DEMO, numeroTicket: `${a.prefixe}-000001` }),
+      ev(a, orderId, 'line.added', {
+        ligneId: pizza,
+        produitId: '01930000-0000-7000-8000-000000000100',
+        designation: 'Pizza Margherita',
+        quantite: 3,
+        prixBaseMillimes: millimes(10_000),
+        modificateursMillimes: millimes(0),
+        tauxTaxeId: TVA_19,
+      }),
+      ev(a, orderId, 'payment.recorded', { paiementId, methodeId: ESPECES, mode: 'cash', montantMillimes: millimes(30_000) }),
+      ev(a, orderId, 'order.closed', { totalMillimes: millimes(30_000), closePar: EMPLOYE_DEMO }),
+    ])
+    const partiel = (q: number, montant: number) =>
+      ev(a, orderId, 'refund.recorded', {
+        remboursementId: uuidV7(),
+        paiementId,
+        mode: 'cash',
+        montantMillimes: millimes(montant),
+        ligneIds: [pizza],
+        quantites: { [pizza]: q },
+        motif: 'Pizza froide',
+        shiftId: uuidV7(),
+        autorisePar: GERANT_DEMO,
+      })
+    expect((await push(a, [partiel(1, 10_000)])).corps.rejetes).toEqual([])
+    expect((await push(a, [partiel(2, 20_000)])).corps.rejetes).toEqual([])
+    const exceptions = async () =>
+      JSON.stringify(
+        (await client.query('select exceptions from kaissi.orders where id = $1', [orderId])).rows[0]!.exceptions,
+      )
+    expect(await exceptions()).not.toContain('double_remboursement')
+
+    await push(a, [partiel(1, 10_000)])
+    expect(await exceptions()).toContain('double_remboursement')
+  })
+
+  it('des quantités MAL FORMÉES sont refusées à l entrée', async () => {
+    const a = await creerAppareil('R9')
+    const v = vente(a)
+    await push(a, v.evenements)
+    for (const quantites of [{ [v.pizza]: 0 }, { [v.pizza]: 1.5 }, { [v.coca]: 1 }, [1]]) {
+      const res = await push(a, [
+        ev(a, v.orderId, 'refund.recorded', {
+          remboursementId: uuidV7(),
+          paiementId: v.paiementId,
+          mode: 'cash',
+          montantMillimes: millimes(1_000),
+          ligneIds: [v.pizza],
+          quantites: quantites as never,
+          motif: 'Test',
+        }),
+      ])
+      expect(res.corps.rejetes, JSON.stringify(quantites)).toHaveLength(1)
+      expect(res.corps.rejetes[0].code).toBe('charge_invalide')
+    }
+  })
+
   it('le rapport compte enfin la ligne « Remboursements »', async () => {
     const a = await creerAppareil('R8')
     const v = vente(a)

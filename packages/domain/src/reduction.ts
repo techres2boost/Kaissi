@@ -66,6 +66,11 @@ export interface RemboursementEtat {
   readonly mode: ModePaiement
   readonly montantMillimes: Millimes
   readonly ligneIds: readonly Uuid[]
+  /**
+   * Unités rendues par ligne, RÉSOLUES à la réduction : une ligne sans
+   * quantité dans l'événement y figure pour ce qui en restait.
+   */
+  readonly quantites: Readonly<Record<Uuid, number>>
   readonly motif: string
   /** Le service de caisse d'où l'argent est sorti. */
   readonly shiftId: Uuid | null
@@ -490,9 +495,30 @@ export function reduireEvenements(
             `Remboursement sur une commande ${etat.statut} : seul un ticket encaissé se rembourse.`,
           )
         }
-        const dejaRendues = new Set<Uuid>()
-        for (const r of remboursements.values()) for (const id of r.ligneIds) dejaRendues.add(id)
-        const enDouble = p.ligneIds.filter((id) => dejaRendues.has(id))
+        /*
+         * Le compte se fait en UNITÉS : rendre une pizza puis une autre sur
+         * une ligne de trois est normal ; en rendre quatre ne l'est pas.
+         */
+        const dejaRendues = new Map<Uuid, number>()
+        for (const r of remboursements.values()) {
+          for (const [id, q] of Object.entries(r.quantites)) {
+            dejaRendues.set(id, (dejaRendues.get(id) ?? 0) + q)
+          }
+        }
+        const quantites: Record<Uuid, number> = {}
+        for (const id of p.ligneIds) {
+          const totale = lignes.get(id)?.quantite ?? 0
+          const demandee = p.quantites?.[id]
+          quantites[id] =
+            typeof demandee === 'number' && Number.isFinite(demandee) && demandee > 0
+              ? demandee
+              : Math.max(totale - (dejaRendues.get(id) ?? 0), 0) || totale
+        }
+        const enDouble = p.ligneIds.filter((id) => {
+          const totale = lignes.get(id)?.quantite
+          if (totale === undefined) return false
+          return (dejaRendues.get(id) ?? 0) + (quantites[id] ?? 0) > totale
+        })
         if (enDouble.length > 0) {
           const noms = enDouble.map((id) => lignes.get(id)?.designation ?? id)
           signaler(
@@ -513,6 +539,7 @@ export function reduireEvenements(
           mode: p.mode,
           montantMillimes: p.montantMillimes,
           ligneIds: [...p.ligneIds],
+          quantites,
           motif: p.motif,
           shiftId: p.shiftId ?? null,
           autorisePar: p.autorisePar ?? null,

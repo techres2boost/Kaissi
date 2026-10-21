@@ -673,7 +673,13 @@ export class SessionCaisse {
   async rembourser(
     acteur: Employe | null,
     orderId: string,
-    demande: { readonly ligneIds: readonly string[]; readonly mode: ModePaiement; readonly motif: string },
+    demande: {
+      readonly ligneIds: readonly string[]
+      /** Unités rendues par ligne ; absente, la ligne entière (ce qui en reste). */
+      readonly quantites?: Readonly<Record<string, number>>
+      readonly mode: ModePaiement
+      readonly motif: string
+    },
     autorisePar?: Employe,
   ): Promise<EtatCommande> {
     if (!acteur) throw new RefusOperation(t('Aucun employé identifié sur ce terminal.'), false)
@@ -694,8 +700,11 @@ export class SessionCaisse {
       config: configEffective(this.config, etat),
     })
     let montant: Millimes
+    let quantites: Readonly<Record<string, number>>
     try {
-      montant = calculerRemboursement(etat, totaux, demande.ligneIds).montantMillimes
+      const calcul = calculerRemboursement(etat, totaux, demande.ligneIds, demande.quantites)
+      montant = calcul.montantMillimes
+      quantites = calcul.quantites
     } catch (erreur) {
       if (erreur instanceof ErreurRemboursement) throw new RefusOperation(erreur.message, false)
       throw erreur
@@ -728,6 +737,7 @@ export class SessionCaisse {
         mode: demande.mode,
         montantMillimes: montant,
         ligneIds: [...demande.ligneIds],
+        quantites: { ...quantites },
         motif: demande.motif.trim(),
         shiftId,
         ...(autorisePar ? { autorisePar: autorisePar.id } : {}),
