@@ -175,6 +175,35 @@ export interface ReponseShifts {
   readonly protocolVersion: number
 }
 
+// ─── POST /sync/pointages ───────────────────────────────────────────────────
+
+/**
+ * La pointeuse (0048) : un pointage envoyé à l'ARRIVÉE, puis renvoyé à la
+ * SORTIE. Même forme de route que les services de caisse, pour les mêmes
+ * raisons — ce n'est pas une vente, rien ne le rejoue, et l'upsert sur
+ * l'identifiant de la tablette le rend idempotent.
+ *
+ * ⚑ Route ADDITIVE : un serveur antérieur répond 404, la caisse avale
+ * l'erreur et réessaie au cycle suivant. Les ventes n'en dépendent jamais.
+ */
+export interface PointageSynchronise {
+  readonly id: string
+  readonly employeId: string | null
+  /** ISO 8601, horloge de la tablette. */
+  readonly arriveeA: string
+  readonly sortieA: string | null
+}
+
+export interface RequetePointages {
+  readonly protocolVersion: number
+  readonly pointages: readonly PointageSynchronise[]
+}
+
+export interface ReponsePointages {
+  readonly enregistres: readonly string[]
+  readonly protocolVersion: number
+}
+
 // ─── Erreurs de transport ───────────────────────────────────────────────────
 
 export type CodeErreur =

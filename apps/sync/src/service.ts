@@ -36,6 +36,9 @@ import {
   type RequetePull,
   type RequetePush,
   type RequeteShifts,
+  type RequetePointages,
+  type ReponsePointages,
+  type PointageSynchronise,
   type ReponsePull,
   type ReponsePush,
   type ReponseShifts,
@@ -599,6 +602,48 @@ export class ServiceSync {
       recevables.length === 0
         ? []
         : await this.depot.enregistrerShifts(appareil, recevables)
+    return { enregistres, protocolVersion: VERSION_PROTOCOLE }
+  }
+
+  /**
+   * La pointeuse. Un pointage mal formé est ÉCARTÉ (et donc renvoyé au
+   * cycle suivant), jamais une raison d'échouer le lot : les autres
+   * passent. Une date illisible ferait échouer l'insertion `timestamptz` —
+   * et avec elle tout le lot.
+   */
+  async pointages(
+    appareil: AppareilAuthentifie,
+    requete: RequetePointages,
+  ): Promise<ReponsePointages> {
+    if (!protocoleSupporte(requete.protocolVersion)) {
+      throw new ErreurSync(
+        'protocole_non_supporte',
+        `Protocole v${requete.protocolVersion} non supporté. Mettez à jour l'application.`,
+        426,
+      )
+    }
+    const brut = Array.isArray(requete.pointages) ? requete.pointages : []
+    if (brut.length > TAILLE_LOT_MAX) {
+      throw new ErreurSync(
+        'requete_invalide',
+        `Lot de ${brut.length} pointages : le maximum est ${TAILLE_LOT_MAX}.`,
+        413,
+      )
+    }
+    const dateLisible = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v))
+    const recevables = brut.filter(
+      (p): p is PointageSynchronise =>
+        typeof p === 'object' &&
+        p !== null &&
+        estUuid((p as PointageSynchronise).id) &&
+        dateLisible((p as PointageSynchronise).arriveeA) &&
+        ((p as PointageSynchronise).sortieA === null || dateLisible((p as PointageSynchronise).sortieA)),
+    )
+    const enregistrer = this.depot.enregistrerPointages
+    const enregistres =
+      recevables.length === 0 || !enregistrer
+        ? []
+        : await enregistrer.call(this.depot, appareil, recevables)
     return { enregistres, protocolVersion: VERSION_PROTOCOLE }
   }
 }

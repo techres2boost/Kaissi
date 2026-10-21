@@ -7,8 +7,8 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { etatApresEchec } from './moteur.js'
-import { ErreurTransport } from './transport.js'
+import { MoteurSync, etatApresEchec, type DepotLocalSync } from './moteur.js'
+import { ErreurTransport, type Transport } from './transport.js'
 
 describe('etatApresEchec', () => {
   it('pas de réponse du tout → hors ligne', () => {
@@ -27,5 +27,56 @@ describe('etatApresEchec', () => {
 
   it('échec local (pas une erreur de transport) → erreur', () => {
     expect(etatApresEchec(new Error('disque plein'))).toBe('erreur')
+  })
+})
+
+describe('pointeuse', () => {
+  const pointage = { id: 'p1', employeId: 'e1', arriveeA: '2026-10-21T10:00:00Z', sortieA: null }
+
+  function moteur(transport: Partial<Transport>, accuses: unknown[][]) {
+    const depot: DepotLocalSync = {
+      lotAPousser: async () => [],
+      accuserReception: async () => {},
+      marquerRejet: async () => {},
+      integrerEvenements: async () => {},
+      integrerCatalogue: async () => {},
+      lireCurseur: async () => 0,
+      ecrireCurseur: async () => {},
+      compteurs: async () => ({ enAttente: 0, rejetes: 0 }),
+      pointagesAPousser: async () => [pointage],
+      accuserPointages: async (envoyes) => {
+        accuses.push([...envoyes])
+      },
+    }
+    return new MoteurSync({
+      transport: {
+        push: async () => ({ acceptes: [], rejetes: [] }) as never,
+        pull: async () =>
+          ({ catalogue: [], evenements: [], curseurCatalogue: 0, curseurEvenements: 0, encore: false }) as never,
+        ...transport,
+      },
+      depot,
+      genererId: () => 'lot',
+    })
+  }
+
+  it('accuse les pointages que le serveur a enregistrés, tels qu’envoyés', async () => {
+    const accuses: unknown[][] = []
+    await moteur({ pointages: async () => ({ enregistres: ['p1'] }) }, accuses).cycle()
+    expect(accuses).toEqual([[pointage]])
+  })
+
+  it('un serveur ANTÉRIEUR (404) ne met pas le cycle en échec', async () => {
+    const accuses: unknown[][] = []
+    const resume = await moteur(
+      {
+        pointages: async () => {
+          throw new ErreurTransport('Not Found', false, 404)
+        },
+      },
+      accuses,
+    ).cycle()
+    expect(resume.etat).toBe('a_jour')
+    expect(accuses).toEqual([])
   })
 })

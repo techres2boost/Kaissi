@@ -135,6 +135,15 @@ export function depotLocalSync(
       await contexte.caisse.marquerShiftsPousses(ids)
     },
 
+    /** La pointeuse (0048) : même voie que les services de caisse. */
+    async pointagesAPousser(limite) {
+      return contexte.pointeuse.aPousser(limite)
+    },
+
+    async accuserPointages(envoyes) {
+      await contexte.pointeuse.marquerPousses(envoyes)
+    },
+
     async lireCurseur(cle) {
       const brut = await contexte.etat.lire(
         cle === 'catalogue' ? 'last_catalog_seq' : 'last_event_seq',

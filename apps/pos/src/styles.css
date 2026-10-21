@@ -2143,3 +2143,22 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* « Rapport Z » sous un service clos : un geste du lendemain, discret. */
 .liste-periodes .ouvrir-z { margin-block-start: 0.6rem; min-height: 44px; }
+
+/* ── Pointeuse ─────────────────────────────────────────────────────────── */
+.action-secondaire-pin { display: block; margin: 0.75rem auto 0; min-height: 44px; }
+.pointage-fait { font-size: 1.1rem; font-weight: 600; }
+.pointeuse { padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.pointeuse .barre-salle { display: flex; align-items: center; gap: 0.75rem; }
+.pointeuse .barre-salle .principal { margin-inline-start: auto; min-height: 44px; padding-inline: 1.25rem; }
+.liste-heures, .liste-pointages { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.liste-heures li {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  padding: 0.75rem 1rem; background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--rayon);
+}
+.liste-heures .duree { margin-inline-start: auto; font-variant-numeric: tabular-nums; font-weight: 700; }
+.liste-pointages li {
+  display: flex; justify-content: space-between; gap: 0.75rem;
+  padding: 0.4rem 1rem; color: var(--texte-2); font-size: 0.9rem;
+}
+.liste-pointages .plage { font-variant-numeric: tabular-nums; }
+.liste-pointages li.sortie_oubliee, .liste-pointages li.incoherent { color: var(--alerte); }

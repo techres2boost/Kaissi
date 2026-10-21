@@ -10,6 +10,7 @@ import {
   CalendarDays,
   ChefHat,
   Clock,
+  Timer,
   Contact,
   CreditCard,
   FolderTree,
@@ -135,6 +136,7 @@ const GROUPES = [
       { chemin: 'recus', libelle: aTraduire('Reçus'), icone: Ticket, gestionnaire: true },
       { chemin: 'reductions', libelle: aTraduire('Réductions'), icone: Tag, gestionnaire: true },
       { chemin: 'periodes', libelle: aTraduire('Périodes de travail'), icone: Clock, gestionnaire: true },
+      { chemin: 'heures', libelle: aTraduire('Heures travaillées'), icone: Timer, gestionnaire: true },
     ],
   },
   {

@@ -1390,6 +1390,27 @@ export function creerServeur({
     }
   })
 
+  // ── POST /sync/pointages ─────────────────────────────────────────────
+  // Route ADDITIVE (0048), comme /sync/shifts : la caisse avale un 404.
+  app.post('/sync/pointages', async (c) => {
+    const appareil = c.get('appareil')
+    let corps: unknown
+    try {
+      corps = await c.req.json()
+    } catch {
+      const erreur: ReponseErreur = {
+        erreur: 'requete_invalide',
+        message: 'Corps JSON illisible.',
+      }
+      return c.json(erreur, 400)
+    }
+    try {
+      return c.json(await service.pointages(appareil, corps as never))
+    } catch (erreur) {
+      return repondreErreur(c, erreur)
+    }
+  })
+
   // ── GET /sync/pull ───────────────────────────────────────────────────
   app.get('/sync/pull', async (c) => {
     const appareil = c.get('appareil')

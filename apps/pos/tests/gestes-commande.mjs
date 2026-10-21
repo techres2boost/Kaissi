@@ -8,7 +8,9 @@
  *   • une commande change de table, et l'ancienne se libère ;
  *   • un article à PRIX LIBRE s'ajoute au ticket, au montant saisi ;
  *   • une commande avec des articles ne s'annule QUE sous le PIN d'un
- *     gérant — et sa table se libère ensuite.
+ *     gérant — et sa table se libère ensuite ;
+ *   • la pointeuse : arrivée depuis l'écran verrouillé, sortie depuis le
+ *     menu, sans caisse à prendre ni réseau.
  *
  * Lancement :
  *   pnpm --filter @kaissi/pos dev
@@ -53,9 +55,22 @@ const retourSalle = async () => {
   await page.waitForSelector('.grille-tables', { timeout: 15000 })
 }
 
-await etape('Karim (serveur) prend son poste', async () => {
+await etape('Karim pointe son ARRIVÉE depuis l’écran verrouillé, sans prendre la caisse', async () => {
   if (await page.$('.bienvenue')) await page.click('.lien-discret')
   await page.waitForSelector('text=Prise de poste', { timeout: 20000 })
+  await page.click('.action-secondaire-pin')
+  await page.waitForSelector('.modale:has-text("Qui pointe ?")', { timeout: 10000 })
+  await page.click('.liste-employes button:has-text("Karim Jelassi")')
+  await pin('9753')
+  await page.click('.modale footer .principal:has-text("Pointer l’arrivée")')
+  await page.waitForSelector('.pointage-fait:has-text("Arrivée pointée")', { timeout: 10000 })
+  await page.click('.modale footer .principal')
+  await page.waitForSelector('text=Prise de poste', { timeout: 10000 })
+})
+
+await etape('Karim (serveur) prend son poste', async () => {
+  await page.waitForSelector('text=Prise de poste', { timeout: 20000 })
+  if (await page.$('.employe-choisi')) await page.click('.employe-choisi')
   await page.click('text=Karim Jelassi')
   await page.waitForSelector('.pave', { timeout: 10000 })
   await pin('9753')
@@ -124,6 +139,23 @@ await etape('l’annulation d’une commande avec articles exige le PIN d’un g
   await pin('1357')
   await page.waitForSelector('.grille-tables', { timeout: 15000 })
   if ((await etatTable('6')) !== 'libre') throw new Error('la table 6 est restée occupée après annulation')
+})
+
+await etape('la pointeuse le dit présent, puis il pointe sa SORTIE', async () => {
+  await page.click('.ouvrir-tiroir')
+  await page.click('.tiroir-lien:has-text("Pointeuse")')
+  await page.waitForSelector('.liste-heures li:has-text("Karim Jelassi") .badge:has-text("présent")', { timeout: 10000 })
+  await page.click('.pointeuse .barre-salle .principal')
+  await page.click('.liste-employes button:has-text("Karim Jelassi")')
+  await pin('9753')
+  await page.click('.modale footer .principal:has-text("Pointer la sortie")')
+  await page.waitForSelector('.pointage-fait:has-text("Sortie pointée")', { timeout: 10000 })
+  await page.click('.modale footer .principal')
+  await page.waitForFunction(
+    () => !document.querySelector('.liste-heures .badge.ouverte'),
+    null,
+    { timeout: 10000 },
+  )
 })
 
 await nav.close()

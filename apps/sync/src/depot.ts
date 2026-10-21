@@ -9,7 +9,7 @@
  */
 
 import type { EvenementCommande, MutationCatalogue } from '@kaissi/domain'
-import type { ChangementCatalogue, ShiftSynchronise } from './protocole.js'
+import type { ChangementCatalogue, PointageSynchronise, ShiftSynchronise } from './protocole.js'
 import type { SondeMigration } from './schema-requis.js'
 import type { MesuresBase } from './surveillance.js'
 
@@ -206,6 +206,16 @@ export interface DepotSync {
   enregistrerShifts(
     appareil: AppareilAuthentifie,
     shifts: readonly ShiftSynchronise[],
+  ): Promise<readonly string[]>
+
+  /**
+   * Écrit les pointages remontés par un terminal (0048). Même upsert que les
+   * shifts ; une sortie déjà connue n'est jamais effacée par un renvoi plus
+   * ancien. FACULTATIF : les dépôts de test n'ont pas à le connaître.
+   */
+  enregistrerPointages?(
+    appareil: AppareilAuthentifie,
+    pointages: readonly PointageSynchronise[],
   ): Promise<readonly string[]>
 
   /**

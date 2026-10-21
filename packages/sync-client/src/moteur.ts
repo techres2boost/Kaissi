@@ -17,7 +17,12 @@
 
 import type { EvenementCommande, MutationCatalogue } from '@kaissi/domain'
 import { delaiRetentative, estReessayable, type PolitiqueRetentative } from './index.js'
-import { ErreurTransport, type ShiftSynchronise, type Transport } from './transport.js'
+import {
+  ErreurTransport,
+  type PointageSynchronise,
+  type ShiftSynchronise,
+  type Transport,
+} from './transport.js'
 
 export interface DepotLocalSync {
   /** Lot à pousser, le plus ancien d'abord. */
@@ -46,6 +51,15 @@ export interface DepotLocalSync {
   shiftsAPousser?(limite: number): Promise<readonly ShiftSynchronise[]>
   /** FACULTATIF : marque poussés les shifts que le serveur a accusés. */
   accuserShifts?(ids: readonly string[]): Promise<void>
+  /** FACULTATIF : pointages (arrivée, puis sortie) restant à remonter. */
+  pointagesAPousser?(limite: number): Promise<readonly PointageSynchronise[]>
+  /**
+   * FACULTATIF : marque poussés les pointages ACCUSÉS, tels qu'ils ont été
+   * envoyés. Le lot entier est rendu, pas seulement les identifiants : une
+   * sortie pointée PENDANT l'envoi de l'arrivée ne doit pas être marquée
+   * partie — le dépôt compare ce qui a été envoyé à ce qu'il contient.
+   */
+  accuserPointages?(envoyes: readonly PointageSynchronise[]): Promise<void>
   /**
    * FACULTATIF : mutations de CATALOGUE restant à remonter.
    *
@@ -167,6 +181,7 @@ export class MoteurSync {
     try {
       await this.pousser()
       await this.pousserShifts()
+      await this.pousserPointages()
       await this.pousserCatalogue()
       await this.tirer()
       this.tentatives = 0
@@ -253,6 +268,30 @@ export class MoteurSync {
       }
     } catch {
       // Silencieux à dessein — voir le commentaire ci-dessus.
+    }
+  }
+
+  /**
+   * Étape 1 bis bis — la pointeuse. Après les ventes et les services de
+   * caisse, avant le catalogue ; erreur AVALÉE pour la même raison que les
+   * shifts — un serveur antérieur répond 404, et une heure d'arrivée qui
+   * remonte au cycle suivant ne coûte rien.
+   */
+  private async pousserPointages(): Promise<void> {
+    const lire = this.options.depot.pointagesAPousser
+    const accuser = this.options.depot.accuserPointages
+    const envoyer = this.options.transport.pointages
+    if (!lire || !accuser || !envoyer) return
+
+    try {
+      const lot = await lire.call(this.options.depot, 50)
+      if (lot.length === 0) return
+      const reponse = await envoyer.call(this.options.transport, lot)
+      const accuses = new Set(reponse.enregistres)
+      const envoyes = lot.filter((p) => accuses.has(p.id))
+      if (envoyes.length > 0) await accuser.call(this.options.depot, envoyes)
+    } catch {
+      // Silencieux à dessein — voir `pousserShifts`.
     }
   }
 

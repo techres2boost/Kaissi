@@ -74,6 +74,18 @@ export function heureLocale(instant: Date, fuseau: string): number {
 
 export class ErreurJournee extends Error {}
 
+/**
+ * « 2026-10-21T18:30 » (un champ `datetime-local`), lu dans le fuseau de
+ * l'ÉTABLISSEMENT — pas dans celui du serveur, qui tourne en UTC. Sans
+ * cela, une sortie corrigée à 18 h 30 à Tunis s'enregistrait à 19 h 30.
+ */
+export function instantLocal(dateHeure: string, fuseau: string): Date {
+  const trouve = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(dateHeure.trim())
+  if (!trouve) throw new ErreurJournee(`Date et heure illisibles : « ${dateHeure} »`)
+  const [, a, mo, j, h, mi] = trouve
+  return instantDepuisLocal(Number(a), Number(mo), Number(j), Number(h) * 60 + Number(mi), fuseau)
+}
+
 /** « 04:00 » ou « 04:00:00 » → minutes depuis minuit. */
 export function minutesDeBascule(bascule: string): number {
   const trouve = /^(\d{2}):(\d{2})(:\d{2})?$/.exec(bascule.trim())

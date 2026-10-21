@@ -128,6 +128,11 @@ export const SONDES: readonly SondeMigration[] = [
     objet: 'push_subscriptions.alertes_preparation',
     sql: colonne('push_subscriptions', 'alertes_preparation'),
   },
+  {
+    migration: '0048',
+    objet: 'politique time_entries_correction_appareil (pointeuse)',
+    sql: politique('time_entries', 'time_entries_correction_appareil'),
+  },
 ]
 
 /** La requête unique : un tableau de booléens, dans l'ordre de `SONDES`. */

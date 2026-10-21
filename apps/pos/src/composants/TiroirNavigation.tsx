@@ -34,6 +34,7 @@ import {
   RefreshCw,
   Store,
   Stethoscope,
+  Timer,
   X,
 } from 'lucide-react'
 import type { Vue } from '../navigation.js'
@@ -214,6 +215,7 @@ export const ICONES_TIROIR = {
   salle: Store,
   recus: ReceiptText,
   periodes: Clock,
+  pointeuse: Timer,
   carte: BookOpen,
   sync: RefreshCw,
   diagnostic: Stethoscope,

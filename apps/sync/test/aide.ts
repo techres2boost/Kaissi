@@ -58,6 +58,7 @@ export async function nettoyer(): Promise<void> {
     await client.query('delete from kaissi.order_events')
     await client.query('delete from kaissi.orders')
     await client.query('delete from kaissi.shifts')
+    await client.query('delete from kaissi.time_entries')
     await client.query('delete from kaissi.devices')
     // Les tests d'employés et de RLS créent des appartenances, donc des
     // entrées de journal. Sans ce ménage, change_log grossit à chaque

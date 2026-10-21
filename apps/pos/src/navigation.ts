@@ -16,3 +16,4 @@ export type Vue =
   | { nom: 'recus' }
   | { nom: 'periodes' }
   | { nom: 'carte' }
+  | { nom: 'pointeuse' }

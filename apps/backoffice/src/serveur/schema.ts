@@ -494,6 +494,23 @@ export type LigneCommande = {
   sent_seq: number | null
 }
 
+/**
+ * Un pointage (0048) : arrivée puis sortie, saisies au PIN sur une caisse.
+ * Heures de la TABLETTE ; `received_at` est celle du serveur.
+ */
+export type Pointage = {
+  id: Uuid
+  restaurant_id: Uuid
+  user_id: Uuid | null
+  device_id: Uuid | null
+  clock_in_at: Horodatage
+  clock_out_at: Horodatage | null
+  /** Une sortie corrigée au back-office : par qui (compte), et quand. */
+  corrected_by: Uuid | null
+  corrected_at: Horodatage | null
+  received_at: Horodatage
+}
+
 export type Remboursement = {
   id: Uuid
   restaurant_id: Uuid
@@ -775,6 +792,19 @@ export type Database = {
        */
       order_events: Table<EvenementJournal>
       payment_methods: Table<MethodePaiement>
+      time_entries: Table<
+        Pointage,
+        [
+          VersUtilisateur<'time_entries_user_id_fkey'>,
+          {
+            foreignKeyName: 'time_entries_device_id_fkey'
+            columns: ['device_id']
+            isOneToOne: false
+            referencedRelation: 'devices'
+            referencedColumns: ['id']
+          },
+        ]
+      >
       shifts: Table<
         Shift,
         [

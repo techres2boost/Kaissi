@@ -57,6 +57,14 @@ export interface ReponseShifts {
   readonly enregistres: readonly string[]
 }
 
+/** Un pointage (arrivée, puis sortie) tel que la tablette le remonte. */
+export interface PointageSynchronise {
+  readonly id: string
+  readonly employeId: string | null
+  readonly arriveeA: string
+  readonly sortieA: string | null
+}
+
 /**
  * La réponse du serveur à un lot de mutations de catalogue.
  *
@@ -80,6 +88,8 @@ export interface Transport {
    * l'optionalité. Les ventes ne dépendent jamais de cette route.
    */
   shifts?(shifts: readonly ShiftSynchronise[]): Promise<ReponseShifts>
+  /** FACULTATIF : la pointeuse (0048). Même raison que `shifts`. */
+  pointages?(pointages: readonly PointageSynchronise[]): Promise<ReponseShifts>
   /**
    * FACULTATIF : les mutations de catalogue émises par la caisse.
    *
@@ -177,6 +187,13 @@ export function transportHttp(options: OptionsTransport): Transport {
       return (await appeler('/sync/shifts', {
         method: 'POST',
         body: JSON.stringify({ protocolVersion: VERSION_PROTOCOLE, shifts }),
+      })) as ReponseShifts
+    },
+
+    async pointages(pointages) {
+      return (await appeler('/sync/pointages', {
+        method: 'POST',
+        body: JSON.stringify({ protocolVersion: VERSION_PROTOCOLE, pointages }),
       })) as ReponseShifts
     },
 

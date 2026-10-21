@@ -23,6 +23,8 @@ import { EcranCarte } from './ecrans/EcranCarte.js'
 import { EcranDiagnostic } from './ecrans/EcranDiagnostic.js'
 import { Modale } from './composants/Modale.js'
 import { EcranPeriodes } from './ecrans/EcranPeriodes.js'
+import { EcranPointeuse } from './ecrans/EcranPointeuse.js'
+import { ModalePointeuse } from './composants/Pointeuse.js'
 import { EcranRecus } from './ecrans/EcranRecus.js'
 import { EcranSync } from './ecrans/EcranSync.js'
 import { EcranBienvenue } from './ecrans/EcranBienvenue.js'
@@ -80,6 +82,8 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
 
   const [shift, setShift] = useState<Shift | null | undefined>(undefined)
   const [vue, setVue] = useState<Vue>({ nom: 'salle' })
+  /** La pointeuse ouverte depuis l'écran VERROUILLÉ — sans prendre la caisse. */
+  const [pointeuseVerrou, setPointeuseVerrou] = useState(false)
   /**
    * Le back-office a été demandé SANS réseau.
    *
@@ -198,6 +202,13 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
       icone: ICONES_TIROIR.periodes,
       action: bascule('periodes'),
     },
+    {
+      cle: 'pointeuse',
+      vues: ['pointeuse'],
+      libelle: t('Pointeuse'),
+      icone: ICONES_TIROIR.pointeuse,
+      action: bascule('pointeuse'),
+    },
     /*
       La CARTE — gérant et administrateur seulement.
 
@@ -312,12 +323,20 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
     return (
       <div className="application">
         <BandeauSimple reseau={reseau} />
-        <DemandePin
-          titre={t('Prise de poste')}
-          sousTitre={t('Qui utilise la caisse ?')}
-          proposerLHabitue
-          onValide={definirEmploye}
-        />
+        {pointeuseVerrou ? (
+          <ModalePointeuse onFermer={() => setPointeuseVerrou(false)} />
+        ) : (
+          <DemandePin
+            titre={t('Prise de poste')}
+            sousTitre={t('Qui utilise la caisse ?')}
+            proposerLHabitue
+            onValide={definirEmploye}
+            actionSecondaire={{
+              libelle: t('Pointer mon arrivée ou ma sortie'),
+              onClick: () => setPointeuseVerrou(true),
+            }}
+          />
+        )}
       </div>
     )
   }
@@ -343,7 +362,7 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
   //
   // Le bandeau proposait déjà les deux liens ; seul « Diagnostic » était
   // exempté ici, donc cliquer « Sync » ne changeait rien à l'écran.
-  if (!shift && vue.nom !== 'diagnostic' && vue.nom !== 'sync') {
+  if (!shift && vue.nom !== 'diagnostic' && vue.nom !== 'sync' && vue.nom !== 'pointeuse') {
     return (
       <div className="application">
         <Bandeau
@@ -440,6 +459,10 @@ function Terminal({ contexte }: { contexte: ContexteApplication }) {
 
         {vue.nom === 'periodes' && (
           <EcranPeriodes onRetour={() => setVue({ nom: 'salle' })} />
+        )}
+
+        {vue.nom === 'pointeuse' && (
+          <EcranPointeuse onRetour={() => setVue({ nom: 'salle' })} />
         )}
       </main>
 

@@ -42,6 +42,8 @@ interface Props {
   readonly proposerLHabitue?: boolean
   readonly onValide: (employe: Employe) => void
   readonly onAnnuler?: () => void
+  /** Un second geste, sous la saisie — « Pointer » sur l'écran verrouillé. */
+  readonly actionSecondaire?: { readonly libelle: string; readonly onClick: () => void }
 }
 
 export function DemandePin({
@@ -51,6 +53,7 @@ export function DemandePin({
   proposerLHabitue = false,
   onValide,
   onAnnuler,
+  actionSecondaire,
 }: Props) {
   const { employes, app } = useApp()
   const liste = candidats ?? employes
@@ -245,6 +248,11 @@ export function DemandePin({
             validerActif={pin.length >= 4 && !bloque && !verification}
           />
         </div>
+      )}
+      {actionSecondaire && (
+        <button type="button" className="lien action-secondaire-pin" onClick={actionSecondaire.onClick}>
+          {actionSecondaire.libelle}
+        </button>
       )}
     </Modale>
   )

@@ -39,7 +39,7 @@ import type {
   ProduitEnAlerte,
   ResultatInsertion,
 } from './depot.js'
-import type { ChangementCatalogue, ShiftSynchronise } from './protocole.js'
+import type { ChangementCatalogue, PointageSynchronise, ShiftSynchronise } from './protocole.js'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { ReglageSsl } from './ssl.js'
 import { journal } from './journal.js'
@@ -959,6 +959,49 @@ export class DepotPostgres implements DepotSync {
           ],
         )
         ecrits.push(s.id)
+      }
+    })
+    return ecrits
+  }
+
+  async enregistrerPointages(
+    appareil: AppareilAuthentifie,
+    pointages: readonly PointageSynchronise[],
+  ): Promise<readonly string[]> {
+    const ecrits: string[] = []
+    await this.sousIdentite(appareil, async (client) => {
+      for (const p of pointages) {
+        const { rowCount } = await client.query(
+          // L'employé passe par le même filtre que pour les shifts : inconnu
+          // du serveur, il devient nul plutôt que de faire échouer la clé
+          // étrangère — un pointage ne se perd pas pour un employé archivé.
+          // COALESCE sur la sortie : un renvoi de l'ARRIVÉE, arrivé après
+          // celui de la sortie, n'efface jamais une sortie déjà remontée.
+          `insert into kaissi.time_entries
+             (id, organization_id, restaurant_id, device_id, user_id, clock_in_at, clock_out_at)
+           values (
+             $1, $2, $3, $4,
+             (select u.id from kaissi.users u
+               where u.id = $5::uuid and u.organization_id = $2),
+             $6, $7)
+           on conflict (id) do update set
+             clock_out_at = coalesce(excluded.clock_out_at, kaissi.time_entries.clock_out_at),
+             received_at  = now()
+           -- Le pointage d'une AUTRE caisse n'est pas touché, et sans
+           -- erreur : laisser RLS refuser l'update ferait échouer tout le
+           -- lot, et les pointages suivants de cette caisse avec lui.
+           where kaissi.time_entries.device_id = excluded.device_id`,
+          [
+            p.id,
+            appareil.organizationId,
+            appareil.restaurantId,
+            appareil.deviceId,
+            p.employeId && estUuid(p.employeId) ? p.employeId : null,
+            p.arriveeA,
+            p.sortieA,
+          ],
+        )
+        if (rowCount) ecrits.push(p.id)
       }
     })
     return ecrits
