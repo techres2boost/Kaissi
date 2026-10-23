@@ -111,6 +111,35 @@ await etape('un article à prix libre s’ajoute au montant saisi', async () => 
   await page.waitForSelector('.lignes li:has-text("Bouteille réserve")', { timeout: 10000 })
 })
 
+await etape('deux touchers sur un article donnent « 2 × », pas deux lignes', async () => {
+  await page.click('.categories button:has-text("Boissons")')
+  const coca = page.locator('.carte-produit:has-text("Coca-Cola 33cl")')
+  await coca.click()
+  await page.waitForSelector('.lignes li:has-text("Coca-Cola") .qte:text-is("1")', { timeout: 10000 })
+  await coca.click()
+  await page.waitForSelector('.lignes li:has-text("Coca-Cola") .qte:text-is("2")', { timeout: 10000 })
+  const n = await page.locator('.lignes li:not(.retiree):has-text("Coca-Cola")').count()
+  if (n !== 1) throw new Error(`${n} lignes Coca-Cola au lieu d'une seule « 2 × »`)
+})
+
+await etape('après l’envoi en cuisine, un ajout fait une ligne NEUVE — la cuisine la reçoit', async () => {
+  await page.click('.actions-commande .cuisine')
+  // Impression éteinte : les bons s'affichent à l'écran.
+  await page.waitForSelector('.modale:has-text("Envoyé en cuisine")', { timeout: 10000 })
+  await page.keyboard.press('Escape')
+  await page.waitForSelector('.lignes li.envoyee:has-text("Coca-Cola")', { timeout: 10000 })
+  await page.click('.carte-produit:has-text("Coca-Cola 33cl")')
+  await page.waitForFunction(
+    () => document.querySelectorAll('.lignes li:not(.retiree)').length >= 3,
+    null,
+    { timeout: 10000 },
+  )
+  const envoyee = await page.locator('.lignes li.envoyee:has-text("Coca-Cola") .qte').textContent()
+  if (envoyee !== '2') throw new Error(`la ligne déjà envoyée a changé : ${envoyee}`)
+  const nouvelle = await page.locator('.lignes li:not(.envoyee):not(.retiree):has-text("Coca-Cola") .qte').textContent()
+  if (nouvelle !== '1') throw new Error(`la nouvelle ligne porte ${nouvelle}`)
+})
+
 await etape('la commande passe de la table 5 à la table 6', async () => {
   await page.click('.actions-commande .plus')
   await page.click('.modale .autres-actions button:has-text("Changer de table")')

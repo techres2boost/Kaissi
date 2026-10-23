@@ -261,6 +261,29 @@ export function depotJournal(db: AdaptateurSqlite) {
       return avant?.n ?? 0
     },
 
+    /**
+     * Écarte des opérations REFUSÉES, une fois qu'un gérant l'a décidé.
+     *
+     * Même garantie qu'`abandonnerRejets` : seule la ligne d'outbox part,
+     * l'événement reste dans le journal local. Rien d'autre que des rejets
+     * ne peut être écarté ici — le `status = 'rejete'` du `where` interdit
+     * d'effacer une vente encore en attente d'envoi, quel que soit l'appel.
+     */
+    async ecarterRejets(eventIds: readonly string[]): Promise<number> {
+      let n = 0
+      await db.transaction(async () => {
+        for (const id of eventIds) {
+          const avant = await db.lireUne<{ n: number }>(
+            `SELECT COUNT(*) AS n FROM outbox WHERE status = 'rejete' AND event_id = ?`,
+            [id],
+          )
+          await db.executer(`DELETE FROM outbox WHERE status = 'rejete' AND event_id = ?`, [id])
+          n += avant?.n ?? 0
+        }
+      })
+      return n
+    },
+
     /** Nombre d'opérations en attente — badge de l'écran de synchronisation. */
     async enAttente(): Promise<{ enAttente: number; rejetes: number }> {
       const ligne = await db.lireUne<{ en_attente: number; rejetes: number }>(

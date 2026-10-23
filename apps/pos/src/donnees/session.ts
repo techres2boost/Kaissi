@@ -20,6 +20,7 @@ import {
   configEffective,
   ErreurRemboursement,
   estCommandeVide,
+  ligneACompleter,
   millimes,
   paiementARembourser,
   construireTicketClient,
@@ -202,10 +203,72 @@ export class SessionCaisse {
     this.garde(acteur, 'commande.ajouter_ligne')
     const etat = await this.etatDe(orderId)
     this.gardeTransition(etat, 'line.added')
+
+    /*
+     * Deux touchers sur « Ojja merguez » donnent « 2 × Ojja merguez », comme
+     * le bouton « + » — pas deux lignes identiques. La règle (quand on
+     * complète, quand on ne complète surtout pas) est dans le domaine :
+     * `ligneACompleter`.
+     */
+    const existante = ligneACompleter(etat.lignes, ligne, {
+      deviceId: this.identite.deviceId,
+      dejaEnvoyees: await this.contexte.caisse.lignesDejaEnvoyees(orderId),
+    })
+    if (existante) {
+      this.gardeTransition(etat, 'line.quantity_changed')
+      const e = await this.evenement(
+        orderId,
+        'line.quantity_changed',
+        { ligneId: existante.id, quantite: existante.quantite + ligne.quantite },
+        acteur,
+      )
+      return this.appliquer(orderId, [e])
+    }
+
     const e = await this.evenement(
       orderId,
       'line.added',
       { ligneId: uuidV7(), ...ligne },
+      acteur,
+    )
+    return this.appliquer(orderId, [e])
+  }
+
+  /**
+   * « + » sur une ligne du ticket.
+   *
+   * Tant que la ligne n'est pas partie en cuisine, c'est sa quantité qui
+   * monte. Une fois partie, une ligne neuve : `kitchen_sends` ne renvoie
+   * jamais une ligne déjà envoyée, et la cuisine n'aurait JAMAIS su qu'il
+   * fallait un plat de plus — elle aurait servi 1 pizza sur un ticket qui en
+   * facturait 2.
+   */
+  async augmenter(acteur: Employe | null, orderId: string, ligneId: string): Promise<EtatCommande> {
+    const etat = await this.etatDe(orderId)
+    const ligne = etat.lignes.find((l) => l.id === ligneId)
+    if (!ligne) throw new RefusOperation(t('Cette ligne n’existe plus sur la commande.'), false)
+    const envoyees = await this.contexte.caisse.lignesDejaEnvoyees(orderId)
+    if (!envoyees.has(ligneId)) {
+      return this.changerQuantite(acteur, orderId, ligneId, ligne.quantite + 1)
+    }
+    this.garde(acteur, 'commande.ajouter_ligne')
+    this.gardeTransition(etat, 'line.added')
+    const e = await this.evenement(
+      orderId,
+      'line.added',
+      {
+        ligneId: uuidV7(),
+        produitId: ligne.produitId,
+        variantId: ligne.variantId,
+        designation: ligne.designation,
+        quantite: 1,
+        prixBaseMillimes: ligne.prixBaseMillimes,
+        modificateursMillimes: ligne.modificateursMillimes,
+        modificateurs: ligne.modificateurs.map((m) => ({ ...m })),
+        tauxTaxeId: ligne.tauxTaxeId,
+        stationId: ligne.stationId,
+        ...(ligne.note ? { note: ligne.note } : {}),
+      },
       acteur,
     )
     return this.appliquer(orderId, [e])

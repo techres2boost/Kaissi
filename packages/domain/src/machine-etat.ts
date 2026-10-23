@@ -151,3 +151,73 @@ export function estCommandeVide(
   return estModifiable(etat.statut) && etat.lignes.length === 0 && etat.paiements.length === 0
 }
 
+
+/**
+ * La ligne qu'un nouvel ajout doit COMPLÉTER plutôt que doubler.
+ *
+ * Toucher deux fois « Ojja merguez » doit donner « 2 × Ojja merguez », comme
+ * le bouton « + » — et non deux lignes identiques que le caissier relit, que
+ * la cuisine reçoit en double, et qu'il faut retirer une par une.
+ *
+ * On ne complète qu'une ligne en tout point IDENTIQUE, et seulement si rien
+ * ne s'y oppose :
+ *
+ *  • même produit, même variante, même prix, même taux ;
+ *  • aucune option, aucune note, aucune remise de ligne — « bien cuit » et
+ *    « à point » sont deux plats, et une remise de 2 dinars ne s'étend pas
+ *    en silence à une deuxième unité ;
+ *  • PAS ENCORE ENVOYÉE en cuisine : `kitchen_sends` ne renvoie jamais une
+ *    ligne déjà partie, la cuisine ne verrait donc jamais l'unité ajoutée ;
+ *  • ajoutée par CET appareil. Le changement de quantité est un
+ *    « dernier-écrivain-gagne » : deux tablettes hors ligne qui complètent la
+ *    même ligne en perdraient une unité. Une ligne neuve, elle, commute —
+ *    deux caisses qui ajoutent chacune un plat donnent deux plats.
+ *
+ * Un article à prix libre (`produitId` nul) ne se complète jamais : deux
+ * « divers » à 3 dinars ne sont pas forcément la même chose.
+ */
+export function ligneACompleter<
+  T extends {
+    id: string
+    produitId: string | null
+    variantId: string | null
+    prixBaseMillimes: number
+    modificateursMillimes: number
+    tauxTaxeId: string
+    modificateurs: readonly unknown[]
+    note: string | null
+    remise?: unknown
+    annulee: boolean
+    deviceId: string
+  },
+>(
+  lignes: readonly T[],
+  ajout: {
+    produitId: string | null
+    variantId?: string | null
+    prixBaseMillimes: number
+    modificateursMillimes: number
+    tauxTaxeId: string
+    modificateurs?: readonly unknown[]
+    note?: string | null
+  },
+  contexte: { deviceId: string; dejaEnvoyees: ReadonlySet<string> },
+): T | null {
+  if (ajout.produitId === null) return null
+  if ((ajout.modificateurs?.length ?? 0) > 0 || (ajout.note ?? '').trim() !== '') return null
+  const trouvee = lignes.find(
+    (l) =>
+      !l.annulee &&
+      !contexte.dejaEnvoyees.has(l.id) &&
+      l.deviceId === contexte.deviceId &&
+      l.produitId === ajout.produitId &&
+      (l.variantId ?? null) === (ajout.variantId ?? null) &&
+      l.prixBaseMillimes === ajout.prixBaseMillimes &&
+      l.modificateursMillimes === ajout.modificateursMillimes &&
+      l.tauxTaxeId === ajout.tauxTaxeId &&
+      l.modificateurs.length === 0 &&
+      (l.note ?? '').trim() === '' &&
+      l.remise === undefined,
+  )
+  return trouvee ?? null
+}

@@ -189,6 +189,18 @@ await etape('la RÉDUCTION créée est proposée dans « Remise », sans redéma
   }
 })
 
+await etape('« + » au bout des catégories : la catégorie se crée DEPUIS la commande, et s’ouvre', async () => {
+  if (await page.$('.modale')) await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  await page.click('.categories .ajout-categorie')
+  await page.waitForSelector('.modale:has-text("Nouvelle catégorie")', { timeout: 10000 })
+  await page.fill('#cat-nom', 'TEST Grillades')
+  await page.selectOption('#cat-poste', { index: 1 })
+  await page.click('.modale footer .principal')
+  // La nouvelle catégorie est là, et c'est ELLE qui est ouverte.
+  await page.waitForSelector('.categories button.actif:has-text("TEST Grillades")', { timeout: 10000 })
+})
+
 await nav.close()
 if (erreurs.length > 0) {
   console.log(`✗ erreurs de page :\n  ${erreurs.join('\n  ')}`)

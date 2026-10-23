@@ -300,6 +300,20 @@ describe('journal local et outbox', () => {
     expect(await journal.lotAPousser()).toHaveLength(0)
   })
 
+  it('écarte les rejets décidés par un gérant — jamais une vente en attente', async () => {
+    const journal = depotJournal(db)
+    await journal.ajouter(evenement('evt-1', 1))
+    await journal.ajouter(evenement('evt-2', 2))
+    await journal.marquerRejet('evt-1', 'commande_close', 'La commande est déjà clôturée.')
+
+    // On demande d'écarter les DEUX : seul le rejet part.
+    expect(await journal.ecarterRejets(['evt-1', 'evt-2'])).toBe(1)
+    expect(await journal.enAttente()).toEqual({ enAttente: 1, rejetes: 0 })
+    expect((await journal.lotAPousser()).map((o) => o.eventId)).toEqual(['evt-2'])
+    // Rien n'est effacé du journal : la vente reste.
+    expect(await journal.journalDe('cmd-1')).toHaveLength(2)
+  })
+
   it('numérote les tickets avec le préfixe de l appareil', async () => {
     const journal = depotJournal(db)
     expect(await journal.prochainNumeroTicket()).toBe('P1-000001')

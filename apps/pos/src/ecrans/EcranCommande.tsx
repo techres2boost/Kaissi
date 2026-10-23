@@ -37,6 +37,7 @@ import { Modale } from '../composants/Modale.js'
 import { DemandePin } from '../composants/DemandePin.js'
 import { TicketEcran } from '../composants/TicketEcran.js'
 import { ModaleNouvelArticle } from '../composants/ModaleNouvelArticle.js'
+import { ModaleNouvelleCategorie } from '../composants/ModaleNouvelleCategorie.js'
 import {
   ModaleAnnulerCommande,
   ModaleArticleLibre,
@@ -67,6 +68,12 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
   const [produits, setProduits] = useState<ProduitLocal[]>([])
   const [categorieActive, setCategorieActive] = useState<string | null>(null)
   const [etat, setEtat] = useState<EtatCommande | null>(null)
+  /**
+   * Les lignes déjà parties en cuisine. Elles le DISENT sur le ticket : le
+   * serveur sait d'un coup d'œil ce que la cuisine a déjà, et pourquoi un
+   * « + » sur une ligne partie en crée une nouvelle au lieu de la gonfler.
+   */
+  const [envoyees, setEnvoyees] = useState<ReadonlySet<string>>(new Set())
   const [choix, setChoix] = useState<ChoixProduit | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [escalade, setEscalade] = useState<{
@@ -75,6 +82,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
   } | null>(null)
   const [remiseOuverte, setRemiseOuverte] = useState(false)
   const [nouvelArticle, setNouvelArticle] = useState(false)
+  const [nouvelleCategorie, setNouvelleCategorie] = useState(false)
   const [clientOuvert, setClientOuvert] = useState(false)
   const [plusOuvert, setPlusOuvert] = useState(false)
   const [changerTable, setChangerTable] = useState(false)
@@ -102,9 +110,15 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
    */
   const [bonsEmis, setBonsEmis] = useState<Uint8Array[] | null>(null)
 
+  const caisseLocale = app.app.caisse
   const recharger = useCallback(async () => {
-    setEtat(await session.etatDe(orderId))
-  }, [session, orderId])
+    const [nouvelEtat, parties] = await Promise.all([
+      session.etatDe(orderId),
+      caisseLocale.lignesDejaEnvoyees(orderId),
+    ])
+    setEnvoyees(parties)
+    setEtat(nouvelEtat)
+  }, [session, orderId, caisseLocale])
 
   // Dépend du CATALOGUE, pas de l'objet de contexte entier : ce dernier change
   // d'identité à chaque tic de la file d'impression, et l'effet se relancerait
@@ -306,6 +320,23 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
               {c.nom}
             </button>
           ))}
+          {/*
+            « + » au BOUT des catégories, là où l'œil cherche celle qui
+            manque — même geste que la tuile « Nouvel article » au bout des
+            plats. Gérant et administrateur seulement : le serveur relit le
+            rôle en base et refuserait de toute façon un serveur de salle.
+          */}
+          {employe && peutModifierCatalogue(employe.role) && (
+            <button
+              type="button"
+              className="ajout-categorie"
+              onClick={() => setNouvelleCategorie(true)}
+              aria-label={t('Nouvelle catégorie')}
+              title={t('Nouvelle catégorie')}
+            >
+              <Plus size={18} strokeWidth={2.4} aria-hidden="true" />
+            </button>
+          )}
         </div>
 
         <div className="grille-produits">
@@ -445,10 +476,18 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
             {lignesActives.map((l) => {
               const detail = totaux?.lignes.find((x) => x.id === l.id)
               return (
-                <li key={l.id}>
+                <li key={l.id} className={envoyees.has(l.id) ? 'envoyee' : undefined}>
                   <div className="haut">
                     <span className="qte">{l.quantite}</span>
-                    <span className="designation">{l.designation}</span>
+                    <span className="designation">
+                      {l.designation}
+                      {envoyees.has(l.id) && (
+                        <span className="marque-envoyee" title={t('Déjà en cuisine')}>
+                          <ChefHat size={13} strokeWidth={2} aria-hidden="true" />
+                          <span className="lecteur-ecran">{t('Déjà en cuisine')}</span>
+                        </span>
+                      )}
+                    </span>
                     <span className="montant">
                       {formaterTND(detail?.totalBrutMillimes ?? millimes(0), { symbole: false })}
                     </span>
@@ -487,7 +526,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                         onClick={() =>
                           void executer(
                             () =>
-                              session.changerQuantite(employe, orderId, l.id, l.quantite + 1),
+                              session.augmenter(employe, orderId, l.id),
                             t('Modification de quantité'),
                           )
                         }
@@ -736,6 +775,19 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
               t('Ajout d’un article'),
             )
             setArticleLibre(false)
+          }}
+        />
+      )}
+
+      {nouvelleCategorie && employe && (
+        <ModaleNouvelleCategorie
+          employe={employe}
+          onFerme={() => setNouvelleCategorie(false)}
+          onCree={async (_nom, id) => {
+            // Relue ICI seulement, comme après un nouvel article : recharger
+            // la carte à chaque ligne ajoutée coûterait le délai de 50 ms.
+            setCategories(await catalogue.categories())
+            setCategorieActive(id)
           }}
         />
       )}

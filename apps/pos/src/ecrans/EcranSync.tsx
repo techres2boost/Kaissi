@@ -25,6 +25,7 @@ import {
 } from '@kaissi/db-local'
 import type { ResumeSync } from '@kaissi/sync-client'
 import { useApp } from '../etat/contexte.js'
+import { DemandePin } from '../composants/DemandePin.js'
 import { expliquerEchecReseau } from '../donnees/diagnostic-reseau.js'
 import { estNatif } from '../donnees/sqlite.js'
 import { identifiantInstallation } from '../donnees/installation.js'
@@ -69,7 +70,9 @@ const LIBELLES_REJET: Record<string, string> = {
 }
 
 export function EcranSync() {
-  const { app, sync, resumeSync, rafraichir, identite } = useApp()
+  const { app, sync, resumeSync, rafraichir, identite, employes } = useApp()
+  /** Le PIN d'un gérant est demandé avant d'écarter des opérations refusées. */
+  const [ecartDemande, setEcartDemande] = useState(false)
   const [rejets, setRejets] = useState<EnregistrementOutbox[]>([])
   const [enAttente, setEnAttente] = useState<EnregistrementOutbox[]>([])
   /*
@@ -135,6 +138,21 @@ export function EcranSync() {
     } catch {
       return enregistrement.eventId
     }
+  }
+
+  /*
+   * Écarter les opérations refusées — décision d'un GÉRANT, pas un nettoyage.
+   *
+   * Un rejet ne repart jamais tout seul : c'est une règle métier (« commande
+   * déjà encaissée sur un autre terminal »), et il reste affiché tant que
+   * personne n'a décidé. Mais des rejets d'il y a trois jours, déjà réglés
+   * en salle, finissaient par masquer ceux d'aujourd'hui. Le gérant les
+   * écarte ; la vente, elle, reste dans le journal de la caisse.
+   */
+  const ecarterRejets = async () => {
+    await app.journal.ecarterRejets(rejets.map((r) => r.eventId))
+    setEcartDemande(false)
+    rafraichir()
   }
 
   const abandonnerEtrangers = async () => {
@@ -288,6 +306,23 @@ export function EcranSync() {
               ))}
             </tbody>
           </table>
+
+          <div className="actions-rejets">
+            <p className="note">{t('Déjà réglées en salle ? Un gérant peut les écarter : elles quittent cette liste et cessent d’être envoyées. Rien n’est effacé du journal de la caisse.')}</p>
+            <button type="button" className="secondaire" onClick={() => setEcartDemande(true)}>
+              {t('Écarter ces {n} opération(s)…', { n: rejets.length })}
+            </button>
+          </div>
+
+          {ecartDemande && (
+            <DemandePin
+              titre={t('Écarter les opérations refusées')}
+              sousTitre={t('Un gérant pose son code : son geste est une décision, pas un nettoyage.')}
+              candidats={employes.filter((e) => e.role === 'gerant' || e.role === 'admin')}
+              onAnnuler={() => setEcartDemande(false)}
+              onValide={() => void ecarterRejets()}
+            />
+          )}
 
           {rejets.some((r) => r.codeRejet === 'appareil_etranger') && (
             <div className="note" style={{ marginTop: '0.75rem' }}>

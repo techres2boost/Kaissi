@@ -23,7 +23,8 @@ import { t, tm } from '../i18n.js'
 interface Props {
   readonly employe: Employe
   readonly onFerme: () => void
-  readonly onCree: (nom: string) => void | Promise<void>
+  /** `id` : la catégorie créée, pour l'ouvrir aussitôt dans la carte. */
+  readonly onCree: (nom: string, id: string) => void | Promise<void>
 }
 
 export function ModaleNouvelleCategorie({ employe, onFerme, onCree }: Props) {
@@ -77,7 +78,7 @@ export function ModaleNouvelleCategorie({ employe, onFerme, onCree }: Props) {
     try {
       await app.catalogue.creerCatalogueLocal(mutation)
       rafraichir()
-      await onCree(nom.trim())
+      await onCree(nom.trim(), mutation.categorieId)
       onFerme()
     } catch (e) {
       setErreur(e instanceof Error ? tm(e.message) : String(e))

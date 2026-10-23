@@ -596,4 +596,12 @@ export const AR_CAISSE: Readonly<Record<string, string>> = {
   "Personne n’a encore pointé sur cette caisse aujourd’hui.": "لم يسجّل أحد حضوره على هذا الصندوق اليوم.",
   "présent": "حاضر",
   "à vérifier": "للتحقّق",
+  // ── Lignes : complétées, envoyées ──
+  "Déjà en cuisine": "في المطبخ مسبقًا",
+  "Cette ligne n’existe plus sur la commande.": "لم يعد هذا السطر موجودًا في الطلبية.",
+  // ── Écarter les opérations refusées ──
+  "Déjà réglées en salle ? Un gérant peut les écarter : elles quittent cette liste et cessent d’être envoyées. Rien n’est effacé du journal de la caisse.": "تمّت تسويتها في القاعة؟ يمكن للمدير استبعادها: تخرج من هذه القائمة ويتوقّف إرسالها. لا يُمحى شيء من سجلّ الصندوق.",
+  "Écarter ces {n} opération(s)…": "استبعاد هذه العمليات ({n})…",
+  "Écarter les opérations refusées": "استبعاد العمليات المرفوضة",
+  "Un gérant pose son code : son geste est une décision, pas un nettoyage.": "يُدخل المدير رمزه: إنّه قرار، وليس تنظيفًا.",
 }

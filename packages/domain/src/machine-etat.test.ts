@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   estCommandeVide,
+  ligneACompleter,
   estFigee,
   estModifiable,
   libelleStatut,
@@ -95,5 +96,52 @@ describe('commande vide — libérable sans gérant', () => {
   it('une commande close ou annulée n’est jamais « vide »', () => {
     expect(estCommandeVide({ statut: 'annulee', lignes: [], paiements: [] })).toBe(false)
     expect(estCommandeVide({ statut: 'close', lignes: [], paiements: [] })).toBe(false)
+  })
+})
+
+describe('ligne à compléter — deux touchers sur un article', () => {
+  const base = {
+    id: 'l1',
+    produitId: 'ojja',
+    variantId: null,
+    prixBaseMillimes: 13_500,
+    modificateursMillimes: 0,
+    tauxTaxeId: 'tva',
+    modificateurs: [] as unknown[],
+    note: null as string | null,
+    annulee: false,
+    deviceId: 'caisse-1',
+  }
+  const ajout = { produitId: 'ojja', prixBaseMillimes: 13_500, modificateursMillimes: 0, tauxTaxeId: 'tva' }
+  const ctx = { deviceId: 'caisse-1', dejaEnvoyees: new Set<string>() }
+
+  it('complète la ligne identique de cette caisse', () => {
+    expect(ligneACompleter([base], ajout, ctx)?.id).toBe('l1')
+  })
+
+  it('ne complète PAS une ligne déjà envoyée : la cuisine ne verrait pas l’unité', () => {
+    expect(ligneACompleter([base], ajout, { ...ctx, dejaEnvoyees: new Set(['l1']) })).toBeNull()
+  })
+
+  it('ne complète PAS la ligne d’une autre tablette : deux ajouts doivent commuter', () => {
+    expect(ligneACompleter([{ ...base, deviceId: 'caisse-2' }], ajout, ctx)).toBeNull()
+  })
+
+  it('ne complète pas une ligne avec options, note, remise, ou retirée', () => {
+    expect(ligneACompleter([{ ...base, modificateurs: [{}] }], ajout, ctx)).toBeNull()
+    expect(ligneACompleter([{ ...base, note: 'sans oignon' }], ajout, ctx)).toBeNull()
+    expect(ligneACompleter([{ ...base, remise: { type: 'pourcentage' } }], ajout, ctx)).toBeNull()
+    expect(ligneACompleter([{ ...base, annulee: true }], ajout, ctx)).toBeNull()
+  })
+
+  it('un ajout AVEC options ou note, ou à prix libre, fait toujours une ligne neuve', () => {
+    expect(ligneACompleter([base], { ...ajout, modificateurs: [{}] }, ctx)).toBeNull()
+    expect(ligneACompleter([base], { ...ajout, note: 'bien cuit' }, ctx)).toBeNull()
+    expect(ligneACompleter([{ ...base, produitId: null }], { ...ajout, produitId: null }, ctx)).toBeNull()
+  })
+
+  it('une autre variante ou un autre prix ne se confondent pas', () => {
+    expect(ligneACompleter([base], { ...ajout, variantId: 'grande' }, ctx)).toBeNull()
+    expect(ligneACompleter([base], { ...ajout, prixBaseMillimes: 14_000 }, ctx)).toBeNull()
   })
 })

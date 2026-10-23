@@ -2168,3 +2168,28 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .liste-pointages .plage { font-variant-numeric: tabular-nums; }
 .liste-pointages li.sortie_oubliee, .liste-pointages li.incoherent { color: var(--alerte); }
+
+/* Texte lu par les lecteurs d'écran, invisible à l'œil. */
+.lecteur-ecran {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+/* Une ligne déjà partie en cuisine : une toque discrète après le nom. */
+.lignes .marque-envoyee {
+  display: inline-flex; vertical-align: middle; margin-inline-start: 0.35rem;
+  color: var(--ok); opacity: 0.85;
+}
+.actions-rejets { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-block-start: 0.75rem; }
+.actions-rejets .note { flex: 1 1 18rem; margin: 0; }
+.actions-rejets button { min-height: 44px; }
+
+/* « + » au bout des catégories : un rond pointillé, du même vert que les
+   gestes de création (« + Nouvel article »), qui se lit comme une invitation
+   et non comme une catégorie de plus. */
+.categories .ajout-categorie {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; padding: 0; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72); color: var(--accent);
+  border: 1.5px dashed #C9BFA8; box-shadow: none;
+}
+.categories .ajout-categorie:hover { background: var(--surface); border-color: var(--accent); }
