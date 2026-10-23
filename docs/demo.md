@@ -12,6 +12,10 @@ le vois pas, c'est un défaut à signaler.
 
 Durée : environ 2 heures pour tout.
 
+> **Une démo de 10 minutes devant l'équipe ?** Suis plutôt
+> [`demo-10-minutes.md`](demo-10-minutes.md) : un scénario minuté, et le
+> tableau des technologies.
+
 ## Sommaire
 
 1. [Avant de commencer](#1-avant-de-commencer)
