@@ -506,6 +506,7 @@ export function creerServeur({
         nomEtablissement: enrole.nomEtablissement,
         prefixe: enrole.prefixe,
         reprise: enrole.reprise,
+        seqDevice: enrole.seqDevice,
         /*
          * QUI a mis ce terminal en service.
          *
@@ -690,6 +691,7 @@ export function creerServeur({
         nomEtablissement: nomRestaurant,
         prefixe: enrole.prefixe,
         reprise: enrole.reprise,
+        seqDevice: enrole.seqDevice,
         employeId,
         /*
          * ⚠ Le taux de taxe posé est à ZÉRO, et le gérant doit le savoir tout

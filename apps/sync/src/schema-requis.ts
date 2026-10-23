@@ -133,6 +133,19 @@ export const SONDES: readonly SondeMigration[] = [
     objet: 'politique time_entries_correction_appareil (pointeuse)',
     sql: politique('time_entries', 'time_entries_correction_appareil'),
   },
+  {
+    /*
+     * Sonde INVERSÉE, la seule du lot : 0049 RETIRE une contrainte. Tant
+     * qu'elle est là, une caisse réinitialisée ne peut remonter aucune
+     * vente — et un service qui démarre sur une base pareille doit le dire
+     * plutôt que d'échouer vente après vente.
+     */
+    migration: '0049',
+    objet: 'unicité (device_id, seq_device) RETIRÉE de order_events',
+    sql:
+      `not exists (select 1 from pg_constraint` +
+      ` where conname = 'order_events_device_id_seq_device_key')`,
+  },
 ]
 
 /** La requête unique : un tableau de booléens, dans l'ordre de `SONDES`. */

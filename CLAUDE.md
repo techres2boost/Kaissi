@@ -455,6 +455,16 @@ l'original reste dans le journal, et la collision est inscrite dans
 `orders.exceptions`. **Perdre une vente coûte infiniment plus cher qu'un
 numéro suffixé.**
 
+**Un compteur d'événements ne repart JAMAIS en arrière.** `seq_device` vit
+dans la base LOCALE : la vider le remet à zéro, alors que le terminal garde
+son `device_id` (ci-dessous). Il réémettait donc les numéros 1, 2, 3… déjà
+remontés, et l'unicité `(device_id, seq_device)` refusait TOUT le lot —
+transaction oblige, les ventes saines tombaient avec. Une caisse
+réinitialisée ne remontait plus rien, définitivement. Vu en production.
+La 0049 retire cette unicité (l'identité est `event_id`, RÈGLE 5 ; l'ordre
+global est `server_seq`, RÈGLE 4), et l'appairage rend le compteur connu du
+serveur, que le POS adopte — comme le préfixe de tickets.
+
 **La remise en service d'un terminal ne crée jamais un terminal de plus.**
 Le POS conserve un `installation_id` dans sa base locale et l'envoie à
 l'appairage ; le serveur reconnaît l'installation et rend le MÊME appareil —

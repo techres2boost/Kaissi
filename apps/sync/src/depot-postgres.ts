@@ -476,6 +476,19 @@ export class DepotPostgres implements DepotSync {
            values ($1,$2,$3,$4)`,
           [resto.organization_id, demande.restaurantId, connu.id, empreinte],
         )
+        /*
+         * Où en est le compteur d'événements de ce terminal, VU DU SERVEUR.
+         *
+         * Une caisse qui revient avec une base locale vide repart à 1 et
+         * réémet des numéros déjà pris. Depuis 0049 cela ne bloque plus ses
+         * ventes, mais l'ordre intra-appareil deviendrait ambigu entre deux
+         * vies du terminal. On lui rend donc son compteur, et elle reprend
+         * au-dessus.
+         */
+        const { rows: compteur } = await client.query<{ seq: string | null }>(
+          `select max(seq_device) as seq from kaissi.order_events where device_id = $1`,
+          [connu.id],
+        )
         await client.query('commit')
 
         return {
@@ -486,6 +499,7 @@ export class DepotPostgres implements DepotSync {
           prefixe: connu.ticket_prefix,
           jeton,
           reprise: true,
+          seqDevice: Number(compteur[0]?.seq ?? 0),
         }
       }
 
@@ -523,6 +537,8 @@ export class DepotPostgres implements DepotSync {
         prefixe,
         jeton,
         reprise: false,
+        // Terminal neuf : aucun événement, le compteur part de zéro.
+        seqDevice: 0,
       }
     } catch (erreur) {
       await client.query('rollback').catch(() => {})

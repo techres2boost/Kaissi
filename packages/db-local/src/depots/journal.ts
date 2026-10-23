@@ -40,6 +40,30 @@ export function depotJournal(db: AdaptateurSqlite) {
     },
 
     /**
+     * Reprend le compteur AU-DESSUS de ce que le serveur connaît déjà.
+     *
+     * Appelé à l'appairage : une caisse dont la base locale a été vidée
+     * garde son `device_id` et repartirait à 1, en répétant des numéros
+     * déjà émis dans sa vie précédente. Jamais en arrière — on ne prend le
+     * compteur du serveur que s'il est plus HAUT que le nôtre.
+     */
+    async adopterSeq(seqServeur: number): Promise<void> {
+      if (!Number.isFinite(seqServeur) || seqServeur <= 0) return
+      await db.transaction(async () => {
+        const ligne = await db.lireUne<{ valeur: string }>(
+          "SELECT valeur FROM sync_state WHERE cle = 'seq_device'",
+        )
+        const local = Number.parseInt(ligne?.valeur ?? '0', 10)
+        if (seqServeur > local) {
+          await db.executer(
+            "UPDATE sync_state SET valeur = ? WHERE cle = 'seq_device'",
+            [String(Math.floor(seqServeur))],
+          )
+        }
+      })
+    },
+
+    /**
      * Écrit un événement ET son entrée d'outbox, atomiquement.
      * Idempotent : réécrire le même `eventId` ne crée pas de doublon.
      */

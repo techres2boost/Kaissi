@@ -35,6 +35,7 @@ import { SQL_015 } from './015_relire_les_evenements.js'
 import { SQL_016 } from './016_remboursements.js'
 import { SQL_017 } from './017_pret_par_envoi.js'
 import { SQL_018 } from './018_pointeuse.js'
+import { SQL_019 } from './019_seq_device_non_unique.js'
 
 export interface MigrationLocale {
   readonly version: number
@@ -61,6 +62,7 @@ export const MIGRATIONS: readonly MigrationLocale[] = [
   { version: 16, nom: 'remboursements', sql: SQL_016 },
   { version: 17, nom: 'pret_par_envoi', sql: SQL_017 },
   { version: 18, nom: 'pointeuse', sql: SQL_018 },
+  { version: 19, nom: 'seq_device_non_unique', sql: SQL_019 },
 ]
 
 /** Version cible : celle de la dernière migration connue de ce binaire. */

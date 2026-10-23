@@ -90,6 +90,16 @@ export interface AppareilEnrole {
    * neuve. Le POS le dit à l'écran : « ce terminal était déjà connu ».
    */
   readonly reprise: boolean
+  /**
+   * Le plus haut `seq_device` que le serveur connaisse pour CE terminal.
+   *
+   * Le POS reprend son compteur au-dessus — comme il adopte le préfixe de
+   * tickets, et pour la même raison : le serveur fait autorité. Une caisse
+   * dont la base locale a été vidée repartirait sinon à 1 alors que le
+   * serveur a déjà ses événements 1 à N, et ses numéros se répéteraient
+   * d'une VIE du terminal à l'autre (voir Postgres 0049).
+   */
+  readonly seqDevice: number
 }
 
 /**

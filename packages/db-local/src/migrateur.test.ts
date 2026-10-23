@@ -242,6 +242,28 @@ describe('journal local et outbox', () => {
     expect(b).toBe(a + 1)
   })
 
+  /*
+   * PANNE OBSERVÉE (23 octobre). Base locale vidée, mais même `device_id` :
+   * le compteur repartait à 1 et réémettait des numéros déjà remontés. Le
+   * serveur rend désormais le sien à l'appairage, et la caisse reprend
+   * au-dessus — jamais en arrière.
+   */
+  it('reprend le compteur du serveur, et ne RECULE jamais', async () => {
+    const journal = depotJournal(db)
+    await journal.adopterSeq(143)
+    expect(await journal.prochaineSeq()).toBe(144)
+
+    // Un compteur serveur plus BAS (un lot pas encore remonté) ne doit pas
+    // faire reculer le nôtre : on réémettrait des numéros déjà pris.
+    await journal.adopterSeq(10)
+    expect(await journal.prochaineSeq()).toBe(145)
+
+    // Zéro, négatif, illisible : sans effet.
+    await journal.adopterSeq(0)
+    await journal.adopterSeq(Number.NaN)
+    expect(await journal.prochaineSeq()).toBe(146)
+  })
+
   it('écrit l événement ET son entrée d outbox atomiquement', async () => {
     const journal = depotJournal(db)
     await journal.ajouter(evenement('evt-1', 1))

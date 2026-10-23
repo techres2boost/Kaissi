@@ -489,6 +489,7 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
         organizationId?: string
         nomEtablissement?: string
         prefixe?: string
+        seqDevice?: number
         employeId?: string
         choix?: { restaurantId: string; nom: string }[]
         message?: string
@@ -596,6 +597,28 @@ export function FormulaireAppairage({ onAppaire }: { onAppaire: () => void }) {
       // appareils hors ligne ne doivent pas pouvoir produire le même numéro.
       // Encore fallait-il l'appliquer.
       if (corps.prefixe) await app.etat.ecrire('ticket_prefix', corps.prefixe)
+      /*
+       * Le COMPTEUR D'ÉVÉNEMENTS de ce terminal, vu du serveur — et on
+       * reprend au-dessus.
+       *
+       * PANNE OBSERVÉE (23 octobre). Une caisse dont la base locale avait
+       * été vidée gardait son `device_id` (le serveur la reconnaît par son
+       * `installation_id`, migration 0021) mais repartait à `seq_device = 1`.
+       * Le serveur avait déjà ses événements 1 à 143 : l'ancienne contrainte
+       * d'unicité refusait l'insertion, tout le lot tombait, et plus AUCUNE
+       * vente ne remontait — pour toujours.
+       *
+       * Postgres 0049 a retiré cette unicité, qui bloquait une caisse pour
+       * un numéro d'ordre. Ici, on règle la cause : le compteur ne repart
+       * jamais en arrière. Même principe que le préfixe de tickets.
+       *
+       * `Math.max` et jamais une écriture sèche : un serveur qui rendrait un
+       * compteur plus BAS que le nôtre (lot pas encore remonté) ne doit pas
+       * faire reculer le nôtre.
+       */
+      if (typeof corps.seqDevice === 'number' && corps.seqDevice > 0) {
+        await app.journal.adopterSeq(corps.seqDevice)
+      }
       /*
        * QUI vient de mettre ce terminal en service — pour lui proposer son
        * pavé PIN d'emblée, plutôt que la liste de toute l'équipe.
