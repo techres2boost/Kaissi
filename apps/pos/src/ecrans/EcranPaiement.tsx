@@ -51,6 +51,12 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
    * fenêtre ne peut plus rien annuler, elle ne fait que rendre la caisse.
    */
   const [ticketEmis, setTicketEmis] = useState<Uint8Array | null>(null)
+  /**
+   * La monnaie à rendre de la vente qui vient de se clore — affichée EN
+   * GRAND au-dessus du ticket. Elle était derrière la fenêtre du ticket :
+   * au moment exact où le caissier tend la monnaie, le chiffre était caché.
+   */
+  const [renduFinal, setRenduFinal] = useState<Millimes | null>(null)
 
   const recharger = useCallback(async () => {
     setEtat(await session.etatDe(orderId))
@@ -117,8 +123,31 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
         renduMillimes: rendu,
       })
       setSaisie('')
-      await recharger()
+      const apres = await session.etatDe(orderId)
+      setEtat(apres)
       app.rafraichir()
+
+      /*
+       * ENCAISSER EN UN GESTE. Le paiement qui solde la note CLÔT la vente.
+       *
+       * Il fallait toucher « Espèces », le montant, « Encaisser »… puis un
+       * SECOND « Encaisser », dans l'autre colonne, qui ne faisait pas la
+       * même chose que le premier. Quatre gestes et deux boutons homonymes
+       * pour un compte juste, cent fois par service. Une note soldée n'a plus
+       * rien à attendre : on la clôt. Un paiement PARTIEL, lui, laisse la
+       * vente ouverte pour le moyen suivant — espèces puis carte.
+       */
+      const totalApres = calculerTotaux({
+        lignes: apres.lignes,
+        remiseGlobale: apres.remiseGlobale ?? undefined,
+        config,
+      }).totalMillimes
+      const verseApres = millimes(
+        apres.paiements.filter((p) => !p.annule).reduce((t2, p) => t2 + p.montantMillimes, 0),
+      )
+      if (calculerRendu(totalApres, verseApres).solde) {
+        await cloturer(apres)
+      }
     } catch (e) {
       setMessage(
         e instanceof RefusOperation || e instanceof Error ? tm(e.message) : String(e),
@@ -128,13 +157,15 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
     }
   }
 
-  const cloturer = async () => {
-    if (!totaux) return
+  const cloturer = async (etatCourant: EtatCommande | null = etat) => {
+    if (!etatCourant) return
     setEnCours(true)
     try {
-      const libelleTable = tables.find((elt) => elt.id === etat?.tableId)?.label ?? null
+      const libelleTable = tables.find((elt) => elt.id === etatCourant.tableId)?.label ?? null
       const imprimante = [...stations.values()].find((s) => s.hote) ?? null
-      const especes = (etat?.paiements ?? []).some((p) => !p.annule && p.mode === 'cash')
+      const vivants = etatCourant.paiements.filter((p) => !p.annule)
+      const especes = vivants.some((p) => p.mode === 'cash')
+      const rendu = millimes(vivants.reduce((t2, p) => t2 + (p.renduMillimes ?? 0), 0))
       const { ticket } = await session.cloturer(employe, orderId, {
         libellesPaiement: Object.fromEntries(methodesPaiement.map((m) => [m.id, m.nom])),
         libelleTable,
@@ -144,10 +175,14 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
         imprimer: true,
       })
       app.rafraichir()
-      // Impression allumée : le ticket part en file et la caisse enchaîne.
-      // Éteinte (MVP) : on l'affiche, et c'est le caissier qui enchaîne.
+      setRenduFinal(rendu)
+      // Impression allumée : le ticket part en file, et la caisse enchaîne —
+      // sauf s'il y a de la monnaie à rendre : ce chiffre-là doit rester à
+      // l'écran le temps de compter les pièces.
+      // Éteinte (MVP) : le ticket s'affiche, et c'est le caissier qui enchaîne.
       if (IMPRESSION_ACTIVE) {
-        onTermine()
+        if (rendu > 0) setTicketEmis(new Uint8Array())
+        else onTermine()
       } else {
         setTicketEmis(rendreTicketClient(ticket, { ouvrirTiroir: false }))
       }
@@ -167,6 +202,9 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
   }
 
   const suggestions = methode?.type === 'cash' ? suggestionsEspeces(resteDu) : []
+  // Le rendu de la saisie en cours — par `calculerRendu`, jamais une
+  // soustraction écrite ici.
+  const apercu = calculerRendu(resteDu, montantSaisi)
   const paiementsVivants = etat.paiements.filter((p) => !p.annule)
 
   return (
@@ -190,6 +228,11 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
           </ul>
         )}
 
+        {/*
+          « Reste à payer » n'apparaît que s'il DIT quelque chose : avant tout
+          paiement, il répétait le total, en aussi gros, juste en dessous.
+        */}
+        {(paiementsVivants.length > 0 || encaissement.solde) && (
         <div className={`bloc-reste ${encaissement.solde ? 'solde' : ''}`}>
           <span className="libelle">
             {encaissement.solde ? t('Monnaie à rendre') : t('Reste à payer')}
@@ -198,15 +241,16 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
             {formaterTND(encaissement.solde ? aRendre : encaissement.resteDuMillimes)}
           </span>
         </div>
+        )}
 
         {encaissement.solde && (
           <button
             type="button"
             className="principal grand"
             disabled={enCours}
-            onClick={() => void cloturer()}
+            onClick={() => void cloturer(etat)}
           >
-            {enCours ? t('Clôture…') : IMPRESSION_ACTIVE ? t('Encaisser et imprimer') : t('Encaisser')}
+            {enCours ? t('Clôture…') : IMPRESSION_ACTIVE ? t('Terminer et imprimer') : t('Terminer la vente')}
           </button>
         )}
 
@@ -278,6 +322,15 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
             <div className="montant-saisi">
               <span className="libelle">{t('Montant reçu')}</span>
               <span className="valeur">{formaterTND(montantSaisi)}</span>
+              {/*
+                La monnaie à rendre AVANT de valider : le caissier compte les
+                pièces pendant que le client attend, pas après coup.
+              */}
+              {methode?.type === 'cash' && apercu.rendreMillimes > 0 && (
+                <span className="apercu-rendu">
+                  {t('À rendre : {montant}', { montant: formaterTND(apercu.rendreMillimes) })}
+                </span>
+              )}
             </div>
 
             <PaveNumerique
@@ -285,7 +338,11 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
               onChange={setSaisie}
               decimale
               onValider={() => void enregistrer(montantSaisi, montantSaisi)}
-              libelleValider={t('Encaisser')}
+              libelleValider={
+                montantSaisi === 0 || montantSaisi >= resteDu
+                  ? t('Encaisser {montant}', { montant: formaterTND(resteDu) })
+                  : t('Paiement partiel {montant}', { montant: formaterTND(montantSaisi) })
+              }
               validerActif={!enCours && montantSaisi > 0}
             />
           </>
@@ -300,7 +357,13 @@ export function EcranPaiement({ orderId, onRetour, onTermine }: Props) {
 
       {ticketEmis && (
         <Modale titre={t('Ticket client')} onFermer={onTermine}>
-          <TicketEcran charge={ticketEmis} />
+          {renduFinal !== null && renduFinal > 0 && (
+            <div className="rendu-final" role="status">
+              <span className="libelle">{t('Monnaie à rendre')}</span>
+              <span className="valeur">{formaterTND(renduFinal)}</span>
+            </div>
+          )}
+          {ticketEmis.length > 0 && <TicketEcran charge={ticketEmis} />}
           <p className="aide">{t('La vente est enregistrée. Montrez ce ticket au client, ou fermez simplement cette fenêtre.')}</p>
           <button type="button" className="principal grand" onClick={onTermine}>{t('Terminer')}</button>
         </Modale>

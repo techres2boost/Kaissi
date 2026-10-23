@@ -6,7 +6,7 @@
  * directement dans l'état React — l'état vient toujours du journal réduit.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChefHat, ChevronLeft, Minus, MoreHorizontal, Percent, Plus, Trash2, UserRound } from 'lucide-react'
 import {
   calculerTotaux,
@@ -74,6 +74,18 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
    * « + » sur une ligne partie en crée une nouvelle au lieu de la gonfler.
    */
   const [envoyees, setEnvoyees] = useState<ReadonlySet<string>>(new Set())
+  /**
+   * La ligne dont les commandes (−, +, corbeille) sont ouvertes.
+   *
+   * Elles étaient sous CHAQUE ligne : deux rangées par plat, quatre plats
+   * visibles sur une tablette, et un ticket de table de six qu'il fallait
+   * faire défiler pour voir le total. On corrige presque toujours le plat
+   * qu'on vient d'ajouter : c'est donc lui qui les porte, d'office. Toucher
+   * une autre ligne les y déplace.
+   */
+  const [ligneOuverte, setLigneOuverte] = useState<string | null>(null)
+  /** L'état précédent, pour savoir QUELLE ligne vient de bouger. */
+  const etatPrecedent = useRef<EtatCommande | null>(null)
   const [choix, setChoix] = useState<ChoixProduit | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [escalade, setEscalade] = useState<{
@@ -116,6 +128,17 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
       session.etatDe(orderId),
       caisseLocale.lignesDejaEnvoyees(orderId),
     ])
+    // La ligne qui vient de BOUGER — ajoutée, ou dont la quantité a changé —
+    // prend les commandes : c'est celle qu'on voudra corriger.
+    const avant = etatPrecedent.current
+    if (avant) {
+      const quantites = new Map(avant.lignes.map((l) => [l.id, l.quantite]))
+      const touchee = nouvelEtat.lignes.find(
+        (l) => !l.annulee && quantites.get(l.id) !== l.quantite,
+      )
+      if (touchee) setLigneOuverte(touchee.id)
+    }
+    etatPrecedent.current = nouvelEtat
     setEnvoyees(parties)
     setEtat(nouvelEtat)
   }, [session, orderId, caisseLocale])
@@ -475,9 +498,27 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
           <ul className="lignes">
             {lignesActives.map((l) => {
               const detail = totaux?.lignes.find((x) => x.id === l.id)
+              const ouverte = (ligneOuverte && lignesActives.some((x) => x.id === ligneOuverte)
+                ? ligneOuverte
+                : lignesActives[lignesActives.length - 1]?.id) === l.id
               return (
-                <li key={l.id} className={envoyees.has(l.id) ? 'envoyee' : undefined}>
-                  <div className="haut">
+                <li
+                  key={l.id}
+                  className={[envoyees.has(l.id) ? 'envoyee' : '', ouverte ? 'ouverte' : ''].join(' ').trim() || undefined}
+                >
+                  <div
+                    className="haut"
+                    role={modifiable ? 'button' : undefined}
+                    tabIndex={modifiable ? 0 : undefined}
+                    aria-expanded={modifiable ? ouverte : undefined}
+                    onClick={() => modifiable && setLigneOuverte(l.id)}
+                    onKeyDown={(e) => {
+                      if (modifiable && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault()
+                        setLigneOuverte(l.id)
+                      }
+                    }}
+                  >
                     <span className="qte">{l.quantite}</span>
                     <span className="designation">
                       {l.designation}
@@ -498,7 +539,7 @@ export function EcranCommande({ orderId, onRetour, onEncaisser }: Props) {
                     </div>
                   )}
                   {l.note && <div className="note">{l.note}</div>}
-                  {modifiable && (
+                  {modifiable && ouverte && (
                     <div className="actions-ligne">
                       <span className="pas">
                       {/*

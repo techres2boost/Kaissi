@@ -320,16 +320,16 @@ await etape('paiement en espèces avec suggestion', async () => {
   await page.click('.modes button:has-text("Espèces")')
   const sugg = await page.$$eval('.suggestions button', (b) => b.map((x) => x.textContent))
   console.log(`    suggestions : ${sugg.join(' · ')}`)
+  /* Une note SOLDÉE se clôt seule : plus de second « Encaisser » à chercher.
+     La monnaie à rendre s'affiche en grand, AU-DESSUS du ticket. */
   await page.click('.suggestions button >> nth=1')
-  await page.waitForSelector('.bloc-reste.solde', { timeout: 10000 })
-  const rendu = await page.textContent('.bloc-reste .valeur')
+  await page.waitForSelector('.modale:has-text("Ticket client")', { timeout: 15000 })
+  const rendu = await page.textContent('.modale .rendu-final .valeur')
   console.log(`    monnaie à rendre : ${rendu}`)
   if (!rendu.includes('0,900')) throw new Error(`rendu attendu 0,900 — obtenu ${rendu}`)
 })
 
 await etape('clôture de la commande — le ticket client s’affiche', async () => {
-  await page.click('.colonne-recap .principal.grand')
-  await page.waitForSelector('.modale:has-text("Ticket client")', { timeout: 15000 })
   const ticket = await page.textContent('.modale .ticket-ecran')
   console.log(`    ticket client :\n${ticket.split('\n').map((l) => `      ${l}`).join('\n')}`)
   if (!ticket.includes('TOTAL')) throw new Error('le ticket ne porte pas de total')

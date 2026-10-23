@@ -604,4 +604,10 @@ export const AR_CAISSE: Readonly<Record<string, string>> = {
   "Écarter ces {n} opération(s)…": "استبعاد هذه العمليات ({n})…",
   "Écarter les opérations refusées": "استبعاد العمليات المرفوضة",
   "Un gérant pose son code : son geste est une décision, pas un nettoyage.": "يُدخل المدير رمزه: إنّه قرار، وليس تنظيفًا.",
+  // ── Encaissement en un geste ──
+  "Terminer la vente": "إنهاء البيع",
+  "Terminer et imprimer": "إنهاء وطباعة",
+  "À rendre : {montant}": "للإرجاع: {montant}",
+  "Encaisser {montant}": "استخلاص {montant}",
+  "Paiement partiel {montant}": "دفع جزئي {montant}",
 }

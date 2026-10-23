@@ -1296,3 +1296,37 @@ caisses, cinq gérants sur le tableau de bord — 36 secondes de travail pour
 le serveur, zéro erreur. Et le stress jusqu'à 400 caisses simultanées :
 aucune vente perdue ni doublée, même au-delà de la limite.
 
+## 24. Moins de gestes à la caisse (23 octobre)
+
+### 24.1 Deux touchers sur un article = « 2 × », pas deux lignes
+
+Toucher deux fois **Coca-Cola 33cl** donne une ligne **2 × Coca-Cola**, comme
+le « + ». Une ligne déjà partie en cuisine (marquée d'une toque) n'est jamais
+complétée : l'ajout fait une ligne neuve, qui part au prochain envoi — sinon
+la cuisine ne verrait jamais le second plat. Même chose pour une ligne avec
+options, note ou remise : elle reste à part.
+
+### 24.2 Encaisser en un geste
+
+**Encaisser** → **Espèces** → une suggestion. Si la note est soldée, la vente
+se clôt **seule** : plus de second « Encaisser » à chercher. La **monnaie à
+rendre** s'affiche en grand au-dessus du ticket — c'est le chiffre que le
+caissier lit, le client devant lui. Avant de valider un montant tapé au pavé,
+« À rendre : … » s'affiche déjà ; le bouton dit **Encaisser 22,900 TND** ou
+**Paiement partiel 10,000 TND**.
+
+### 24.3 Un ticket plus lisible
+
+Seule la ligne qu'on vient de toucher montre −, + et la corbeille ; toucher
+une autre ligne l'ouvre. Les autres tiennent sur une seule rangée.
+
+### 24.4 Une catégorie depuis la carte
+
+Gérant ou administrateur : la pastille **+** au bout des catégories en crée
+une, hors ligne, et l'ouvre aussitôt.
+
+### 24.5 Les opérations refusées anciennes
+
+☰ → Synchronisation → **Écarter ces 3 opérations…** → PIN d'un gérant. Elles
+disparaissent de la caisse ; le serveur ne les avait jamais acceptées, rien
+n'est donc effacé de son journal.

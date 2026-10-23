@@ -85,9 +85,10 @@ serveur. Le back-office, celui du patron. L'écran de la cuisine. »*
 1. **Couper Internet.** Le bandeau de la caisse passe hors ligne.
    *« Le Wi-Fi du restaurant vient de tomber. Un samedi soir. »*
 2. Table 3 → **Remise** → **Happy hour** (10 %).
-3. **Encaisser** → **Espèces** → la première suggestion (le compte juste)
-   → **Encaisser**.
-4. Le **ticket** s'affiche à l'écran → **Terminer**.
+3. **Encaisser** → **Espèces** → la première suggestion (le compte juste).
+   La note est soldée : la vente se clôt seule, sans second bouton.
+4. Le **ticket** s'affiche à l'écran, la monnaie à rendre en grand
+   au-dessus → **Terminer**.
    *« Encaissé. Sans réseau. La vente attend sur la tablette. »*
 5. **Rétablir Internet.** Le compteur d'attente redescend à 0, l'état repasse
    « À jour ».

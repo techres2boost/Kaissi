@@ -976,6 +976,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
   color: var(--texte-2); font-size: 0.85rem; margin-top: 0.75rem;
 }
 
+/* Un geste secondaire (« ‹ Salle », « Pointer mon arrivée… ») : du texte
+   d'accent, souligné — jamais le bouton gris du navigateur. */
+.lien {
+  background: transparent; border: 0;
+  color: var(--accent); font-weight: 600;
+  text-decoration: underline; text-underline-offset: 3px;
+  padding: 0.5rem 0.25rem; min-height: 44px;
+  max-width: 100%;
+}
+
 /* Discret, mais pas caché — et libellé pour ce qu'il est. */
 .lien-discret {
   background: transparent; border: 0;
@@ -1023,7 +1033,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   -webkit-tap-highlight-color: transparent;
 }
 .pave button:active { background: var(--surface-2); transform: scale(0.96); }
-.pave button.inactif { opacity: 0.25; }
+/* Une virgule morte n'invite qu'à taper dessus pour rien : la case reste
+   (la grille ne bouge pas), la touche disparaît. */
+.pave button.inactif { visibility: hidden; }
 .pave .effacer { color: var(--accent); }
 .pave .valider { grid-column: 1 / -1; background: var(--accent); color: var(--sur-accent); }
 .pave .valider:disabled { opacity: 0.35; }
@@ -2193,3 +2205,41 @@ button { font: inherit; color: inherit; cursor: pointer; }
   border: 1.5px dashed #C9BFA8; box-shadow: none;
 }
 .categories .ajout-categorie:hover { background: var(--surface); border-color: var(--accent); }
+
+/* ── Encaissement en un geste ─────────────────────────────────────────── */
+/* La monnaie à rendre, AVANT de valider : sous le montant reçu, en vert. */
+.montant-saisi { flex-wrap: wrap; row-gap: 0.15rem; }
+.montant-saisi .apercu-rendu {
+  flex-basis: 100%; text-align: end; font-weight: 700; color: var(--ok);
+  font-variant-numeric: tabular-nums;
+}
+/* Puis EN GRAND, au-dessus du ticket : c'est le chiffre qu'on lit en
+   comptant les pièces. Il était derrière la fenêtre du ticket. */
+.rendu-final {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
+  padding: 0.9rem 1.1rem; margin-block-end: 0.75rem;
+  background: var(--fond-ok); border: 1px solid var(--ok); border-radius: var(--rayon);
+}
+.rendu-final .libelle { font-weight: 700; color: var(--ok); text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.04em; }
+.rendu-final .valeur { font-size: 2rem; font-weight: 800; color: var(--ok); font-variant-numeric: tabular-nums; }
+
+/* Sur téléphone, l'encaissement d'abord : le pavé tombait sous la ligne de
+   flottaison, derrière le rappel de la commande. Le détail des lignes reste
+   au ticket ; ici, on paie. */
+@media (max-width: 600px) {
+  .colonne-recap .recap-commande { display: none; }
+  .colonne-recap .bloc-total { padding-block: 0.6rem; }
+  .colonne-recap .bloc-total .valeur { font-size: 1.9rem; }
+  .colonne-recap .retour { margin-block-end: 0.25rem; }
+}
+
+/* ── Ticket : une rangée par plat, les commandes sur la ligne ouverte ──── */
+.ticket .lignes li { padding: 0.55rem 0.5rem; margin-inline: -0.5rem; border-radius: var(--rayon-s); }
+.ticket .lignes .haut[role='button'] { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.ticket .lignes .haut[role='button']:focus-visible { outline: none; box-shadow: var(--anneau); border-radius: var(--rayon-s); }
+/* La ligne ouverte se distingue sans crier : un fond à peine teinté. */
+.ticket .lignes li.ouverte { background: var(--fond-accent); }
+.ticket .lignes li.ouverte .qte { background: var(--accent); color: var(--sur-accent); }
+@media (prefers-reduced-motion: no-preference) {
+  .ticket .lignes li { transition: background var(--transition); }
+}
