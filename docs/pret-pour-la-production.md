@@ -61,6 +61,13 @@ venir de nous** :
 > confirmer au JORT. Analyse, calendrier, sources et plan :
 > [`fonctionnalites-manquantes.md`](fonctionnalites-manquantes.md) §2. Ce
 > point passe désormais devant tous les autres.
+>
+> **Mise à jour du 27 octobre** : le sujet a son propre document,
+> [`conformite-fiscale.md`](conformite-fiscale.md) — les trois obligations
+> séparées (caisse, facture, paiement), les trois scénarios de chiffrage
+> selon ce que le cahier des charges dira du hors ligne, et les questions à
+> poser. Vue de direction, risques et suivi :
+> [`dossier-cto.md`](dossier-cto.md).
 
 **Action** : une séance avec un expert-comptable, ces quatre questions
 écrites, ses réponses consignées dans le dépôt. Et, sans attendre, le cahier

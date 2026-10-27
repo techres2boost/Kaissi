@@ -45,6 +45,9 @@ mode avion — le seul test qui compte vraiment.
 
 | Document | Pour |
 |---|---|
+| **[`docs/dossier-cto.md`](docs/dossier-cto.md)** | **La vue de direction** — l'état réel, les risques classés, les coûts, les décisions à prendre, et le **tableau de suivi** de tout ce qui manque |
+| **[`docs/conformite-fiscale.md`](docs/conformite-fiscale.md)** | ⚠ **Caisse, facture, paiement** — les trois obligations tunisiennes, ce qu'elles exigent, et les questions à poser à l'expert-comptable |
+| **[`docs/positionnement-marche-tunisien.md`](docs/positionnement-marche-tunisien.md)** | **Face aux concurrents** — les quatre familles de caisses vendues en Tunisie, leurs prix, et la case vide qui est la nôtre |
 | **[`docs/mvp.md`](docs/mvp.md)** | **Le périmètre livré** — ce qui est dedans, ce qui est éteint, comment déployer |
 | **[`docs/demo.md`](docs/demo.md)** | **Démonstration de bout en bout** — tester chaque fonctionnalité, de la mise en service d'une caisse aux rapports du back-office |
 | **[`docs/gestion.md`](docs/gestion.md)** | **Ventes, coûts, marges et stock** — les écrans de gestion et leur protocole de test |

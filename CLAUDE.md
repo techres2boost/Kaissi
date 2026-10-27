@@ -767,9 +767,19 @@ une caisse **homologuée NACEF** — module de sécurisation des données
 fiscales, transmission à une plateforme du ministère, rapport journalier —
 aux cafés et restaurants, par étapes de novembre 2025 à juillet 2028. Avant
 toute fonction touchant au ticket, à la numérotation ou à la clôture, lire
-`docs/fonctionnalites-manquantes.md` §2 et le cahier des charges du portail
+`docs/conformite-fiscale.md` et le cahier des charges du portail
 homologation.nacef.tn. La question qui décide de tout : comment une vente
 faite HORS LIGNE y est sécurisée puis transmise.
+
+`docs/conformite-fiscale.md` sépare les **trois** obligations que la presse
+mélange : la caisse homologuée (NACEF), la facture électronique (El Fatoora /
+TTN, article 53 de la loi de finances 2026) et le paiement — pour lequel
+aucune obligation n'a été trouvée côté commerçant. Corollaire d'architecture
+à ne pas franchir : **Kaissi ne touche jamais au flux d'argent**. Encaisser,
+détenir ou transférer des fonds fait entrer dans le périmètre des
+établissements de paiement (agrément BCT, circulaire 2026-10). Le modèle est
+un TPE de la banque du client à côté de la tablette, et un mode de paiement
+« Carte » enregistré — lire le résultat, jamais encaisser.
 
 ---
 

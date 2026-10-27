@@ -8,6 +8,10 @@ le même discours que nous. Faut-il changer de nom ? »
 **Oui, et avant deux échéances** : le premier client payant, et surtout le
 **dépôt d'homologation NACEF**, qui se fera sous un nom de produit.
 
+Le marché et les concurrents sont décrits dans
+[`positionnement-marche-tunisien.md`](positionnement-marche-tunisien.md) ;
+KAISSE y figure parmi les caisses qui revendiquent l'homologation NACEF.
+
 « Kaissi » et « KAISSE » se prononcent presque pareil, visent le même client
 (cafés et restaurants tunisiens) et vendent la même promesse (caisse
 tunisienne, conforme). Un prospect qui cherche l'un trouvera l'autre. Et si

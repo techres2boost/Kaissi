@@ -44,6 +44,14 @@ remise sur demande est donc déjà à portée.
 
 ## 2. Obligatoire n° 0 — la caisse homologuée ⚠
 
+> **Le détail à jour est désormais dans
+> [`conformite-fiscale.md`](conformite-fiscale.md)** (27 octobre) : les
+> **trois** obligations que la presse mélange — la caisse homologuée NACEF,
+> la facture électronique El Fatoora/TTN, et le paiement, pour lequel aucune
+> obligation n'a été trouvée côté commerçant — plus les douze questions à
+> poser à l'expert-comptable et ce qui manque, point par point, dans le
+> ticket. Ce qui suit reste exact, mais s'arrête au 20 octobre.
+
 > **C'est la découverte de cette analyse, et elle change la réponse à la
 > question « est-on prêt ».** Le benchmark du 17 octobre l'avait signalée comme
 > une question ouverte (« Certification de caisse — ⚠ à faire trancher ») ;
