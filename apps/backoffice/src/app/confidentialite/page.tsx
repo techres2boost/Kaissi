@@ -145,8 +145,11 @@ export default function Confidentialite() {
 
       <section className="carte">
         <h2>{t('Suppression du compte')}</h2>
-        <p>{t('Pour faire supprimer un compte et les données associées, envoyez la demande depuis l’adresse e-mail du compte à')}{' '}
-          <a href={`mailto:${EDITEUR.contact}`}>{EDITEUR.contact}</a>{t(', avec le nom de l’établissement. Nous confirmons la suppression par retour de courriel.')}</p>
+        <p>{t('Depuis la caisse : écran d’accueil, ou ☰ → Synchronisation → « Supprimer mon compte ». L’écran montre d’abord ce qui sera effacé et ce qui sera conservé, puis demande de retaper l’adresse du compte. La suppression est immédiate et définitive.')}</p>
+        <p>{t('Sont effacés : votre nom, votre adresse e-mail, votre téléphone, votre code PIN de caisse, et vos rattachements aux établissements. Votre connexion au back-office cesse aussitôt.')}</p>
+        <p className="indication">{t('Sont conservées : les ventes déjà encaissées et le journal d’audit. Ce sont des écritures comptables, et elles ne portent plus votre nom. Une seule chose peut retarder la suppression : si vous êtes le dernier administrateur d’un établissement, il faut d’abord en nommer un autre — sans quoi plus personne ne pourrait y ouvrir d’accès.')}</p>
+        <p>{t('Si vous préférez, la demande peut aussi être envoyée depuis l’adresse e-mail du compte à')}{' '}
+          <a href={`mailto:${EDITEUR.contact}`}>{EDITEUR.contact}</a>{t(', avec le nom de l’établissement.')}</p>
       </section>
 
       <section className="carte">

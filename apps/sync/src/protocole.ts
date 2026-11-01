@@ -267,6 +267,16 @@ export type CodeErreur =
    * l'ouvrirait à quiconque connaît une adresse.
    */
   | 'adresse_deja_utilisee'
+  // ── Suppression de son propre compte (/compte/*) ────────────────────────
+  /**
+   * Refus de supprimer un compte : adresse de confirmation qui ne
+   * correspond pas, ou dernier administrateur d'un établissement.
+   *
+   * Distinct d'`acces_refuse` : ici le mot de passe était BON. Confondre les
+   * deux enverrait la personne vérifier ses identifiants alors que le
+   * problème est qu'elle doit d'abord nommer un autre administrateur.
+   */
+  | 'suppression_refusee'
 
 export interface ReponseErreur {
   readonly erreur: CodeErreur

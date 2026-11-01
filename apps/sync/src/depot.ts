@@ -407,6 +407,54 @@ export interface DepotSync {
   supprimerEtablissement(restaurantId: string): Promise<void>
 
   /**
+   * Ce que la suppression d'un COMPTE effacerait — compté AVANT de la
+   * proposer, comme pour un établissement.
+   *
+   * `seulAdmin` est le seul vrai obstacle : partir en laissant un
+   * établissement sans aucun administrateur le rendrait ingérable, et
+   * personne ne pourrait plus y ouvrir d'accès. On refuse, en nommant
+   * l'établissement — « promouvez quelqu'un d'abord » est une consigne
+   * qu'on peut suivre ; « opération impossible » ne l'est pas.
+   */
+  apercuSuppressionCompte(authUserId: string): Promise<{
+    /** La fiche EMPLOYÉ liée à ce compte, si elle existe (migration 0017). */
+    employeId: string | null
+    nom: string
+    etablissements: {
+      restaurantId: string
+      nom: string
+      role: string
+      /** Vrai si ce compte est le DERNIER administrateur de cet établissement. */
+      seulAdmin: boolean
+    }[]
+    /** Ventes qui portent son nom, et qui RESTERONT — sans son nom. */
+    ventes: number
+  }>
+
+  /**
+   * Supprime un compte : les appartenances partent, la fiche employé est
+   * ANONYMISÉE, les écritures comptables restent.
+   *
+   * ── Pourquoi anonymiser et non supprimer la fiche ────────────────────────
+   *
+   * Toutes les références à un employé (`orders.opened_by`, `closed_by`,
+   * `audit_events.actor_user_id`, et quinze autres) sont en
+   * `on delete set null` : supprimer la ligne marcherait, techniquement.
+   * Mais le journal d'audit est chaîné, et une vente dont l'acteur devient
+   * nul ne dit plus « encaissée par quelqu'un qui est parti » — elle dit
+   * « encaissée par personne ». La règle 6 veut que l'historique ne PERDE
+   * jamais d'information ; le droit à l'effacement veut que la donnée
+   * personnelle disparaisse. Les deux tiennent ensemble si on efface
+   * l'IDENTITÉ sans effacer l'ÉCRITURE : nom, adresse, téléphone et PIN
+   * s'en vont, la ligne reste, et son identifiant continue de relier les
+   * actes d'une même personne devenue anonyme.
+   *
+   * Tout dans UNE transaction : une suppression à moitié faite laisserait un
+   * compte capable de se connecter mais rattaché à rien, ou l'inverse.
+   */
+  supprimerCompte(authUserId: string): Promise<void>
+
+  /**
    * Ouvre une organisation ENTIÈRE pour un compte qui n'a encore rien.
    *
    * Distinct de `creerEtablissement`, qui suppose une organisation, un

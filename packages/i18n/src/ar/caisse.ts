@@ -610,4 +610,37 @@ export const AR_CAISSE: Readonly<Record<string, string>> = {
   "À rendre : {montant}": "للإرجاع: {montant}",
   "Encaisser {montant}": "استخلاص {montant}",
   "Paiement partiel {montant}": "دفع جزئي {montant}",
+  // ── Suppression de compte (règle 5.1.1(v) d'Apple, et droit à l'effacement) ──
+  "Supprimer mon compte": "حذف حسابي",
+  "Compte supprimé": "تمّ حذف الحساب",
+  "Compte : {email}": "الحساب: {email}",
+  "Continuer": "متابعة",
+  "Revenir": "رجوع",
+  "Suppression…": "جارٍ الحذف…",
+  "Supprimer définitivement mon compte": "حذف حسابي نهائيًّا",
+  "Ce qui sera effacé": "ما سيُمحى",
+  "Ce qui sera conservé": "ما سيُحفظ",
+  "Votre connexion au back-office — définitivement.": "اتّصالك بمكتب الإدارة — نهائيًّا.",
+  "Votre nom, votre adresse e-mail et votre téléphone.": "اسمك وبريدك الإلكتروني ورقم هاتفك.",
+  "Votre code PIN de caisse.": "رمزك السرّي للصندوق.",
+  "Votre rattachement à : {noms}.": "ارتباطك بـ: {noms}.",
+  "Les {n} vente(s) que vous avez encaissées — sans votre nom.":
+    "عمليات البيع التي استخلصتها وعددها {n} — دون اسمك.",
+  "Aucune vente n’est rattachée à ce compte.": "لا توجد أيّ عملية بيع مرتبطة بهذا الحساب.",
+  "Le journal des ventes et le journal d’audit : ce sont des écritures comptables, elles ne se suppriment pas. Elles ne portent plus votre nom.":
+    "سجلّ المبيعات وسجلّ التدقيق: هذه قيود محاسبية، لا تُحذف. لكنّها لم تعد تحمل اسمك.",
+  "Pour confirmer, retapez votre adresse e-mail": "للتأكيد، أعد كتابة بريدك الإلكتروني",
+  "Retaper l’adresse oblige à lire QUEL compte sera effacé. Une case à cocher ne l’oblige pas.":
+    "إعادة كتابة العنوان تُجبر على قراءة أيّ حساب سيُمحى. خانة اختيار لا تُجبر على ذلك.",
+  "Identifiez-vous : la caisse ne garde aucune session d’utilisateur, et un écran laissé ouvert sur un comptoir ne doit pas suffire à effacer un compte.":
+    "عرّف بنفسك: الصندوق لا يحتفظ بأيّ جلسة مستخدم، وشاشة تُركت مفتوحة على طاولة لا يجب أن تكفي لمحو حساب.",
+  "Rien n’est supprimé à cette étape : l’écran suivant montre d’abord ce qui serait effacé.":
+    "لا شيء يُحذف في هذه المرحلة: الشاشة التالية تعرض أوّلًا ما سيُمحى.",
+  "Vous êtes le seul administrateur de : {noms}.": "أنت المسؤول الوحيد عن: {noms}.",
+  "Supprimer votre compte laisserait cet établissement sans personne pour y ouvrir un accès. Nommez un autre administrateur au back-office (Employés), ou supprimez l’établissement, puis revenez ici.":
+    "حذف حسابك يترك هذا المحلّ دون أيّ شخص يفتح فيه صلاحية. عيّن مسؤولًا آخر من مكتب الإدارة (الموظّفون)، أو احذف المحلّ، ثمّ عُد إلى هنا.",
+  "Cette caisse continue de fonctionner : son jeton d’appareil n’est l’identité de personne. Pour la mettre hors service, utilisez « Révoquer » au back-office, ou effacez-la depuis l’écran Synchronisation.":
+    "هذا الصندوق يواصل العمل: رمز الجهاز ليس هويّة أيّ شخص. لإيقافه، استعمل «إلغاء» في مكتب الإدارة، أو امسحه من شاشة المزامنة.",
+  "Supprimer le compte efface votre nom, votre adresse et votre code PIN. Les ventes déjà encaissées restent : ce sont des écritures comptables, elles ne portent simplement plus votre nom. Cette caisse, elle, continue de fonctionner.":
+    "حذف الحساب يمحو اسمك وعنوانك ورمزك السرّي. أمّا المبيعات التي استُخلصت فتبقى: هي قيود محاسبية، لكنّها لم تعد تحمل اسمك. وهذا الصندوق يواصل العمل.",
 }

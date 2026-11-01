@@ -30,11 +30,12 @@ import { LogIn, Store } from 'lucide-react'
 import { useApp } from '../etat/contexte.js'
 import { FormulaireAppairage } from './EcranSync.js'
 import { FormulaireInscription } from '../composants/FormulaireInscription.js'
+import { SuppressionCompte } from '../composants/SuppressionCompte.js'
 import { t } from '../i18n.js'
 
 export function EcranBienvenue({ onDemonstration }: { onDemonstration: () => void }) {
   const { app, rafraichir } = useApp()
-  const [voie, setVoie] = useState<'choix' | 'connexion' | 'creation'>('choix')
+  const [voie, setVoie] = useState<'choix' | 'connexion' | 'creation' | 'suppression'>('choix')
 
   const accepterDemonstration = () => {
     void (async () => {
@@ -48,6 +49,23 @@ export function EcranBienvenue({ onDemonstration }: { onDemonstration: () => voi
       <div className="bienvenue">
         <button type="button" className="retour-accueil" onClick={() => setVoie('choix')}>{t('‹ Retour')}</button>
         <FormulaireAppairage onAppaire={rafraichir} />
+      </div>
+    )
+  }
+
+  /*
+   * La suppression est accessible depuis l'accueil, et c'est volontaire.
+   *
+   * La règle 5.1.1(v) d'Apple veut qu'on puisse supprimer un compte créé
+   * dans l'application. Une caisse déjà mise en service propose le même
+   * geste dans son tiroir ; mais celle qui ne l'est pas n'a que cet
+   * écran-ci — et c'est précisément la tablette d'où le compte a pu être
+   * créé par erreur.
+   */
+  if (voie === 'suppression') {
+    return (
+      <div className="bienvenue">
+        <SuppressionCompte onRetour={() => setVoie('choix')} />
       </div>
     )
   }
@@ -91,6 +109,8 @@ export function EcranBienvenue({ onDemonstration }: { onDemonstration: () => voi
         c'est une caisse dont les ventes ne quitteront jamais l'appareil.
       */}
       <button type="button" className="lien-discret" onClick={accepterDemonstration}>{t('Découvrir sans compte — les ventes resteront sur cet appareil')}</button>
+
+      <button type="button" className="lien-discret" onClick={() => setVoie('suppression')}>{t('Supprimer mon compte')}</button>
     </div>
   )
 }

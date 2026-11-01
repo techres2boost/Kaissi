@@ -173,6 +173,16 @@ jobs:
           # table, vendre à prix libre, annuler sous le PIN d'un gérant.
           node apps/pos/tests/gestes-commande.mjs
 
+          # La suppression de compte doit être ATTEIGNABLE depuis la caisse.
+          #
+          # La règle 5.1.1(v) d'Apple ne demande pas qu'une route existe :
+          # elle demande qu'un utilisateur arrive à l'écran. Un test de
+          # service ne le prouve pas. Celui-ci vérifie que le lien est sur
+          # l'accueil, et que rien n'est supprimé avant d'avoir montré ce
+          # que la suppression emporte. Retirer ce lien ferait rejeter la
+          # prochaine soumission iOS, sans qu'aucun autre test ne bronche.
+          node apps/pos/tests/suppression-compte.mjs
+
       # L'inscription depuis la caisse, sur la cible WEB : sa base est
       # persistée (IndexedDB). En dev, la base est en mémoire et le test
       # passerait même sans la correction — c'est vérifié : il échoue si la

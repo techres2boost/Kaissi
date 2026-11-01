@@ -9,9 +9,11 @@ de revue dès le départ. Les textes ci-dessous sont prêts à coller, en
 anglais, dans **App Store Connect → Version → Informations pour la revue →
 Notes**, et dans la réponse au message d'Apple.
 
-> ⚠ **À lire avant de répondre.** Le vrai risque n'est pas celui-ci : c'est le
-> **§7**, un motif de rejet que la prochaine soumission déclencherait
-> presque à coup sûr, et qu'Apple n'a pas encore vu. Lisez-le d'abord.
+> ⚠ **Deux choses avant de répondre.** Le compte de démonstration donné à
+> Apple doit être un compte **dédié**, pas un compte personnel
+> d'administration (§2 bis). Et le §7 — la suppression de compte exigée par
+> la règle 5.1.1(v) — est désormais **livré** : la vidéo peut montrer le
+> parcours entier.
 
 ---
 
@@ -36,178 +38,145 @@ Chaque séquence répond à une exigence précise de leur message.
 | 8 | **Coupez le mode avion**, allez à l'écran **Synchronisation**, montrez les opérations qui remontent | Montre que les ventes faites hors ligne arrivent au serveur |
 | 9 | Revenez à l'écran de bienvenue → **« Créer un compte »** → montrez le formulaire d'inscription | **« Account registration, login, and account deletion flows »** |
 | 10 | **Connexion** avec le compte de démonstration | Idem |
-| 11 | ⚠ **La suppression de compte** | **Voir le §7 — ce parcours n'existe pas encore** |
+| 11 | Retour à l'accueil → **« Supprimer mon compte »** → saisissez les identifiants de démonstration → montrez l'écran « Ce qui sera effacé / Ce qui sera conservé » → **revenez en arrière** | « account deletion flows » (règle 5.1.1(v)). Pas besoin de supprimer pour de vrai : montrer que le parcours existe suffit |
 
 **Ce qu'il ne faut PAS filmer** : rien. Il n'y a ni contenu généré par les
 utilisateurs, ni contenu payant dans l'application — dites-le explicitement
 dans la réponse (texte au §2 ci-dessous), sinon Apple le redemandera.
 
-**Comment enregistrer** : réglage iOS *Centre de contrôle* → ajouter
-*Enregistrement de l'écran*. Filmez sur un iPhone ou iPad réel sous la
-dernière version d'iOS. Téléversez la vidéo dans la réponse App Store
-Connect (ou déposez un lien vers un fichier accessible sans compte).
+**Où filmer** : sur un **iPhone ou iPad réel**, sous la dernière version
+d'iOS. **Pas sur le PC, pas dans le simulateur** — Apple le demande
+explicitement (« captured on a physical device »), et un enregistrement de
+simulateur se reconnaît tout de suite.
+
+**Comment** : Réglages iOS → *Centre de contrôle* → ajouter *Enregistrement
+de l'écran*. La vidéo part dans Photos.
+
+**Où la déposer** : dans la fenêtre **« Reply to App Review »**, par
+**« Attach File »** — c'est le bon endroit, celui de votre capture. Le
+champ *Attachment* de *App Review Information* convient aussi, mais la
+réponse est plus sûre : elle est rattachée au message du relecteur.
+Si le fichier est refusé pour sa taille, compressez-le (720p suffit) ou
+déposez un lien vers un fichier accessible **sans compte**.
 
 ---
 
-## 2. Les six réponses — texte prêt à coller, en anglais
+## 2. Les deux textes — calibrés pour les champs d'App Store Connect
 
-> Copiez ce bloc dans la réponse à Apple **et** dans le champ *Notes* de
-> *App Review Information*, pour les soumissions suivantes.
+> ⚠ **Les deux champs font 4 000 caractères.** Pas un de plus. Les textes
+> ci-dessous tiennent : **3858** et **3869** caractères. Ne les rallongez pas
+> sans recompter — un texte tronqué au milieu d'une phrase fait mauvaise
+> impression, et c'est un humain qui lit.
+
+### 2.a — Dans « Reply to App Review » (3858 caractères)
+
+C'est la réponse au rejet. Elle répond aux six points, dans l'ordre, et
+annonce la vidéo. **Joignez la vidéo par « Attach File », dans cette même
+fenêtre.**
 
 ```
-Thank you for the review. Please find the requested information below.
+Thank you for the review. A screen recording captured on a physical iPhone running the latest iOS is attached. It begins with the app launch, with the device in AIRPLANE MODE, and shows the full flow: staff sign-in, opening the cash drawer, taking an order, cashing it, the on-screen receipt, then account registration, sign-in and account deletion.
 
-────────────────────────────────────────────────────────────────
-1. SCREEN RECORDING
-────────────────────────────────────────────────────────────────
-A screen recording captured on a physical iPhone running the latest
-iOS is attached. It begins with the app launch and shows the typical
-user flow: staff sign-in, opening the cash drawer, taking an order,
-cashing it, and the on-screen receipt.
+1. SCREEN RECORDING - attached. The app has NO user-generated content, NO social features, and NO paid content or features, so there is nothing to show for those items and no reporting or blocking mechanism is applicable. Account creation and account deletion are both shown.
 
-Please note that the recording begins with the device in AIRPLANE
-MODE. This is intentional and is the core purpose of the product
-(see section 2 below).
+2. PURPOSE AND AUDIENCE
+Kaissi is a point-of-sale and business-management app for restaurants, cafes and snack bars in Tunisia. It is sold business-to-business to the owner of the establishment; it is not a consumer app.
+Problem: Internet connectivity in Tunisia is unreliable. Cloud point-of-sale apps stop working when the connection drops, so the business cannot take orders or complete sales. Kaissi never stops: the whole app is bundled in the IPA, data is stored locally in SQLite, and every calculation runs on the device. Sales made offline synchronise automatically when connectivity returns, with no loss and no duplicates.
+Value: the restaurant keeps serving during an outage; staff take orders on a tablet in the dining room; the owner sees the day's figures from a phone. Amounts use integer millimes because the Tunisian dinar has THREE decimal places. The UI is in French and Arabic (RTL).
 
-The app contains NO user-generated content, NO social features, and
-NO paid content or features of any kind. There is therefore nothing
-to show for those items, and no content reporting or blocking
-mechanism is applicable.
+3. HOW TO TEST - no setup, no network and no account are required.
+a) Optionally enable Airplane Mode to verify the app works with no connectivity.
+b) Launch the app. On the welcome screen tap "Decouvrir sans compte" (try without an account).
+c) Staff sign-in: select "Salma Trabelsi", PIN 2468. (This 4-digit PIN identifies WHICH employee is acting; it is not a security boundary.)
+d) Enter any opening cash amount, e.g. 50.
+e) Tap table 3, tap any product, then "Encaisser" (cash out) > "Especes" (cash) > a suggested amount. The receipt appears on screen.
+To test sign-in and synchronisation, use the demo credentials in the Sign-In Information fields. Account deletion: welcome screen > "Supprimer mon compte", or menu > Synchronisation > "Supprimer mon compte".
 
-────────────────────────────────────────────────────────────────
-2. PURPOSE AND TARGET AUDIENCE
-────────────────────────────────────────────────────────────────
-Kaissi is a point-of-sale and business-management application for
-restaurants, cafés and snack bars in Tunisia. It is sold business-
-to-business to the owner of the establishment; it is not intended
-for consumers.
+4. EXTERNAL SERVICES - the app works fully without all of these; they are used only to synchronise between devices when connectivity is available.
+- Supabase (PostgreSQL database and email/password authentication), hosted in Frankfurt, Germany.
+- Our own synchronisation service (Node.js) hosted on Railway.
+- Apple Push / Web Push, for optional staff notifications when an order is ready.
+NOT used: no payment processor, no advertising network, no analytics SDK, no tracking, no AI service, no third-party data provider. No user data is sold or shared.
 
-THE PROBLEM IT SOLVES
-Internet connectivity in Tunisia is unreliable. Cloud-based point-of-
-sale applications stop working the moment the connection drops, which
-means a restaurant cannot take orders or complete sales. Kaissi is
-built so that the cash register never stops: the entire application
-is bundled inside the IPA, all data is stored locally in SQLite, and
-every calculation (prices, VAT, discounts, change due) runs on the
-device. Sales made while offline are synchronised automatically when
-connectivity returns, with no duplicate and no loss.
+5. REGIONAL DIFFERENCES - none. No geofencing, no region-dependent feature or content. The app is designed for the Tunisian market, so its defaults are the Tunisian dinar with three decimals and configurable VAT and stamp duty, with French and Arabic. These are settings, identical in every region.
 
-THE VALUE IT PROVIDES
-- The restaurant keeps serving customers during an outage.
-- Staff take orders on a tablet in the dining room instead of
-  walking to a PC in a back office.
-- The owner sees the day's figures from a phone, from anywhere.
-- Amounts are handled in integer millimes, because the Tunisian
-  dinar has THREE decimal places, not two. Most international
-  point-of-sale software assumes two and produces rounding errors.
-- The interface is available in French and Arabic (RTL).
-
-────────────────────────────────────────────────────────────────
-3. SETTING UP AND ACCESSING THE MAIN FEATURES
-────────────────────────────────────────────────────────────────
-No setup, no network and no account are required to review the app.
-
-OPTION A — NO ACCOUNT NEEDED (recommended for review)
-1. Optionally enable Airplane Mode to verify the app works with no
-   connectivity whatsoever.
-2. Launch the app.
-3. On the welcome screen, tap "Découvrir sans compte"
-   ("Try it without an account"). This loads a demonstration
-   restaurant stored entirely on the device.
-4. Staff sign-in screen: select "Salma Trabelsi", enter PIN 2468.
-   (This 4-digit PIN identifies WHICH employee is acting. It is not
-   a security boundary — see section 6.)
-5. Enter any opening cash amount, e.g. 50, and confirm.
-6. The floor plan appears. Tap table 3, then tap any product to add
-   it to the order.
-7. Tap "Encaisser" (cash out), choose "Espèces" (cash), tap one of
-   the suggested amounts. The sale closes and the receipt is shown
-   on screen.
-
-OPTION B — WITH AN ACCOUNT (to test synchronisation)
-Use the demo credentials provided in the "Sign-In Required" fields
-of App Review Information:
-  Email:    <À REMPLIR>
-  Password: <À REMPLIR>
-  Cash register PIN: <À REMPLIR>
-From the welcome screen choose "J'ai déjà un compte" and sign in.
-Sales then synchronise to our server and appear in the web back
-office.
-
-No sample files are needed. The demonstration catalogue (products,
-categories, staff) ships inside the app.
-
-────────────────────────────────────────────────────────────────
-4. EXTERNAL SERVICES USED
-────────────────────────────────────────────────────────────────
-The application works fully WITHOUT any of these. They are used only
-to synchronise data between devices when connectivity is available.
-
-  - Supabase (PostgreSQL database and user authentication),
-    hosted in Frankfurt, Germany (eu-central-1).
-    Used for: storing synchronised sales, and email/password sign-in
-    for the owner's account.
-  - Our own synchronisation service (Node.js), hosted on Railway.
-    Used for: receiving sales from devices and sending catalogue
-    updates back.
-  - Apple Push / Web Push (VAPID), for optional staff notifications
-    when an order is ready in the kitchen.
-
-NOT USED, to be explicit:
-  - No payment processor. The app does NOT process, hold or transfer
-    any funds (see section 6).
-  - No advertising network, no analytics SDK, no tracking.
-  - No AI or machine-learning service.
-  - No third-party data provider.
-  - No user data is sold or shared with anyone.
-
-────────────────────────────────────────────────────────────────
-5. REGIONAL DIFFERENCES
-────────────────────────────────────────────────────────────────
-The app behaves identically in every region. There is no geofencing,
-no region-dependent feature, and no region-dependent content.
-
-The app is designed for the Tunisian market and its defaults reflect
-that: the currency is the Tunisian dinar with three decimal places,
-VAT rates and the stamp duty are configurable by the restaurant
-owner, and the interface is available in French and Arabic. These
-are settings, not regional restrictions: they are the same wherever
-the app is opened.
-
-────────────────────────────────────────────────────────────────
-6. REGULATED INDUSTRY / THIRD-PARTY MATERIAL
-────────────────────────────────────────────────────────────────
-Kaissi does not operate in a regulated industry and contains no
-protected third-party material.
-
-PAYMENTS: the app does NOT process, hold, route or transfer any
-funds, and it integrates with no payment processor or card terminal.
-When a customer pays, the merchant's staff records WHICH method was
-used (cash, card, etc.) and the amount, exactly as they would write
-it in a paper ledger. This is bookkeeping data entry, not a payment
-service. Kaissi is therefore not a financial service and requires no
-financial licence.
-
-CONTENT: all text, icons and imagery in the app are our own or are
-used under open-source licences. The demonstration data (restaurant
-name, products, staff names) is fictitious and was created by us.
-
-BUSINESS MODEL: Kaissi is licensed to businesses through a direct
-commercial relationship outside the App Store. The app contains no
-in-app purchase and no paywall; a restaurant that has not signed with
-us simply has no account to sign in with, and can still use the
-offline demonstration mode. We believe this falls under Guideline
-3.1.3(b) (Multiplatform Services) / enterprise B2B distribution, and
-we are happy to provide any further detail you need on this point.
+6. REGULATED INDUSTRY / THIRD-PARTY MATERIAL - neither applies.
+The app does NOT process, hold, route or transfer any funds, and integrates with no payment processor or card terminal. When a customer pays, staff record WHICH method was used and the amount, exactly as in a paper ledger. This is bookkeeping data entry, not a payment service, so no financial licence is required.
+All text, icons and imagery are our own or used under open-source licences. The demonstration data is fictitious and created by us.
+Kaissi is licensed to businesses through a direct commercial relationship outside the App Store. There is no in-app purchase and no paywall. We are happy to provide further detail if needed.
 ```
 
-**Trois champs à remplir avant d'envoyer** : l'e-mail, le mot de passe et le
-PIN du compte de démonstration. Créez-le pour de bon
-(`pnpm sync:nouveau-client`), sur un établissement de démonstration — un
-compte qui ne fonctionne pas est la version subtile du même rejet
-([`stores.md`](stores.md) §étape 9).
+### 2.b — Dans le champ « Notes » (3869 caractères)
 
----
+Celui de *App Review Information*, que votre capture montre vide. C'est le
+texte **permanent** : il restera pour toutes les soumissions suivantes, et
+c'est lui qui évite de revivre ce rejet. Le texte d'aide affiché à côté du
+champ parle de la loi chinoise sur les permis — c'est une **indication
+générique d'Apple**, pas une restriction du champ. Il sert à toute note
+destinée au relecteur.
+
+```
+Kaissi is a point-of-sale and business-management app for restaurants, cafes and snack bars in Tunisia. It is sold business-to-business to the owner of the establishment; it is not a consumer app. Its purpose is that the cash register never stops working when the Internet connection drops, which happens often in Tunisia.
+
+HOW TO TEST - no setup, no network and no account are required.
+1. Optionally enable Airplane Mode first, to verify the app works with no connectivity at all.
+2. Launch the app. On the welcome screen tap "Decouvrir sans compte" (try without an account). This loads a demonstration restaurant stored entirely on the device.
+3. Staff sign-in screen: select "Salma Trabelsi", enter PIN 2468. This 4-digit PIN identifies WHICH employee is acting. It is not a security boundary.
+4. Enter any opening cash amount, e.g. 50, and confirm.
+5. On the floor plan, tap table 3, then tap any product to add it to the order.
+6. Tap "Encaisser" (cash out), choose "Especes" (cash), then tap one of the suggested amounts. The sale closes and the receipt is shown on screen.
+To test sign-in and server synchronisation, use the credentials in the Sign-In Information fields above, plus the cash register PIN given there.
+
+ACCOUNT CREATION AND DELETION (Guideline 5.1.1(v))
+The app allows creating an account: welcome screen > "Creer un compte".
+It also allows deleting it, in-app, from two places:
+- welcome screen > "Supprimer mon compte";
+- menu > Synchronisation > "Supprimer mon compte".
+The flow has two steps: the user signs in, the app shows exactly what will be erased (name, email, phone, cash register PIN, back-office access, all establishment memberships) and what will be kept (past sales and the audit log, which are accounting records and no longer carry the user's name), then asks the user to retype their email address to confirm. Deletion is immediate and permanent.
+
+THIS APP IS NOT A WEBSITE WRAPPER (Guideline 4.2)
+The entire application is bundled inside the IPA. No remote URL is loaded at runtime: no server.url, no WebView pointing at a website. Please verify by enabling Airplane Mode BEFORE the first launch - the app starts, takes orders and completes a sale with no connectivity at all. This is the core purpose of the product.
+The app does contain one button that opens the system browser on our web back office. That is the system browser, not the app: the app itself never loads code from the network.
+
+EXTERNAL SERVICES
+The app works fully without all of these; they are used only to synchronise data between devices when connectivity is available.
+- Supabase: PostgreSQL database and email/password authentication, hosted in Frankfurt, Germany.
+- Our own synchronisation service (Node.js), hosted on Railway.
+- Apple Push / Web Push, for optional staff notifications when an order is ready in the kitchen.
+Not used: no payment processor, no advertising network, no analytics SDK, no tracking, no AI service, no third-party data provider. No user data is sold or shared.
+
+PAYMENTS (Guidelines 3.1.1 / 3.1.3)
+The app does NOT process, hold, route or transfer any funds, and integrates with no payment processor or card terminal. When a customer pays, staff record WHICH method was used and the amount, exactly as in a paper ledger. This is bookkeeping data entry, not a payment service.
+Kaissi is licensed to businesses through a direct commercial relationship outside the App Store. There is no in-app purchase and no paywall. A business that has not signed with us simply has no account to sign in with, and can still use the offline demonstration mode.
+
+REGIONS
+The app behaves identically in every region. No geofencing, no region-dependent feature or content. Its defaults target Tunisia (dinar with three decimal places, configurable VAT and stamp duty, French and Arabic interface), but these are settings, not restrictions.
+```
+
+### 2.c — ⚠ Le compte de démonstration : à refaire avant d'envoyer
+
+Votre capture montre, dans *Sign-In Information*, **votre adresse
+personnelle** et un mot de passe de neuf chiffres consécutifs. Je ne les
+recopie pas ici : ce document part sur GitHub, et des identifiants n'ont
+rien à faire dans un dépôt.
+
+**Trois problèmes, dont deux sérieux.**
+
+| | |
+|---|---|
+| 🔴 C'est votre compte **personnel** | S'il est administrateur en production, le relecteur d'Apple a accès à tous vos établissements, à leur chiffre d'affaires et à la gestion des accès. Un relecteur n'est pas un attaquant — mais ces identifiants transitent, sont stockés chez Apple, et resteront dans la fiche |
+| 🔴 Le **mot de passe** | Il fait partie des tout premiers qu'un attaquant essaie, et il figure dans notre propre liste de refus (`MOTS_DE_PASSE_COURANTS`, `admin-comptes.ts`) : le service le refuserait aujourd'hui à la création. Ce compte a donc été créé avant ce garde-fou, ou hors du service |
+| 🟠 **Le PIN de caisse manque** | L'e-mail et le mot de passe ouvrent le back-office ; c'est le **PIN** qui ouvre la caisse. Sans lui, le relecteur reste bloqué à la prise de poste — motif de rejet n° 1 des applications de caisse |
+
+**À faire** : créer un compte dédié (`pnpm sync:nouveau-client`) sur un
+établissement de démonstration, avec un vrai mot de passe, puis
+**l'essayer soi-même sur un iPhone** avant de l'envoyer. Et ajouter le PIN
+dans les Notes (le texte du §2.b y renvoie déjà).
+
+Le parcours « Découvrir sans compte » rend d'ailleurs ce compte presque
+inutile pour la revue : le relecteur peut tout tester sans se connecter.
+Mais Apple veut des identifiants dès que l'application en propose, donc on
+en donne — simplement pas les vôtres.
 
 ## 3. Ce qu'il ne faut SURTOUT pas écrire à Apple
 
@@ -248,7 +217,9 @@ collez ce bloc dans les notes, il y restera pour les envois suivants.
 | J+1 | Répondre dans App Store Connect, et coller le texte dans les Notes |
 | J+1 à J+3 | Réponse d'Apple (la 2.1 se résout d'habitude en un aller-retour) |
 
-⚠ **Mais ne renvoyez pas avant d'avoir lu le §7.**
+Le §7 (suppression de compte) est **livré** : la vidéo peut donc montrer le
+parcours complet, création **et** suppression, ce que le relecteur demandera
+de toute façon.
 
 ---
 
@@ -261,9 +232,23 @@ partagée, aucun traqueur.
 
 ---
 
-## 7. ⚠ Le vrai risque — la suppression de compte (Guideline 5.1.1(v))
+## 7. ✅ La suppression de compte (Guideline 5.1.1(v)) — FAIT
 
-**Lisez ceci avant de renvoyer.** Ce n'est pas dans le message d'Apple, mais
+> **Livré le 1er novembre.** Le parcours existe : écran d'accueil de la
+> caisse → « Supprimer mon compte », et ☰ → Synchronisation →
+> « Supprimer mon compte » pour une caisse déjà en service. En deux temps :
+> on s'identifie, l'écran montre **ce qui sera effacé et ce qui sera
+> conservé**, puis demande de retaper l'adresse du compte.
+>
+> **À filmer dans la vidéo** (séquence 11 du §1) : ouvrez l'écran, montrez
+> la liste « Ce qui sera effacé / Ce qui sera conservé », puis revenez en
+> arrière. Vous n'avez pas à supprimer un compte pour de vrai devant la
+> caméra — montrer que le parcours existe et qu'il est atteignable suffit.
+>
+> `apps/pos/tests/suppression-compte.mjs` le vérifie à chaque PR : retirer
+> le lien ferait rouge la CI, pas la revue Apple six semaines plus tard.
+
+**Ce qui suit explique pourquoi c'était nécessaire.** Ce n'est pas dans le message d'Apple, mais
 c'est dans leur demande de vidéo, en toutes lettres :
 
 > *« Account registration, login, and account deletion flows. **Account
@@ -320,14 +305,29 @@ que ce qui est effacé est l'identité, pas l'écriture.
 **Mon estimation : 2 à 3 jours.** C'est moins cher qu'un deuxième
 aller-retour avec Apple, qui coûte une semaine de calendrier.
 
-### La décision qui vous revient
+### Ce qui a été livré
 
-| Option | Pour | Contre |
-|---|---|---|
-| **A — Écrire la suppression de compte** (recommandé) | Débloque iOS pour de bon, et c'est de toute façon exigé par le droit des données personnelles, Apple ou pas | 2–3 jours |
-| **B — Retirer la création de compte de la caisse** | Supprime l'obligation côté Apple en une heure | On perd une vraie fonction : un gérant ouvre son restaurant depuis la tablette, sans passer par un ordinateur. Et l'obligation légale d'effacement, elle, reste |
+| | |
+|---|---|
+| **Effacé** | la connexion au back-office, le nom, l'adresse e-mail, le téléphone, le code PIN de caisse, et tous les rattachements aux établissements |
+| **Conservé** | les ventes et le journal d'audit — ce sont des écritures comptables (règle 6), et elles ne portent plus le nom |
+| **Le seul refus possible** | être le **dernier administrateur** d'un établissement. L'écran le nomme et dit quoi faire : nommer un autre administrateur, ou supprimer l'établissement |
+| **Garde-fous** | mot de passe revérifié à l'instant, adresse exacte à retaper, limites de débit par connexion et par compte |
+| **Tests** | 10 tests de service contre un vrai PostgreSQL (`apps/sync/test/suppression-compte.test.ts`) + un parcours navigateur |
 
-**Je recommande A**, et de **ne pas renvoyer à Apple avant que ce soit
-fait** : la vidéo demandée montrera l'écran de création de compte, et le
-relecteur demandera la suppression dans la foulée. Autant livrer les deux
-ensemble.
+**Le piège qu'il a fallu éviter**, et qui aurait donné une suppression de
+façade : depuis la migration 0017, `kaissi.users` n'est plus un miroir de
+`auth.users` — la contrainte `users_id_fkey` a été retirée et
+`auth_user_id` est un lien facultatif en `on delete set null`. Supprimer le
+seul compte Supabase aurait laissé **le nom, l'adresse, le téléphone et le
+hachage du PIN** intacts en base. La fiche employé est donc **anonymisée**
+dans la même transaction.
+
+**Pourquoi anonymiser plutôt que supprimer la ligne** : toutes les
+références à un employé sont en `on delete set null`, donc la supprimer
+marcherait. Mais une vente dont l'acteur devient nul ne dit plus
+« encaissée par quelqu'un qui est parti » — elle dit « encaissée par
+personne ». La règle 6 veut que l'historique ne perde jamais d'information,
+le droit à l'effacement veut que la donnée personnelle disparaisse : les
+deux tiennent ensemble si on efface **l'identité** sans effacer
+**l'écriture**.

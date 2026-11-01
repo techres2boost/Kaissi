@@ -37,6 +37,7 @@ import {
   identifierParJeton,
   ROLES_ACCES,
   ROLES_QUI_DONNENT_LES_CLES,
+  supprimerCompteSupabase,
   verifierEmail,
   verifierMotDePasse,
 } from './admin-comptes.js'
@@ -756,6 +757,186 @@ export function creerServeur({
     await next()
   })
 
+
+  /*
+   * ── POST /compte/apercu-suppression et POST /compte/supprimer ─────────
+   *
+   * Supprimer SON PROPRE compte. Deux raisons, et la première n'est pas la
+   * plus importante :
+   *
+   *   1. La règle 5.1.1(v) d'Apple : une application qui permet de CRÉER un
+   *      compte doit permettre de le supprimer DEPUIS l'application. La
+   *      caisse crée des comptes (écran de bienvenue → « Créer un compte »),
+   *      et une adresse e-mail à qui écrire ne satisfait pas la règle.
+   *   2. Le droit à l'effacement, qui ne dépend d'aucun magasin
+   *      d'applications et qui, lui, ne se négocie pas.
+   *
+   * ── Pourquoi PAS sous `/admin/*`, et pas derrière un jeton de session ──
+   *
+   * La caisse ne porte AUCUNE session d'utilisateur — c'est délibéré (une
+   * tablette reste authentifiée en continu par son jeton d'appareil, qui
+   * n'est l'identité de personne). Elle n'a donc pas de jeton à présenter.
+   * Et même au back-office, redemander le mot de passe avant un geste
+   * définitif est ce qu'il faut faire : un écran laissé ouvert sur un
+   * comptoir ne doit pas suffire à effacer un compte.
+   *
+   * On s'authentifie donc par MOT DE PASSE, comme `/appairage`, avec les
+   * deux mêmes limites de débit : par connexion et par compte.
+   */
+  async function compteParMotDePasse(
+    c: ContexteKaissi,
+    travail: (contexte: {
+      config: ConfigAuth
+      cle: string
+      identite: { userId: string; email: string }
+      corps: Record<string, unknown>
+    }) => Promise<unknown>,
+  ) {
+    const verdictIp = parIp.verifier(adresseClient(c.req.raw.headers))
+    if (!verdictIp.autorise) {
+      return tropDeTentatives(c, verdictIp.attendreSecondes, 'depuis cette connexion')
+    }
+    if (!auth || !cleService) {
+      const absentes = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY'].filter(
+        (nom) => !(process.env[nom] ?? '').trim(),
+      )
+      const corps: ReponseErreur = {
+        erreur: 'administration_indisponible',
+        message:
+          "La suppression de compte n'est pas configurée sur ce serveur. " +
+          `Variable(s) absente(s) : ${absentes.join(', ')}.`,
+      }
+      return c.json(corps, 501)
+    }
+
+    let brut: unknown
+    try {
+      brut = await c.req.json()
+    } catch {
+      const corps: ReponseErreur = { erreur: 'requete_invalide', message: 'Corps JSON illisible.' }
+      return c.json(corps, 400)
+    }
+    const corps = (brut ?? {}) as Record<string, unknown>
+    const email = typeof corps['email'] === 'string' ? corps['email'].trim().toLowerCase() : ''
+    const motDePasse = typeof corps['motDePasse'] === 'string' ? corps['motDePasse'] : ''
+    if (!email || !motDePasse) {
+      const reponse: ReponseErreur = {
+        erreur: 'requete_invalide',
+        message: 'E-mail et mot de passe sont requis.',
+      }
+      return c.json(reponse, 400)
+    }
+
+    const cleCompte = `suppression:${email}`
+    const verdictCompte = parCompte.verifier(cleCompte)
+    if (!verdictCompte.autorise) {
+      return tropDeTentatives(c, verdictCompte.attendreSecondes, 'pour ce compte')
+    }
+
+    try {
+      const identite = await identifierParMotDePasse(auth, email, motDePasse, fetchAuth)
+      parCompte.reussite(cleCompte)
+      const resultat = await travail({
+        config: auth,
+        cle: cleService,
+        identite,
+        corps,
+      })
+      return c.json(resultat as Record<string, unknown>, 200)
+    } catch (erreur) {
+      if (erreur instanceof ErreurAuth) {
+        const reponse: ReponseErreur = {
+          // 401 = le mot de passe n'a pas convaincu ; tout le reste est un
+          // refus MÉTIER sur un compte dûment authentifié, et la suite à
+          // donner n'est pas la même.
+          erreur: erreur.statut === 401 ? 'acces_refuse' : 'suppression_refusee',
+          message: erreur.message,
+        }
+        return c.json(reponse, erreur.statut)
+      }
+      const reponse: ReponseErreur = {
+        erreur: 'erreur_serveur',
+        message: erreur instanceof Error ? erreur.message : 'Échec inattendu.',
+      }
+      metriques.noterErreur(c.req.path, 500, reponse.message)
+      return c.json(reponse, 500)
+    }
+  }
+
+  /*
+   * Ce que la suppression effacerait, AVANT de la demander.
+   *
+   * On ne fait jamais confirmer un geste définitif sans dire ce qu'il
+   * emporte : « supprimer mon compte » ne dit pas si les ventes partent
+   * avec, et c'est précisément la question que se pose un restaurateur.
+   */
+  app.post('/compte/apercu-suppression', async (c) => {
+    return compteParMotDePasse(c, async ({ identite }) => {
+      const apercu = await depot.apercuSuppressionCompte(identite.userId)
+      return {
+        email: identite.email,
+        nom: apercu.nom,
+        etablissements: apercu.etablissements,
+        ventes: apercu.ventes,
+        bloquants: apercu.etablissements.filter((e) => e.seulAdmin).map((e) => e.nom),
+      }
+    })
+  })
+
+  /*
+   * La suppression DÉFINITIVE, et ses trois verrous.
+   *
+   *   1. le mot de passe, revérifié à l'instant (`compteParMotDePasse`) ;
+   *   2. l'adresse exacte retapée — comme le nom d'un établissement qu'on
+   *      supprime : retaper oblige à lire QUEL compte on efface, et une case
+   *      à cocher ne l'oblige pas ;
+   *   3. aucun établissement dont on serait le dernier administrateur.
+   *
+   * L'ORDRE compte : la base d'abord, Supabase ensuite. Si la suppression du
+   * compte d'authentification échoue (Supabase injoignable), la personne
+   * reste capable de se connecter sur un compte qui n'ouvre plus rien, et
+   * elle peut relancer le geste — `supprimerCompteSupabase` accepte le 404,
+   * et `supprimerCompte` ne retrouve plus de fiche : l'opération est
+   * rejouable. Dans l'autre sens, on aurait un orphelin invisible, que
+   * personne ne pourrait plus nettoyer faute de pouvoir se connecter.
+   */
+  app.post('/compte/supprimer', async (c) => {
+    return compteParMotDePasse(c, async ({ config, cle, identite, corps }) => {
+      const confirmation = String(corps['confirmation'] ?? '').trim().toLowerCase()
+      if (confirmation !== identite.email.trim().toLowerCase()) {
+        throw new ErreurAuth(
+          `Pour confirmer, retapez l’adresse exacte du compte : « ${identite.email} ».`,
+          401,
+        )
+      }
+
+      const apercu = await depot.apercuSuppressionCompte(identite.userId)
+      const bloquants = apercu.etablissements.filter((e) => e.seulAdmin)
+      if (bloquants.length > 0) {
+        const noms = bloquants.map((e) => `« ${e.nom} »`).join(', ')
+        throw new ErreurAuth(
+          `Vous êtes le seul administrateur de ${noms}. Supprimer votre compte ` +
+            'laisserait cet établissement sans personne pour y ouvrir un accès. ' +
+            'Nommez un autre administrateur (back-office → Employés), ou supprimez ' +
+            'l’établissement, puis recommencez.',
+          409,
+        )
+      }
+
+      await depot.supprimerCompte(identite.userId)
+      await supprimerCompteSupabase(config, cle, identite.userId, fetchAuth)
+
+      return {
+        message:
+          'Votre compte est supprimé. Votre nom, votre adresse, votre téléphone et ' +
+          'votre code PIN ont été effacés. ' +
+          (apercu.ventes > 0
+            ? `Les ${apercu.ventes} vente(s) que vous avez encaissées restent — ce sont des ` +
+              'écritures comptables, elles ne portent plus votre nom.'
+            : 'Aucune vente n’était rattachée à ce compte.'),
+      }
+    })
+  })
 
   // ── POST /admin/comptes ──────────────────────────────────────────────
   //

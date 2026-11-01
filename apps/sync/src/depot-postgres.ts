@@ -415,6 +415,117 @@ export class DepotPostgres implements DepotSync {
     await this.pool.query('delete from kaissi.restaurants where id = $1', [restaurantId])
   }
 
+  async apercuSuppressionCompte(authUserId: string): Promise<{
+    employeId: string | null
+    nom: string
+    etablissements: { restaurantId: string; nom: string; role: string; seulAdmin: boolean }[]
+    ventes: number
+  }> {
+    const { rows: fiches } = await this.pool.query<{ id: string; full_name: string }>(
+      'select id, full_name from kaissi.users where auth_user_id = $1',
+      [authUserId],
+    )
+    const employeId = fiches[0]?.id ?? null
+    if (!employeId) {
+      return { employeId: null, nom: '', etablissements: [], ventes: 0 }
+    }
+
+    /*
+     * Le compte des autres administrateurs se fait DANS la même requête.
+     *
+     * Le faire en deux temps (la liste, puis une requête par établissement)
+     * ouvrait une fenêtre : le dernier autre administrateur peut être
+     * révoqué entre les deux, et on autoriserait alors une suppression qui
+     * laisse l'établissement orphelin.
+     */
+    const { rows } = await this.pool.query<{
+      restaurant_id: string
+      name: string
+      role: string
+      autres_admins: string
+    }>(
+      `select m.restaurant_id,
+              r.name,
+              m.role,
+              (select count(*)
+                 from kaissi.memberships m2
+                 join kaissi.users u2 on u2.id = m2.user_id
+                where m2.restaurant_id = m.restaurant_id
+                  and m2.role = 'admin'
+                  and m2.revoked_at is null
+                  and m2.user_id <> $1
+                  and u2.status = 'actif'
+                  and u2.auth_user_id is not null)::text as autres_admins
+         from kaissi.memberships m
+         join kaissi.restaurants r on r.id = m.restaurant_id
+        where m.user_id = $1
+          and m.revoked_at is null
+        order by r.name`,
+      // Un paramètre DÉCLARÉ mais non utilisé fait échouer Postgres
+      // (« could not determine data type of parameter »). On ne passe donc
+      // que `employeId` : `authUserId` a servi à le trouver, au-dessus.
+      [employeId],
+    )
+
+    const { rows: ventes } = await this.pool.query<{ n: string }>(
+      `select count(*)::text as n from kaissi.orders
+        where opened_by = $1 or closed_by = $1`,
+      [employeId],
+    )
+
+    return {
+      employeId,
+      nom: fiches[0]?.full_name ?? '',
+      etablissements: rows.map((r) => ({
+        restaurantId: r.restaurant_id,
+        nom: r.name,
+        role: r.role,
+        seulAdmin: r.role === 'admin' && Number(r.autres_admins) === 0,
+      })),
+      ventes: Number(ventes[0]?.n ?? '0'),
+    }
+  }
+
+  async supprimerCompte(authUserId: string): Promise<void> {
+    const client = await this.pool.connect()
+    try {
+      await client.query('begin')
+      const { rows } = await client.query<{ id: string }>(
+        'select id from kaissi.users where auth_user_id = $1 for update',
+        [authUserId],
+      )
+      const employeId = rows[0]?.id
+      if (employeId) {
+        await client.query('delete from kaissi.memberships where user_id = $1', [employeId])
+        /*
+         * `email` est nullable depuis la 0017 ; `full_name` ne l'est pas et
+         * porte donc un libellé — jamais une chaîne vide, qui laisserait les
+         * écrans afficher un blanc qu'on prendrait pour un bug d'affichage.
+         * C'est une DONNÉE, elle ne se traduit pas (comme un nom de plat).
+         */
+        await client.query(
+          `update kaissi.users
+              set auth_user_id = null,
+                  email        = null,
+                  full_name    = 'Compte supprimé',
+                  phone        = null,
+                  pin_hash     = null,
+                  status       = 'parti',
+                  archived_at  = now(),
+                  updated_at   = now()
+            where id = $1`,
+          [employeId],
+        )
+      }
+      await client.query('commit')
+    } catch (erreur) {
+      await client.query('rollback').catch(() => undefined)
+      throw erreur
+    } finally {
+      client.release()
+    }
+  }
+
   async enrolerAppareil(demande: DemandeEnrolement): Promise<AppareilEnrole> {
     const client = await this.pool.connect()
     try {

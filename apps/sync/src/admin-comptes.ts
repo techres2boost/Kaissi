@@ -263,3 +263,56 @@ export function verifierEmail(email: unknown): string {
   }
   return valeur
 }
+
+/**
+ * Supprime le COMPTE DE CONNEXION chez Supabase.
+ *
+ * Ne supprime QUE l'identité d'authentification. La fiche employé et les
+ * appartenances sont traitées côté base, dans `depot.supprimerCompte()` :
+ * depuis la migration 0017, `kaissi.users` n'est plus un miroir de
+ * `auth.users` — la contrainte `users_id_fkey` a été retirée, et
+ * `auth_user_id` est un lien FACULTATIF en `on delete set null`. Supprimer
+ * le compte Supabase laisserait donc intacts le nom, l'adresse, le
+ * téléphone et le PIN de la personne. Vu en relisant le schéma ; c'est
+ * exactement le genre d'oubli qui transforme une suppression de compte en
+ * suppression de façade.
+ *
+ * 404 n'est PAS une erreur : le compte n'existe plus, ce qui est le but. On
+ * rejoue l'opération sans rien casser — même raison que le 422 « already
+ * been registered » à la création.
+ */
+export async function supprimerCompteSupabase(
+  config: ConfigAuth,
+  cleService: string,
+  authUserId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  let reponse: Response
+  try {
+    reponse = await fetchImpl(`${config.url}/auth/v1/admin/users/${authUserId}`, {
+      method: 'DELETE',
+      headers: {
+        apikey: cleService,
+        authorization: `Bearer ${cleService}`,
+      },
+    })
+  } catch (erreur) {
+    throw new ErreurAuth(
+      'Supabase est injoignable — le compte n’a pas été supprimé. ' +
+        (erreur instanceof Error ? erreur.message : String(erreur)),
+      503,
+    )
+  }
+  if (reponse.ok || reponse.status === 404) return
+  if (reponse.status === 401 || reponse.status === 403) {
+    throw new ErreurAuth(
+      'La clé de service Supabase est refusée. Vérifiez SUPABASE_SERVICE_ROLE_KEY.',
+      500,
+    )
+  }
+  const texte = await reponse.text().catch(() => '')
+  throw new ErreurAuth(
+    `Supabase a refusé la suppression du compte (${reponse.status}). ${texte.slice(0, 200)}`,
+    500,
+  )
+}

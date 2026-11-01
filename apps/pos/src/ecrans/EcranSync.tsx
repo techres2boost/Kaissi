@@ -30,6 +30,7 @@ import { expliquerEchecReseau } from '../donnees/diagnostic-reseau.js'
 import { estNatif } from '../donnees/sqlite.js'
 import { identifiantInstallation } from '../donnees/installation.js'
 import { URL_SYNC_PAR_DEFAUT } from '../config.js'
+import { SuppressionCompte } from '../composants/SuppressionCompte.js'
 import { dateLocale, t, tm } from '../i18n.js'
 
 const LIBELLES_ETAT: Record<ResumeSync['etat'], string> = {
@@ -93,6 +94,10 @@ export function EcranSync() {
    * « avec quel compte j'ouvre le back-office ? ».
    */
   const [compteEmail, setCompteEmail] = useState<string | null>(null)
+  /* La suppression de compte, par-dessus cet écran. Elle vit ici parce que
+     c'est ici que vit le COMPTE : adresse de mise en service, ré-appairage,
+     révocation. La chercher ailleurs serait la chercher longtemps. */
+  const [suppression, setSuppression] = useState(false)
 
   useEffect(() => {
     let vivant = true
@@ -180,6 +185,16 @@ export function EcranSync() {
   // plutôt qu'un écran d'état vide et incompréhensible.
   if (!sync) {
     return <FormulaireAppairage onAppaire={rafraichir} />
+  }
+
+  // La suppression prend TOUT l'écran : c'est un geste définitif, et le
+  // laisser dans un coin d'une page d'état le ferait valider distraitement.
+  if (suppression) {
+    return (
+      <div className="diagnostic">
+        <SuppressionCompte onRetour={() => setSuppression(false)} />
+      </div>
+    )
   }
 
   return (
@@ -278,6 +293,10 @@ export function EcranSync() {
         <p>
           <button type="button" onClick={() => void oublierAppairage()}>{t('Ré-appairer — ou changer d’établissement')}</button>
         </p>
+        <p>
+          <button type="button" className="lien-discret" onClick={() => setSuppression(true)}>{t('Supprimer mon compte')}</button>
+        </p>
+        <p className="note">{t('Supprimer le compte efface votre nom, votre adresse et votre code PIN. Les ventes déjà encaissées restent : ce sont des écritures comptables, elles ne portent simplement plus votre nom. Cette caisse, elle, continue de fonctionner.')}</p>
         <p className="note">{t('Le formulaire réapparaîtra. Reconnectez-vous avec le compte du gérant : si celui-ci gère')}{' '}<strong>{t('plusieurs établissements')}</strong>{t(', la liste s’affichera et vous choisirez celui de cette caisse.')}</p>
         <p className="note">
           <strong>{t('Changer d’établissement vide la base locale')}</strong>{' '}{t('— carte, employés, stock et ventes de l’ancien. C’est indispensable : les curseurs de synchronisation sont communs à toute la base, et sans remise à zéro le catalogue du nouvel établissement ne serait jamais reçu. Rien n’est perdu côté serveur, où tout a déjà été remonté.')}</p>
