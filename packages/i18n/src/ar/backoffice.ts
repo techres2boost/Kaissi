@@ -1471,10 +1471,12 @@ export const AR_BACKOFFICE: Readonly<Record<string, string>> = {
     "من الصندوق: شاشة البداية، أو ☰ ← المزامنة ← «حذف حسابي». تعرض الشاشة أوّلًا ما سيُمحى وما سيُحفظ، ثمّ تطلب إعادة كتابة عنوان الحساب. الحذف فوري ونهائي.",
   "Sont effacés : votre nom, votre adresse e-mail, votre téléphone, votre code PIN de caisse, et vos rattachements aux établissements. Votre connexion au back-office cesse aussitôt.":
     "يُمحى: اسمك وبريدك الإلكتروني ورقم هاتفك ورمزك السرّي للصندوق وارتباطاتك بالمحلّات. ويتوقّف اتّصالك بمكتب الإدارة فورًا.",
-  "Sont conservées : les ventes déjà encaissées et le journal d’audit. Ce sont des écritures comptables, et elles ne portent plus votre nom. Une seule chose peut retarder la suppression : si vous êtes le dernier administrateur d’un établissement, il faut d’abord en nommer un autre — sans quoi plus personne ne pourrait y ouvrir d’accès.":
-    "يُحفظ: المبيعات التي استُخلصت وسجلّ التدقيق. هذه قيود محاسبية، ولم تعد تحمل اسمك. أمر واحد قد يؤخّر الحذف: إن كنت آخر مسؤول عن محلّ، يجب تعيين مسؤول آخر أوّلًا — وإلّا لن يتمكّن أحد من فتح صلاحية فيه.",
   "Si vous préférez, la demande peut aussi être envoyée depuis l’adresse e-mail du compte à":
     "إن فضّلت ذلك، يمكن أيضًا إرسال الطلب من البريد الإلكتروني للحساب إلى",
   ", avec le nom de l’établissement.": "، مع اسم المحلّ.",
   "Supprimer mon compte": "حذف حسابي",
+  "Sont conservées : les ventes déjà encaissées et le journal d’audit. Ce sont des écritures comptables, et elles ne portent plus votre nom.":
+    "يُحفظ: المبيعات التي استُخلصت وسجلّ التدقيق. هذه قيود محاسبية، ولم تعد تحمل اسمك.",
+  "Rien ne peut empêcher la suppression — pas même d’être la seule personne du restaurant. L’écran dit simplement ce qui arrivera à vos établissements : celui où aucun autre compte ne resterait est FERMÉ (ses données sont conservées, et nous pouvons le rouvrir) ; celui où il reste des gérants continue d’être exploité, sans administrateur.":
+    "لا شيء يمنع الحذف — ولا حتّى أن تكون الشخص الوحيد في المطعم. تكتفي الشاشة ببيان ما سيحدث لمحلّاتك: المحلّ الذي لا يبقى فيه أيّ حساب آخر يُغلق (تُحفظ بياناته، ويمكننا إعادة فتحه)؛ أمّا الذي يبقى فيه مديرون فيواصل الاستغلال، دون مسؤول.",
 }

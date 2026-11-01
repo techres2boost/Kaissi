@@ -878,7 +878,12 @@ export function creerServeur({
         nom: apercu.nom,
         etablissements: apercu.etablissements,
         ventes: apercu.ventes,
-        bloquants: apercu.etablissements.filter((e) => e.seulAdmin).map((e) => e.nom),
+        /* Les deux listes que l'écran doit montrer, prémâchées ici : ce sont
+           des conséquences, jamais des obstacles. */
+        fermes: apercu.etablissements.filter((e) => e.devenir === 'ferme').map((e) => e.nom),
+        sansAdministrateur: apercu.etablissements
+          .filter((e) => e.devenir === 'sans_administrateur')
+          .map((e) => e.nom),
       }
     })
   })
@@ -910,31 +915,48 @@ export function creerServeur({
         )
       }
 
+      /*
+       * AUCUN cas ne bloque, et c'est une correction.
+       *
+       * La première version refusait au dernier administrateur d'un
+       * établissement, « nommez quelqu'un d'abord ». Dans un restaurant tenu
+       * par UNE personne — le cas le plus courant de notre marché — cette
+       * personne n'a personne à nommer : son compte devenait indestructible.
+       * Une suppression conditionnée à une action impossible n'en est pas
+       * une. On informe, et on exécute.
+       */
       const apercu = await depot.apercuSuppressionCompte(identite.userId)
-      const bloquants = apercu.etablissements.filter((e) => e.seulAdmin)
-      if (bloquants.length > 0) {
-        const noms = bloquants.map((e) => `« ${e.nom} »`).join(', ')
-        throw new ErreurAuth(
-          `Vous êtes le seul administrateur de ${noms}. Supprimer votre compte ` +
-            'laisserait cet établissement sans personne pour y ouvrir un accès. ' +
-            'Nommez un autre administrateur (back-office → Employés), ou supprimez ' +
-            'l’établissement, puis recommencez.',
-          409,
-        )
-      }
+      const fermes = apercu.etablissements.filter((e) => e.devenir === 'ferme')
+      const orphelins = apercu.etablissements.filter(
+        (e) => e.devenir === 'sans_administrateur',
+      )
 
       await depot.supprimerCompte(identite.userId)
       await supprimerCompteSupabase(config, cle, identite.userId, fetchAuth)
 
-      return {
-        message:
-          'Votre compte est supprimé. Votre nom, votre adresse, votre téléphone et ' +
-          'votre code PIN ont été effacés. ' +
-          (apercu.ventes > 0
-            ? `Les ${apercu.ventes} vente(s) que vous avez encaissées restent — ce sont des ` +
-              'écritures comptables, elles ne portent plus votre nom.'
-            : 'Aucune vente n’était rattachée à ce compte.'),
+      const phrases = [
+        'Votre compte est supprimé. Votre nom, votre adresse, votre téléphone et ' +
+          'votre code PIN ont été effacés.',
+        apercu.ventes > 0
+          ? `Les ${apercu.ventes} vente(s) que vous avez encaissées restent — ce sont des ` +
+            'écritures comptables, elles ne portent plus votre nom.'
+          : 'Aucune vente n’était rattachée à ce compte.',
+      ]
+      if (fermes.length > 0) {
+        phrases.push(
+          `${fermes.map((e) => `« ${e.nom} »`).join(', ')} n’avait plus aucun compte : ` +
+            'l’établissement a été fermé. Ses données sont conservées, et Res2Boost ' +
+            'peut le rouvrir.',
+        )
       }
+      if (orphelins.length > 0) {
+        phrases.push(
+          `${orphelins.map((e) => `« ${e.nom} »`).join(', ')} n’a plus d’administrateur. ` +
+            'Les gérants continuent d’exploiter normalement ; plus personne ne peut ' +
+            'y accorder ni retirer un accès.',
+        )
+      }
+      return { message: phrases.join(' ') }
     })
   })
 

@@ -140,7 +140,7 @@ afterAll(async () => {
 })
 
 describe('aperçu — ce que la suppression emporterait', () => {
-  it('rend les établissements, le rôle, et ne bloque pas un gérant', async () => {
+  it('rend les établissements et le rôle', async () => {
     const moi = await compte('gerant')
     const reponse = await poste('/compte/apercu-suppression', {
       email: moi.email,
@@ -148,28 +148,47 @@ describe('aperçu — ce que la suppression emporterait', () => {
     })
     expect(reponse.status).toBe(200)
     const corps = (await reponse.json()) as {
-      etablissements: { nom: string; role: string; seulAdmin: boolean }[]
-      bloquants: string[]
+      etablissements: { nom: string; role: string; devenir: string }[]
     }
     expect(corps.etablissements).toHaveLength(1)
     expect(corps.etablissements[0]!.role).toBe('gerant')
-    expect(corps.etablissements[0]!.seulAdmin).toBe(false)
-    expect(corps.bloquants).toEqual([])
+    // L'établissement de démonstration a d'autres comptes : ce départ-là ne
+    // le laisse ni fermé ni orphelin.
+    expect(corps.etablissements[0]!.devenir).not.toBe('ferme')
   })
 
-  it('NOMME l’établissement dont on est le seul administrateur', async () => {
+  it('ANNONCE la fermeture quand on est la seule personne de l’établissement', async () => {
     const seul = await autreEtablissement()
     const moi = await compte('admin', [seul])
     const reponse = await poste('/compte/apercu-suppression', {
       email: moi.email,
       motDePasse: MOT_DE_PASSE,
     })
-    const corps = (await reponse.json()) as { bloquants: string[] }
-    expect(corps.bloquants).toHaveLength(1)
-    expect(corps.bloquants[0]).toMatch(/^Resto /)
+    const corps = (await reponse.json()) as {
+      fermes: string[]
+      sansAdministrateur: string[]
+      etablissements: { devenir: string }[]
+    }
+    expect(corps.fermes).toHaveLength(1)
+    expect(corps.fermes[0]).toMatch(/^Resto /)
+    expect(corps.sansAdministrateur).toEqual([])
+    expect(corps.etablissements[0]!.devenir).toBe('ferme')
   })
 
-  it('ne bloque PAS quand un autre administrateur reste', async () => {
+  it('annonce « sans administrateur » quand un GÉRANT reste', async () => {
+    const partage = await autreEtablissement()
+    await compte('gerant', [partage])
+    const moi = await compte('admin', [partage])
+    const reponse = await poste('/compte/apercu-suppression', {
+      email: moi.email,
+      motDePasse: MOT_DE_PASSE,
+    })
+    const corps = (await reponse.json()) as { fermes: string[]; sansAdministrateur: string[] }
+    expect(corps.fermes).toEqual([])
+    expect(corps.sansAdministrateur).toHaveLength(1)
+  })
+
+  it('n’annonce RIEN quand un autre administrateur reste', async () => {
     const partage = await autreEtablissement()
     await compte('admin', [partage])
     const moi = await compte('admin', [partage])
@@ -177,8 +196,9 @@ describe('aperçu — ce que la suppression emporterait', () => {
       email: moi.email,
       motDePasse: MOT_DE_PASSE,
     })
-    const corps = (await reponse.json()) as { bloquants: string[] }
-    expect(corps.bloquants).toEqual([])
+    const corps = (await reponse.json()) as { fermes: string[]; sansAdministrateur: string[] }
+    expect(corps.fermes).toEqual([])
+    expect(corps.sansAdministrateur).toEqual([])
   })
 
   it('refuse un mot de passe faux, sans dire si l’adresse existe', async () => {
@@ -255,7 +275,7 @@ describe('suppression', () => {
         DEMO_ORG,
         DEMO_RESTO,
         appareil.id,
-        `S-${orderId.slice(0, 8)}`,
+        `S-${orderId.slice(-12)}`,
         moi.employeId,
         millimes(12_500),
       ],
@@ -288,7 +308,19 @@ describe('suppression', () => {
     expect(rows[0]!.opened_by).toBe(moi.employeId)
   })
 
-  it('REFUSE si l’on est le dernier administrateur, et dit quoi faire', async () => {
+  /*
+   * ⚑ LE test de ce fichier, et celui qui dit pourquoi la première version
+   * était fausse.
+   *
+   * Un restaurant tenu par UNE personne est le cas le plus courant de notre
+   * marché. La première version lui refusait la suppression : « vous êtes le
+   * seul administrateur, nommez-en un autre d'abord ». Il n'y a personne à
+   * nommer — le compte devenait indestructible, et une suppression
+   * conditionnée à une action impossible n'en est pas une. Apple la rejette
+   * (règle 5.1.1(v)), et le droit à l'effacement ne se conditionne pas non
+   * plus.
+   */
+  it('RÉUSSIT pour le restaurant tenu par une seule personne, et ferme l’établissement', async () => {
     const seul = await autreEtablissement()
     const moi = await compte('admin', [seul])
 
@@ -297,19 +329,49 @@ describe('suppression', () => {
       motDePasse: MOT_DE_PASSE,
       confirmation: moi.email,
     })
-    expect(reponse.status).toBe(409)
-    const corps = (await reponse.json()) as { erreur: string; message: string }
-    expect(corps.erreur).toBe('suppression_refusee')
-    expect(corps.message).toContain('seul administrateur')
-    expect(corps.message).toContain('Nommez un autre administrateur')
+    expect(reponse.status).toBe(200)
+    const corps = (await reponse.json()) as { message: string }
+    expect(corps.message).toContain('fermé')
 
-    // Rien n'a bougé : ni Supabase, ni la fiche.
-    expect(supprimesChezSupabase).toEqual([])
-    const { rows } = await client.query<{ auth_user_id: string | null }>(
+    // Le compte est bien parti.
+    expect(supprimesChezSupabase).toEqual([moi.authId])
+    const { rows: fiche } = await client.query<{ auth_user_id: string | null }>(
       'select auth_user_id from kaissi.users where id = $1',
       [moi.employeId],
     )
-    expect(rows[0]!.auth_user_id).toBe(moi.authId)
+    expect(fiche[0]!.auth_user_id).toBeNull()
+
+    // L'établissement est FERMÉ — jamais supprimé : ses ventes sont des
+    // écritures comptables, et l'éditeur peut le rouvrir.
+    const { rows: resto } = await client.query<{ status: string }>(
+      'select status from kaissi.restaurants where id = $1',
+      [seul],
+    )
+    expect(resto).toHaveLength(1)
+    expect(resto[0]!.status).toBe('ferme')
+  })
+
+  it('ne ferme PAS un établissement où un gérant reste', async () => {
+    const partage = await autreEtablissement()
+    await compte('gerant', [partage])
+    const moi = await compte('admin', [partage])
+
+    const reponse = await poste('/compte/supprimer', {
+      email: moi.email,
+      motDePasse: MOT_DE_PASSE,
+      confirmation: moi.email,
+    })
+    expect(reponse.status).toBe(200)
+    const corps = (await reponse.json()) as { message: string }
+    expect(corps.message).toContain('plus d’administrateur')
+
+    // Le gérant exploite encore : l'établissement reste ACTIF (0024 — un
+    // gérant gère carte, stock, rapports ; il ne distribue pas les rôles).
+    const { rows } = await client.query<{ status: string }>(
+      'select status from kaissi.restaurants where id = $1',
+      [partage],
+    )
+    expect(rows[0]!.status).toBe('actif')
   })
 
   it('REFUSE si l’adresse de confirmation ne correspond pas', async () => {

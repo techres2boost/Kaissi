@@ -147,7 +147,8 @@ export default function Confidentialite() {
         <h2>{t('Suppression du compte')}</h2>
         <p>{t('Depuis la caisse : écran d’accueil, ou ☰ → Synchronisation → « Supprimer mon compte ». L’écran montre d’abord ce qui sera effacé et ce qui sera conservé, puis demande de retaper l’adresse du compte. La suppression est immédiate et définitive.')}</p>
         <p>{t('Sont effacés : votre nom, votre adresse e-mail, votre téléphone, votre code PIN de caisse, et vos rattachements aux établissements. Votre connexion au back-office cesse aussitôt.')}</p>
-        <p className="indication">{t('Sont conservées : les ventes déjà encaissées et le journal d’audit. Ce sont des écritures comptables, et elles ne portent plus votre nom. Une seule chose peut retarder la suppression : si vous êtes le dernier administrateur d’un établissement, il faut d’abord en nommer un autre — sans quoi plus personne ne pourrait y ouvrir d’accès.')}</p>
+        <p className="indication">{t('Sont conservées : les ventes déjà encaissées et le journal d’audit. Ce sont des écritures comptables, et elles ne portent plus votre nom.')}</p>
+        <p className="indication">{t('Rien ne peut empêcher la suppression — pas même d’être la seule personne du restaurant. L’écran dit simplement ce qui arrivera à vos établissements : celui où aucun autre compte ne resterait est FERMÉ (ses données sont conservées, et nous pouvons le rouvrir) ; celui où il reste des gérants continue d’être exploité, sans administrateur.')}</p>
         <p>{t('Si vous préférez, la demande peut aussi être envoyée depuis l’adresse e-mail du compte à')}{' '}
           <a href={`mailto:${EDITEUR.contact}`}>{EDITEUR.contact}</a>{t(', avec le nom de l’établissement.')}</p>
       </section>

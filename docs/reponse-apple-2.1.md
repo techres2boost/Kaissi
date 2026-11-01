@@ -38,7 +38,31 @@ Chaque séquence répond à une exigence précise de leur message.
 | 8 | **Coupez le mode avion**, allez à l'écran **Synchronisation**, montrez les opérations qui remontent | Montre que les ventes faites hors ligne arrivent au serveur |
 | 9 | Revenez à l'écran de bienvenue → **« Créer un compte »** → montrez le formulaire d'inscription | **« Account registration, login, and account deletion flows »** |
 | 10 | **Connexion** avec le compte de démonstration | Idem |
-| 11 | Retour à l'accueil → **« Supprimer mon compte »** → saisissez les identifiants de démonstration → montrez l'écran « Ce qui sera effacé / Ce qui sera conservé » → **revenez en arrière** | « account deletion flows » (règle 5.1.1(v)). Pas besoin de supprimer pour de vrai : montrer que le parcours existe suffit |
+| 11 | **Créer puis supprimer un compte JETABLE**, devant la caméra (détail au §1 bis ci-dessous) | « account registration… and account deletion flows ». Montrer la suppression **réussie** est la preuve la plus forte, et un compte jetable ne coûte rien |
+
+### 1 bis — Filmer la suppression : avec un compte jetable
+
+**Ne supprimez jamais le compte de démonstration donné à Apple** : le
+relecteur en a besoin pour se connecter. Filmez la suppression sur un
+compte créé pour l'occasion, qui sert aussi à montrer l'inscription — les
+deux exigences d'Apple en une seule séquence.
+
+⚠ **Réseau rallumé** pour cette partie : créer et supprimer un compte passe
+par le serveur. Faites donc d'abord les séquences 1 à 8 (mode avion), puis
+coupez le mode avion avant la 9.
+
+| Étape | Ce que vous faites |
+|---|---|
+| a | Accueil → **« Créer un compte »** → un restaurant « Test Apple », une adresse jetable (par exemple `revue-apple-1@` votre domaine), un mot de passe, un PIN |
+| b | Le compte est créé, la caisse s'ouvre sur ce restaurant neuf |
+| c | ☰ → **Synchronisation** → **« Supprimer mon compte »** |
+| d | Saisissez l'adresse et le mot de passe du compte jetable → **Continuer** |
+| e | **Laissez l'écran visible 3 secondes** : « Ce qui sera effacé », « Ce qui sera conservé », et « Ce qui arrivera à vos établissements » — « Test Apple » sera fermé, puisque personne d'autre n'y a de compte |
+| f | Retapez l'adresse → **Supprimer définitivement mon compte** |
+| g | L'écran « Compte supprimé » s'affiche. Fin de la séquence |
+
+C'est exactement le cas que la première version ratait : **une seule
+personne dans le restaurant**. Il marche, et c'est lui qu'on filme.
 
 **Ce qu'il ne faut PAS filmer** : rien. Il n'y a ni contenu généré par les
 utilisateurs, ni contenu payant dans l'application — dites-le explicitement
@@ -311,9 +335,16 @@ aller-retour avec Apple, qui coûte une semaine de calendrier.
 |---|---|
 | **Effacé** | la connexion au back-office, le nom, l'adresse e-mail, le téléphone, le code PIN de caisse, et tous les rattachements aux établissements |
 | **Conservé** | les ventes et le journal d'audit — ce sont des écritures comptables (règle 6), et elles ne portent plus le nom |
-| **Le seul refus possible** | être le **dernier administrateur** d'un établissement. L'écran le nomme et dit quoi faire : nommer un autre administrateur, ou supprimer l'établissement |
+| **Aucun refus possible** | même la seule personne d'un restaurant peut supprimer son compte. L'écran dit ce qui arrive à chaque établissement : **fermé** s'il n'y reste aucun autre compte (données conservées, réouvrable par Res2Boost), **sans administrateur** s'il y reste des gérants (ils continuent d'exploiter), **inchangé** s'il reste un autre administrateur |
 | **Garde-fous** | mot de passe revérifié à l'instant, adresse exacte à retaper, limites de débit par connexion et par compte |
 | **Tests** | 10 tests de service contre un vrai PostgreSQL (`apps/sync/test/suppression-compte.test.ts`) + un parcours navigateur |
+
+**L'erreur de la première version, corrigée le jour même** : elle refusait
+la suppression au dernier administrateur d'un établissement (« nommez-en un
+autre d'abord »). Dans un restaurant tenu par une seule personne — le cas le
+plus courant de notre marché — il n'y a personne à nommer : le compte était
+indestructible. Apple l'aurait rejeté, à raison. Le blocage est devenu une
+**information** : l'écran dit ce qui arrivera, puis exécute.
 
 **Le piège qu'il a fallu éviter**, et qui aurait donné une suppression de
 façade : depuis la migration 0017, `kaissi.users` n'est plus un miroir de

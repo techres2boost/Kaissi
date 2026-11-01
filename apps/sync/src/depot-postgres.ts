@@ -418,7 +418,12 @@ export class DepotPostgres implements DepotSync {
   async apercuSuppressionCompte(authUserId: string): Promise<{
     employeId: string | null
     nom: string
-    etablissements: { restaurantId: string; nom: string; role: string; seulAdmin: boolean }[]
+    etablissements: {
+      restaurantId: string
+      nom: string
+      role: string
+      devenir: 'inchange' | 'sans_administrateur' | 'ferme'
+    }[]
     ventes: number
   }> {
     const { rows: fiches } = await this.pool.query<{ id: string; full_name: string }>(
@@ -431,18 +436,29 @@ export class DepotPostgres implements DepotSync {
     }
 
     /*
-     * Le compte des autres administrateurs se fait DANS la même requête.
+     * Les deux comptages se font DANS la même requête que la liste.
      *
-     * Le faire en deux temps (la liste, puis une requête par établissement)
-     * ouvrait une fenêtre : le dernier autre administrateur peut être
-     * révoqué entre les deux, et on autoriserait alors une suppression qui
-     * laisse l'établissement orphelin.
+     * En deux temps, le dernier autre administrateur peut être révoqué
+     * entre la liste et le comptage — et on déciderait alors du sort d'un
+     * établissement sur un état qui n'est déjà plus le sien.
+     *
+     * On compte DEUX choses, et la distinction fait tout :
+     *   • les autres ADMINISTRATEURS — s'il en reste un, rien ne change ;
+     *   • les autres COMPTES, quel que soit leur rôle. Un gérant exploite
+     *     parfaitement sans administrateur (migration 0024) : carte, stock,
+     *     rapports, équipe. Il ne peut simplement plus accorder ni retirer
+     *     un accès. L'établissement est DIMINUÉ, pas mort — ce n'est pas
+     *     une raison pour retenir quelqu'un qui veut partir.
+     *
+     * Un employé sans compte (un serveur qui n'a qu'un PIN) ne compte pas :
+     * il ne peut pas ouvrir le back-office, donc il ne garde rien ouvert.
      */
     const { rows } = await this.pool.query<{
       restaurant_id: string
       name: string
       role: string
       autres_admins: string
+      autres_comptes: string
     }>(
       `select m.restaurant_id,
               r.name,
@@ -455,7 +471,15 @@ export class DepotPostgres implements DepotSync {
                   and m2.revoked_at is null
                   and m2.user_id <> $1
                   and u2.status = 'actif'
-                  and u2.auth_user_id is not null)::text as autres_admins
+                  and u2.auth_user_id is not null)::text as autres_admins,
+              (select count(*)
+                 from kaissi.memberships m3
+                 join kaissi.users u3 on u3.id = m3.user_id
+                where m3.restaurant_id = m.restaurant_id
+                  and m3.revoked_at is null
+                  and m3.user_id <> $1
+                  and u3.status = 'actif'
+                  and u3.auth_user_id is not null)::text as autres_comptes
          from kaissi.memberships m
          join kaissi.restaurants r on r.id = m.restaurant_id
         where m.user_id = $1
@@ -480,7 +504,12 @@ export class DepotPostgres implements DepotSync {
         restaurantId: r.restaurant_id,
         nom: r.name,
         role: r.role,
-        seulAdmin: r.role === 'admin' && Number(r.autres_admins) === 0,
+        devenir:
+          Number(r.autres_admins) > 0
+            ? 'inchange'
+            : Number(r.autres_comptes) > 0
+              ? 'sans_administrateur'
+              : 'ferme',
       })),
       ventes: Number(ventes[0]?.n ?? '0'),
     }
@@ -496,7 +525,51 @@ export class DepotPostgres implements DepotSync {
       )
       const employeId = rows[0]?.id
       if (employeId) {
+        /*
+         * Les établissements que ce départ laisserait SANS PERSONNE.
+         *
+         * Calculés AVANT de retirer les appartenances — après, la requête
+         * ne saurait plus de quels établissements il s'agissait. Et dans la
+         * même transaction que la suppression : sinon un établissement
+         * pourrait être fermé sans que le compte le soit, ou l'inverse.
+         */
+        const { rows: aFermer } = await client.query<{ restaurant_id: string }>(
+          `select m.restaurant_id
+             from kaissi.memberships m
+            where m.user_id = $1
+              and m.revoked_at is null
+              and not exists (
+                select 1
+                  from kaissi.memberships m2
+                  join kaissi.users u2 on u2.id = m2.user_id
+                 where m2.restaurant_id = m.restaurant_id
+                   and m2.revoked_at is null
+                   and m2.user_id <> $1
+                   and u2.status = 'actif'
+                   and u2.auth_user_id is not null)`,
+          [employeId],
+        )
+
         await client.query('delete from kaissi.memberships where user_id = $1', [employeId])
+
+        /*
+         * FERMER, jamais supprimer.
+         *
+         * Un établissement dont plus personne ne détient de compte ne doit
+         * plus accepter d'appairage : sinon une tablette continuerait d'y
+         * envoyer des ventes que personne ne lira jamais. Mais ses ventes
+         * sont des écritures comptables (règle 6) — on ne les détruit pas
+         * parce que son dernier gérant s'en va. La 0038 a précisément prévu
+         * cet état : fermé, consultable, réouvrable par l'éditeur.
+         */
+        for (const ligne of aFermer) {
+          await client.query(
+            `update kaissi.restaurants
+                set status = 'ferme', updated_at = now()
+              where id = $1 and status <> 'ferme'`,
+            [ligne.restaurant_id],
+          )
+        }
         /*
          * `email` est nullable depuis la 0017 ; `full_name` ne l'est pas et
          * porte donc un libellé — jamais une chaîne vide, qui laisserait les

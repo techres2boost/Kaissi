@@ -27,7 +27,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { TriangleAlert, UserX } from 'lucide-react'
+import { UserX } from 'lucide-react'
 import { URL_SYNC_PAR_DEFAUT } from '../config.js'
 import { expliquerEchecReseau } from '../donnees/diagnostic-reseau.js'
 import { useApp } from '../etat/contexte.js'
@@ -37,7 +37,7 @@ interface Etablissement {
   readonly restaurantId: string
   readonly nom: string
   readonly role: string
-  readonly seulAdmin: boolean
+  readonly devenir: 'inchange' | 'sans_administrateur' | 'ferme'
 }
 
 interface Apercu {
@@ -45,7 +45,10 @@ interface Apercu {
   readonly nom: string
   readonly etablissements: Etablissement[]
   readonly ventes: number
-  readonly bloquants: string[]
+  /** Établissements que ce départ laisse sans aucun compte : ils seront fermés. */
+  readonly fermes: string[]
+  /** Établissements qui restent exploités, mais sans administrateur. */
+  readonly sansAdministrateur: string[]
 }
 
 export function SuppressionCompte({ onRetour }: { onRetour: () => void }) {
@@ -140,69 +143,77 @@ export function SuppressionCompte({ onRetour }: { onRetour: () => void }) {
   }
 
   if (apercu) {
-    const bloque = apercu.bloquants.length > 0
     return (
       <section className="carte-action">
         <button type="button" className="retour-accueil" onClick={() => setApercu(null)}>{t('‹ Retour')}</button>
         <h1>{t('Supprimer mon compte')}</h1>
         <p>{t('Compte : {email}', { email: apercu.email })}</p>
 
-        {bloque ? (
-          <>
-            <p className="erreur">
-              <TriangleAlert size={18} strokeWidth={2} aria-hidden="true" />{' '}
-              {t('Vous êtes le seul administrateur de : {noms}.', { noms: apercu.bloquants.join(', ') })}
-            </p>
-            <p>{t('Supprimer votre compte laisserait cet établissement sans personne pour y ouvrir un accès. Nommez un autre administrateur au back-office (Employés), ou supprimez l’établissement, puis revenez ici.')}</p>
-            <button type="button" onClick={onRetour}>{t('Revenir')}</button>
-          </>
-        ) : (
-          <>
-            <div className="effets-suppression">
-              <h2>{t('Ce qui sera effacé')}</h2>
+        <div className="effets-suppression">
+          <h2>{t('Ce qui sera effacé')}</h2>
+          <ul>
+            <li>{t('Votre connexion au back-office — définitivement.')}</li>
+            <li>{t('Votre nom, votre adresse e-mail et votre téléphone.')}</li>
+            <li>{t('Votre code PIN de caisse.')}</li>
+            {apercu.etablissements.length > 0 && (
+              <li>{t('Votre rattachement à : {noms}.', { noms: apercu.etablissements.map((e) => e.nom).join(', ') })}</li>
+            )}
+          </ul>
+
+          <h2>{t('Ce qui sera conservé')}</h2>
+          <ul>
+            <li>
+              {apercu.ventes > 0
+                ? t('Les {n} vente(s) que vous avez encaissées — sans votre nom.', { n: String(apercu.ventes) })
+                : t('Aucune vente n’est rattachée à ce compte.')}
+            </li>
+            <li>{t('Le journal des ventes et le journal d’audit : ce sont des écritures comptables, elles ne se suppriment pas. Elles ne portent plus votre nom.')}</li>
+          </ul>
+
+          {/*
+            Ce qui arrive aux ÉTABLISSEMENTS — et jamais un refus.
+
+            La première version bloquait le dernier administrateur : « nommez
+            quelqu'un d'abord ». Dans un restaurant tenu par une seule
+            personne, il n'y a personne à nommer, et le compte devenait
+            indestructible. On informe, on n'empêche pas.
+          */}
+          {(apercu.fermes.length > 0 || apercu.sansAdministrateur.length > 0) && (
+            <>
+              <h2>{t('Ce qui arrivera à vos établissements')}</h2>
               <ul>
-                <li>{t('Votre connexion au back-office — définitivement.')}</li>
-                <li>{t('Votre nom, votre adresse e-mail et votre téléphone.')}</li>
-                <li>{t('Votre code PIN de caisse.')}</li>
-                {apercu.etablissements.length > 0 && (
-                  <li>{t('Votre rattachement à : {noms}.', { noms: apercu.etablissements.map((e) => e.nom).join(', ') })}</li>
+                {apercu.fermes.length > 0 && (
+                  <li>{t('{noms} : plus aucun compte n’y donnerait accès. L’établissement sera FERMÉ — aucune caisse ne pourra plus s’y appairer. Ses ventes sont conservées, et Res2Boost peut le rouvrir.', { noms: apercu.fermes.join(', ') })}</li>
+                )}
+                {apercu.sansAdministrateur.length > 0 && (
+                  <li>{t('{noms} : il n’y aura plus d’administrateur. Les gérants continueront d’exploiter normalement — carte, stock, rapports — mais plus personne ne pourra y accorder ni retirer un accès.', { noms: apercu.sansAdministrateur.join(', ') })}</li>
                 )}
               </ul>
+            </>
+          )}
+        </div>
 
-              <h2>{t('Ce qui sera conservé')}</h2>
-              <ul>
-                <li>
-                  {apercu.ventes > 0
-                    ? t('Les {n} vente(s) que vous avez encaissées — sans votre nom.', { n: String(apercu.ventes) })
-                    : t('Aucune vente n’est rattachée à ce compte.')}
-                </li>
-                <li>{t('Le journal des ventes et le journal d’audit : ce sont des écritures comptables, elles ne se suppriment pas. Elles ne portent plus votre nom.')}</li>
-              </ul>
-            </div>
+        <label htmlFor="suppr-confirmation">{t('Pour confirmer, retapez votre adresse e-mail')}</label>
+        <input
+          id="suppr-confirmation"
+          type="email"
+          autoComplete="off"
+          autoCapitalize="none"
+          value={confirmation}
+          onChange={(e) => setConfirmation(e.target.value)}
+          placeholder={apercu.email}
+        />
+        <p className="aide">{t('Retaper l’adresse oblige à lire QUEL compte sera effacé. Une case à cocher ne l’oblige pas.')}</p>
 
-            <label htmlFor="suppr-confirmation">{t('Pour confirmer, retapez votre adresse e-mail')}</label>
-            <input
-              id="suppr-confirmation"
-              type="email"
-              autoComplete="off"
-              autoCapitalize="none"
-              value={confirmation}
-              onChange={(e) => setConfirmation(e.target.value)}
-              placeholder={apercu.email}
-            />
-            <p className="aide">{t('Retaper l’adresse oblige à lire QUEL compte sera effacé. Une case à cocher ne l’oblige pas.')}</p>
-
-            <button
-              type="button"
-              className="principal destructif"
-              disabled={etat === 'envoi' || confirmation.trim().toLowerCase() !== apercu.email.trim().toLowerCase()}
-              onClick={() => void supprimer()}
-            >
-              <UserX size={18} strokeWidth={2} aria-hidden="true" />{' '}
-              {etat === 'envoi' ? t('Suppression…') : t('Supprimer définitivement mon compte')}
-            </button>
-          </>
-        )}
+        <button
+          type="button"
+          className="principal destructif"
+          disabled={etat === 'envoi' || confirmation.trim().toLowerCase() !== apercu.email.trim().toLowerCase()}
+          onClick={() => void supprimer()}
+        >
+          <UserX size={18} strokeWidth={2} aria-hidden="true" />{' '}
+          {etat === 'envoi' ? t('Suppression…') : t('Supprimer définitivement mon compte')}
+        </button>
 
         {etat === 'erreur' && message && (
           <p className="erreur" style={{ whiteSpace: 'pre-line' }}>{tm(message)}</p>

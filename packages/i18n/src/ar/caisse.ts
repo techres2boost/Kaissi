@@ -615,7 +615,6 @@ export const AR_CAISSE: Readonly<Record<string, string>> = {
   "Compte supprimé": "تمّ حذف الحساب",
   "Compte : {email}": "الحساب: {email}",
   "Continuer": "متابعة",
-  "Revenir": "رجوع",
   "Suppression…": "جارٍ الحذف…",
   "Supprimer définitivement mon compte": "حذف حسابي نهائيًّا",
   "Ce qui sera effacé": "ما سيُمحى",
@@ -636,11 +635,13 @@ export const AR_CAISSE: Readonly<Record<string, string>> = {
     "عرّف بنفسك: الصندوق لا يحتفظ بأيّ جلسة مستخدم، وشاشة تُركت مفتوحة على طاولة لا يجب أن تكفي لمحو حساب.",
   "Rien n’est supprimé à cette étape : l’écran suivant montre d’abord ce qui serait effacé.":
     "لا شيء يُحذف في هذه المرحلة: الشاشة التالية تعرض أوّلًا ما سيُمحى.",
-  "Vous êtes le seul administrateur de : {noms}.": "أنت المسؤول الوحيد عن: {noms}.",
-  "Supprimer votre compte laisserait cet établissement sans personne pour y ouvrir un accès. Nommez un autre administrateur au back-office (Employés), ou supprimez l’établissement, puis revenez ici.":
-    "حذف حسابك يترك هذا المحلّ دون أيّ شخص يفتح فيه صلاحية. عيّن مسؤولًا آخر من مكتب الإدارة (الموظّفون)، أو احذف المحلّ، ثمّ عُد إلى هنا.",
   "Cette caisse continue de fonctionner : son jeton d’appareil n’est l’identité de personne. Pour la mettre hors service, utilisez « Révoquer » au back-office, ou effacez-la depuis l’écran Synchronisation.":
     "هذا الصندوق يواصل العمل: رمز الجهاز ليس هويّة أيّ شخص. لإيقافه، استعمل «إلغاء» في مكتب الإدارة، أو امسحه من شاشة المزامنة.",
   "Supprimer le compte efface votre nom, votre adresse et votre code PIN. Les ventes déjà encaissées restent : ce sont des écritures comptables, elles ne portent simplement plus votre nom. Cette caisse, elle, continue de fonctionner.":
     "حذف الحساب يمحو اسمك وعنوانك ورمزك السرّي. أمّا المبيعات التي استُخلصت فتبقى: هي قيود محاسبية، لكنّها لم تعد تحمل اسمك. وهذا الصندوق يواصل العمل.",
+  "Ce qui arrivera à vos établissements": "ما سيحدث لمحلّاتك",
+  "{noms} : plus aucun compte n’y donnerait accès. L’établissement sera FERMÉ — aucune caisse ne pourra plus s’y appairer. Ses ventes sont conservées, et Res2Boost peut le rouvrir.":
+    "{noms}: لن يبقى أيّ حساب يفتح صلاحية فيه. سيُغلق المحلّ — ولن يتمكّن أيّ صندوق من الاقتران به. تُحفظ مبيعاته، ويمكن لـ Res2Boost إعادة فتحه.",
+  "{noms} : il n’y aura plus d’administrateur. Les gérants continueront d’exploiter normalement — carte, stock, rapports — mais plus personne ne pourra y accorder ni retirer un accès.":
+    "{noms}: لن يبقى أيّ مسؤول. يواصل المديرون الاستغلال عاديًّا — القائمة والمخزون والتقارير — لكن لن يتمكّن أحد من منح صلاحية أو سحبها.",
 }

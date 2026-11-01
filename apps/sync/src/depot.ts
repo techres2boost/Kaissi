@@ -407,14 +407,28 @@ export interface DepotSync {
   supprimerEtablissement(restaurantId: string): Promise<void>
 
   /**
-   * Ce que la suppression d'un COMPTE effacerait — compté AVANT de la
+   * Ce que la suppression d'un COMPTE emporterait — calculé AVANT de la
    * proposer, comme pour un établissement.
    *
-   * `seulAdmin` est le seul vrai obstacle : partir en laissant un
-   * établissement sans aucun administrateur le rendrait ingérable, et
-   * personne ne pourrait plus y ouvrir d'accès. On refuse, en nommant
-   * l'établissement — « promouvez quelqu'un d'abord » est une consigne
-   * qu'on peut suivre ; « opération impossible » ne l'est pas.
+   * ── Pourquoi aucun cas ne BLOQUE ─────────────────────────────────────────
+   *
+   * La première version refusait la suppression au dernier administrateur
+   * d'un établissement, et c'était une faute : dans un restaurant tenu par
+   * UNE personne — le cas le plus courant de notre marché — le compte
+   * devenait indestructible. Une suppression conditionnée à une action
+   * impossible n'est pas une suppression : Apple la rejette (règle
+   * 5.1.1(v)), et le droit à l'effacement ne se conditionne pas davantage.
+   *
+   * On ne bloque donc plus rien ; on DIT ce qui arrivera, par établissement :
+   *
+   *   • `inchange` — il reste un autre administrateur ;
+   *   • `sans_administrateur` — il reste des comptes, mais aucun admin. Les
+   *     gérants continuent d'exploiter (migration 0024) ; plus personne ne
+   *     peut accorder ni retirer un accès, et l'éditeur peut en redésigner
+   *     un. L'établissement est diminué, pas mort ;
+   *   • `ferme` — plus aucun compte. L'établissement est FERMÉ (0038) :
+   *     plus d'appairage, données conservées. Jamais supprimé — ce sont des
+   *     écritures comptables.
    */
   apercuSuppressionCompte(authUserId: string): Promise<{
     /** La fiche EMPLOYÉ liée à ce compte, si elle existe (migration 0017). */
@@ -424,8 +438,8 @@ export interface DepotSync {
       restaurantId: string
       nom: string
       role: string
-      /** Vrai si ce compte est le DERNIER administrateur de cet établissement. */
-      seulAdmin: boolean
+      /** Ce que ce départ fait à l'établissement. Jamais un blocage. */
+      devenir: 'inchange' | 'sans_administrateur' | 'ferme'
     }[]
     /** Ventes qui portent son nom, et qui RESTERONT — sans son nom. */
     ventes: number
@@ -450,7 +464,9 @@ export interface DepotSync {
    * actes d'une même personne devenue anonyme.
    *
    * Tout dans UNE transaction : une suppression à moitié faite laisserait un
-   * compte capable de se connecter mais rattaché à rien, ou l'inverse.
+   * compte capable de se connecter mais rattaché à rien, ou l'inverse. Les
+   * établissements que ce départ laisse sans aucun compte y sont FERMÉS
+   * (0038) — jamais supprimés.
    */
   supprimerCompte(authUserId: string): Promise<void>
 
