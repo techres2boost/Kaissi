@@ -73,13 +73,19 @@
       "sharp": ">=0.35.5",
       "postcss": ">=8.5.23",
       "source-map-js": ">=1.2.2",
-      "brace-expansion@>=4.0.0 <5.0.11": "^5.0.11"
+      "brace-expansion@>=4.0.0 <5.0.11": "^5.0.11",
+      "zod": ">=4.6.6",
+      "hono": ">=4.13.11",
+      "@vitest/mocker": ">=4.1.12"
     },
     "_overrides_pourquoi": {
       "sharp": "GHSA-rgj7-g3m4-5g8c (libheif, corrigé en 0.35.4) puis CVE-2026-96889 (librsvg, HAUTE, corrigé en 0.35.5). Dépendance transitive de Next.js pour l'optimisation d'images ; Next tarde à remonter sa borne, on la force. Une alerte HAUTE ne se documente pas, elle se corrige.",
       "postcss": "GHSA-qx2v-qp2m-jg93 et GHSA-fxqj-rqcc-2cmp — corrigés en 8.5.23. Ils étaient auparavant écartés comme « dépendance de développement » ; c'était devenu FAUX : postcss arrive maintenant par `next`, donc par le chemin de build du back-office. Une justification cesse d'être vraie sans prévenir — c'est pourquoi on préfère corriger.",
       "source-map-js": "Déni de service (HAUTE), corrigé en 1.2.2. Arrive par next > postcss : le chemin de build du back-office.",
-      "brace-expansion@>=4.0.0 <5.0.11": "Déni de service par récursion (HAUTE), corrigé en 5.0.11. Arrive par eslint > minimatch. Borné à la branche 4–5 : les minimatch plus anciens dépendent de brace-expansion 1.x/2.x, qu'on ne force pas vers une majeure qu'ils ne connaissent pas."
+      "brace-expansion@>=4.0.0 <5.0.11": "Déni de service par récursion (HAUTE), corrigé en 5.0.11. Arrive par eslint > minimatch. Borné à la branche 4–5 : les minimatch plus anciens dépendent de brace-expansion 1.x/2.x, qu'on ne force pas vers une majeure qu'ils ne connaissent pas.",
+      "zod": "GHSA-mrhx-c7xc-m3w5 — épuisement mémoire sur une collection surdimensionnée (HAUTE), corrigé en 4.6.6. C'est l'avis qui a fait rougir la CI du 27 octobre. Il arrive par eslint-plugin-react-hooks, donc par le LINTER seul : aucun zod ne tourne en production, ni sur la caisse ni dans le service. On corrige quand même — la borne coûte une ligne, et une justification « ce n'est que du développement » est exactement celle qui cesse d'être vraie sans prévenir (voir postcss ci-dessus).",
+      "hono": "GHSA sur `serveStatic` (double décodage du chemin, corrigé en 4.13.11) et sur `hono/jsx` (chaîne non échappée, corrigé en 4.13.7). Ni `serveStatic` ni `hono/jsx` ne sont appelés par `apps/sync` — vérifié — mais hono EST le serveur qui porte chaque vente, et la montée reste dans la même majeure. On corrige.",
+      "@vitest/mocker": "Injection de code par un mock manuel non authentifié, et contournement de chemin sous Windows (corrigés en 4.1.12). Outil de test uniquement, jamais livré."
     }
   }
 }
