@@ -141,7 +141,18 @@ afterAll(async () => {
 
 describe('aperçu — ce que la suppression emporterait', () => {
   it('rend les établissements et le rôle', async () => {
-    const moi = await compte('gerant')
+    /*
+     * Un établissement PROPRE à ce test, avec un collègue administrateur.
+     *
+     * La première version comptait sur l'établissement de démonstration
+     * « ayant déjà d'autres comptes ». C'était vrai en local — les
+     * exécutions précédentes en avaient laissé — et faux sur la base neuve
+     * de la CI. Un test qui dépend de ce que les autres ont laissé derrière
+     * eux n'en est pas un.
+     */
+    const resto = await autreEtablissement()
+    await compte('admin', [resto])
+    const moi = await compte('gerant', [resto])
     const reponse = await poste('/compte/apercu-suppression', {
       email: moi.email,
       motDePasse: MOT_DE_PASSE,
@@ -152,9 +163,7 @@ describe('aperçu — ce que la suppression emporterait', () => {
     }
     expect(corps.etablissements).toHaveLength(1)
     expect(corps.etablissements[0]!.role).toBe('gerant')
-    // L'établissement de démonstration a d'autres comptes : ce départ-là ne
-    // le laisse ni fermé ni orphelin.
-    expect(corps.etablissements[0]!.devenir).not.toBe('ferme')
+    expect(corps.etablissements[0]!.devenir).toBe('inchange')
   })
 
   it('ANNONCE la fermeture quand on est la seule personne de l’établissement', async () => {
