@@ -424,6 +424,30 @@ jobs:
           fi
           echo "OK — la cle de service reste dans le service."
 
+      - name: Le build du back-office ne telecharge AUCUNE police
+        run: |
+          # `next/font/google` va chercher les polices chez Google a CHAQUE
+          # build. Le 1er novembre, Google a repondu une adresse que Next ne
+          # savait pas lire : le build est tombe, et le meme chemin sert au
+          # deploiement Vercel. Les polices sont donc des fichiers du depot
+          # (apps/backoffice/src/polices/, licences OFL), charges par
+          # `next/font/local`. Cette garde refuse le retour en arriere.
+          fautes=$(grep -rnE "from 'next/font/google'|fonts\.googleapis|fonts\.gstatic" \
+               --include='*.ts' --include='*.tsx' --include='*.css' \
+               apps/backoffice/src apps/pos/src 2>/dev/null || true)
+          if [ -n "$fautes" ]; then
+            echo '::error::Une police est de nouveau telechargee au build ou a l execution :'
+            echo "$fautes"
+            exit 1
+          fi
+          for f in inter-latin sora-latin ibm-plex-sans-arabic-400; do
+            if [ ! -s "apps/backoffice/src/polices/$f.woff2" ]; then
+              echo "::error::Police absente du depot : $f.woff2"
+              exit 1
+            fi
+          done
+          echo "OK — les polices sont dans le depot."
+
       - name: Le back-office REFUSE la cle de service au demarrage
         run: |
           # Le pendant positif de la garde precedente : l'absence d'une mention

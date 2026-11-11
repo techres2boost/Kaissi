@@ -1,33 +1,44 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
-import { IBM_Plex_Sans_Arabic, Inter, Sora } from 'next/font/google'
+import localFont from 'next/font/local'
 import { direction } from '@kaissi/i18n'
 import { FournisseurLangue } from '../i18n/client.js'
 import { langueCourante, traduction } from '../i18n/serveur.js'
 import './styles.css'
 
 /*
- * Les polices de la marque, chargées par `next/font`.
+ * Les polices de la marque — des FICHIERS du dépôt, pas un téléchargement.
  *
- * Next les télécharge AU BUILD et les sert depuis notre propre domaine : la
- * page n'émet aucune requête vers un tiers à l'exécution. Ce n'est pas qu'une
- * question de performance — une balise <link> vers un CDN de polices révèle
- * chaque visite du back-office à ce tiers.
+ * PANNE DE BUILD OBSERVÉE (1er novembre) : `next/font/google` télécharge les
+ * polices chez Google à CHAQUE build. Ce jour-là, Google a répondu une
+ * adresse de fichier que Next ne savait pas lire, et le build est tombé sur
+ * « Cannot read properties of null (reading '1') » — dans la CI, mais le
+ * même chemin sert au déploiement Vercel : un back-office qu'on ne peut plus
+ * déployer parce qu'un tiers a changé un format de réponse.
+ *
+ * `src/polices/` porte donc les woff2 et leurs licences (SIL OFL 1.1, qui
+ * autorise la redistribution). Le build ne dépend plus d'aucun réseau —
+ * la même exigence que pour la caisse, appliquée à ce qui la mérite ici.
+ * Rien ne change à l'exécution : Next servait déjà ces polices depuis notre
+ * domaine, sans requête vers un tiers.
+ *
+ * Inter et Sora sont des polices VARIABLES : un seul fichier couvre toutes
+ * les graisses (`weight` donne la plage).
  *
  * `display: 'swap'` : le texte s'affiche tout de suite dans la police de
  * repli, puis bascule. Un gérant qui ouvre son rapport du matin ne doit pas
  * attendre devant un écran vide.
  */
-const sora = Sora({
-  subsets: ['latin'],
-  weight: ['600', '700'],
+const sora = localFont({
+  src: '../polices/sora-latin.woff2',
+  weight: '100 800',
   display: 'swap',
   variable: '--police-titre',
 })
 
-const inter = Inter({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
+const inter = localFont({
+  src: '../polices/inter-latin.woff2',
+  weight: '100 900',
   display: 'swap',
   variable: '--police-corps',
 })
@@ -38,11 +49,15 @@ const inter = Inter({
  * Noto sur un autre, des chasses différentes partout. IBM Plex Sans Arabic
  * est dessinée pour l'écran, lisible en petit corps, et sous licence libre
  * (OFL). Chargée seulement pour une page en arabe : la classe n'est posée
- * qu'alors, et `next/font` ne précharge que ce qui est utilisé.
+ * qu'alors, et `preload: false` évite de la précharger ailleurs.
  */
-const arabe = IBM_Plex_Sans_Arabic({
-  subsets: ['arabic'],
-  weight: ['400', '500', '600', '700'],
+const arabe = localFont({
+  src: [
+    { path: '../polices/ibm-plex-sans-arabic-400.woff2', weight: '400', style: 'normal' },
+    { path: '../polices/ibm-plex-sans-arabic-500.woff2', weight: '500', style: 'normal' },
+    { path: '../polices/ibm-plex-sans-arabic-600.woff2', weight: '600', style: 'normal' },
+    { path: '../polices/ibm-plex-sans-arabic-700.woff2', weight: '700', style: 'normal' },
+  ],
   display: 'swap',
   variable: '--police-arabe',
   preload: false,
