@@ -20,11 +20,32 @@
  * Aucun code n'a été retiré, aucun test supprimé.
  */
 
+import { Capacitor } from '@capacitor/core'
+
 /** L'impression ESC/POS est-elle allumée sur ce build ? */
 export const IMPRESSION_ACTIVE = import.meta.env.VITE_IMPRESSION === '1'
 
 /** Cible du build : APK Android (défaut) ou site statique. */
 export const CIBLE_WEB = import.meta.env.VITE_CIBLE === 'web'
+
+/**
+ * Ouvrir un restaurant DEPUIS LA CAISSE : partout, sauf sur iOS.
+ *
+ * Apple a refusé la 1.0 (60) au titre de la règle 3.1.1 : sur iPhone et
+ * iPad, une application ne doit pas permettre de créer le compte d'une
+ * entreprise, ce qu'Apple assimile à un accès à des achats hors de l'App
+ * Store. Sur iOS, la caisse ne fait donc que SE CONNECTER à un compte qui
+ * existe déjà ; le compte s'ouvre ailleurs (Android, cible web, ou par
+ * Res2Boost à la mise en place). Le service garde sa route `/inscription` :
+ * c'est l'écran qui s'efface, pas la capacité.
+ *
+ * Décidé à l'EXÉCUTION et non au build : le même bundle part sur les deux
+ * plateformes (Codemagic), et un drapeau de build oublié remettrait le
+ * bouton devant le relecteur d'Apple.
+ */
+export function inscriptionPermise(plateforme: string = Capacitor.getPlatform()): boolean {
+  return plateforme !== 'ios'
+}
 
 /**
  * Adresse du serveur de synchronisation, pré-remplie à l'appairage.

@@ -32,6 +32,7 @@ import { FormulaireAppairage } from './EcranSync.js'
 import { FormulaireInscription } from '../composants/FormulaireInscription.js'
 import { SuppressionCompte } from '../composants/SuppressionCompte.js'
 import { t } from '../i18n.js'
+import { inscriptionPermise } from '../config.js'
 
 export function EcranBienvenue({ onDemonstration }: { onDemonstration: () => void }) {
   const { app, rafraichir } = useApp()
@@ -70,7 +71,7 @@ export function EcranBienvenue({ onDemonstration }: { onDemonstration: () => voi
     )
   }
 
-  if (voie === 'creation') {
+  if (voie === 'creation' && inscriptionPermise()) {
     return (
       <div className="bienvenue">
         <button type="button" className="retour-accueil" onClick={() => setVoie('choix')}>{t('‹ Retour')}</button>
@@ -99,8 +100,13 @@ export function EcranBienvenue({ onDemonstration }: { onDemonstration: () => voi
         <button type="button" className="principal" onClick={() => setVoie('connexion')}>
           <LogIn size={18} strokeWidth={2} aria-hidden="true" />{' '}{t('Se connecter')}</button>
 
-        <button type="button" onClick={() => setVoie('creation')}>
-          <Store size={18} strokeWidth={2} aria-hidden="true" />{' '}{t('Créer un compte')}</button>
+        {/* Pas sur iOS : règle Apple 3.1.1 — voir `inscriptionPermise()`. */}
+        {inscriptionPermise() ? (
+          <button type="button" onClick={() => setVoie('creation')}>
+            <Store size={18} strokeWidth={2} aria-hidden="true" />{' '}{t('Créer un compte')}</button>
+        ) : (
+          <p className="aide">{t('Le compte du restaurant vous est remis à la mise en place de Kaissi.')}</p>
+        )}
       </section>
 
       {/*

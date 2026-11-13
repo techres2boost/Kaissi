@@ -471,6 +471,9 @@ jobs:
           fi
           echo "OK — le back-office refuse encore la cle de service."
 
+      - name: Aucune icône provisoire (règle Apple 2.3.8)
+        run: node apps/pos/scripts/verifier-icones.mjs
+
       - name: Aucun PIN en clair dans le code ou la graine
         run: |
           # Un PIN litteral AFFECTE a `pin_hash` ne l'est jamais ; un PIN passe

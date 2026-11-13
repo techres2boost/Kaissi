@@ -649,4 +649,6 @@ export const AR_CAISSE: Readonly<Record<string, string>> = {
   "Vos ventes sont enregistrées sur cette caisse : rien n’est perdu. Relancez l’écran pour reprendre là où vous en étiez.": "مبيعاتك مسجّلة على هذا الصندوق: لم يضِع شيء. أعد تشغيل الشاشة لتواصل من حيث توقّفت.",
   "L’erreur sera transmise à l’équipe Kaissi à la prochaine synchronisation.": "سيُرسَل الخطأ إلى فريق Kaissi عند المزامنة القادمة.",
   "Relancer la caisse": "إعادة تشغيل الصندوق",
+  // ── Accueil iOS (règle Apple 3.1.1) ──
+  "Le compte du restaurant vous est remis à la mise en place de Kaissi.": "يُسلَّم إليك حساب المطعم عند تركيب Kaissi.",
 }
