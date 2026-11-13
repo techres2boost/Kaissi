@@ -1212,12 +1212,34 @@ export class DepotPostgres implements DepotSync {
     const ecrits: string[] = []
     await this.sousIdentite(appareil, async (client) => {
       for (const p of pointages) {
-        const { rowCount } = await client.query(
-          // L'employé passe par le même filtre que pour les shifts : inconnu
-          // du serveur, il devient nul plutôt que de faire échouer la clé
-          // étrangère — un pointage ne se perd pas pour un employé archivé.
-          // COALESCE sur la sortie : un renvoi de l'ARRIVÉE, arrivé après
-          // celui de la sortie, n'efface jamais une sortie déjà remontée.
+        /*
+         * DEUX requêtes, et non un `on conflict … do update … where`.
+         *
+         * PANNE TROUVÉE PAR LA CI LE 13 NOVEMBRE, sans changement de notre
+         * code : l'image `postgres:16` est passée de 16.15 à 16.16, et la
+         * route a rendu 500 sur le test « une caisse ne modifie jamais le
+         * pointage d'une autre ». L'ancienne requête comptait sur un ORDRE
+         * d'évaluation : la clause `where device_id = …` du `do update`
+         * écartait la ligne d'une autre caisse AVANT que la politique RLS
+         * d'update ne la refuse. PostgreSQL 16.16 vérifie désormais la
+         * politique d'abord — et lève « new row violates row-level security
+         * policy », ce qui fait échouer TOUT le lot de pointages de la
+         * caisse. Supabase recevra le même correctif à sa prochaine mise à
+         * jour mineure : la panne serait arrivée en production, un jour,
+         * sans un seul commit.
+         *
+         * Deux requêtes ne dépendent d'aucun ordre :
+         *   • l'INSERT … do nothing crée le pointage s'il est nouveau, et
+         *     n'examine jamais la ligne existante ;
+         *   • l'UPDATE ne pose la sortie que sur une ligne de CETTE caisse.
+         *     Sous RLS, une ligne d'une autre caisse est simplement
+         *     invisible : zéro ligne modifiée, jamais une erreur.
+         *
+         * L'employé passe par le même filtre que pour les shifts : inconnu
+         * du serveur, il devient nul plutôt que de faire échouer la clé
+         * étrangère — un pointage ne se perd pas pour un employé archivé.
+         */
+        const cree = await client.query(
           `insert into kaissi.time_entries
              (id, organization_id, restaurant_id, device_id, user_id, clock_in_at, clock_out_at)
            values (
@@ -1225,13 +1247,7 @@ export class DepotPostgres implements DepotSync {
              (select u.id from kaissi.users u
                where u.id = $5::uuid and u.organization_id = $2),
              $6, $7)
-           on conflict (id) do update set
-             clock_out_at = coalesce(excluded.clock_out_at, kaissi.time_entries.clock_out_at),
-             received_at  = now()
-           -- Le pointage d'une AUTRE caisse n'est pas touché, et sans
-           -- erreur : laisser RLS refuser l'update ferait échouer tout le
-           -- lot, et les pointages suivants de cette caisse avec lui.
-           where kaissi.time_entries.device_id = excluded.device_id`,
+           on conflict (id) do nothing`,
           [
             p.id,
             appareil.organizationId,
@@ -1242,7 +1258,21 @@ export class DepotPostgres implements DepotSync {
             p.sortieA,
           ],
         )
-        if (rowCount) ecrits.push(p.id)
+        if (cree.rowCount) {
+          ecrits.push(p.id)
+          continue
+        }
+        // Déjà là : un RENVOI. COALESCE sur la sortie — un renvoi de
+        // l'ARRIVÉE, arrivé après celui de la sortie, n'efface jamais une
+        // sortie déjà remontée.
+        const maj = await client.query(
+          `update kaissi.time_entries
+              set clock_out_at = coalesce($3::timestamptz, clock_out_at),
+                  received_at  = now()
+            where id = $1 and device_id = $2`,
+          [p.id, appareil.deviceId, p.sortieA],
+        )
+        if (maj.rowCount) ecrits.push(p.id)
       }
     })
     return ecrits
