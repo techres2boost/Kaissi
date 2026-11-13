@@ -183,6 +183,16 @@ jobs:
           # prochaine soumission iOS, sans qu'aucun autre test ne bronche.
           node apps/pos/tests/suppression-compte.mjs
 
+          # La mise en service, sur ses deux branches : un refus du SERVEUR
+          # arrive a l'ecran, et une caisse qui a servi en local dit ce
+          # qu'elle efface avant de basculer. Ces deux parcours existaient
+          # mais ne tournaient nulle part : ils dataient d'avant l'ecran
+          # d'accueil et echouaient en silence. Trouve par l'audit de
+          # lancement (docs/audit-lancement.md). Un test hors CI ne protege
+          # rien.
+          node apps/pos/tests/mise-en-service.mjs
+          node apps/pos/tests/premiere-mise-en-service.mjs
+
       # L'inscription depuis la caisse, sur la cible WEB : sa base est
       # persistée (IndexedDB). En dev, la base est en mémoire et le test
       # passerait même sans la correction — c'est vérifié : il échoue si la
@@ -193,6 +203,9 @@ jobs:
           pnpm --filter @kaissi/pos preview:web --host 127.0.0.1 &
           npx wait-on -t 60000 http://127.0.0.1:4173/
           node apps/pos/tests/inscription-caisse.mjs
+          # La cible web survit-elle a un rechargement en plein service ?
+          # Meme constat : le test existait, hors CI, perime.
+          node apps/pos/tests/persistance-web.mjs
 
       # Le back-office n'avait AUCUN test de largeur : le même défaut s'y est
       # produit, découvert sur le même iPhone — « Se déconnecter » passait à

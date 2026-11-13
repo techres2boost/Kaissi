@@ -101,14 +101,16 @@ const etape = async (nom, fn) => {
 
 await page.goto(URL_POS, { waitUntil: 'networkidle' })
 
-await etape('prise de poste, puis écran de synchronisation', async () => {
-  await page.waitForSelector('text=Prise de poste', { timeout: 30000 })
-  await page.click('text=Salma Trabelsi')
-  await page.waitForSelector('.pave', { timeout: 10000 })
-  for (const c of '2468') await page.click(`.pave button:has-text("${c}")`)
-  await page.click('.pave .valider')
-  // Le bandeau porte un lien permanent vers l'écran de synchronisation.
-  await page.click('.bandeau .lien:has-text("Sync")')
+await etape('accueil → « Se connecter » → formulaire de mise en service', async () => {
+  /*
+   * Ce test datait d'avant l'écran d'accueil : il passait par la prise de
+   * poste et un lien « Sync » du bandeau, qui n'existent plus sur une caisse
+   * neuve. Il échouait depuis, hors CI, sans que personne le voie — trouvé
+   * par l'audit de lancement du 11 novembre. Le chemin réel d'un gérant est
+   * désormais celui-ci : l'accueil, puis « Se connecter ».
+   */
+  await page.waitForSelector('.bienvenue', { timeout: 30000 })
+  await page.click('.bienvenue button.principal')
   await page.waitForSelector('text=Mettre cette caisse en service', { timeout: 15000 })
 })
 

@@ -76,6 +76,28 @@ export function configurationPg(env: NodeJS.ProcessEnv = process.env): Configura
   }
 }
 
+/**
+ * La taille du pool de connexions — `SYNC_POOL_MAX`, 10 par défaut.
+ *
+ * L'AUDIT DE LANCEMENT (11 novembre) l'a montré : sous mille envois
+ * simultanés, tout le temps de réponse est de l'ATTENTE d'une connexion —
+ * ni le service ni PostgreSQL ne sont à bout, c'est la file devant le pool
+ * qui s'allonge. La taille était écrite en dur ; il fallait redéployer du
+ * code pour la changer.
+ *
+ * Le plafond n'est pas libre pour autant : chaque connexion du pool en
+ * occupe une chez PostgreSQL, et l'offre Supabase en limite le nombre
+ * (pooler de session et connexions directes). Monter ce réglage au-delà de
+ * ce que la base accorde transforme une file d'attente en refus de
+ * connexion. Borné à 1–100, et une valeur illisible retombe sur 10 :
+ * un réglage mal tapé ne doit jamais empêcher le service de démarrer.
+ */
+export function taillePoolDepuisEnvironnement(env: NodeJS.ProcessEnv = process.env): number {
+  const brut = Number(env['SYNC_POOL_MAX'] ?? '')
+  if (!Number.isInteger(brut) || brut < 1) return 10
+  return Math.min(100, brut)
+}
+
 /** L'hôte, pour les messages. Jamais le mot de passe. */
 export function hoteDe(config: ConfigurationPg): string {
   if (config.host) return config.host

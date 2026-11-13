@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { configurationPg, hoteDe, ErreurConfiguration } from '../src/connexion.js'
+import { configurationPg, hoteDe, taillePoolDepuisEnvironnement, ErreurConfiguration } from '../src/connexion.js'
 
 const URL_SUPABASE =
   'postgresql://postgres.mzrbpbqp:MOT2PASSE@aws-0-eu-central-1.pooler.supabase.com:5432/postgres'
@@ -67,5 +67,16 @@ describe('configurationPg', () => {
     expect(
       hoteDe(configurationPg({ DATABASE_URL: URL_SUPABASE, DATABASE_PASSWORD: 'x' })),
     ).toBe('aws-0-eu-central-1.pooler.supabase.com')
+  })
+})
+
+describe('taillePoolDepuisEnvironnement', () => {
+  it('rend 10 sans réglage, lit SYNC_POOL_MAX, et borne à 100', () => {
+    expect(taillePoolDepuisEnvironnement({})).toBe(10)
+    expect(taillePoolDepuisEnvironnement({ SYNC_POOL_MAX: '25' })).toBe(25)
+    expect(taillePoolDepuisEnvironnement({ SYNC_POOL_MAX: '4000' })).toBe(100)
+    // Un réglage mal tapé ne doit JAMAIS empêcher le service de démarrer.
+    expect(taillePoolDepuisEnvironnement({ SYNC_POOL_MAX: 'dix' })).toBe(10)
+    expect(taillePoolDepuisEnvironnement({ SYNC_POOL_MAX: '0' })).toBe(10)
   })
 })

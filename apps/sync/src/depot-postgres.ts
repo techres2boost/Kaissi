@@ -134,6 +134,47 @@ export class DepotPostgres implements DepotSync {
        */
       connectionTimeoutMillis: 15_000,
     })
+
+    /*
+     * Une connexion AU REPOS qui meurt ne doit pas tuer le service.
+     *
+     * DÉFAUT TROUVÉ PAR L'AUDIT DE LANCEMENT (11 novembre, scénario R2) :
+     * PostgreSQL redémarré sous le service, celui-ci mourait sur
+     * « Unhandled 'error' event » — `pg` émet l'erreur sur le POOL quand
+     * une connexion inoccupée est coupée par le serveur, et un événement
+     * `error` sans écouteur fait tomber Node. Or ce n'est pas un cas
+     * d'école : Supabase coupe les connexions au repos à chaque
+     * maintenance, à chaque bascule de son pooler, à chaque redémarrage de
+     * la base. Chaque fois, le service entier serait tombé, requêtes en
+     * cours comprises — et n'aurait été relevé que par la politique de
+     * redémarrage de l'hébergeur.
+     *
+     * Rien à faire de plus qu'ÉCOUTER : le pool retire lui-même la
+     * connexion morte et en rouvrira une à la prochaine demande. On
+     * consigne, pour que cela se voie dans la supervision.
+     */
+    this.pool.on('error', (erreur) => {
+      journal.avertissement('connexion au repos perdue — le pool en rouvrira une', {
+        erreur: erreur.message,
+      })
+    })
+
+    /*
+     * … et une connexion EN COURS D'USAGE non plus.
+     *
+     * Le second passage du même scénario l'a montré : l'écouteur du pool ne
+     * couvre que les connexions inoccupées. Une connexion EMPRUNTÉE qui
+     * tombe entre deux requêtes d'une transaction émet son erreur sur le
+     * CLIENT — toujours sans écouteur, donc toujours fatale. On en pose un
+     * sur chaque connexion à sa création. La requête en cours, elle, est
+     * rejetée normalement : la route rend une erreur, la caisse réessaie,
+     * et l'idempotence fait le reste.
+     */
+    this.pool.on('connect', (client) => {
+      client.on('error', (erreur) => {
+        journal.avertissement('connexion en cours d’usage perdue', { erreur: erreur.message })
+      })
+    })
   }
 
   /**

@@ -12,7 +12,7 @@ import { DepotPostgres } from './depot-postgres.js'
 import { creerServeur } from './serveur.js'
 import { formaterErreurBase } from './diagnostic-base.js'
 import { avertissementDemarrage } from './schema-requis.js'
-import { configurationPg, hoteDe } from './connexion.js'
+import { configurationPg, hoteDe, taillePoolDepuisEnvironnement } from './connexion.js'
 import { planifierReparation, INTERVALLE_DEFAUT_MINUTES } from './reparation.js'
 import {
   planifierAlertesStock,
@@ -170,6 +170,7 @@ export async function demarrer(): Promise<void> {
 
   const depot = new DepotPostgres({
     ...configuration,
+    max: taillePoolDepuisEnvironnement(),
     surCarteModifiee: () => alertes?.declencher(),
   })
 

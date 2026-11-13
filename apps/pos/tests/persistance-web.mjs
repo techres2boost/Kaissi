@@ -55,6 +55,15 @@ const prendrePoste = async () => {
 await page.goto(URL_POS, { waitUntil: 'networkidle' })
 
 await etape('le bundle web démarre et ouvre une base persistante', async () => {
+  /*
+   * L'écran d'accueil d'abord. Ce test datait d'avant lui : il attendait la
+   * prise de poste directement, échouait depuis, et — n'étant pas en CI —
+   * personne ne le voyait. Trouvé par l'audit de lancement du 11 novembre.
+   * Un test qui ne tourne nulle part ne protège rien : il est maintenant
+   * dans la CI.
+   */
+  await page.waitForSelector('.bienvenue', { timeout: 30000 })
+  await page.click('.bienvenue button:has-text("Découvrir sans compte")')
   await page.waitForSelector('text=Prise de poste', { timeout: 30000 })
   // Le bandeau n'affiche « démo — mémoire » que si la base ne persiste pas.
   const demo = await page.$('.etiquette-demo')

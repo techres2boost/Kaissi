@@ -68,9 +68,41 @@ export interface Comportement {
   readonly tolerante: boolean
   readonly delaiMs: number
   readonly tentativesMax: number
+  /**
+   * Une remontée qui échoue n'interrompt PAS la vente en cours.
+   *
+   * C'est le comportement de la vraie caisse : elle encaisse en local, et la
+   * synchronisation est une conséquence, jamais une condition. Sans cette
+   * option, un push en échec faisait abandonner la commande simulée à
+   * mi-chemin — un cas que le produit ne produit pas.
+   */
+  readonly venteContinue?: boolean
 }
 
 const STRICTE: Comportement = { tolerante: false, delaiMs: 60_000, tentativesMax: 1 }
+
+/**
+ * L'ÉTABLISSEMENT d'une caisse simulée, quand ce n'est pas celui de
+ * démonstration.
+ *
+ * Les scénarios historiques mettent toutes les caisses dans UN restaurant :
+ * c'est le pire cas pour le verrou de numérotation (0043), qui est par
+ * établissement. Mais ce n'est pas la forme de la production, où la charge
+ * vient de BEAUCOUP de restaurants à une ou deux caisses. L'audit de
+ * lancement mesure les deux — d'où ce contexte.
+ *
+ * Les lignes d'un établissement cloné n'ont pas de produit (`produitId`
+ * nul, comme un article à prix libre) : sa carte n'est pas copiée, et
+ * référencer les produits d'un AUTRE restaurant mesurerait un cas qui
+ * n'existe pas.
+ */
+export interface ContexteEtablissement {
+  readonly restaurantId: string
+  readonly organizationId: string
+  readonly tva19: string
+  readonly tva07: string
+  readonly especes: string
+}
 
 /** Une caisse : son journal, son outbox, ses mesures. Le protocole du POS. */
 export class Caisse {
@@ -88,6 +120,7 @@ export class Caisse {
     readonly aleatoire: () => number,
     readonly base: string,
     readonly comportement: Comportement = STRICTE,
+    readonly contexte: ContexteEtablissement | null = null,
   ) {}
 
   private emettre(orderId: string, type: string, charge: unknown): EvenementCommande {
@@ -102,6 +135,12 @@ export class Caisse {
     const e = {
       ...ev(this.appareil, orderId, type as never, charge as never, this.seq),
       clientTs: new Date(Date.UTC(2026, 9, 17, 12) + this.seq).toISOString(),
+      ...(this.contexte
+        ? {
+            restaurantId: this.contexte.restaurantId,
+            organizationId: this.contexte.organizationId,
+          }
+        : {}),
     }
     this.journal.push(e)
     this.outbox.push(e)
@@ -121,7 +160,7 @@ export class Caisse {
       ouvertePar: EMPLOYE_DEMO,
       numeroTicket: `${this.appareil.prefixe}-${String(this.ventes).padStart(6, '0')}`,
     })
-    if (pousserApresChaqueGeste) await this.synchroniser()
+    if (pousserApresChaqueGeste) await this.apresGeste()
 
     const nbLignes = 2 + Math.floor(r() * 3)
     const lignes: string[] = []
@@ -131,21 +170,25 @@ export class Caisse {
       lignes.push(ligneId)
       this.emettre(orderId, 'line.added', {
         ligneId,
-        produitId: plat.id,
+        produitId: this.contexte ? null : plat.id,
         designation: plat.nom,
         quantite: 1 + Math.floor(r() * 2),
         prixBaseMillimes: millimes(plat.prix),
         modificateursMillimes: millimes(0),
-        tauxTaxeId: plat.taux,
+        tauxTaxeId: this.contexte
+          ? plat.taux === TVA_19
+            ? this.contexte.tva19
+            : this.contexte.tva07
+          : plat.taux,
       })
     }
     if (r() < 0.3) {
       this.emettre(orderId, 'line.quantity_changed', { ligneId: lignes[0]!, quantite: 3 })
     }
-    if (pousserApresChaqueGeste) await this.synchroniser()
+    if (pousserApresChaqueGeste) await this.apresGeste()
 
     this.emettre(orderId, 'order.sent', { lignes })
-    if (pousserApresChaqueGeste) await this.synchroniser()
+    if (pousserApresChaqueGeste) await this.apresGeste()
 
     // Le total vient de packages/domain — la MÊME fonction que la caisse.
     const etat = reduireEvenements(this.journal.filter((e) => e.orderId === orderId))
@@ -153,15 +196,25 @@ export class Caisse {
     this.attendus.set(orderId, total)
     this.emettre(orderId, 'payment.recorded', {
       paiementId: uuidV7(),
-      methodeId: ESPECES,
+      methodeId: this.contexte?.especes ?? ESPECES,
       mode: 'cash',
       montantMillimes: total,
       recuMillimes: total,
       renduMillimes: millimes(0),
     })
     this.emettre(orderId, 'order.closed', { totalMillimes: total, closePar: EMPLOYE_DEMO })
-    if (pousserApresChaqueGeste) await this.synchroniser()
+    if (pousserApresChaqueGeste) await this.apresGeste()
     return orderId
+  }
+
+  /** La remontée qui suit un geste — bloquante ou non, selon le comportement. */
+  private async apresGeste(): Promise<void> {
+    if (!this.comportement.venteContinue) return this.synchroniser()
+    try {
+      await this.synchroniser()
+    } catch {
+      // L'outbox garde tout : la vente continue, la remontée viendra.
+    }
   }
 
   private async appeler(route: 'push' | 'pull', chemin: string, init: RequestInit = {}) {

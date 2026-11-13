@@ -105,6 +105,15 @@ await page.route('**/sync/**', (route) => route.abort())
 await page.goto(URL_POS, { waitUntil: 'networkidle' })
 
 await etape('prise de poste et ouverture de caisse', async () => {
+  /*
+   * L'écran d'accueil d'abord : ce test datait d'avant lui, échouait depuis
+   * hors CI, et personne ne le voyait — trouvé par l'audit de lancement du
+   * 11 novembre. « Découvrir sans compte » est exactement le chemin de la
+   * panne rejouée ici : une caisse qui a servi en LOCAL avant d'être mise
+   * en service.
+   */
+  await page.waitForSelector('.bienvenue', { timeout: 20000 })
+  await page.click('.bienvenue button:has-text("Découvrir sans compte")')
   await page.waitForSelector('text=Prise de poste', { timeout: 20000 })
   await page.click('text=Salma Trabelsi')
   await page.waitForSelector('.pave', { timeout: 5000 })
@@ -129,7 +138,10 @@ await etape('une vente en local — c’est ELLE qui bloquait tout', async () =>
 })
 
 await etape('la liste des établissements s’affiche', async () => {
-  await page.click('.bandeau .lien:has-text("Sync")')
+  // L'écran de synchronisation est dans le tiroir de navigation (le lien
+  // « Sync » du bandeau n'existe plus).
+  await page.click('.ouvrir-tiroir')
+  await page.click('.tiroir-lien[data-cle="sync"]')
   await page.waitForSelector('text=Mettre cette caisse en service', { timeout: 15000 })
   await page.fill('input[type="email"]', 'gerant@monresto.tn')
   await page.fill('input[type="password"]', 'motdepasse')
@@ -172,7 +184,10 @@ await etape('confirmation → la caisse repart sur le second établissement', as
   await page.click('button:has-text("Snack Lac 2")')
   await page.click('button:has-text("Effacer et mettre en service")')
   // La page se recharge : le `device_id` est lu une seule fois au montage.
-  await page.waitForSelector('text=Prise de poste', { timeout: 30000 })
+  // En dev, la base est en mémoire : le rechargement réinstalle la graine et
+  // l'écran d'accueil revient. Ce qu'on vérifie, c'est que l'application
+  // REDÉMARRE — accueil ou prise de poste, pas un écran figé.
+  await page.waitForSelector('.bienvenue, .saisie-pin, .liste-employes', { timeout: 30000 })
 })
 
 await etape('aucune erreur n’a été avalée en chemin', () => {
