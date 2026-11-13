@@ -235,9 +235,11 @@ C'est le geste de démonstration — à refaire à chaque version publiée.
    est la première dépense ([`dossier-cto.md`](dossier-cto.md) E1).
 3. **Mémoire du service** : ~1 Go sous forte charge. Instance Railway à
    **2 Go minimum**.
-4. **Aucune alerte active.** Une panne se découvre par le client. La
-   supervision historique avec incidents est conçue (schéma prêt) mais **pas
-   livrée** dans ce lot.
+4. **Aucune alerte active** — ✅ corrigé le 13 novembre : centre de
+   supervision livré (0050), incidents envoyés par webhook
+   (`SYNC_ALERTES_WEBHOOK`), erreurs de la caisse et du back-office au même
+   journal. Reste la sonde EXTERNE, à poser chez un tiers
+   ([`deploiement.md`](deploiement.md) § 6 ter).
 5. **Sauvegardes jamais restaurées.**
 
 ## 7. Recommandations, par ordre
@@ -247,7 +249,7 @@ C'est le geste de démonstration — à refaire à chaque version publiée.
 | 1 | Déployer ce lot : il corrige la mort du service à chaque maintenance Supabase | fait, à pousser |
 | 2 | Instance Railway à 2 Go, `SYNC_POOL_MAX=20` après vérification du quota Supabase | 10 min |
 | 3 | Supabase Pro (volume, sauvegardes, mots de passe compromis) | une décision |
-| 4 | Sonde externe sur `/sante` avec alerte téléphone | 1 h |
+| 4 | Sonde externe sur `/sante` (toutes les 5 min) + `SYNC_ALERTES_WEBHOOK` | 30 min — § 6 ter |
 | 5 | Restaurer une sauvegarde pour de vrai | ½ journée |
-| 6 | Supervision historique + incidents (schéma prêt) | 3 à 5 jours |
+| 6 | Supervision historique + incidents | ✅ fait (0050) |
 | 7 | `@hono/node-server` 2.x, dans son propre changement testé | ½ journée |

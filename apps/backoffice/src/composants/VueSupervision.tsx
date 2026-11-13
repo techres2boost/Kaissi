@@ -10,13 +10,13 @@
  * l'instrumentation du service (`apps/sync/src/supervision.ts`), écrite une
  * fois par période — jamais une ligne par vente (migration 0050).
  *
- * ── Ce qu'il ne montre PAS, et le dit ─────────────────────────────────────
+ * ── Les erreurs vues CHEZ LE CLIENT ───────────────────────────────────────
  *
- * Les erreurs du navigateur et les plantages de la caisse ne remontent pas
- * encore : une caisse qui plante redémarre et garde ses ventes dans son
- * outbox, ce qui se voit ici comme un terminal qui se tait puis reprend.
- * L'écran le dit en clair plutôt que d'afficher un compteur à zéro qui
- * aurait l'air d'une bonne nouvelle.
+ * Celles de la caisse arrivent à sa synchronisation suivante, dédupliquées
+ * par elle (`apps/pos/src/etat/collecteur-erreurs.ts`) ; celles du
+ * back-office, dès que sa page d'erreur s'affiche. Une caisse hors ligne
+ * les garde : l'écran le dit, plutôt que de laisser croire qu'un compteur à
+ * zéro est une bonne nouvelle.
  *
  * ── Données sensibles ─────────────────────────────────────────────────────
  *
@@ -74,6 +74,10 @@ const TYPES: Record<string, string> = {
   evenements_ignores: aTraduire('Événements ignorés (plafond atteint)'),
   operation_rejetee: aTraduire('Opération rejetée'),
   terminal_mis_en_service: aTraduire('Terminal mis en service'),
+  erreur_caisse: aTraduire('Erreur sur la caisse'),
+  erreur_backoffice: aTraduire('Page en erreur au back-office'),
+  alerte_envoyee: aTraduire('Alerte envoyée'),
+  alerte_non_envoyee: aTraduire('Alerte non envoyée'),
 }
 
 const STATUTS: Record<IncidentSupervision['statut'], string> = {
@@ -122,7 +126,7 @@ export function VueSupervision({
       <p>
         <Link href="/editeur">{t('‹ Clients et formules')}</Link>{' · '}
         <Link href="/editeur/surveillance">{t('État instantané du service ›')}</Link>{' · '}
-        <RafraichirPeriodiquement secondes={30} />
+        <RafraichirPeriodiquement secondes={60} />
       </p>
     </>
   )
@@ -202,6 +206,12 @@ export function VueSupervision({
 
         {etat.erreurHistorique && (
           <p className="message avertissement">{t('Historique indisponible :')}{' '}{t.m(etat.erreurHistorique)}</p>
+        )}
+        {etat.collecteur && etat.collecteur.alertesSortantes === false && (
+          <p className="message info">{t('Aucune alerte ne sort du service : les incidents ne s’affichent qu’ici. Renseignez SYNC_ALERTES_WEBHOOK chez l’hébergeur pour être prévenu sur un téléphone.')}</p>
+        )}
+        {etat.collecteur?.alertesSortantes && (
+          <p className="indication">{t('🔔 Alertes sortantes actives : chaque incident critique qui s’ouvre ou se résout est envoyé au webhook configuré.')}</p>
         )}
         {etat.collecteur === null ? (
           <p className="message avertissement">{t('Le collecteur de supervision est désactivé sur ce service (SYNC_SUPERVISION=0) : aucun historique n’est écrit.')}</p>
@@ -441,7 +451,7 @@ export function VueSupervision({
               </table>
             </div>
           )}
-          <p className="indication">{t('Pas encore collectés : les erreurs du navigateur au back-office et les plantages de l’application de caisse. Une caisse qui redémarre garde ses ventes ; elle se voit ici comme un terminal qui se tait puis reprend.')}</p>
+          <p className="indication">{t('Les erreurs de la caisse arrivent à sa synchronisation suivante, regroupées (une ligne par erreur, avec son nombre) ; celles du back-office, dès que la page d’erreur s’affiche. Une caisse hors ligne les garde jusqu’au retour du réseau.')}</p>
         </section>
 
         {/* ── Historique des incidents ────────────────────────────────────── */}

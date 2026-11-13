@@ -219,6 +219,8 @@ export interface Supervision {
     evenementsEnAttente: number
     evenementsIgnores: number
     derniereEcriture: { instant: string; ok: boolean; erreur: string | null } | null
+    /** Un webhook d'alerte est configuré (`SYNC_ALERTES_WEBHOOK`). Absent sur un service antérieur. */
+    alertesSortantes?: boolean
   } | null
   vivant: Surveillance
   historique: {

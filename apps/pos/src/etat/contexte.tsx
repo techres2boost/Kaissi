@@ -6,6 +6,7 @@
  * les dépôts, la session de caisse et l'employé en poste.
  */
 
+import { collecteurErreurs } from './collecteur-erreurs.js'
 import {
   createContext,
   useContext,
@@ -391,6 +392,7 @@ export function FournisseurApp({ app, children }: Props) {
       transport: transportHttp({ urlBase: appairage.url, jeton: appairage.jeton }),
       depot: depotLocalSync(app, () => donnees.config),
       genererId: uuidV7,
+      erreurs: collecteurErreurs,
     })
   }, [app, donnees, appairage])
 

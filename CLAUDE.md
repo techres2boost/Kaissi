@@ -841,7 +841,12 @@ révélait autre chose.
   persiste devient un incident dédupliqué par sa CLÉ (index unique partiel
   sur `statut <> 'resolu'`), résolu d'office quand sa cause disparaît.
   `test/charge.test.ts` (palier E) exige que chaque requête soit comptée
-  exactement une fois sous charge.
+  exactement une fois sous charge. Les ouvertures, aggravations et
+  résolutions d'incidents sortent par webhook (`alertes-externes.ts`,
+  `SYNC_ALERTES_WEBHOOK`, un secret — jamais journalisé) : une par
+  TRANSITION, plafond horaire. Les erreurs de la caisse (`POST
+  /sync/erreurs`, route additive, APRÈS les ventes, zéro requête s'il n'y a
+  rien) et du back-office (`/admin/erreur-ecran`) entrent au même journal.
 - **Le service emprunte le rôle `kaissi_device`** et pose son contexte en
   variables de session : tout passe par RLS. Un défaut de filtrage applicatif
   ne peut pas provoquer de fuite entre restaurants.

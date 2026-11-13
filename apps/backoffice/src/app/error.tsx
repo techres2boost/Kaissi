@@ -29,6 +29,7 @@
 
 import { useEffect } from 'react'
 import { useT } from '../i18n/client.js'
+import { useSignalerErreur } from '../composants/SignalerErreur.js'
 
 export default function ErreurEcran({
   error,
@@ -38,13 +39,14 @@ export default function ErreurEcran({
   reset: () => void
 }) {
   const t = useT()
+  // Le centre de supervision l'apprend aussi (`/admin/erreur-ecran`).
+  useSignalerErreur(error)
   useEffect(() => {
     /*
      * Le journal du NAVIGATEUR, en plus de celui du serveur.
      *
      * Une erreur de rendu client ne laisse aucune trace côté serveur : sans
-     * cette ligne, elle n'existe nulle part. C'est aussi le point de
-     * branchement d'un collecteur (Sentry) le jour où il sera posé.
+     * cette ligne, elle n'existe nulle part.
      */
     console.error('[kaissi] écran en erreur', { digest: error.digest, message: error.message })
   }, [error])

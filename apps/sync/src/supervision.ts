@@ -40,6 +40,7 @@
 
 import { monitorEventLoopDelay } from 'node:perf_hooks'
 import { centile, familleDeRoute, limiteBaseDepuisEnvironnement, type Alerte } from './surveillance.js'
+import type { ChangementIncident, Notificateur } from './alertes-externes.js'
 
 export type NiveauSupervision = 'critique' | 'attention' | 'info'
 export type CategorieEvenement = 'securite' | 'application' | 'synchronisation' | 'terminal'
@@ -109,7 +110,7 @@ export interface DepotSupervision {
     alertes: readonly Alerte[]
     /** Une condition non revue depuis ce délai est résolue d'office. */
     resolutionApresSecondes: number
-  }): Promise<void>
+  }): Promise<readonly ChangementIncident[] | void>
   purgerSupervision(): Promise<void>
 }
 
@@ -200,6 +201,8 @@ export interface OptionsSupervision {
   readonly maintenant?: () => number
   /** Les alertes de `surveillance.ts`, recalculées à chaque écriture. */
   readonly alertes?: () => Promise<readonly Alerte[]>
+  /** Où partent les ouvertures et résolutions d'incidents (webhook). */
+  readonly notificateur?: Notificateur | null
 }
 
 export class Supervision {
@@ -207,9 +210,12 @@ export class Supervision {
   readonly intervalleMs: number
   private readonly maintenant: () => number
   private readonly alertesExternes: (() => Promise<readonly Alerte[]>) | null
+  private readonly notificateur: Notificateur | null
+  private notificationsEnCours: Promise<void> = Promise.resolve()
   private periode: Periode
   private evenements: EvenementSupervision[] = []
   private evenementsIgnores = 0
+  private erreursEcranPeriode = 0
   private enCours = 0
   private refus: Refus[] = []
   private premiere = true
@@ -231,6 +237,7 @@ export class Supervision {
     this.intervalleMs = options.intervalleMs ?? 60_000
     this.maintenant = options.maintenant ?? Date.now
     this.alertesExternes = options.alertes ?? null
+    this.notificateur = options.notificateur ?? null
     this.periode = this.nouvellePeriode()
     this.noterEvenement({
       categorie: 'application',
@@ -272,6 +279,9 @@ export class Supervision {
     if (this.minuteur) clearInterval(this.minuteur)
     this.minuteur = null
     await this.vider().catch(() => undefined)
+    // Une alerte en vol a trois secondes pour partir — pas davantage : un
+    // arrêt de service ne doit pas attendre un webhook qui ne répond pas.
+    await Promise.race([this.notificationsEnCours, new Promise((fin) => setTimeout(fin, 3_000).unref?.())])
     this.boucle.disable()
   }
 
@@ -322,7 +332,7 @@ export class Supervision {
     // tentative de connexion.
     const identification =
       famille === 'appairage' || famille === 'inscription' || r.chemin.startsWith('/compte/')
-    const routeDeCaisse = ['push', 'pull', 'shifts', 'pointages', 'catalogue', 'sync'].includes(famille)
+    const routeDeCaisse = ['push', 'pull', 'shifts', 'pointages', 'catalogue', 'erreurs', 'sync'].includes(famille)
     if (r.statut === 401 && (identification || routeDeCaisse)) {
       p.echecsAuthentification += 1
       this.refus.push({ instant: this.maintenant(), origine })
@@ -492,7 +502,70 @@ export class Supervision {
       evenementsEnAttente: this.evenements.length,
       evenementsIgnores: this.evenementsIgnores,
       derniereEcriture: this.derniereEcriture,
+      alertesSortantes: this.notificateur !== null,
     }
+  }
+
+  /**
+   * Prévient, HORS du chemin de l'écriture : un webhook lent ne retarde ni
+   * la période suivante ni, a fortiori, une vente. Le résultat de chaque
+   * envoi entre au journal — une alerte qui n'a pas pu partir doit se voir
+   * quelque part, sinon on croit l'astreinte prévenue.
+   */
+  private notifier(changements: readonly ChangementIncident[]): void {
+    const notificateur = this.notificateur
+    if (!notificateur) return
+    this.notificationsEnCours = this.notificationsEnCours.then(async () => {
+      for (const c of changements) {
+        const r = await notificateur.envoyer(c).catch(() => ({ envoye: false as const, raison: 'echec' as const }))
+        if (r.envoye) {
+          this.noterEvenement({
+            categorie: 'application',
+            type: 'alerte_envoyee',
+            niveau: 'info',
+            message: `Alerte envoyée (${c.transition}) : ${c.sujet}.`,
+            detail: { cle: c.cle, transition: c.transition },
+          })
+        } else if (r.raison !== 'niveau') {
+          this.noterEvenement({
+            categorie: 'application',
+            type: 'alerte_non_envoyee',
+            niveau: 'attention',
+            message:
+              r.raison === 'plafond'
+                ? `Alerte retenue par le plafond horaire : ${c.sujet}.`
+                : `L’alerte n’a pas pu partir (${'detail' in r && r.detail ? r.detail : 'échec'}) : ${c.sujet}.`,
+            detail: { cle: c.cle, transition: c.transition, raison: r.raison },
+          })
+        }
+      }
+    })
+  }
+
+  /**
+   * Une page d'erreur du back-office. PLAFONNÉ à trente par période : une
+   * page qui casse en boucle (un rechargement automatique sur une erreur)
+   * ne doit pas remplir le journal au détriment des événements de sécurité.
+   */
+  erreurEcran(e: { chemin: string; digest: string | null; message: string; origine: string }): void {
+    if (this.erreursEcranPeriode >= 30) {
+      this.evenementsIgnores += 1
+      return
+    }
+    this.erreursEcranPeriode += 1
+    this.noterEvenement({
+      categorie: 'application',
+      type: 'erreur_backoffice',
+      niveau: 'attention',
+      origine: tronquerIp(e.origine),
+      message: e.message.trim() ? `${e.chemin} — ${e.message}` : `Page en erreur : ${e.chemin}`,
+      detail: { chemin: e.chemin, digest: e.digest },
+    })
+  }
+
+  /** Pour les tests et l'arrêt : attend les notifications en vol. */
+  async attendreNotifications(): Promise<void> {
+    await this.notificationsEnCours
   }
 
   /**
@@ -512,6 +585,7 @@ export class Supervision {
     const evenements = this.evenements
     const ignores = this.evenementsIgnores
     this.periode = this.nouvellePeriode()
+    this.erreursEcranPeriode = 0
     this.periode.concurrenceMax = this.enCours
     this.evenements = []
     this.evenementsIgnores = 0
@@ -602,7 +676,7 @@ export class Supervision {
     }
 
     try {
-      await this.depot.ecrireSupervision({
+      const changements = await this.depot.ecrireSupervision({
         point,
         evenements,
         alertes: dedoublonner(alertes),
@@ -613,6 +687,7 @@ export class Supervision {
       })
       this.premiere = false
       this.derniereEcriture = { instant: point.minute, ok: true, erreur: null }
+      if (changements && changements.length > 0) this.notifier(changements)
     } catch (erreur) {
       // Perdus, pas réessayés : voir l'en-tête du fichier.
       this.derniereEcriture = {

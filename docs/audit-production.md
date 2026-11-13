@@ -246,7 +246,7 @@ HaveIBeenPwned au moment de leur choix.
 
 Coût : zéro. À faire.
 
-## M-5 · Aucune rétention sur les journaux ⚠ documenté
+## M-5 · Aucune rétention sur les journaux ✅ traité pour `sync_mutations`
 
 `change_log`, `order_events`, `sync_mutations` et `audit_events` grossissent
 sans limite. Seuls les marqueurs `kitchen_ready` sont purgés (7 jours).
@@ -258,7 +258,7 @@ dont l'utilité expire une fois l'événement projeté — mais il porte
 l'idempotence, donc la purge doit être plus longue que la plus longue
 déconnexion plausible (recommandation : **90 jours**).
 
-## M-6 · Aucun collecteur d'erreurs ⚠ recommandé
+## M-6 · Aucun collecteur d'erreurs ✅ corrigé (13 novembre 2026, sans tiers)
 
 Pas de Sentry ni d'OpenTelemetry. `error.tsx` porte déjà le point de
 branchement (le `useEffect` qui journalise le digest). Recommandation :
@@ -389,13 +389,21 @@ Le raisonnement complet est dans
 Quand le service passera à deux instances. Table Postgres avec `insert … on
 conflict` sur une fenêtre, ou Redis.
 
-## R-3 · Sentry + Speed Insights
+## R-3 · Sentry + Speed Insights ✅ remplacé
 
-Voir M-6.
+Remplacé par un collecteur maison, branché sur le centre de supervision :
+erreurs non attrapées et erreurs d'affichage de la CAISSE (dédupliquées,
+remontées par `POST /sync/erreurs` après les ventes), pages d'erreur du
+BACK-OFFICE (`POST /admin/erreur-ecran`). Aucun tiers ne reçoit de pile
+d'appel, aucun domaine de plus dans la garde du mode avion. Speed Insights
+reste possible côté Vercel, sans incidence sur la caisse.
 
-## R-4 · Purge de `sync_mutations` à 90 jours
+## R-4 · Purge de `sync_mutations` ✅ fait
 
-Voir M-5.
+`purgerRegistreSynchronisation()`, par lots de 20 000 : accusés
+d'événements de commande (leur idempotence est portée par la clé primaire
+de `order_events`, jamais purgée), créations de catalogue après bien plus
+longtemps, rejets après six mois.
 
 ## R-5 · Tests d'accessibilité
 

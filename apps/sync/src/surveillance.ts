@@ -31,6 +31,7 @@ export function familleDeRoute(chemin: string): string {
   if (chemin.startsWith('/sync/shifts')) return 'shifts'
   if (chemin.startsWith('/sync/pointages')) return 'pointages'
   if (chemin.startsWith('/sync/catalogue')) return 'catalogue'
+  if (chemin.startsWith('/sync/erreurs')) return 'erreurs'
   if (chemin.startsWith('/sync/')) return 'sync'
   if (chemin.startsWith('/appairage')) return 'appairage'
   if (chemin.startsWith('/inscription')) return 'inscription'

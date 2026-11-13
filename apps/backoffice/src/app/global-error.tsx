@@ -1,5 +1,6 @@
 'use client'
 import { useT } from '../i18n/client.js'
+import { useSignalerErreur } from '../composants/SignalerErreur.js'
 
 /**
  * Le dernier filet : une erreur dans la mise en page RACINE.
@@ -30,6 +31,7 @@ export default function ErreurGlobale({
   reset: () => void
 }) {
   const t = useT()
+  useSignalerErreur(error)
   return (
     <html lang="fr">
       <body

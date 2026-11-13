@@ -12,7 +12,12 @@ import { createRoot } from 'react-dom/client'
 import { Application } from './Application.js'
 import { CIBLE_WEB } from './config.js'
 import { appliquerLangue } from './i18n.js'
+import { installerCollecteurErreurs } from './etat/collecteur-erreurs.js'
+import { BarriereErreur } from './composants/BarriereErreur.js'
 import './styles.css'
+
+// AVANT tout le reste : une erreur au démarrage est la plus précieuse.
+installerCollecteurErreurs()
 
 // Le sens d'écriture AVANT le premier rendu : sans cela, une caisse en
 // arabe clignoterait de gauche à droite pendant une image.
@@ -71,6 +76,8 @@ if (CIBLE_WEB && 'serviceWorker' in navigator) {
 
 createRoot(racine).render(
   <StrictMode>
-    <Application />
+    <BarriereErreur>
+      <Application />
+    </BarriereErreur>
   </StrictMode>,
 )

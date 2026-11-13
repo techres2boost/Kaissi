@@ -17,6 +17,7 @@
 
 import type { EvenementCommande, MutationCatalogue } from '@kaissi/domain'
 import { delaiRetentative, estReessayable, type PolitiqueRetentative } from './index.js'
+import type { ErreurClientSynchronisee } from './transport.js'
 import {
   ErreurTransport,
   type PointageSynchronise,
@@ -104,6 +105,18 @@ export interface OptionsMoteur {
   readonly tailleLot?: number
   readonly politique?: PolitiqueRetentative
   readonly maintenant?: () => number
+  /**
+   * FACULTATIF : le collecteur d'erreurs de la caisse. Ce n'est pas le dépôt
+   * SQLite — une erreur n'est pas une donnée métier, et le collecteur doit
+   * fonctionner même quand c'est la base locale qui casse.
+   */
+  readonly erreurs?: CollecteurErreursSync
+}
+
+export interface CollecteurErreursSync {
+  aEnvoyer(limite: number): readonly ErreurClientSynchronisee[]
+  /** Retire ce que le serveur a accusé — tel qu'il a été envoyé. */
+  accuser(envoyees: readonly ErreurClientSynchronisee[]): void
 }
 
 /**
@@ -183,6 +196,7 @@ export class MoteurSync {
       await this.pousserShifts()
       await this.pousserPointages()
       await this.pousserCatalogue()
+      await this.pousserErreurs()
       await this.tirer()
       this.tentatives = 0
       await this.publier({
@@ -290,6 +304,32 @@ export class MoteurSync {
       const accuses = new Set(reponse.enregistres)
       const envoyes = lot.filter((p) => accuses.has(p.id))
       if (envoyes.length > 0) await accuser.call(this.options.depot, envoyes)
+    } catch {
+      // Silencieux à dessein — voir `pousserShifts`.
+    }
+  }
+
+  /**
+   * Étape 1 quater — les erreurs vues sur la caisse.
+   *
+   * En DERNIER des poussées : c'est la seule qui ne sert pas le restaurant
+   * mais l'exploitant. Rien à envoyer, aucune requête — une caisse qui va
+   * bien ne coûte rien au serveur. Erreur AVALÉE, comme les shifts : un
+   * serveur antérieur répond 404, et ce n'est pas une raison pour afficher
+   * « bloqué » sur une caisse dont les ventes sont parties.
+   */
+  private async pousserErreurs(): Promise<void> {
+    const collecteur = this.options.erreurs
+    const envoyer = this.options.transport.erreurs
+    if (!collecteur || !envoyer) return
+    try {
+      const lot = collecteur.aEnvoyer(20)
+      if (lot.length === 0) return
+      await envoyer.call(this.options.transport, lot)
+      // Une réponse 200 dit que le lot a été LU, entrées illisibles comprises
+      // (le serveur les écarte à dessein) : tout le lot est retiré. Garder
+      // une entrée refusée la renverrait à chaque cycle, pour rien.
+      collecteur.accuser(lot)
     } catch {
       // Silencieux à dessein — voir `pousserShifts`.
     }

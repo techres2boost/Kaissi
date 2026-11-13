@@ -1596,4 +1596,13 @@ export const AR_BACKOFFICE: Readonly<Record<string, string>> = {
   "Cet incident a déjà changé d’état — rechargez la page.": "تغيّرت حالة هذا الحادث بالفعل — أعد تحميل الصفحة.",
   "La migration 0050 (supervision) n’est pas appliquée : aucun historique.": "الترحيل 0050 (الإشراف) غير مطبّق: لا يوجد أيّ سجلّ تاريخي.",
   "Ce dépôt ne tient pas d’historique de supervision.": "هذا المستودع لا يحتفظ بسجلّ تاريخي للإشراف.",
+  // ── Supervision : erreurs clientes et alertes sortantes ──
+  "Erreur sur la caisse": "خطأ على الصندوق",
+  "Page en erreur au back-office": "صفحة بها خطأ في لوحة الإدارة",
+  "Alerte envoyée": "أُرسل التنبيه",
+  "Alerte non envoyée": "لم يُرسل التنبيه",
+  "Aucune alerte ne sort du service : les incidents ne s’affichent qu’ici. Renseignez SYNC_ALERTES_WEBHOOK chez l’hébergeur pour être prévenu sur un téléphone.": "لا يخرج أيّ تنبيه من الخدمة: لا تظهر الحوادث إلا هنا. أدخل SYNC_ALERTES_WEBHOOK لدى المستضيف لتصلك التنبيهات على الهاتف.",
+  "🔔 Alertes sortantes actives : chaque incident critique qui s’ouvre ou se résout est envoyé au webhook configuré.": "🔔 التنبيهات الخارجية مفعّلة: يُرسَل كلّ حادث حرج يُفتح أو يُعالج إلى الـwebhook المضبوط.",
+  "Les erreurs de la caisse arrivent à sa synchronisation suivante, regroupées (une ligne par erreur, avec son nombre) ; celles du back-office, dès que la page d’erreur s’affiche. Une caisse hors ligne les garde jusqu’au retour du réseau.": "تصل أخطاء الصندوق عند مزامنته التالية، مجمّعة (سطر لكلّ خطأ، مع عدد مرّاته)؛ وأخطاء لوحة الإدارة فور ظهور صفحة الخطأ. الصندوق غير المتّصل يحتفظ بها حتّى عودة الشبكة.",
+  "Erreur signalée.": "تمّ الإبلاغ عن الخطأ.",
 }

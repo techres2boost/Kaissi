@@ -15,6 +15,7 @@ import { avertissementDemarrage } from './schema-requis.js'
 import { configurationPg, hoteDe, taillePoolDepuisEnvironnement } from './connexion.js'
 import { Metriques, evaluerAlertes } from './surveillance.js'
 import { Supervision, intervalleSupervisionDepuisEnvironnement } from './supervision.js'
+import { notificateurDepuisEnvironnement } from './alertes-externes.js'
 import { planifierReparation, INTERVALLE_DEFAUT_MINUTES } from './reparation.js'
 import {
   planifierAlertesStock,
@@ -215,11 +216,13 @@ export async function demarrer(): Promise<void> {
    * demande. Les mesures légères, le collecteur les prend lui-même.
    */
   const metriques = new Metriques()
+  const notificateur = notificateurDepuisEnvironnement()
   const supervision =
     process.env['SYNC_SUPERVISION'] === '0'
       ? null
       : new Supervision(depot, {
           intervalleMs: intervalleSupervisionDepuisEnvironnement(),
+          notificateur,
           alertes: async () => {
             const migrations = (await depot.migrationsManquantes().catch(() => [])).map(
               (m) => m.migration,
@@ -240,6 +243,14 @@ export async function demarrer(): Promise<void> {
       // UN port. Si ce port ne correspond pas à celui-ci, le conteneur est
       // sain mais le domaine répond 502 « Application failed to respond ».
       `\n    Hébergeur : le domaine public DOIT pointer sur le port ${port}.` +
+      // L'adresse du webhook est un secret : on dit SI, jamais OÙ.
+      `\n    Alertes : ${
+        !supervision
+          ? 'aucune — supervision éteinte (SYNC_SUPERVISION=0)'
+          : notificateur
+            ? `webhook configuré (niveau ${process.env['SYNC_ALERTES_NIVEAU'] === 'attention' ? 'attention et plus' : 'critique'})`
+            : 'aucune sortie — SYNC_ALERTES_WEBHOOK absent ou non https'
+      }` +
       `\n    Laisse ce terminal OUVERT. Vérifie dans un autre : ` +
       `curl http://127.0.0.1:${port}/sante\n`,
   )

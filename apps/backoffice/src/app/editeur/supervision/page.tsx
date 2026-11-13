@@ -10,13 +10,13 @@
  * l'instrumentation du service (`apps/sync/src/supervision.ts`), écrite une
  * fois par période — jamais une ligne par vente (migration 0050).
  *
- * ── Ce qu'il ne montre PAS, et le dit ─────────────────────────────────────
+ * ── Les erreurs vues CHEZ LE CLIENT ───────────────────────────────────────
  *
- * Les erreurs du navigateur et les plantages de la caisse ne remontent pas
- * encore : une caisse qui plante redémarre et garde ses ventes dans son
- * outbox, ce qui se voit ici comme un terminal qui se tait puis reprend.
- * L'écran le dit en clair plutôt que d'afficher un compteur à zéro qui
- * aurait l'air d'une bonne nouvelle.
+ * Celles de la caisse arrivent à sa synchronisation suivante, dédupliquées
+ * par elle (`apps/pos/src/etat/collecteur-erreurs.ts`) ; celles du
+ * back-office, dès que sa page d'erreur s'affiche. Une caisse hors ligne
+ * les garde : l'écran le dit, plutôt que de laisser croire qu'un compteur à
+ * zéro est une bonne nouvelle.
  *
  * ── Données sensibles ─────────────────────────────────────────────────────
  *

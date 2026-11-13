@@ -10,6 +10,23 @@ import type { EvenementCommande, MutationCatalogue } from '@kaissi/domain'
 
 export const VERSION_PROTOCOLE = 1
 
+/**
+ * Une erreur vue sur la caisse, déjà DÉDUPLIQUÉE par elle : une signature,
+ * un compte, la première et la dernière fois. Ni donnée de vente, ni nom de
+ * client — le service nettoie de toute façon ce qu'il reçoit.
+ */
+export interface ErreurClientSynchronisee {
+  readonly signature: string
+  readonly type: 'erreur' | 'promesse' | 'rendu'
+  readonly message: string
+  readonly pile: string | null
+  readonly ecran: string | null
+  readonly version: string | null
+  readonly nombre: number
+  readonly premiere: string
+  readonly derniere: string
+}
+
 export interface RejetEvenement {
   readonly eventId: string
   readonly code: string
@@ -90,6 +107,8 @@ export interface Transport {
   shifts?(shifts: readonly ShiftSynchronise[]): Promise<ReponseShifts>
   /** FACULTATIF : la pointeuse (0048). Même raison que `shifts`. */
   pointages?(pointages: readonly PointageSynchronise[]): Promise<ReponseShifts>
+  /** FACULTATIF : les erreurs vues sur la caisse (`POST /sync/erreurs`). */
+  erreurs?(erreurs: readonly ErreurClientSynchronisee[]): Promise<{ enregistres: readonly string[] }>
   /**
    * FACULTATIF : les mutations de catalogue émises par la caisse.
    *
@@ -195,6 +214,13 @@ export function transportHttp(options: OptionsTransport): Transport {
         method: 'POST',
         body: JSON.stringify({ protocolVersion: VERSION_PROTOCOLE, pointages }),
       })) as ReponseShifts
+    },
+
+    async erreurs(erreurs) {
+      return (await appeler('/sync/erreurs', {
+        method: 'POST',
+        body: JSON.stringify({ protocolVersion: VERSION_PROTOCOLE, erreurs }),
+      })) as { enregistres: readonly string[] }
     },
 
     async catalogue(mutations) {

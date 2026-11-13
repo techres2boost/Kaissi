@@ -43,7 +43,8 @@ import {
 } from './admin-comptes.js'
 import { journal } from './journal.js'
 import { Metriques, evaluerAlertes } from './surveillance.js'
-import type { Supervision } from './supervision.js'
+import { nettoyer, type Supervision } from './supervision.js'
+import { lireErreursClients } from './erreurs-clients.js'
 import {
   estSchemaEnRetard,
   messageSchemaEnRetard,
@@ -1520,6 +1521,34 @@ export function creerServeur({
   })
 
   /*
+   * ── POST /admin/erreur-ecran ─────────────────────────────────────────
+   *
+   * La page d'erreur du back-office prévient le service, une fois. Tout
+   * compte connecté peut le faire — c'est SA page qui a cassé — mais rien
+   * de ce qu'il envoie n'est cru sur parole : le chemin est réduit à sa
+   * forme (les identifiants remplacés), le message nettoyé et borné, et le
+   * collecteur plafonne ces événements par période.
+   */
+  app.post('/admin/erreur-ecran', async (c) => {
+    return adminSupabase(c, async ({ corps }) => {
+      const brut = typeof corps['chemin'] === 'string' ? corps['chemin'] : ''
+      const chemin = brut
+        .split('?')[0]!
+        .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '‹id›')
+        .slice(0, 120)
+      const digest = typeof corps['digest'] === 'string' ? corps['digest'].replace(/[^\w-]/g, '').slice(0, 40) : null
+      const message = typeof corps['message'] === 'string' ? corps['message'] : ''
+      supervision?.erreurEcran({
+        chemin: chemin || '/',
+        digest: digest || null,
+        message,
+        origine: adresseClient(c.req.raw.headers),
+      })
+      return { message: 'Erreur signalée.' }
+    })
+  })
+
+  /*
    * ── POST /admin/supervision/incident ─────────────────────────────────
    *
    * Prendre en charge, résoudre ou rouvrir un incident. Qui l'a fait est
@@ -1772,6 +1801,41 @@ export function creerServeur({
     }
     try {
       return c.json(await service.pointages(appareil, corps as never))
+    } catch (erreur) {
+      return repondreErreur(c, erreur)
+    }
+  })
+
+  // ── POST /sync/erreurs ───────────────────────────────────────────────
+  // Route ADDITIVE : les erreurs vues sur la caisse, dédupliquées par elle.
+  // Elles entrent au journal de supervision dans le lot de la période —
+  // aucune écriture de plus. Sans collecteur, elles sont accusées quand
+  // même : la caisse n'a pas à les garder pour un serveur qui n'en veut pas.
+  app.post('/sync/erreurs', async (c) => {
+    const appareil = c.get('appareil')
+    try {
+      const corps = await c.req.json().catch(() => null)
+      const erreurs = lireErreursClients(corps)
+      for (const e of erreurs) {
+        supervision?.noterEvenement({
+          restaurantId: appareil.restaurantId,
+          deviceId: appareil.deviceId,
+          categorie: 'terminal',
+          type: 'erreur_caisse',
+          niveau: 'attention',
+          message: e.nombre > 1 ? `${e.message} (×${e.nombre})` : e.message,
+          detail: {
+            type: e.type,
+            nombre: e.nombre,
+            ecran: e.ecran,
+            version: e.version,
+            premiere: e.premiere,
+            derniere: e.derniere,
+            pile: e.pile ? nettoyer(e.pile, 1_500) : null,
+          },
+        })
+      }
+      return c.json({ enregistres: erreurs.map((e) => e.signature) })
     } catch (erreur) {
       return repondreErreur(c, erreur)
     }

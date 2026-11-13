@@ -644,4 +644,9 @@ export const AR_CAISSE: Readonly<Record<string, string>> = {
     "{noms}: لن يبقى أيّ حساب يفتح صلاحية فيه. سيُغلق المحلّ — ولن يتمكّن أيّ صندوق من الاقتران به. تُحفظ مبيعاته، ويمكن لـ Res2Boost إعادة فتحه.",
   "{noms} : il n’y aura plus d’administrateur. Les gérants continueront d’exploiter normalement — carte, stock, rapports — mais plus personne ne pourra y accorder ni retirer un accès.":
     "{noms}: لن يبقى أيّ مسؤول. يواصل المديرون الاستغلال عاديًّا — القائمة والمخزون والتقارير — لكن لن يتمكّن أحد من منح صلاحية أو سحبها.",
+  // ── Barrière d’erreur ──
+  "Un écran de la caisse a rencontré une erreur": "واجهت إحدى شاشات الصندوق خطأً",
+  "Vos ventes sont enregistrées sur cette caisse : rien n’est perdu. Relancez l’écran pour reprendre là où vous en étiez.": "مبيعاتك مسجّلة على هذا الصندوق: لم يضِع شيء. أعد تشغيل الشاشة لتواصل من حيث توقّفت.",
+  "L’erreur sera transmise à l’équipe Kaissi à la prochaine synchronisation.": "سيُرسَل الخطأ إلى فريق Kaissi عند المزامنة القادمة.",
+  "Relancer la caisse": "إعادة تشغيل الصندوق",
 }

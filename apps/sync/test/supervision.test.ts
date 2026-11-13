@@ -20,6 +20,7 @@ import { DepotPostgres } from '../src/depot-postgres.js'
 import { creerServeur } from '../src/serveur.js'
 import { Supervision, masquerEmail, nettoyer, tronquerIp } from '../src/supervision.js'
 import type { Alerte } from '../src/surveillance.js'
+import type { ChangementIncident, Notificateur } from '../src/alertes-externes.js'
 import { DEMO_RESTO, URL_TEST, creerAppareil, nettoyer as nettoyerBase } from './aide.js'
 
 const client = new Client({ connectionString: URL_TEST })
@@ -48,8 +49,16 @@ const fetchSimule: typeof fetch = async (entree, init) => {
 }
 
 let alertesAFournir: Alerte[] = []
+let notifies: ChangementIncident[] = []
+const notificateurTest: Notificateur = {
+  envoyer: async (c) => {
+    notifies.push(c)
+    return { envoye: true }
+  },
+}
 function nouveauServeur() {
   const supervision = new Supervision(depot, {
+    notificateur: notificateurTest,
     // Écriture déclenchée À LA MAIN par les tests (`vider()`), et une
     // période courte pour que la résolution automatique soit testable.
     intervalleMs: 400,
@@ -81,6 +90,7 @@ beforeEach(async () => {
   await client.query('delete from kaissi.supervision_evenements')
   await client.query('delete from kaissi.supervision_incidents')
   alertesAFournir = []
+  notifies = []
 })
 
 afterAll(async () => {
@@ -177,6 +187,144 @@ describe('les compteurs sont EXACTS', () => {
     const lignes = await points(supervision.instance)
     expect(lignes.map((l) => Number(l.requetes)).reduce((a, b) => a + b, 0)).toBe(3)
     expect(lignes.filter((l) => l.redemarrage)).toHaveLength(1)
+  })
+})
+
+describe('les erreurs vues chez le client', () => {
+  it('une erreur de caisse entre au journal, nettoyée, rattachée à son terminal', async () => {
+    const { app, supervision } = nouveauServeur()
+    const caisse = await creerAppareil('SV4')
+    const envoyer = (corps: unknown) =>
+      app.request('http://test/sync/erreurs', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${caisse.jetonClair}`, 'content-type': 'application/json' },
+        body: JSON.stringify(corps),
+      })
+    const r = await envoyer({
+      erreurs: [
+        {
+          signature: 'a1b2c3',
+          type: 'erreur',
+          message: 'Cannot read properties of undefined (reading "prix") — gerant@resto.tn',
+          pile: 'TypeError at Encaissement (index.js:1:2) jeton abcdefghijklmnopqrstuvwxyz0123456789',
+          ecran: 'Encaissement',
+          version: '1.4.2',
+          nombre: 3,
+        },
+        { signature: 'pas valide !', message: 'ignorée' },
+        { signature: 'sansmessage' },
+      ],
+    })
+    expect(r.status).toBe(200)
+    expect(await r.json()).toEqual({ enregistres: ['a1b2c3'] })
+    await supervision.vider()
+    const { rows } = await client.query(
+      "select categorie, device_id, message, detail from kaissi.supervision_evenements where type = 'erreur_caisse'",
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0].categorie).toBe('terminal')
+    expect(rows[0].device_id).toBe(caisse.id)
+    expect(rows[0].message).toContain('(×3)')
+    expect(rows[0].detail).toMatchObject({ ecran: 'Encaissement', version: '1.4.2', nombre: 3 })
+    const texte = JSON.stringify(rows)
+    expect(texte).not.toContain('gerant@')
+    expect(texte).not.toContain('abcdefghijklmnopqrstuvwxyz')
+
+    // Plus de vingt : refusé, et la caisse les garde pour le cycle suivant.
+    const trop = await envoyer({ erreurs: Array.from({ length: 21 }, (_, i) => ({ signature: `s${i}`, message: 'x' })) })
+    expect(trop.status).toBe(400)
+  })
+
+  it('sans jeton d’appareil, rien n’entre', async () => {
+    const { app } = nouveauServeur()
+    const r = await app.request('http://test/sync/erreurs', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ erreurs: [{ signature: 'x', message: 'y' }] }),
+    })
+    expect(r.status).toBe(401)
+  })
+
+  it('une page d’erreur du back-office : chemin réduit à sa forme, plafond par période', async () => {
+    const { app, supervision } = nouveauServeur()
+    const signaler = () =>
+      app.request('http://test/admin/erreur-ecran', {
+        method: 'POST',
+        headers: { authorization: 'Bearer jeton-client', 'content-type': 'application/json', 'x-forwarded-for': '203.0.113.7' },
+        body: JSON.stringify({
+          chemin: '/01930000-0000-7000-8000-000000000002/ventes?du=2026-11-01',
+          digest: '1234567890',
+          message: '',
+        }),
+      })
+    expect((await signaler()).status).toBe(200)
+    for (let i = 0; i < 40; i += 1) await signaler()
+    await supervision.vider()
+    const { rows } = await client.query(
+      "select message, origine, detail from kaissi.supervision_evenements where type = 'erreur_backoffice'",
+    )
+    expect(rows).toHaveLength(30)
+    expect(rows[0].detail).toEqual({ chemin: '/‹id›/ventes', digest: '1234567890' })
+    expect(rows[0].origine).toBe('203.0.113.0/24')
+    // Sans session valide : refusé.
+    const anonyme = await app.request('http://test/admin/erreur-ecran', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ chemin: '/' }),
+    })
+    expect(anonyme.status).toBe(401)
+  })
+})
+
+describe('les alertes qui sortent du service', () => {
+  it('UNE notification par transition — ouverture, aggravation, résolution — jamais par période', async () => {
+    const { supervision } = nouveauServeur()
+    const alerte = (niveau: 'attention' | 'critique'): Alerte => ({ cle: 'test.astreinte', niveau, sujet: 'Astreinte', message: niveau })
+
+    alertesAFournir = [alerte('attention')]
+    await supervision.vider()
+    await supervision.vider()
+    await supervision.attendreNotifications()
+    expect(notifies.map((n) => n.transition)).toEqual(['ouvert'])
+
+    alertesAFournir = [alerte('critique')]
+    await supervision.vider()
+    await supervision.vider()
+    await supervision.attendreNotifications()
+    expect(notifies.map((n) => n.transition)).toEqual(['ouvert', 'aggrave'])
+
+    alertesAFournir = []
+    await new Promise((f) => setTimeout(f, 1_200))
+    await supervision.vider()
+    await supervision.attendreNotifications()
+    expect(notifies.map((n) => [n.transition, n.niveau])).toEqual([
+      ['ouvert', 'attention'],
+      ['aggrave', 'critique'],
+      ['resolu', 'critique'],
+    ])
+
+    // Et l'envoi est inscrit au journal, pour qu'on sache que l'astreinte a été prévenue.
+    await supervision.vider()
+    const { rows } = await client.query(
+      "select count(*)::int as n from kaissi.supervision_evenements where type = 'alerte_envoyee'",
+    )
+    expect(rows[0].n).toBe(3)
+  })
+
+  it('un webhook qui échoue ne bloque pas l’écriture, et se voit au journal', async () => {
+    const supervision = new Supervision(depot, {
+      intervalleMs: 400,
+      instance: 'test-echec-webhook',
+      alertes: async () => [{ cle: 'test.webhook', niveau: 'critique', sujet: 'Webhook', message: 'x' }],
+      notificateur: { envoyer: async () => ({ envoye: false, raison: 'echec', detail: 'HTTP 500' }) },
+    })
+    await supervision.vider()
+    await supervision.attendreNotifications()
+    await supervision.vider()
+    const { rows } = await client.query(
+      "select message from kaissi.supervision_evenements where type = 'alerte_non_envoyee'",
+    )
+    expect(rows.map((r) => r.message)).toEqual(['L’alerte n’a pas pu partir (HTTP 500) : Webhook.'])
   })
 })
 

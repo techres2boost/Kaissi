@@ -574,10 +574,51 @@ Comment c'est écrit — et pourquoi ça ne ralentit pas la caisse :
   180 jours — purgés par le service, une fois par heure.
 - `SYNC_SUPERVISION=0` éteint le collecteur (l'écran le dit).
 
-Ce qui n'est **pas encore** collecté, et l'écran le dit : les erreurs du
-navigateur au back-office (Vercel les a) et les plantages de l'application
-de caisse. Une caisse qui plante redémarre avec ses ventes dans l'outbox ;
-elle se voit comme un terminal qui se tait puis reprend.
+**Les erreurs vues chez le client** entrent au même journal, sans tiers :
+
+- **caisse** : toute erreur non attrapée, et toute erreur d'affichage (la
+  barrière remplace l'écran blanc par « vos ventes sont enregistrées —
+  Relancer la caisse »). Dédupliquées sur la tablette (une ligne par
+  erreur, avec son nombre), gardées dans `localStorage` pour survivre au
+  plantage, envoyées par `POST /sync/erreurs` APRÈS les ventes — zéro
+  requête quand il n'y a rien. Catégorie « Terminaux » ;
+- **back-office** : la page d'erreur prévient `POST /admin/erreur-ecran`,
+  une fois par erreur et par onglet, avec le `digest` qui la relie au
+  journal de Vercel. Chemin réduit à sa forme (identifiants masqués),
+  30 au plus par période. Catégorie « Application ».
+
+### 6 ter. Être PRÉVENU — sur un téléphone
+
+Le centre de supervision ne prévient personne tant qu'on ne le regarde
+pas. Deux mécanismes, et il faut **les deux** :
+
+**1. Les incidents, par webhook** (service vivant, quelque chose va mal).
+Chez Railway, variables du service de synchronisation :
+
+| Variable | Valeur |
+|---|---|
+| `SYNC_ALERTES_WEBHOOK` | l'adresse **https** du webhook — c'est un **secret** |
+| `SYNC_ALERTES_NIVEAU` | `critique` (défaut) ou `attention` |
+| `SYNC_ALERTES_LIEN` | `https://‹back-office›/editeur/supervision` (facultatif) |
+
+Le message part à l'OUVERTURE d'un incident, à son AGGRAVATION en critique
+et à sa RÉSOLUTION — jamais à chaque minute où il est revu, et au plus 12
+par heure. Il porte un champ `text` (et `content`) : Telegram, Slack,
+Discord, Google Chat, Mattermost le lisent tels quels. Pour Telegram :
+créer un robot avec @BotFather, écrire une fois au robot, puis
+`https://api.telegram.org/bot‹JETON›/sendMessage?chat_id=‹VOTRE_ID›`
+(l'identifiant se lit sur `https://api.telegram.org/bot‹JETON›/getUpdates`).
+Au démarrage, le journal du service dit `Alertes : webhook configuré` ou
+`aucune sortie` — jamais l'adresse. Chaque envoi, réussi ou non, est inscrit
+au journal de supervision (« Alerte envoyée » / « Alerte non envoyée »).
+
+**2. Une sonde EXTERNE sur `/sante`** (service MORT ou injoignable — le
+webhook ne peut rien dire, puisque c'est lui qui est tombé). UptimeRobot,
+Better Stack ou équivalent, offre gratuite : une requête `GET
+https://‹service›/sante` toutes les **5 minutes** (inutile d'aller plus vite :
+c'est une requête de plus pour Railway et la base à chaque fois), alerte si
+le statut n'est pas 200 deux fois de suite. `/sante` répond 503 quand une
+migration manque — la sonde le verra aussi.
 
 En SQL, l'état appareil par appareil :
 

@@ -174,7 +174,7 @@ export interface DepotSync {
    * supervision historique, et le service démarre quand même.
    */
   mesuresSupervisionBase?(): Promise<MesuresSupervisionBase>
-  ecrireSupervision?(lot: Parameters<DepotSupervision['ecrireSupervision']>[0]): Promise<void>
+  ecrireSupervision?(lot: Parameters<DepotSupervision['ecrireSupervision']>[0]): ReturnType<DepotSupervision['ecrireSupervision']>
   purgerSupervision?(): Promise<void>
   lireSupervision?(demande: DemandeSupervision): Promise<LectureSupervision>
   traiterIncident?(demande: {

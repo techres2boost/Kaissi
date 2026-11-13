@@ -51,6 +51,7 @@ import { journal } from './journal.js'
 import { manquantes, requeteSondes, type SondeMigration } from './schema-requis.js'
 import type { MesuresBase } from './surveillance.js'
 import type { Alerte } from './surveillance.js'
+import type { ChangementIncident } from './alertes-externes.js'
 import type {
   EvenementSupervision,
   MesuresSupervisionBase,
@@ -1269,7 +1270,7 @@ export class DepotPostgres implements DepotSync {
     evenements: readonly EvenementSupervision[]
     alertes: readonly Alerte[]
     resolutionApresSecondes: number
-  }): Promise<void> {
+  }): Promise<ChangementIncident[]> {
     const { point: p, evenements, alertes } = lot
     const client = await this.pool.connect()
     try {
@@ -1331,30 +1332,54 @@ export class DepotPostgres implements DepotSync {
        * garantie de la base, pas une lecture suivie d'une écriture qu'une
        * seconde instance pourrait doubler.
        */
+      /*
+       * Chaque upsert dit aussi ce qui a CHANGÉ — c'est ce qui part vers le
+       * téléphone d'astreinte (`alertes-externes.ts`). `xmax = 0` : la ligne
+       * vient d'être insérée, donc l'incident s'OUVRE ; le niveau d'avant,
+       * lu dans le même instantané par la CTE, dit s'il s'AGGRAVE. Aucune
+       * lecture de plus, et deux instances ne peuvent pas annoncer le même
+       * incident : une seule l'a inséré.
+       */
+      const changements: ChangementIncident[] = []
       for (const a of alertes) {
-        await client.query(
-          `insert into kaissi.supervision_incidents (id, cle, niveau, sujet, message)
+        const { rows } = await client.query<{ id: string; nouveau: boolean; niveau_avant: string | null }>(
+          `with avant as (
+             select niveau from kaissi.supervision_incidents
+              where cle = $2 and statut <> 'resolu'
+           )
+           insert into kaissi.supervision_incidents (id, cle, niveau, sujet, message)
            values ($1, $2, $3, $4, $5)
            on conflict (cle) where statut <> 'resolu' do update set
              niveau        = excluded.niveau,
              message       = excluded.message,
              dernier_vu_le = now(),
-             occurrences   = kaissi.supervision_incidents.occurrences + 1`,
+             occurrences   = kaissi.supervision_incidents.occurrences + 1
+           returning id, (xmax = 0) as nouveau, (select niveau from avant) as niveau_avant`,
           [uuidV7(), a.cle, a.niveau, a.sujet, a.message],
         )
+        const r = rows[0]
+        if (!r) continue
+        const base = { id: r.id, cle: a.cle, niveau: a.niveau, sujet: a.sujet, message: a.message }
+        if (r.nouveau) changements.push({ ...base, transition: 'ouvert' })
+        else if (r.niveau_avant !== 'critique' && a.niveau === 'critique') {
+          changements.push({ ...base, transition: 'aggrave' })
+        }
       }
       // … et une condition disparue depuis plus de deux périodes est résolue
       // d'office. Un incident pris en charge l'est aussi : la cause a
       // disparu, la note du responsable reste.
-      await client.query(
+      const resolus = await client.query<{ id: string; cle: string; niveau: string; sujet: string; message: string }>(
         `update kaissi.supervision_incidents
             set statut = 'resolu', resolu_le = now(), resolution = 'automatique'
           where statut <> 'resolu'
             and not (cle = any($1::text[]))
-            and dernier_vu_le < now() - make_interval(secs => $2)`,
+            and dernier_vu_le < now() - make_interval(secs => $2)
+          returning id, cle, niveau, sujet, message`,
         [alertes.map((a) => a.cle), lot.resolutionApresSecondes],
       )
+      for (const r of resolus.rows) changements.push({ ...r, transition: 'resolu' })
       await client.query('commit')
+      return changements
     } catch (erreur) {
       await client.query('rollback').catch(() => undefined)
       throw erreur
