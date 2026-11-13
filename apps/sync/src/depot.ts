@@ -12,6 +12,7 @@ import type { EvenementCommande, MutationCatalogue } from '@kaissi/domain'
 import type { ChangementCatalogue, PointageSynchronise, ShiftSynchronise } from './protocole.js'
 import type { SondeMigration } from './schema-requis.js'
 import type { MesuresBase } from './surveillance.js'
+import type { DepotSupervision, MesuresSupervisionBase } from './supervision.js'
 
 export interface AppareilAuthentifie {
   readonly deviceId: string
@@ -165,6 +166,23 @@ export interface DepotSync {
 
   /** Les mesures de l'écran Surveillance (`surveillance.ts`). Facultative. */
   mesuresBase?(): Promise<MesuresBase>
+
+  /*
+   * ── Supervision (`supervision.ts`, migration 0050) ─────────────────────
+   *
+   * Facultatives toutes les cinq : un dépôt sans elles n'a simplement pas de
+   * supervision historique, et le service démarre quand même.
+   */
+  mesuresSupervisionBase?(): Promise<MesuresSupervisionBase>
+  ecrireSupervision?(lot: Parameters<DepotSupervision['ecrireSupervision']>[0]): Promise<void>
+  purgerSupervision?(): Promise<void>
+  lireSupervision?(demande: DemandeSupervision): Promise<LectureSupervision>
+  traiterIncident?(demande: {
+    id: string
+    action: 'prendre_en_charge' | 'resoudre' | 'rouvrir'
+    par: string
+    note: string | null
+  }): Promise<IncidentSupervision | null>
 
   /**
    * Établissements où cet utilisateur a le droit d'enrôler un terminal.
@@ -663,4 +681,105 @@ export interface DepotSync {
   emailsGestionnaires(restaurantId: string): Promise<readonly string[]>
 
   fermer(): Promise<void>
+}
+
+// ── Supervision : ce que lit l'écran ───────────────────────────────────────
+
+export type FenetreSupervision = '1h' | '6h' | '24h' | '7j' | '30j'
+
+export interface DemandeSupervision {
+  readonly fenetre: FenetreSupervision
+  /** Filtre du journal ; nul = toutes les catégories. */
+  readonly categorie: string | null
+  /** Filtre du journal par niveau ; nul = tous. */
+  readonly niveau: string | null
+}
+
+/** Un point de la série, agrégé sur un « seau » de la fenêtre. */
+export interface SeauSupervision {
+  readonly debut: string
+  readonly requetes: number
+  readonly erreurs5xx: number
+  readonly erreurs4xx: number
+  readonly latenceMoyenneMs: number
+  /** Le PIRE p95 des périodes du seau : un majorant, pas une moyenne de centiles. */
+  readonly pushP95Ms: number | null
+  readonly pushP99Ms: number | null
+  readonly pullP95Ms: number | null
+  readonly concurrenceMax: number
+  readonly evenementsRecus: number
+  readonly cpuPourcent: number | null
+  readonly rssOctets: number | null
+  readonly boucleP99Ms: number | null
+  readonly baseLatenceMs: number | null
+  readonly baseTailleOctets: number | null
+  readonly baseConnexions: number | null
+  readonly poolEnAttente: number | null
+  readonly cachePourcent: number | null
+  readonly caissesVues15min: number | null
+  readonly echecsAuthentification: number
+  readonly limitesDeDebit: number
+  readonly accesRefuses: number
+  readonly redemarrages: number
+}
+
+export interface IncidentSupervision {
+  readonly id: string
+  readonly cle: string
+  readonly niveau: string
+  readonly sujet: string
+  readonly message: string
+  readonly statut: 'ouvert' | 'pris_en_charge' | 'resolu'
+  readonly ouvertLe: string
+  readonly dernierVuLe: string
+  readonly occurrences: number
+  readonly prisEnChargePar: string | null
+  readonly prisEnChargeLe: string | null
+  readonly resoluLe: string | null
+  readonly resolution: string | null
+  readonly resoluPar: string | null
+  readonly note: string | null
+}
+
+export interface EvenementLu {
+  readonly id: number
+  readonly instant: string
+  readonly categorie: string
+  readonly type: string
+  readonly niveau: string
+  readonly restaurant: string | null
+  readonly terminal: string | null
+  readonly origine: string | null
+  readonly message: string
+  readonly detail: Record<string, unknown>
+}
+
+export interface TerminalSupervision {
+  readonly deviceId: string
+  readonly libelle: string
+  readonly restaurant: string
+  readonly version: string | null
+  readonly vuLe: string | null
+  readonly dernierEnvoi: string | null
+  readonly dernierPull: string | null
+  readonly rejets24h: number
+}
+
+export interface LectureSupervision {
+  readonly seauSecondes: number
+  readonly serie: readonly SeauSupervision[]
+  readonly incidentsOuverts: readonly IncidentSupervision[]
+  readonly incidentsRecents: readonly IncidentSupervision[]
+  readonly evenements: readonly EvenementLu[]
+  readonly comptesEvenements: readonly { categorie: string; niveau: string; n: number }[]
+  readonly terminaux: readonly TerminalSupervision[]
+  readonly totaux: {
+    requetes: number
+    erreurs5xx: number
+    erreurs4xx: number
+    echecsAuthentification: number
+    limitesDeDebit: number
+    redemarrages: number
+    disponibilitePourcent: number | null
+  }
 }

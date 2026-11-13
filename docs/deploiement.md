@@ -532,10 +532,52 @@ perdues** : elles repartiront après un nouvel appairage.
 | Caisses muettes depuis 24 h | > 0 | Une tablette ne synchronise plus |
 | Migrations manquantes | ≥ 1 | Toutes les ventes échouent (§ 2.4) |
 
-Ce que l'écran ne montre pas : l'historique au-delà d'une heure (les mesures
-vivent en mémoire du service et repartent de zéro au redémarrage) et le
-back-office lui-même — Railway et Vercel ont leurs propres graphiques pour
-le long terme.
+Surveillance dit l'état **maintenant**, en mémoire du service. Pour la
+mémoire, il y a le **centre de supervision** (§ 6 bis).
+
+### 6 bis. Le centre de supervision — historique, incidents, journal
+
+Back-office → accueil éditeur → **Centre de supervision** (`/editeur/supervision`),
+même réserve : comptes de `KAISSI_EDITEURS`, relus par le service à chaque
+appel, 404 pour tout autre compte.
+
+**⚑ Migration 0050 AVANT le déploiement du service.** Sa sonde est dans
+`schema-requis.ts` : tant qu'elle manque, `/sante` répond 503 et Railway ne
+bascule pas le trafic (règle « la migration avant le code »).
+
+Ce qu'il montre, sur 1 h, 6 h, 24 h, 7 j ou 30 j :
+
+| Volet | Contenu | Source |
+|---|---|---|
+| Performance et charge | requêtes, 5xx, envoi/réception p95, requêtes simultanées, événements reçus | chaque requête, chronométrée par le service |
+| Infrastructure | processeur, mémoire, boucle d'événements, latence, connexions, pool, cache, taille de la base | relevés une fois par période |
+| Sécurité | identifiants refusés, jetons d'appareil refusés, appareils révoqués, accès admin refusés, limites de débit — avec le RÉSEAU d'origine (/24, /48) | les statuts 401/403/429 des routes |
+| Synchronisation | opérations rejetées (par code), erreurs 5xx du push/pull | réponse du push |
+| Terminaux | en ligne / silencieux / muet, dernier envoi, version, rejets 24 h ; mises en service | `devices`, `/appairage` |
+| Incidents | toute alerte persistante devient un incident : ouvert → pris en charge → résolu, avec note ; résolution automatique quand la cause disparaît | les mêmes seuils que Surveillance |
+
+Comment c'est écrit — et pourquoi ça ne ralentit pas la caisse :
+
+- **Une ligne par période** (`SYNC_SUPERVISION_SECONDES`, 60 par défaut) et
+  par instance du service, jamais une ligne par vente. Les compteurs vivent
+  en mémoire ; l'écriture est une transaction toutes les minutes. Mesuré
+  sous charge (`test/charge.test.ts`, palier E) : chaque requête est comptée
+  exactement une fois, et observer une requête coûte quelques microsecondes.
+- **Une écriture qui échoue est abandonnée**, pas réessayée : la supervision
+  ne doit jamais entrer en concurrence avec les ventes pour une connexion.
+  L'écran signale l'échec de la dernière écriture.
+- **Aucune donnée sensible** : adresse IP tronquée au réseau, adresse e-mail
+  masquée, tout ce qui ressemble à un jeton retiré des messages, aucun
+  montant. Les trois tables sont en RLS forcée « refus à tous » : seul le
+  rôle du service les lit et les écrit.
+- **Rétention** : points 30 jours, événements 90 jours, incidents résolus
+  180 jours — purgés par le service, une fois par heure.
+- `SYNC_SUPERVISION=0` éteint le collecteur (l'écran le dit).
+
+Ce qui n'est **pas encore** collecté, et l'écran le dit : les erreurs du
+navigateur au back-office (Vercel les a) et les plantages de l'application
+de caisse. Une caisse qui plante redémarre avec ses ventes dans l'outbox ;
+elle se voit comme un terminal qui se tait puis reprend.
 
 En SQL, l'état appareil par appareil :
 

@@ -59,6 +59,7 @@ export default async function PageSurveillance() {
       <p className="sous-titre">{t('Le service de synchronisation et sa base — le chemin de chaque vente. Mesures en mémoire du service, sur la dernière heure.')}</p>
       <p>
         <Link href="/editeur">{t('‹ Clients et formules')}</Link>{' · '}
+        <Link href="/editeur/supervision">{t('Historique, incidents et journal ›')}</Link>{' · '}
         <RafraichirPeriodiquement secondes={15} />
       </p>
     </>

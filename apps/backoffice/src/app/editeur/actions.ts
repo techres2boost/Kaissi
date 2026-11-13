@@ -128,3 +128,148 @@ export async function lireSurveillance(): Promise<Surveillance | null | string> 
     return erreur instanceof Error ? erreur.message : String(erreur)
   }
 }
+
+/*
+ * ── Centre de supervision ─────────────────────────────────────────────────
+ *
+ * Même régime que la Surveillance : éditeur seul, relu par le service à
+ * chaque appel. La différence est l'HISTORIQUE — écrit par le service une
+ * fois par période (migration 0050), jamais une ligne par vente.
+ */
+
+export type FenetreSupervision = '1h' | '6h' | '24h' | '7j' | '30j'
+
+export interface SeauSupervision {
+  debut: string
+  requetes: number
+  erreurs5xx: number
+  erreurs4xx: number
+  latenceMoyenneMs: number
+  pushP95Ms: number | null
+  pushP99Ms: number | null
+  pullP95Ms: number | null
+  concurrenceMax: number
+  evenementsRecus: number
+  cpuPourcent: number | null
+  rssOctets: number | null
+  boucleP99Ms: number | null
+  baseLatenceMs: number | null
+  baseTailleOctets: number | null
+  baseConnexions: number | null
+  poolEnAttente: number | null
+  cachePourcent: number | null
+  caissesVues15min: number | null
+  echecsAuthentification: number
+  limitesDeDebit: number
+  accesRefuses: number
+  redemarrages: number
+}
+
+export interface IncidentSupervision {
+  id: string
+  cle: string
+  niveau: string
+  sujet: string
+  message: string
+  statut: 'ouvert' | 'pris_en_charge' | 'resolu'
+  ouvertLe: string
+  dernierVuLe: string
+  occurrences: number
+  prisEnChargePar: string | null
+  prisEnChargeLe: string | null
+  resoluLe: string | null
+  resolution: string | null
+  resoluPar: string | null
+  note: string | null
+}
+
+export interface EvenementSupervision {
+  id: number
+  instant: string
+  categorie: string
+  type: string
+  niveau: string
+  restaurant: string | null
+  terminal: string | null
+  origine: string | null
+  message: string
+  detail: Record<string, unknown>
+}
+
+export interface TerminalSupervision {
+  deviceId: string
+  libelle: string
+  restaurant: string
+  version: string | null
+  vuLe: string | null
+  dernierEnvoi: string | null
+  dernierPull: string | null
+  rejets24h: number
+}
+
+export interface Supervision {
+  horodatage: string
+  fenetre: FenetreSupervision
+  categorie: string | null
+  niveau: string | null
+  collecteur: {
+    instance: string
+    intervalleSecondes: number
+    requetesEnCours: number
+    evenementsEnAttente: number
+    evenementsIgnores: number
+    derniereEcriture: { instant: string; ok: boolean; erreur: string | null } | null
+  } | null
+  vivant: Surveillance
+  historique: {
+    seauSecondes: number
+    serie: SeauSupervision[]
+    incidentsOuverts: IncidentSupervision[]
+    incidentsRecents: IncidentSupervision[]
+    evenements: EvenementSupervision[]
+    comptesEvenements: { categorie: string; niveau: string; n: number }[]
+    terminaux: TerminalSupervision[]
+    totaux: {
+      requetes: number
+      erreurs5xx: number
+      erreurs4xx: number
+      echecsAuthentification: number
+      limitesDeDebit: number
+      redemarrages: number
+      disponibilitePourcent: number | null
+    }
+  } | null
+  erreurHistorique: string | null
+}
+
+/** `null` : pas éditeur. Une chaîne : le service n'a pas répondu, et pourquoi. */
+export async function lireSupervision(demande: {
+  fenetre: FenetreSupervision
+  categorie: string | null
+  niveau: string | null
+}): Promise<Supervision | null | string> {
+  await sessionObligatoire()
+  try {
+    return (await appelerService('/admin/supervision', demande)) as unknown as Supervision
+  } catch (erreur) {
+    if (erreur instanceof ErreurSaisie && /éditeur|Accès|refus/i.test(erreur.message)) return null
+    return erreur instanceof Error ? erreur.message : String(erreur)
+  }
+}
+
+/** Prendre en charge, résoudre, rouvrir. Qui agit est relu par le service. */
+export async function traiterIncident(
+  id: string,
+  action: 'prendre_en_charge' | 'resoudre' | 'rouvrir',
+  note: string,
+): Promise<{ erreur?: string; succes?: string }> {
+  await sessionObligatoire()
+  try {
+    const { message } = await appelerService('/admin/supervision/incident', { id, action, note })
+    revalidatePath('/editeur/supervision')
+    return { succes: message ?? 'Incident mis à jour.' }
+  } catch (erreur) {
+    if (erreur instanceof ErreurSaisie) return { erreur: erreur.message }
+    throw erreur
+  }
+}

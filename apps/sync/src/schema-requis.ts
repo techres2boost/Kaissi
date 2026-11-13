@@ -146,6 +146,13 @@ export const SONDES: readonly SondeMigration[] = [
       `not exists (select 1 from pg_constraint` +
       ` where conname = 'order_events_device_id_seq_device_key')`,
   },
+  {
+    migration: '0050',
+    objet: 'tables de supervision (points, incidents, événements)',
+    sql:
+      `(${table('supervision_points')} and ${table('supervision_incidents')}` +
+      ` and ${table('supervision_evenements')})`,
+  },
 ]
 
 /** La requête unique : un tableau de booléens, dans l'ordre de `SONDES`. */

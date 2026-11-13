@@ -118,6 +118,16 @@ perdue, aucune dupliquée, totaux au millime** — vérifié à chaque palier.
   le service rend désormais **503 `serveur_occupe`**, avec `Retry-After` et
   un message qui dit que les ventes sont conservées
   (`test/serveur-occupe.test.ts`).
+- Même famille, trouvée le 13 novembre 2026 en rejouant la charge avec la
+  supervision active (1 exécution sur 10) : cinquante caisses d'un même
+  établissement font la queue derrière le verrou de numérotation (0043), un
+  checkpoint disque lent allonge la file, et une attente dépasse le
+  `statement_timeout` de 10 s. PostgreSQL ANNULE la transaction — rien
+  n'est écrit — mais le service répondait 500. `statement_timeout` et
+  `lock_timeout` (57014, 55P03) rendent désormais le même **503
+  `serveur_occupe`** que le pool saturé (`test/serveur-occupe.test.ts`).
+  La supervision elle-même n'y était pour rien : elle ne prend pas ce
+  verrou, et son écriture d'une période coûte 11 ms sous charge.
 - La recherche du jeton d'appareil, première requête de chaque appel,
   n'était dans aucun `try` : sous saturation, Hono rendait un 500 en texte
   brut que la caisse ne sait pas lire. Elle est protégée, et un `onError`

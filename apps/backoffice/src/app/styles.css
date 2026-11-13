@@ -1930,3 +1930,80 @@ button.danger-plein:disabled { opacity: 0.55; cursor: not-allowed; }
   .kpi-valeur { font-size: 1.3rem; }
   .kpi-valeur small { font-size: 0.75rem; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * CENTRE DE SUPERVISION (éditeur)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Des PETITS MULTIPLES : un indicateur par graphique, tous alignés sur le
+ * même temps. Une seule teinte (l'accent) pour les données ; les couleurs
+ * d'état (danger, or, succès) sont réservées aux niveaux d'alerte, et
+ * toujours accompagnées d'un symbole et d'un mot — jamais la couleur seule.
+ */
+.filtres-supervision { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; margin-block: 0.75rem 1rem; }
+.groupe-filtres { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.puce-filtre {
+  display: inline-flex; align-items: center; min-height: 2rem;
+  padding: 0.2rem 0.7rem; border-radius: 999px;
+  border: 1px solid var(--bordure); background: var(--panneau);
+  color: var(--texte); text-decoration: none; font-size: 0.85rem;
+}
+.puce-filtre:hover { background: var(--panneau-clair); }
+.puce-filtre.actif { background: var(--accent); border-color: var(--accent); color: var(--sur-accent); }
+
+.grille-courbes {
+  display: grid; gap: 1rem 1.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  margin-block: 0.5rem 1rem;
+}
+.courbe-supervision { margin: 0; display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.courbe-supervision figcaption { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+.courbe-titre { font-size: 0.85rem; color: var(--attenue); }
+.courbe-valeur { font-weight: 600; font-variant-numeric: tabular-nums; unicode-bidi: isolate; white-space: nowrap; }
+.courbe-trace { height: 5.5rem; }
+.courbe-trace .barre { fill: var(--accent); }
+.courbe-trace rect:hover + .barre, .courbe-trace .barre:hover { fill: var(--accent-clair); }
+.courbe-trace .seuil {
+  stroke: var(--danger); stroke-width: 1; stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke; opacity: 0.7;
+}
+.courbe-pied {
+  display: flex; justify-content: space-between; gap: 0.5rem;
+  font-size: 0.7rem; color: var(--attenue); unicode-bidi: isolate;
+}
+
+.liste-incidents { list-style: none; padding: 0; margin: 0.5rem 0 0; display: grid; gap: 0.5rem; }
+.incident {
+  border: 1px solid var(--bordure); border-inline-start: 4px solid var(--or);
+  border-radius: var(--rayon); padding: 0.6rem 0.8rem; background: var(--panneau);
+}
+.incident.niveau-critique { border-inline-start-color: var(--danger); }
+.incident.resolu { border-inline-start-color: var(--succes); }
+.incident summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4rem; }
+.etiquette-niveau {
+  display: inline-block; padding: 0.05rem 0.5rem; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 600; white-space: nowrap;
+  background: var(--panneau-clair); color: var(--texte);
+}
+.etiquette-niveau.critique { background: var(--fond-danger); color: var(--danger); }
+.etiquette-niveau.attention { background: var(--fond-or); color: var(--or); }
+.etiquette-niveau.resolu { background: var(--fond-succes); color: var(--succes); }
+.actions-incident { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.6rem; }
+.actions-incident input { flex: 1 1 14rem; min-width: 0; }
+.actions-incident-boutons { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.detail-evenement summary { cursor: pointer; font-size: 0.8rem; color: var(--attenue); }
+.detail-evenement code { display: block; white-space: pre-wrap; word-break: break-all; font-size: 0.75rem; }
+/* « ÉCHECS D'AUTHENTIFICATION » en capitales espacées est plus large qu'une
+   demi-colonne de 320 px : sans `min-width: 0`, la grille s'élargissait à la
+   largeur du mot et poussait la page hors de l'écran (test de largeur). */
+.supervision .kpi { min-width: 0; }
+.supervision .kpi-libelle, .supervision .kpi-valeur { hyphens: auto; overflow-wrap: anywhere; }
+/* Une valeur longue (constat, adresse, réseau IPv6) se replie DANS sa
+   colonne au lieu de l'élargir. */
+.supervision .lignes-chiffres dd { min-width: 0; overflow-wrap: anywhere; }
+.supervision .detail-incident { grid-template-columns: minmax(6rem, 1fr) minmax(0, 2.5fr); margin-top: 0.6rem; }
+@media (max-width: 30rem) {
+  .supervision .detail-incident { grid-template-columns: 1fr; gap: 0.1rem; }
+  .supervision .detail-incident dd { margin-bottom: 0.4rem; }
+}
+.supervision .detail-incident dd { text-align: start; }

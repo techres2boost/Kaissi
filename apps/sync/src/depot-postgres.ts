@@ -38,6 +38,11 @@ import type {
   EtablissementEnrolable,
   ProduitEnAlerte,
   ResultatInsertion,
+  DemandeSupervision,
+  FenetreSupervision,
+  IncidentSupervision,
+  LectureSupervision,
+  SeauSupervision,
 } from './depot.js'
 import type { ChangementCatalogue, PointageSynchronise, ShiftSynchronise } from './protocole.js'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
@@ -45,6 +50,12 @@ import type { ReglageSsl } from './ssl.js'
 import { journal } from './journal.js'
 import { manquantes, requeteSondes, type SondeMigration } from './schema-requis.js'
 import type { MesuresBase } from './surveillance.js'
+import type { Alerte } from './surveillance.js'
+import type {
+  EvenementSupervision,
+  MesuresSupervisionBase,
+  PointSupervision,
+} from './supervision.js'
 
 /**
  * Ne garde que les identifiants réellement au format UUID.
@@ -1203,6 +1214,409 @@ export class DepotPostgres implements DepotSync {
       }
     })
     return ecrits
+  }
+
+  // ── Supervision (migration 0050) ─────────────────────────────────────────
+  //
+  // Le service écrit et lit ces tables avec son rôle PRIVILÉGIÉ (celui de la
+  // chaîne de connexion), jamais sous `sousIdentite` : RLS y refuse tout à
+  // tout le monde, et c'est voulu — ces chiffres traversent tous les
+  // restaurants, seuls les éditeurs les voient, par `/admin/supervision`.
+
+  async mesuresSupervisionBase(): Promise<MesuresSupervisionBase> {
+    const debut = performance.now()
+    const client = await this.pool.connect()
+    try {
+      await client.query('select 1')
+      const latenceMs = Math.round(performance.now() - debut)
+      // Les statistiques du SERVEUR uniquement, plus la table des appareils
+      // (quelques centaines de lignes). Jamais un comptage de ventes : c'est
+      // l'écran Surveillance qui s'en charge, à la demande.
+      const { rows: [b] } = await client.query<Record<string, string | null>>(
+        `select pg_database_size(current_database())::bigint as taille,
+                (select count(*) from pg_stat_activity where datname = current_database()) as connexions,
+                (select count(*) from pg_stat_activity
+                  where datname = current_database() and state = 'active') as actives,
+                (select count(*) from pg_stat_activity
+                  where datname = current_database() and wait_event_type = 'Lock') as verrous,
+                d.blks_hit, d.blks_read,
+                (select count(*) from kaissi.devices where revoked_at is null and type = 'pos'
+                    and last_seen_at > now() - interval '15 minutes') as vues
+           from pg_stat_database d where d.datname = current_database()`,
+      )
+      const n = (v: string | null | undefined) => Number(v ?? 0)
+      const lues = n(b?.['blks_hit']) + n(b?.['blks_read'])
+      return {
+        latenceMs,
+        tailleOctets: n(b?.['taille']),
+        connexions: n(b?.['connexions']),
+        connexionsActives: n(b?.['actives']),
+        poolTotal: this.pool.totalCount,
+        poolEnAttente: this.pool.waitingCount,
+        // Cumul depuis le démarrage de PostgreSQL : une tendance, pas
+        // l'instant. Suffisant pour voir une base qui manque de mémoire.
+        cachePourcent: lues > 0 ? Math.round((n(b?.['blks_hit']) / lues) * 1000) / 10 : null,
+        attentesVerrou: n(b?.['verrous']),
+        caissesVues15min: n(b?.['vues']),
+      }
+    } finally {
+      client.release()
+    }
+  }
+
+  async ecrireSupervision(lot: {
+    point: PointSupervision
+    evenements: readonly EvenementSupervision[]
+    alertes: readonly Alerte[]
+    resolutionApresSecondes: number
+  }): Promise<void> {
+    const { point: p, evenements, alertes } = lot
+    const client = await this.pool.connect()
+    try {
+      await client.query('begin')
+      await client.query("set local statement_timeout = '5s'")
+      // Une instance qui écrit deux fois la même seconde (arrêt + dernière
+      // période) ADDITIONNE ses compteurs au lieu d'échouer.
+      await client.query(
+        `insert into kaissi.supervision_points (
+           minute, instance, requetes, erreurs_5xx, erreurs_4xx, latence_moyenne_ms,
+           push_requetes, push_p50_ms, push_p95_ms, push_p99_ms, pull_p95_ms,
+           concurrence_max, evenements_recus, cpu_pourcent, rss_octets, tas_octets,
+           boucle_p99_ms, redemarrage, base_latence_ms, base_taille_octets,
+           base_connexions, base_connexions_actives, pool_ouvertes, pool_en_attente,
+           cache_pourcent, attentes_verrou, caisses_vues_15min,
+           echecs_authentification, limites_de_debit, acces_refuses)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
+                 $21,$22,$23,$24,$25,$26,$27,$28,$29,$30)
+         on conflict (minute, instance) do update set
+           requetes = kaissi.supervision_points.requetes + excluded.requetes,
+           erreurs_5xx = kaissi.supervision_points.erreurs_5xx + excluded.erreurs_5xx,
+           erreurs_4xx = kaissi.supervision_points.erreurs_4xx + excluded.erreurs_4xx,
+           evenements_recus = kaissi.supervision_points.evenements_recus + excluded.evenements_recus,
+           echecs_authentification = kaissi.supervision_points.echecs_authentification + excluded.echecs_authentification,
+           limites_de_debit = kaissi.supervision_points.limites_de_debit + excluded.limites_de_debit,
+           acces_refuses = kaissi.supervision_points.acces_refuses + excluded.acces_refuses`,
+        [
+          p.minute, p.instance, p.requetes, p.erreurs5xx, p.erreurs4xx, p.latenceMoyenneMs,
+          p.pushRequetes, p.pushP50Ms, p.pushP95Ms, p.pushP99Ms, p.pullP95Ms,
+          p.concurrenceMax, p.evenementsRecus, p.cpuPourcent, p.rssOctets, p.tasOctets,
+          p.boucleP99Ms, p.redemarrage,
+          p.base?.latenceMs ?? null, p.base?.tailleOctets ?? null,
+          p.base?.connexions ?? null, p.base?.connexionsActives ?? null,
+          p.base?.poolTotal ?? null, p.base?.poolEnAttente ?? null,
+          p.base?.cachePourcent ?? null, p.base?.attentesVerrou ?? null,
+          p.base?.caissesVues15min ?? null,
+          p.echecsAuthentification, p.limitesDeDebit, p.accesRefuses,
+        ],
+      )
+
+      if (evenements.length > 0) {
+        // Un seul aller-retour pour tout le lot de la période.
+        await client.query(
+          `insert into kaissi.supervision_evenements
+             (instant, categorie, type, niveau, restaurant_id, device_id, origine, message, detail)
+           select e.instant, e.categorie, e.type, e.niveau, e."restaurantId", e."deviceId",
+                  e.origine, e.message, coalesce(e.detail, '{}'::jsonb)
+             from jsonb_to_recordset($1::jsonb) as e(
+               instant timestamptz, categorie text, type text, niveau text,
+               "restaurantId" uuid, "deviceId" uuid, origine text, message text, detail jsonb)`,
+          [JSON.stringify(evenements)],
+        )
+      }
+
+      /*
+       * Les incidents. Une condition présente ouvre un incident, ou le
+       * RAFRAÎCHIT s'il est déjà ouvert — l'index unique partiel
+       * `supervision_incidents_ouvert_idx` fait de « déjà ouvert » une
+       * garantie de la base, pas une lecture suivie d'une écriture qu'une
+       * seconde instance pourrait doubler.
+       */
+      for (const a of alertes) {
+        await client.query(
+          `insert into kaissi.supervision_incidents (id, cle, niveau, sujet, message)
+           values ($1, $2, $3, $4, $5)
+           on conflict (cle) where statut <> 'resolu' do update set
+             niveau        = excluded.niveau,
+             message       = excluded.message,
+             dernier_vu_le = now(),
+             occurrences   = kaissi.supervision_incidents.occurrences + 1`,
+          [uuidV7(), a.cle, a.niveau, a.sujet, a.message],
+        )
+      }
+      // … et une condition disparue depuis plus de deux périodes est résolue
+      // d'office. Un incident pris en charge l'est aussi : la cause a
+      // disparu, la note du responsable reste.
+      await client.query(
+        `update kaissi.supervision_incidents
+            set statut = 'resolu', resolu_le = now(), resolution = 'automatique'
+          where statut <> 'resolu'
+            and not (cle = any($1::text[]))
+            and dernier_vu_le < now() - make_interval(secs => $2)`,
+        [alertes.map((a) => a.cle), lot.resolutionApresSecondes],
+      )
+      await client.query('commit')
+    } catch (erreur) {
+      await client.query('rollback').catch(() => undefined)
+      throw erreur
+    } finally {
+      client.release()
+    }
+  }
+
+  async purgerSupervision(): Promise<void> {
+    await this.pool.query(
+      `delete from kaissi.supervision_points where minute < now() - interval '30 days'`,
+    )
+    await this.pool.query(
+      `delete from kaissi.supervision_evenements where instant < now() - interval '90 days'`,
+    )
+    await this.pool.query(
+      `delete from kaissi.supervision_incidents
+        where statut = 'resolu' and resolu_le < now() - interval '180 days'`,
+    )
+  }
+
+  async lireSupervision(demande: DemandeSupervision): Promise<LectureSupervision> {
+    // La fenêtre et la taille des seaux : environ 120 points par graphique,
+    // quelle que soit la durée — assez pour voir une forme, peu pour la page.
+    const fenetres: Record<FenetreSupervision, { secondes: number; seau: number }> = {
+      '1h': { secondes: 3_600, seau: 60 },
+      '6h': { secondes: 21_600, seau: 180 },
+      '24h': { secondes: 86_400, seau: 720 },
+      '7j': { secondes: 604_800, seau: 5_040 },
+      '30j': { secondes: 2_592_000, seau: 21_600 },
+    }
+    const { secondes, seau } = fenetres[demande.fenetre]
+    const n = (v: unknown) => (v === null || v === undefined ? null : Number(v))
+    const client = await this.pool.connect()
+    try {
+      await client.query('begin read only')
+      await client.query("set local statement_timeout = '5s'")
+      const { rows: serie } = await client.query<Record<string, unknown>>(
+        `select date_bin(make_interval(secs => $2), minute, timestamptz '2026-01-01') as debut,
+                sum(requetes)::bigint as requetes,
+                sum(erreurs_5xx)::bigint as e5,
+                sum(erreurs_4xx)::bigint as e4,
+                case when sum(requetes) > 0
+                     then round(sum(latence_moyenne_ms::numeric * requetes) / sum(requetes))
+                     else 0 end as latence,
+                max(push_p95_ms) as push95, max(push_p99_ms) as push99, max(pull_p95_ms) as pull95,
+                max(concurrence_max) as concurrence,
+                sum(evenements_recus)::bigint as recus,
+                max(cpu_pourcent) as cpu, max(rss_octets) as rss, max(boucle_p99_ms) as boucle,
+                max(base_latence_ms) as blat, max(base_taille_octets) as btaille,
+                max(base_connexions) as bconn, max(pool_en_attente) as pattente,
+                min(cache_pourcent) as cache, min(caisses_vues_15min) as vues,
+                sum(echecs_authentification)::bigint as auth,
+                sum(limites_de_debit)::bigint as limites,
+                sum(acces_refuses)::bigint as refuses,
+                count(*) filter (where redemarrage)::int as redemarrages
+           from kaissi.supervision_points
+          where minute > now() - make_interval(secs => $1)
+          group by 1 order by 1`,
+        [secondes, seau],
+      )
+
+      const colonnesIncident = `id, cle, niveau, sujet, message, statut, ouvert_le, dernier_vu_le,
+             occurrences, pris_en_charge_par, pris_en_charge_le, resolu_le, resolution,
+             resolu_par, note`
+      const { rows: ouverts } = await client.query(
+        `select ${colonnesIncident} from kaissi.supervision_incidents
+          where statut <> 'resolu'
+          order by case niveau when 'critique' then 0 when 'attention' then 1 else 2 end,
+                   ouvert_le desc`,
+      )
+      const { rows: recents } = await client.query(
+        `select ${colonnesIncident} from kaissi.supervision_incidents
+          where statut = 'resolu' and resolu_le > now() - make_interval(secs => $1)
+          order by resolu_le desc limit 50`,
+        [secondes],
+      )
+
+      const { rows: evenements } = await client.query(
+        `select e.id, e.instant, e.categorie, e.type, e.niveau, r.name as restaurant,
+                d.label as terminal, e.origine, e.message, e.detail
+           from kaissi.supervision_evenements e
+           left join kaissi.restaurants r on r.id = e.restaurant_id
+           left join kaissi.devices d on d.id = e.device_id
+          where e.instant > now() - make_interval(secs => $1)
+            and ($2::text is null or e.categorie = $2)
+            and ($3::text is null or e.niveau = $3)
+          order by e.id desc limit 200`,
+        [secondes, demande.categorie, demande.niveau],
+      )
+      const { rows: comptes } = await client.query<{ categorie: string; niveau: string; n: string }>(
+        `select categorie, niveau, count(*)::bigint as n
+           from kaissi.supervision_evenements
+          where instant > now() - make_interval(secs => $1)
+          group by 1, 2 order by 1, 2`,
+        [secondes],
+      )
+
+      const { rows: terminaux } = await client.query(
+        `select d.id, d.label, r.name as restaurant, d.app_version, d.last_seen_at,
+                c.last_push_at, c.last_pull_at,
+                (select count(*) from kaissi.sync_mutations m
+                  where m.device_id = d.id and m.status = 'rejete'
+                    and m.received_at > now() - interval '24 hours')::int as rejets
+           from kaissi.devices d
+           join kaissi.restaurants r on r.id = d.restaurant_id
+           left join kaissi.sync_cursors c on c.device_id = d.id
+          where d.revoked_at is null and d.type = 'pos'
+          order by d.last_seen_at desc nulls last
+          limit 200`,
+      )
+      await client.query('commit')
+
+      const versIncident = (r: Record<string, unknown>): IncidentSupervision => ({
+        id: String(r['id']),
+        cle: String(r['cle']),
+        niveau: String(r['niveau']),
+        sujet: String(r['sujet']),
+        message: String(r['message']),
+        statut: r['statut'] as IncidentSupervision['statut'],
+        ouvertLe: new Date(r['ouvert_le'] as string).toISOString(),
+        dernierVuLe: new Date(r['dernier_vu_le'] as string).toISOString(),
+        occurrences: Number(r['occurrences']),
+        prisEnChargePar: (r['pris_en_charge_par'] as string | null) ?? null,
+        prisEnChargeLe: r['pris_en_charge_le'] ? new Date(r['pris_en_charge_le'] as string).toISOString() : null,
+        resoluLe: r['resolu_le'] ? new Date(r['resolu_le'] as string).toISOString() : null,
+        resolution: (r['resolution'] as string | null) ?? null,
+        resoluPar: (r['resolu_par'] as string | null) ?? null,
+        note: (r['note'] as string | null) ?? null,
+      })
+
+      const seaux: SeauSupervision[] = serie.map((r) => ({
+        debut: new Date(r['debut'] as string).toISOString(),
+        requetes: Number(r['requetes']),
+        erreurs5xx: Number(r['e5']),
+        erreurs4xx: Number(r['e4']),
+        latenceMoyenneMs: Number(r['latence']),
+        pushP95Ms: n(r['push95']),
+        pushP99Ms: n(r['push99']),
+        pullP95Ms: n(r['pull95']),
+        concurrenceMax: Number(r['concurrence'] ?? 0),
+        evenementsRecus: Number(r['recus']),
+        cpuPourcent: n(r['cpu']),
+        rssOctets: n(r['rss']),
+        boucleP99Ms: n(r['boucle']),
+        baseLatenceMs: n(r['blat']),
+        baseTailleOctets: n(r['btaille']),
+        baseConnexions: n(r['bconn']),
+        poolEnAttente: n(r['pattente']),
+        cachePourcent: n(r['cache']),
+        caissesVues15min: n(r['vues']),
+        echecsAuthentification: Number(r['auth']),
+        limitesDeDebit: Number(r['limites']),
+        accesRefuses: Number(r['refuses']),
+        redemarrages: Number(r['redemarrages']),
+      }))
+      const somme = (f: (x: SeauSupervision) => number) => seaux.reduce((t, x) => t + f(x), 0)
+      const requetes = somme((x) => x.requetes)
+      const e5 = somme((x) => x.erreurs5xx)
+      return {
+        seauSecondes: seau,
+        serie: seaux,
+        incidentsOuverts: ouverts.map(versIncident),
+        incidentsRecents: recents.map(versIncident),
+        evenements: evenements.map((r) => ({
+          id: Number(r['id']),
+          instant: new Date(r['instant'] as string).toISOString(),
+          categorie: String(r['categorie']),
+          type: String(r['type']),
+          niveau: String(r['niveau']),
+          restaurant: (r['restaurant'] as string | null) ?? null,
+          terminal: (r['terminal'] as string | null) ?? null,
+          origine: (r['origine'] as string | null) ?? null,
+          message: String(r['message']),
+          detail: (r['detail'] as Record<string, unknown>) ?? {},
+        })),
+        comptesEvenements: comptes.map((c) => ({ categorie: c.categorie, niveau: c.niveau, n: Number(c.n) })),
+        terminaux: terminaux.map((r) => ({
+          deviceId: String(r['id']),
+          libelle: String(r['label']),
+          restaurant: String(r['restaurant']),
+          version: (r['app_version'] as string | null) ?? null,
+          vuLe: r['last_seen_at'] ? new Date(r['last_seen_at'] as string).toISOString() : null,
+          dernierEnvoi: r['last_push_at'] ? new Date(r['last_push_at'] as string).toISOString() : null,
+          dernierPull: r['last_pull_at'] ? new Date(r['last_pull_at'] as string).toISOString() : null,
+          rejets24h: Number(r['rejets']),
+        })),
+        totaux: {
+          requetes,
+          erreurs5xx: e5,
+          erreurs4xx: somme((x) => x.erreurs4xx),
+          echecsAuthentification: somme((x) => x.echecsAuthentification),
+          limitesDeDebit: somme((x) => x.limitesDeDebit),
+          redemarrages: somme((x) => x.redemarrages),
+          // Disponibilité côté SERVICE : la part des requêtes qui n'ont pas
+          // rendu 5xx. Elle ne voit pas une panne où rien n'arrive — c'est le
+          // rôle de la sonde externe sur /sante.
+          disponibilitePourcent: requetes > 0 ? Math.round((1 - e5 / requetes) * 100_000) / 1000 : null,
+        },
+      }
+    } catch (erreur) {
+      await client.query('rollback').catch(() => undefined)
+      throw erreur
+    } finally {
+      client.release()
+    }
+  }
+
+  async traiterIncident(demande: {
+    id: string
+    action: 'prendre_en_charge' | 'resoudre' | 'rouvrir'
+    par: string
+    note: string | null
+  }): Promise<IncidentSupervision | null> {
+    const requetes = {
+      prendre_en_charge: `update kaissi.supervision_incidents
+          set statut = 'pris_en_charge', pris_en_charge_par = $2, pris_en_charge_le = now(),
+              note = coalesce($3, note)
+        where id = $1 and statut = 'ouvert'`,
+      resoudre: `update kaissi.supervision_incidents
+          set statut = 'resolu', resolu_le = now(), resolution = 'manuelle', resolu_par = $2,
+              note = coalesce($3, note)
+        where id = $1 and statut <> 'resolu'`,
+      // Rouvrir n'est possible que si la MÊME condition n'a pas déjà un autre
+      // incident ouvert : l'index unique partiel le refuserait.
+      rouvrir: `update kaissi.supervision_incidents
+          set statut = 'ouvert', resolu_le = null, resolution = null, resolu_par = null,
+              note = coalesce($3, note), dernier_vu_le = now()
+        where id = $1 and statut = 'resolu'
+          and not exists (select 1 from kaissi.supervision_incidents i
+                           where i.cle = supervision_incidents.cle and i.statut <> 'resolu')`,
+    } as const
+    const { rowCount } = await this.pool.query(requetes[demande.action], [
+      demande.id,
+      demande.par,
+      demande.note,
+    ])
+    if (!rowCount) return null
+    const { rows } = await this.pool.query(
+      `select id, cle, niveau, sujet, message, statut, ouvert_le, dernier_vu_le, occurrences,
+              pris_en_charge_par, pris_en_charge_le, resolu_le, resolution, resolu_par, note
+         from kaissi.supervision_incidents where id = $1`,
+      [demande.id],
+    )
+    const r = rows[0] as Record<string, unknown>
+    return {
+      id: String(r['id']),
+      cle: String(r['cle']),
+      niveau: String(r['niveau']),
+      sujet: String(r['sujet']),
+      message: String(r['message']),
+      statut: r['statut'] as IncidentSupervision['statut'],
+      ouvertLe: new Date(r['ouvert_le'] as string).toISOString(),
+      dernierVuLe: new Date(r['dernier_vu_le'] as string).toISOString(),
+      occurrences: Number(r['occurrences']),
+      prisEnChargePar: (r['pris_en_charge_par'] as string | null) ?? null,
+      prisEnChargeLe: r['pris_en_charge_le'] ? new Date(r['pris_en_charge_le'] as string).toISOString() : null,
+      resoluLe: r['resolu_le'] ? new Date(r['resolu_le'] as string).toISOString() : null,
+      resolution: (r['resolution'] as string | null) ?? null,
+      resoluPar: (r['resolu_par'] as string | null) ?? null,
+      note: (r['note'] as string | null) ?? null,
+    }
   }
 
   async enregistrerPointages(

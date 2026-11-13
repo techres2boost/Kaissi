@@ -34,6 +34,7 @@ export default async function PageEditeur() {
         <h1>{t('Clients et formules')}</h1>
         <p className="sous-titre">{t('Écran de l’éditeur. Changer une formule s’applique à toute l’organisation du client, aussitôt. La caisse n’est jamais concernée.')}</p>
         <p>
+          <Link className="bouton" href="/editeur/supervision">{t('Centre de supervision ›')}</Link>{' '}
           <Link className="bouton discret" href="/editeur/surveillance">{t('Surveillance du service ›')}</Link>
         </p>
 

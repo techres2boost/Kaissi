@@ -13,6 +13,8 @@ import { creerServeur } from './serveur.js'
 import { formaterErreurBase } from './diagnostic-base.js'
 import { avertissementDemarrage } from './schema-requis.js'
 import { configurationPg, hoteDe, taillePoolDepuisEnvironnement } from './connexion.js'
+import { Metriques, evaluerAlertes } from './surveillance.js'
+import { Supervision, intervalleSupervisionDepuisEnvironnement } from './supervision.js'
 import { planifierReparation, INTERVALLE_DEFAUT_MINUTES } from './reparation.js'
 import {
   planifierAlertesStock,
@@ -204,7 +206,31 @@ export async function demarrer(): Promise<void> {
   const absentes = await depot.migrationsManquantes().catch(() => [])
   if (absentes.length > 0) console.error(avertissementDemarrage(absentes))
 
-  const app = creerServeur({ depot, origines })
+  /*
+   * La supervision historique (0050). Une ligne par minute, quelle que soit
+   * la charge — voir `supervision.ts`. `SYNC_SUPERVISION=0` la coupe.
+   *
+   * Ses alertes reprennent celles de l'écran Surveillance, SANS les mesures
+   * lourdes de la base (comptages de ventes) : celles-là restent à la
+   * demande. Les mesures légères, le collecteur les prend lui-même.
+   */
+  const metriques = new Metriques()
+  const supervision =
+    process.env['SYNC_SUPERVISION'] === '0'
+      ? null
+      : new Supervision(depot, {
+          intervalleMs: intervalleSupervisionDepuisEnvironnement(),
+          alertes: async () => {
+            const migrations = (await depot.migrationsManquantes().catch(() => [])).map(
+              (m) => m.migration,
+            )
+            return evaluerAlertes(metriques.instantane(), null, migrations).filter(
+              (a) => a.cle !== 'base.injoignable',
+            )
+          },
+        })
+
+  const app = creerServeur({ depot, origines, metriques, supervision })
 
   const serveur = serve({ fetch: app.fetch, port, hostname: '0.0.0.0' })
   console.log(
@@ -262,10 +288,19 @@ export async function demarrer(): Promise<void> {
     })
   }
 
+  // APRÈS l'ouverture du port : la première écriture a lieu une période plus
+  // tard, et un démarrage ne doit jamais attendre la supervision.
+  supervision?.demarrer()
+
   const arreter = (signal: string) => {
     console.log(`${signal} reçu, arrêt en cours…`)
     serveur.close(() => {
-      void depot.fermer().finally(() => process.exit(0))
+      // La dernière période est écrite avant de fermer la base : sans cela,
+      // la minute qui précède un redéploiement disparaîtrait de l'historique.
+      void (supervision?.arreter() ?? Promise.resolve())
+        .catch(() => undefined)
+        .then(() => depot.fermer())
+        .finally(() => process.exit(0))
     })
   }
   process.on('SIGTERM', () => arreter('SIGTERM'))

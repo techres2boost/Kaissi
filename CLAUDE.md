@@ -832,6 +832,16 @@ révélait autre chose.
   dans `apps/sync/src/schema-requis.ts` — la CI l'exige — et `/sante` répond
   503 `schema_incomplet` tant qu'il en manque une, ce qui empêche Railway de
   basculer le trafic. Vu en production avec 0045 : plus rien ne remontait.
+- **La supervision n'écrit jamais une ligne par vente** (0050,
+  `apps/sync/src/supervision.ts`). Compteurs en mémoire, UNE écriture par
+  période et par instance ; une écriture qui échoue est abandonnée, jamais
+  réessayée — elle ne dispute pas une connexion aux encaissements. Aucune IP
+  complète (/24, /48), aucune adresse e-mail en clair, aucun montant ; RLS
+  forcée « refus à tous », seul le rôle du service y accède. Une alerte qui
+  persiste devient un incident dédupliqué par sa CLÉ (index unique partiel
+  sur `statut <> 'resolu'`), résolu d'office quand sa cause disparaît.
+  `test/charge.test.ts` (palier E) exige que chaque requête soit comptée
+  exactement une fois sous charge.
 - **Le service emprunte le rôle `kaissi_device`** et pose son contexte en
   variables de session : tout passe par RLS. Un défaut de filtrage applicatif
   ne peut pas provoquer de fuite entre restaurants.

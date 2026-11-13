@@ -29,5 +29,6 @@ select migration as "migration manquante" from (values
   ('0046', (exists (select 1 from information_schema.columns where table_schema = 'kaissi' and table_name = 'orders' and column_name = 'last_sent_seq') and exists (select 1 from information_schema.columns where table_schema = 'kaissi' and table_name = 'order_items' and column_name = 'sent_seq') and exists (select 1 from information_schema.columns where table_schema = 'kaissi' and table_name = 'kitchen_ready' and column_name = 'sent_seq'))),
   ('0047', exists (select 1 from information_schema.columns where table_schema = 'kaissi' and table_name = 'push_subscriptions' and column_name = 'alertes_preparation')),
   ('0048', exists (select 1 from pg_policies where schemaname = 'kaissi' and tablename = 'time_entries' and policyname = 'time_entries_correction_appareil')),
-  ('0049', not exists (select 1 from pg_constraint where conname = 'order_events_device_id_seq_device_key'))
+  ('0049', not exists (select 1 from pg_constraint where conname = 'order_events_device_id_seq_device_key')),
+  ('0050', (to_regclass('kaissi.supervision_points') is not null and to_regclass('kaissi.supervision_incidents') is not null and to_regclass('kaissi.supervision_evenements') is not null))
 ) as t(migration, presente) where not presente;

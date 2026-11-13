@@ -272,6 +272,15 @@ export interface MesuresBase {
 }
 
 export interface Alerte {
+  /**
+   * Identifiant STABLE de la condition (« ventes.taux_erreur »).
+   *
+   * Le message porte des chiffres qui changent à chaque mesure ; la clé, non.
+   * C'est elle qui fait qu'une alerte vue soixante fois en une heure reste UN
+   * incident dans la supervision (`supervision_incidents`, index unique
+   * partiel sur `cle`), au lieu de soixante.
+   */
+  readonly cle: string
   readonly niveau: 'critique' | 'attention'
   readonly sujet: string
   readonly message: string
@@ -307,18 +316,21 @@ export function evaluerAlertes(
   limiteBaseOctets: number = limiteBaseDepuisEnvironnement(),
 ): Alerte[] {
   const alertes: Alerte[] = []
-  const critique = (sujet: string, message: string) => alertes.push({ niveau: 'critique', sujet, message })
-  const attention = (sujet: string, message: string) => alertes.push({ niveau: 'attention', sujet, message })
+  const critique = (cle: string, sujet: string, message: string) =>
+    alertes.push({ cle, niveau: 'critique', sujet, message })
+  const attention = (cle: string, sujet: string, message: string) =>
+    alertes.push({ cle, niveau: 'attention', sujet, message })
 
   if (migrationsManquantes.length > 0) {
     critique(
+      'base.migrations',
       'Base de données',
       `Migration(s) manquante(s) : ${migrationsManquantes.join(', ')}. Les ventes poussées échouent ` +
         'jusqu’à ce qu’elles soient appliquées (Supabase → SQL Editor).',
     )
   }
   if (!base) {
-    critique('Base de données', 'Mesures de la base illisibles : base injoignable ou trop lente.')
+    critique('base.injoignable', 'Base de données', 'Mesures de la base illisibles : base injoignable ou trop lente.')
   }
 
   const push = m.requetes.familles15min.find((f) => f.famille === 'push')
@@ -326,23 +338,25 @@ export function evaluerAlertes(
     const taux = push.erreurs5xx / push.requetes
     if (taux > 0.01) {
       critique(
+        'ventes.taux_erreur',
         'Ventes',
         `${Math.round(taux * 100)} % des envois de ventes échouent (15 dernières minutes). ` +
           'Les caisses gardent ces ventes et réessaient, mais rien n’arrive au back-office.',
       )
     }
     if (push.p95Ms > 2_000) {
-      attention('Ventes', `Envoi des ventes lent : 95 % sous ${push.p95Ms} ms (seuil 2 000 ms).`)
+      attention('ventes.lenteur', 'Ventes', `Envoi des ventes lent : 95 % sous ${push.p95Ms} ms (seuil 2 000 ms).`)
     }
   }
 
   const dernier = m.processus.historique[m.processus.historique.length - 1]
   if (dernier) {
     if (dernier.cpuPourcent > 80) {
-      attention('Processeur', `Le service occupe ${dernier.cpuPourcent} % d’un cœur.`)
+      attention('processus.cpu', 'Processeur', `Le service occupe ${dernier.cpuPourcent} % d’un cœur.`)
     }
     if (dernier.boucleP99Ms > 200) {
       critique(
+        'processus.boucle',
         'Réactivité',
         `La boucle d’événements prend jusqu’à ${dernier.boucleP99Ms} ms de retard : ` +
           'chaque requête attend derrière un calcul.',
@@ -358,43 +372,47 @@ export function evaluerAlertes(
         `La base occupe ${mo(base.tailleOctets)} Mo sur ${mo(limiteBaseOctets)} Mo ` +
         `(${Math.round(part * 100)} %). Les ventes ne se purgent pas : passer à l’offre ` +
         'supérieure, puis relever KAISSI_LIMITE_BASE_MO.'
-      if (part >= 0.9) critique('Espace disque', texte)
-      else if (part >= 0.7) attention('Espace disque', texte)
+      if (part >= 0.9) critique('base.espace', 'Espace disque', texte)
+      else if (part >= 0.7) attention('base.espace', 'Espace disque', texte)
     }
     if (base.pool.enAttente > 0) {
-      attention('Connexions', `${base.pool.enAttente} requête(s) attendent une connexion libre au pool.`)
+      attention('base.pool_attente', 'Connexions', `${base.pool.enAttente} requête(s) attendent une connexion libre au pool.`)
     }
     if (base.connexionsMax > 0 && base.connexions / base.connexionsMax > 0.8) {
       critique(
+        'base.connexions',
         'Connexions',
         `${base.connexions} connexions sur ${base.connexionsMax} autorisées par PostgreSQL.`,
       )
     }
     if (base.cachePourcent !== null && base.cachePourcent < 95) {
       attention(
+        'base.cache',
         'Base de données',
         `Seulement ${base.cachePourcent} % des lectures servies par le cache : la base manque de mémoire, ` +
           'ou une requête lit des tables entières.',
       )
     }
     if (base.requetePlusLongueSecondes > 10) {
-      attention('Base de données', `Une requête tourne depuis ${Math.round(base.requetePlusLongueSecondes)} s.`)
+      attention('base.requete_longue', 'Base de données', `Une requête tourne depuis ${Math.round(base.requetePlusLongueSecondes)} s.`)
     }
     if (base.latenceMs > 500) {
-      attention('Base de données', `La base répond en ${base.latenceMs} ms à une requête triviale.`)
+      attention('base.latence', 'Base de données', `La base répond en ${base.latenceMs} ms à une requête triviale.`)
     }
     if (base.metier.projectionsManquantes > 0) {
       attention(
+        'ventes.projections',
         'Ventes',
         `${base.metier.projectionsManquantes} vente(s) reçue(s) sans projection : invisibles au ` +
           'back-office jusqu’au prochain balayage de réparation (30 min).',
       )
     }
     if (base.metier.rejets24h > 0) {
-      attention('Ventes', `${base.metier.rejets24h} opération(s) rejetée(s) en 24 h — à voir avec le gérant.`)
+      attention('ventes.rejets', 'Ventes', `${base.metier.rejets24h} opération(s) rejetée(s) en 24 h — à voir avec le gérant.`)
     }
     if (base.metier.caissesMuettes24h > 0) {
       attention(
+        'caisses.muettes',
         'Caisses',
         `${base.metier.caissesMuettes24h} caisse(s) active(s) n’ont pas parlé au serveur depuis 24 h.`,
       )

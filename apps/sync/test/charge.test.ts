@@ -45,6 +45,8 @@ import { serve, type ServerType } from '@hono/node-server'
 import { DepotPostgres } from '../src/depot-postgres.js'
 import { creerServeur } from '../src/serveur.js'
 import { Metriques } from '../src/surveillance.js'
+import { Supervision } from '../src/supervision.js'
+import { Client } from 'pg'
 import { creerAppareil, nettoyer, URL_TEST } from './aide.js'
 import {
   Caisse,
@@ -59,7 +61,16 @@ const ECHELLE = process.env['KAISSI_CHARGE'] === 'lourd' ? 5 : 1
 
 const depot = new DepotPostgres({ connectionString: URL_TEST, ssl: false })
 const metriques = new Metriques()
-const app = creerServeur({ depot, metriques })
+/*
+ * La supervision tourne PENDANT la charge, avec une période d'une seconde
+ * (soixante fois plus fréquente qu'en production) : si son écriture gênait
+ * les encaissements, c'est ici que cela se verrait.
+ */
+const supervision = new Supervision(depot, {
+  intervalleMs: 1_000,
+  instance: `charge-${Date.now().toString(36)}`,
+})
+const app = creerServeur({ depot, metriques, supervision })
 let serveur: ServerType
 let base = ''
 const rapport: Record<string, unknown>[] = []
@@ -70,6 +81,7 @@ beforeAll(async () => {
   await new Promise<void>((pret) => {
     serveur = serve({ fetch: app.fetch, port: 0, hostname: '127.0.0.1' }, () => pret())
   })
+  supervision.demarrer()
   base = `http://127.0.0.1:${(serveur.address() as AddressInfo).port}`
 })
 
@@ -78,6 +90,7 @@ beforeEach(nettoyer)
 afterAll(async () => {
   imprimerRapport('Rapport de charge (latences en ms, base locale)', rapport)
   metriques.arreter()
+  await supervision.arreter()
   await new Promise((fin) => serveur.close(fin))
   await depot.fermer()
 })
@@ -178,5 +191,49 @@ describe('CHARGE', () => {
     expect(push).toBeDefined()
     expect(push!.erreurs5xx).toBe(0)
     expect(push!.requetes).toBeGreaterThan(500)
+  })
+
+  it('E. la supervision a compté CHAQUE requête, ni plus ni moins, sans gêner la caisse', async () => {
+    // Ce que la surveillance en mémoire a vu, toutes routes confondues…
+    const vues = metriques.statsFamilles(60).reduce((s, f) => s + f.requetes, 0)
+    const e5 = metriques.statsFamilles(60).reduce((s, f) => s + f.erreurs5xx, 0)
+    // …et ce que la supervision a ÉCRIT en base, période après période.
+    const debutEcriture = performance.now()
+    await supervision.vider()
+    const dureeEcritureMs = performance.now() - debutEcriture
+    const client = new Client({ connectionString: URL_TEST })
+    await client.connect()
+    try {
+      const { rows } = await client.query(
+        `select count(*)::int as periodes, sum(requetes)::int as requetes,
+                sum(erreurs_5xx)::int as e5, max(concurrence_max)::int as concurrence,
+                sum(evenements_recus)::int as evenements
+           from kaissi.supervision_points where instance = $1`,
+        [supervision.instance],
+      )
+      const p = rows[0]
+      process.stdout.write(
+        `  ── Supervision pendant la charge : ${p.periodes} périodes écrites, ` +
+          `${p.requetes} requêtes comptées (surveillance : ${vues}), ` +
+          `pic de ${p.concurrence} requêtes simultanées, ${p.evenements} événements de vente, ` +
+          `dernière écriture ${Math.round(dureeEcritureMs)} ms\n`,
+      )
+      expect(p.periodes, 'une ligne par période écrite pendant la charge').toBeGreaterThan(3)
+      expect(p.requetes).toBe(vues)
+      expect(p.e5).toBe(e5)
+      expect(p.evenements).toBeGreaterThan(0)
+    } finally {
+      await client.end()
+    }
+    // Le coût en mémoire d'une observation : cent mille requêtes simulées.
+    const t0 = performance.now()
+    for (let i = 0; i < 100_000; i += 1) {
+      const fin = supervision.debut()
+      supervision.observer({ chemin: '/sync/push', statut: 200, ms: 12, origine: '203.0.113.9', restaurantId: null, deviceId: null, codeErreur: null, messageErreur: null })
+      fin()
+    }
+    const parRequeteUs = ((performance.now() - t0) * 1000) / 100_000
+    process.stdout.write(`  ── Supervision : ${parRequeteUs.toFixed(2)} µs par requête observée\n`)
+    expect(parRequeteUs, 'observer une requête doit coûter moins de 20 µs').toBeLessThan(20)
   })
 })

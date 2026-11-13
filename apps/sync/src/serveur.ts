@@ -43,6 +43,7 @@ import {
 } from './admin-comptes.js'
 import { journal } from './journal.js'
 import { Metriques, evaluerAlertes } from './surveillance.js'
+import type { Supervision } from './supervision.js'
 import {
   estSchemaEnRetard,
   messageSchemaEnRetard,
@@ -100,6 +101,13 @@ export interface OptionsServeur {
    * notifications push, si les clés VAPID sont configurées. `null` coupe.
    */
   readonly surEnvoiCuisine?: ((envois: readonly EnvoiCuisine[]) => Promise<unknown>) | null
+  /**
+   * Le collecteur de supervision (`supervision.ts`). Absent par défaut : le
+   * démarrage autonome (`index.ts`) le crée, les tests le passent quand ils
+   * en ont besoin. Un serveur sans collecteur n'a simplement pas
+   * d'historique — rien d'autre ne change.
+   */
+  readonly supervision?: Supervision | null
 }
 
 function editeursDepuisEnvironnement(): string[] {
@@ -117,6 +125,7 @@ export function creerServeur({
   cleService = cleServiceDepuisEnvironnement(),
   editeurs = editeursDepuisEnvironnement(),
   metriques = new Metriques(),
+  supervision = null,
   surEnvoiCuisine = configVapidDepuisEnvironnement()
     ? (envois: readonly EnvoiCuisine[]) => notifierPreparation(depot, envois)
     : null,
@@ -168,8 +177,43 @@ export function creerServeur({
   metriques.demarrer()
   app.use('*', async (c, next) => {
     const debut = performance.now()
-    await next()
-    metriques.enregistrer(c.req.path, c.res.status, performance.now() - debut)
+    const fin = supervision?.debut()
+    try {
+      await next()
+    } finally {
+      fin?.()
+    }
+    const ms = performance.now() - debut
+    metriques.enregistrer(c.req.path, c.res.status, ms)
+    if (supervision) {
+      /*
+       * Le code et le message d'erreur, lus sur une COPIE de la réponse et
+       * seulement pour les erreurs : une réponse réussie n'est jamais relue.
+       * C'est ce qui permet de distinguer « mot de passe faux » de « appareil
+       * révoqué » sans toucher à chaque route.
+       */
+      let codeErreur: string | null = null
+      let messageErreur: string | null = null
+      if (c.res.status >= 400 && (c.res.headers.get('content-type') ?? '').includes('json')) {
+        const lu = (await c.res.clone().json().catch(() => null)) as {
+          erreur?: unknown
+          message?: unknown
+        } | null
+        codeErreur = typeof lu?.erreur === 'string' ? lu.erreur : null
+        messageErreur = typeof lu?.message === 'string' ? lu.message : null
+      }
+      const appareil = c.get('appareil') as AppareilAuthentifie | undefined
+      supervision.observer({
+        chemin: c.req.path,
+        statut: c.res.status,
+        ms,
+        origine: adresseClient(c.req.raw.headers),
+        restaurantId: appareil?.restaurantId ?? null,
+        deviceId: appareil?.deviceId ?? null,
+        codeErreur,
+        messageErreur,
+      })
+    }
   })
 
   /*
@@ -1405,6 +1449,120 @@ export function creerServeur({
     })
   })
 
+  /*
+   * ── POST /admin/supervision ──────────────────────────────────────────
+   *
+   * Le centre de supervision : l'état vivant (le même que /admin/surveillance)
+   * ET l'historique de la fenêtre demandée — séries, incidents, journal,
+   * terminaux. Réservé aux éditeurs : ces chiffres traversent tous les
+   * restaurants.
+   *
+   * Sans collecteur ou sans la migration 0050, la route répond quand même :
+   * `historique: null` et la raison. Un écran qui tombe en erreur parce que
+   * l'historique manque ne montrerait plus non plus l'état vivant — c'est-à-
+   * dire la seule chose utile pendant un incident.
+   */
+  app.post('/admin/supervision', async (c) => {
+    return adminSupabase(c, async ({ appelant, corps }) => {
+      if (!estEditeur(appelant.email)) {
+        throw new ErreurAuth('Réservé à l’éditeur de Kaissi.', 401)
+      }
+      const fenetres = ['1h', '6h', '24h', '7j', '30j'] as const
+      const fenetre = (fenetres as readonly string[]).includes(String(corps['fenetre']))
+        ? (String(corps['fenetre']) as (typeof fenetres)[number])
+        : '24h'
+      const categories = ['securite', 'application', 'synchronisation', 'terminal']
+      const categorie = categories.includes(String(corps['categorie'])) ? String(corps['categorie']) : null
+      const niveaux = ['critique', 'attention', 'info']
+      const niveau = niveaux.includes(String(corps['niveau'])) ? String(corps['niveau']) : null
+
+      metriques.echantillonnerProcessus()
+      const instantane = metriques.instantane()
+      let base = null
+      let erreurBase: string | null = null
+      try {
+        base = depot.mesuresBase ? await depot.mesuresBase() : null
+      } catch (erreur) {
+        erreurBase = erreur instanceof Error ? erreur.message : String(erreur)
+      }
+      const migrations = (await etatSchema(true)).map((m) => m.migration)
+
+      let historique = null
+      let erreurHistorique: string | null = null
+      if (!depot.lireSupervision) {
+        erreurHistorique = 'Ce dépôt ne tient pas d’historique de supervision.'
+      } else if (migrations.includes('0050')) {
+        erreurHistorique = 'La migration 0050 (supervision) n’est pas appliquée : aucun historique.'
+      } else {
+        try {
+          historique = await depot.lireSupervision({ fenetre, categorie, niveau })
+        } catch (erreur) {
+          erreurHistorique = erreur instanceof Error ? erreur.message : String(erreur)
+        }
+      }
+      return {
+        horodatage: new Date().toISOString(),
+        fenetre,
+        categorie,
+        niveau,
+        collecteur: supervision?.etat() ?? null,
+        vivant: {
+          ...instantane,
+          base,
+          erreurBase,
+          migrationsManquantes: migrations,
+          alertes: evaluerAlertes(instantane, base, migrations),
+        },
+        historique,
+        erreurHistorique,
+      }
+    })
+  })
+
+  /*
+   * ── POST /admin/supervision/incident ─────────────────────────────────
+   *
+   * Prendre en charge, résoudre ou rouvrir un incident. Qui l'a fait est
+   * l'adresse de l'éditeur connecté — relue par le service, jamais reçue du
+   * navigateur.
+   */
+  app.post('/admin/supervision/incident', async (c) => {
+    return adminSupabase(c, async ({ appelant, corps }) => {
+      if (!estEditeur(appelant.email)) {
+        throw new ErreurAuth('Réservé à l’éditeur de Kaissi.', 401)
+      }
+      if (!depot.traiterIncident) {
+        throw new ErreurAuth('La supervision n’est pas disponible sur ce serveur.', 409)
+      }
+      const id = String(corps['id'] ?? '')
+      if (!UUID.test(id)) throw new ErreurAuth('Incident inconnu.', 409)
+      const actions = ['prendre_en_charge', 'resoudre', 'rouvrir'] as const
+      const action = String(corps['action'] ?? '')
+      if (!(actions as readonly string[]).includes(action)) {
+        throw new ErreurAuth(`Action inconnue « ${action} ».`, 409)
+      }
+      const noteBrute = typeof corps['note'] === 'string' ? corps['note'].trim() : ''
+      const incident = await depot.traiterIncident({
+        id,
+        action: action as (typeof actions)[number],
+        par: appelant.email,
+        note: noteBrute ? noteBrute.slice(0, 1_000) : null,
+      })
+      if (!incident) {
+        throw new ErreurAuth(
+          'Cet incident a déjà changé d’état — rechargez la page.',
+          409,
+        )
+      }
+      const libelles = {
+        prendre_en_charge: 'Incident pris en charge.',
+        resoudre: 'Incident résolu.',
+        rouvrir: 'Incident rouvert.',
+      } as const
+      return { incident, message: libelles[action as (typeof actions)[number]] }
+    })
+  })
+
   // ── POST /admin/notification-test ─────────────────────────────────────
   // Fait sonner CE navigateur, et dit en clair ce qui manque sinon. Le
   // compte est relu en base : un membre ne teste que SES abonnements, dans
@@ -1543,7 +1701,10 @@ export function creerServeur({
       return c.json(corps, 400)
     }
     try {
-      return c.json(await service.push(appareil, corps as never))
+      const resultat = await service.push(appareil, corps as never)
+      supervision?.evenementsRecus(resultat.acceptes.length)
+      if (resultat.rejetes.length > 0) supervision?.rejetsSynchronisation(appareil, resultat.rejetes)
+      return c.json(resultat)
     } catch (erreur) {
       return repondreErreur(c, erreur)
     }
@@ -1661,6 +1822,21 @@ export function estPoolSature(erreur: unknown): boolean {
   )
 }
 
+/**
+ * Une instruction annulée parce qu'elle ATTENDAIT trop : `statement_timeout`
+ * ou `lock_timeout` (57014, 55P03).
+ *
+ * Vu au banc de charge : cinquante caisses d'un même établissement font la
+ * queue derrière le verrou de numérotation (0043) ; un checkpoint disque
+ * lent allonge la file, et une attente dépasse les 10 s du pool. La
+ * transaction est ANNULÉE — rien n'est écrit — exactement comme quand le
+ * pool ne donne pas de connexion. Même réponse, donc : occupé, réessayez.
+ */
+export function estAttenteDepassee(erreur: unknown): boolean {
+  const code = (erreur as { code?: unknown } | null)?.code
+  return erreur instanceof Error && (code === '57014' || code === '55P03')
+}
+
 function reponseErreur(c: ContexteKaissi, erreur: unknown) {
   if (erreur instanceof ErreurSync) {
     const corps: ReponseErreur = { erreur: erreur.code, message: erreur.message }
@@ -1673,10 +1849,13 @@ function reponseErreur(c: ContexteKaissi, erreur: unknown) {
    * n'a qu'à réessayer. Un « erreur inattendue » en rouge dans les journaux
    * ferait chercher une panne là où il n'y a qu'une file d'attente.
    */
-  if (estPoolSature(erreur)) {
-    journal.avertissement('pool saturé : requête renvoyée à la caisse pour réessai', {
-      route: c.req.path,
-    })
+  if (estPoolSature(erreur) || estAttenteDepassee(erreur)) {
+    journal.avertissement(
+      estPoolSature(erreur)
+        ? 'pool saturé : requête renvoyée à la caisse pour réessai'
+        : 'attente de verrou dépassée : transaction annulée, requête renvoyée à la caisse pour réessai',
+      { route: c.req.path },
+    )
     const corps: ReponseErreur = {
       erreur: 'serveur_occupe',
       message:

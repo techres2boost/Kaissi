@@ -69,6 +69,9 @@ vi.mock('../app/[restaurant]/caisses/actions.js', () => ({
   revoquerCaisse: () => undefined,
   renommerCaisse: () => undefined,
 }))
+vi.mock('../app/editeur/actions.js', () => ({
+  traiterIncident: () => undefined,
+}))
 vi.mock('../app/[restaurant]/preparation/actions.js', () => ({
   marquerPrete: () => undefined,
   retirerPrete: () => undefined,
@@ -80,6 +83,63 @@ const { TableauCuisine } = await import('./TableauCuisine.js')
 const { EditeurCatalogue } = await import('./EditeurCatalogue.js')
 const { TableauStock } = await import('./TableauStock.js')
 const { TableauRapport } = await import('./TableauRapport.js')
+const { VueSupervision } = await import('./VueSupervision.js')
+const { creerTraduction } = await import('../i18n/commun.js')
+
+
+// ── Le centre de supervision : un jour chargé, deux incidents, un journal ──
+function supervisionDeTest() {
+  const debut = Date.parse('2026-11-13T00:00:00.000Z')
+  const serie = Array.from({ length: 120 }, (_, i) => ({
+    debut: new Date(debut + i * 720_000).toISOString(),
+    requetes: 400 + (i % 17) * 30, erreurs5xx: i % 40 === 0 ? 3 : 0, erreurs4xx: 12,
+    latenceMoyenneMs: 38, pushP95Ms: 140 + (i % 9) * 20, pushP99Ms: 400, pullP95Ms: 90,
+    concurrenceMax: 14, evenementsRecus: 900, cpuPourcent: 22.5, rssOctets: 180_000_000,
+    boucleP99Ms: 24, baseLatenceMs: 6, baseTailleOctets: 812_000_000, baseConnexions: 31,
+    poolEnAttente: 0, cachePourcent: 99.4, caissesVues15min: 46, echecsAuthentification: i % 30 === 0 ? 12 : 1,
+    limitesDeDebit: 0, accesRefuses: 0, redemarrages: i === 60 ? 1 : 0,
+  }))
+  const incident = (id: string, niveau: string, statut: 'ouvert' | 'pris_en_charge' | 'resolu') => ({
+    id, cle: 'securite.source:203.0.113.0/24', niveau, statut,
+    sujet: 'Rafale de refus depuis un même réseau',
+    message: '37 identifications refusées en 15 minutes depuis 203.0.113.0/24 — un essai systématique de mots de passe, ou une caisse mal configurée qui insiste.',
+    ouvertLe: '2026-11-13T09:12:00.000Z', dernierVuLe: '2026-11-13T10:40:00.000Z', occurrences: 88,
+    prisEnChargePar: statut === 'ouvert' ? null : 'exploitation@res2boost.tn', prisEnChargeLe: null,
+    resoluLe: statut === 'resolu' ? '2026-11-13T11:00:00.000Z' : null,
+    resolution: statut === 'resolu' ? 'automatique' : null, resoluPar: null,
+    note: 'Appel au gérant du Snack Lac 1 : tablette réinitialisée, ancienne session encore ouverte.',
+  })
+  return {
+    horodatage: '2026-11-13T23:59:00.000Z', fenetre: '24h' as const, categorie: null, niveau: null,
+    collecteur: { instance: 'railway-7f3a', intervalleSecondes: 60, requetesEnCours: 3, evenementsEnAttente: 0, evenementsIgnores: 0, derniereEcriture: { instant: '2026-11-13T23:58:00.000Z', ok: true, erreur: null } },
+    vivant: {
+      horodatage: '2026-11-13T23:59:00.000Z', demarreLe: '2026-11-13T12:00:00.000Z', dureeVieSecondes: 43_000,
+      processus: { node: 'v22.11.0', coeurs: 2, chargeSysteme: [0.42, 0.38, 0.35], memoireSystemeOctets: 8e9, memoireLibreOctets: 5e9, rssOctets: 1.8e8, tasOctets: 9e7, tasTotalOctets: 1.2e8, historique: [] },
+      requetes: { parMinute: [], familles15min: [] }, erreursRecentes: [],
+      base: { latenceMs: 6, tailleOctets: 812_000_000, connexions: 31, connexionsActives: 4, connexionsMax: 60, attentesVerrou: 0, requetePlusLongueSecondes: 0.4, cachePourcent: 99.4, validations: 1_284_331, annulations: 212, interblocages: 0, tables: [], pool: { total: 10, libres: 7, enAttente: 0, max: 10 }, metier: { evenements1h: 3_400, evenements24h: 61_000, commandes1h: 410, rejets24h: 2, caisses: 52, caissesVues15min: 46, caissesMuettes24h: 1, projectionsManquantes: 0 } },
+      erreurBase: null, migrationsManquantes: [],
+      alertes: [{ niveau: 'attention' as const, sujet: 'Caisses muettes', message: '1 caisse active ne s’est pas synchronisée depuis 24 h.' }],
+    },
+    historique: {
+      seauSecondes: 720, serie,
+      incidentsOuverts: [incident('i1', 'critique', 'ouvert'), incident('i2', 'attention', 'pris_en_charge')],
+      incidentsRecents: [incident('i3', 'attention', 'resolu')],
+      evenements: Array.from({ length: 6 }, (_, i) => ({
+        id: i, instant: '2026-11-13T10:40:00.000Z', categorie: 'securite', type: i % 2 ? 'jeton_appareil_refuse' : 'operation_rejetee',
+        niveau: 'attention', restaurant: 'Snack Lac 1 — Les Berges du Lac', terminal: 'Comptoir principal', origine: '2001:db8:85a3::/48',
+        message: '3 opération(s) refusée(s) par le serveur — code « transition_invalide_depuis_un_etat_annule ».',
+        detail: { code: 'transition_invalide_depuis_un_etat_annule', n: 3, famille: 'push' },
+      })),
+      comptesEvenements: [{ categorie: 'securite', niveau: 'attention', n: 41 }],
+      terminaux: [
+        { deviceId: 'd1', libelle: 'Comptoir principal — tablette Samsung', restaurant: 'Snack Lac 1 — Les Berges du Lac', version: '1.4.2', vuLe: '2026-11-13T23:58:00.000Z', dernierEnvoi: '2026-11-13T23:58:00.000Z', dernierPull: null, rejets24h: 2 },
+        { deviceId: 'd2', libelle: 'Terrasse', restaurant: 'Café des Arts', version: null, vuLe: null, dernierEnvoi: null, dernierPull: null, rejets24h: 0 },
+      ],
+      totaux: { requetes: 61_200, erreurs5xx: 9, erreurs4xx: 1_440, echecsAuthentification: 172, limitesDeDebit: 0, redemarrages: 1, disponibilitePourcent: 99.985 },
+    },
+    erreurHistorique: null,
+  }
+}
 
 const STYLES = readFileSync(new URL('../app/styles.css', import.meta.url), 'utf8')
 
@@ -260,6 +320,21 @@ const ECRANS: { nom: string; html: () => string; saisie: boolean }[] = [
               ],
             },
           ]}
+        />,
+      ),
+  },
+  {
+    nom: 'Éditeur → Supervision',
+    saisie: false,
+    html: () =>
+      `<div class="barre"><span class="marque">Kaissi</span></div>` +
+      rendre(
+        <VueSupervision
+          etat={supervisionDeTest()}
+          fenetre="24h"
+          categorie={null}
+          niveau={null}
+          t={creerTraduction(LANGUE_DU_PASSAGE)}
         />,
       ),
   },
