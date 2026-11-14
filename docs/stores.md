@@ -1680,6 +1680,38 @@ retombe sur le compteur de Codemagic.
 > et rien dans l'écran de soumission ne dit que c'est la cause. On cherche du
 > côté de la build pendant une heure.
 
+### Un contrat Apple à accepter — « A required agreement is missing or has expired »
+
+Le build Codemagic iOS s'arrête à l'étape *Récupérer ou créer les fichiers
+de signature* :
+
+```
+GET https://api.appstoreconnect.apple.com/v1/bundleIds?… returned 403:
+A required agreement is missing or has expired.
+```
+
+**Ce n'est ni la clé d'API, ni le certificat, ni le dépôt.** Apple publie de
+temps en temps une nouvelle version d'un contrat — le plus souvent le
+*Apple Developer Program License Agreement* — et, tant qu'elle n'est pas
+acceptée, l'API d'App Store Connect refuse TOUTES les requêtes. Cela arrive
+sans qu'on ait rien changé : un build qui passait la veille échoue le
+lendemain. Vu le 14 novembre 2026.
+
+1. Se connecter à **developer.apple.com/account** avec le compte du
+   **titulaire** (*Account Holder*). Un *Admin* ne peut PAS accepter un
+   contrat : c'est la personne qui a inscrit le compte au programme.
+2. Un bandeau en haut de la page signale le contrat mis à jour → **Review
+   Agreement** → lire, cocher, **Agree**. S'il n'y a pas de bandeau, aller
+   dans *Membership details* / *Agreements*.
+3. **App Store Connect → Accords, taxes et banque** (*Business*) : aucun
+   accord ne doit rester à l'état « Nouveau » ou « En attente ». L'accord
+   **« Apps gratuites »** doit être **Actif** (étape 4 ci-dessus).
+4. Attendre **quelques minutes** (jusqu'à une heure, parfois), puis dans
+   Codemagic : le build en échec → **Rebuild**. Inutile de pousser du code.
+
+Le script de cette étape reconnaît désormais le message d'Apple et affiche
+ces étapes dans le journal de Codemagic.
+
 ### Étape 5 — Confidentialité (App Privacy)
 
 L'équivalent du *Data safety* de Play, avec le vocabulaire d'Apple. Ce que

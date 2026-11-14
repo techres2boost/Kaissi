@@ -423,13 +423,31 @@ workflows:
           # demandé. Sans CERTIFICATE_PRIVATE_KEY, Codemagic télécharge un
           # certificat avec lequel il n'a rien pour signer, et répond
           # « Cannot save Signing Certificates without certificate private key ».
-          app-store-connect fetch-signing-files "$APP_ID" \
+          #
+          # « A required agreement is missing or has expired » (403) : ce n'est
+          # ni la clé ni le dépôt. Apple a publié une nouvelle version d'un
+          # contrat, et TANT QUE le titulaire du compte ne l'a pas acceptée,
+          # l'API refuse tout. Le message d'Apple ne dit pas où cliquer : on
+          # le dit ici (docs/stores.md § « Un contrat Apple à accepter »).
+          set -o pipefail
+          if ! app-store-connect fetch-signing-files "$APP_ID" \
             --issuer-id "$ASC_ISSUER_ID" \
             --key-id "$ASC_KEY_ID" \
             --private-key "@env:ASC_PRIVATE_KEY" \
             --type IOS_APP_STORE \
             --certificate-key "@env:CERTIFICATE_PRIVATE_KEY" \
-            --create
+            --create 2>&1 | tee "$CM_BUILD_DIR/signature.log"; then
+            if grep -qi "agreement" "$CM_BUILD_DIR/signature.log"; then
+              echo ""
+              echo "ERREUR : un contrat Apple n'est pas accepté. Rien à corriger dans le code."
+              echo "  1. Le TITULAIRE du compte (Account Holder) se connecte à developer.apple.com/account"
+              echo "     et accepte le contrat signalé par le bandeau en haut de la page."
+              echo "  2. App Store Connect → Accords, taxes et banque : rien ne doit rester « En attente »."
+              echo "  3. Attendre quelques minutes, puis relancer CE build dans Codemagic."
+              echo "  Détail : docs/stores.md, « Un contrat Apple à accepter »."
+            fi
+            exit 1
+          fi
 
       - name: Ajouter les certificats au trousseau
         script: keychain add-certificates
