@@ -1605,4 +1605,7 @@ export const AR_BACKOFFICE: Readonly<Record<string, string>> = {
   "🔔 Alertes sortantes actives : chaque incident critique qui s’ouvre ou se résout est envoyé au webhook configuré.": "🔔 التنبيهات الخارجية مفعّلة: يُرسَل كلّ حادث حرج يُفتح أو يُعالج إلى الـwebhook المضبوط.",
   "Les erreurs de la caisse arrivent à sa synchronisation suivante, regroupées (une ligne par erreur, avec son nombre) ; celles du back-office, dès que la page d’erreur s’affiche. Une caisse hors ligne les garde jusqu’au retour du réseau.": "تصل أخطاء الصندوق عند مزامنته التالية، مجمّعة (سطر لكلّ خطأ، مع عدد مرّاته)؛ وأخطاء لوحة الإدارة فور ظهور صفحة الخطأ. الصندوق غير المتّصل يحتفظ بها حتّى عودة الشبكة.",
   "Erreur signalée.": "تمّ الإبلاغ عن الخطأ.",
+  // ── Supervision : mémoire du conteneur ──
+  "Sur {limite} accordés par l’hébergeur. Pointillé : 85 %, seuil critique.": "من أصل {limite} يمنحها المستضيف. الخطّ المنقّط: 85 %، الحدّ الحرج.",
+  "Limite de l’hébergeur inconnue : renseignez SYNC_MEMOIRE_LIMITE_MO pour être alerté avant qu’il ne redémarre le service.": "حدّ المستضيف غير معروف: أدخل SYNC_MEMOIRE_LIMITE_MO لتُنبَّه قبل أن يعيد تشغيل الخدمة.",
 }

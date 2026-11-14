@@ -1,0 +1,45 @@
+# Sonde externe de la production — voir scripts/sonde-production.mjs.
+#
+# Le centre de supervision prévient quand le service va MAL ; seule une
+# sonde extérieure peut prévenir quand il est MORT. Deux requêtes GET toutes
+# les 10 minutes : rien pour Railway ni pour la base.
+#
+# ⚑ GitHub suspend les workflows PLANIFIÉS d'un dépôt public sans activité
+#   depuis 60 jours (il prévient par e-mail). Un commit ou « Enable workflow »
+#   dans l'onglet Actions les relance.
+name: Sonde de production
+
+on:
+  schedule:
+    # 10 minutes, décalé de la minute 0 où tout GitHub se réveille en même temps.
+    - cron: '3-59/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: sonde-production
+  cancel-in-progress: false
+
+jobs:
+  sonde:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/sonde-production.mjs
+            apps/pos/deploiement.json
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Interroger le service et le back-office
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Facultatif : le même webhook que le service (Telegram, Slack…).
+          SYNC_ALERTES_WEBHOOK: ${{ secrets.SYNC_ALERTES_WEBHOOK }}
+        run: node scripts/sonde-production.mjs

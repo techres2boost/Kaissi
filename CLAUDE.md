@@ -666,6 +666,15 @@ pnpm --filter @kaissi/sync exec vitest run test/stress.test.ts --silent=false
 # Le plugin Java d'impression compile — un JDK suffit, aucun SDK Android
 pnpm verifier:natif
 
+# Exercice de RESTAURATION : copie la base, la restaure dans une base
+# jetable, compare ligne à ligne et au millime, recalcule chaque chaîne
+# d'audit, redémarre le service dessus. Ne modifie jamais la source.
+pnpm sync:restauration --source "<chaîne directe ou session pooler>"
+
+# La sonde externe (aussi lancée par .github/workflows/sonde-production.yml
+# toutes les 10 min) : /sante du service et connexion du back-office.
+pnpm sonde:production
+
 # Appairer un terminal en ligne de commande — DÉPANNAGE seulement.
 # En clientèle, le gérant saisit ses identifiants sur la tablette : le jeton
 # ne se recopie plus à la main (POST /appairage).

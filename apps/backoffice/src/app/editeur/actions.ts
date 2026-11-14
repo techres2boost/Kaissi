@@ -221,6 +221,8 @@ export interface Supervision {
     derniereEcriture: { instant: string; ok: boolean; erreur: string | null } | null
     /** Un webhook d'alerte est configuré (`SYNC_ALERTES_WEBHOOK`). Absent sur un service antérieur. */
     alertesSortantes?: boolean
+    /** Mémoire accordée par le conteneur (cgroup), si l'hébergeur la dit. */
+    memoireLimiteOctets?: number | null
   } | null
   vivant: Surveillance
   historique: {

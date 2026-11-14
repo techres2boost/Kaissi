@@ -157,6 +157,7 @@ export function VueSupervision({
   const comptes = (cat: string) =>
     (historique?.comptesEvenements ?? []).filter((c) => c.categorie === cat).reduce((s, c) => s + c.n, 0)
   const maintenant = Date.parse(etat.horodatage)
+  const limiteMemoire = etat.collecteur?.memoireLimiteOctets ?? null
 
   return (
     <main className="enveloppe supervision">
@@ -315,7 +316,16 @@ export function VueSupervision({
           <h2>{t('Infrastructure — service et base de données')}</h2>
           <div className="grille-courbes">
             <CourbeSupervision titre={t('Processeur du service')} points={serie((s) => s.cpuPourcent)} forme="ligne" formater={pourcent} seuil={90} libelleMax={max} aide={t('Part d’un cœur. Pointillé : seuil d’alerte.')} />
-            <CourbeSupervision titre={t('Mémoire du service')} points={serie((s) => s.rssOctets)} forme="ligne" formater={octets} libelleMax={max} />
+            <CourbeSupervision
+              titre={t('Mémoire du service')}
+              points={serie((s) => s.rssOctets)}
+              forme="ligne"
+              formater={octets}
+              libelleMax={max}
+              {...(limiteMemoire
+                ? { seuil: limiteMemoire * 0.85, aide: t('Sur {limite} accordés par l’hébergeur. Pointillé : 85 %, seuil critique.', { limite: octets(limiteMemoire) }) }
+                : { aide: t('Limite de l’hébergeur inconnue : renseignez SYNC_MEMOIRE_LIMITE_MO pour être alerté avant qu’il ne redémarre le service.') })}
+            />
             <CourbeSupervision titre={t('Réactivité (boucle, 99e centile)')} points={serie((s) => s.boucleP99Ms)} forme="ligne" formater={ms} seuil={200} libelleMax={max} />
             <CourbeSupervision titre={t('Base — latence')} points={serie((s) => s.baseLatenceMs)} forme="ligne" formater={ms} seuil={500} libelleMax={max} />
             <CourbeSupervision titre={t('Base — connexions ouvertes')} points={serie((s) => s.baseConnexions)} forme="ligne" formater={entier} libelleMax={max} />

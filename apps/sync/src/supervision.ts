@@ -38,6 +38,7 @@
  * supervision ne doit jamais pouvoir faire tomber ce qu'elle surveille.
  */
 
+import { readFileSync } from 'node:fs'
 import { monitorEventLoopDelay } from 'node:perf_hooks'
 import { centile, familleDeRoute, limiteBaseDepuisEnvironnement, type Alerte } from './surveillance.js'
 import type { ChangementIncident, Notificateur } from './alertes-externes.js'
@@ -203,6 +204,8 @@ export interface OptionsSupervision {
   readonly alertes?: () => Promise<readonly Alerte[]>
   /** Où partent les ouvertures et résolutions d'incidents (webhook). */
   readonly notificateur?: Notificateur | null
+  /** Limite mémoire du conteneur, en octets (défaut : lue dans le cgroup). */
+  readonly limiteMemoire?: number | null
 }
 
 export class Supervision {
@@ -211,6 +214,8 @@ export class Supervision {
   private readonly maintenant: () => number
   private readonly alertesExternes: (() => Promise<readonly Alerte[]>) | null
   private readonly notificateur: Notificateur | null
+  /** La mémoire que le conteneur ACCORDE au service — `null` si inconnue. */
+  readonly limiteMemoire: number | null
   private notificationsEnCours: Promise<void> = Promise.resolve()
   private periode: Periode
   private evenements: EvenementSupervision[] = []
@@ -238,6 +243,7 @@ export class Supervision {
     this.maintenant = options.maintenant ?? Date.now
     this.alertesExternes = options.alertes ?? null
     this.notificateur = options.notificateur ?? null
+    this.limiteMemoire = options.limiteMemoire !== undefined ? options.limiteMemoire : limiteMemoireConteneur()
     this.periode = this.nouvellePeriode()
     this.noterEvenement({
       categorie: 'application',
@@ -503,6 +509,7 @@ export class Supervision {
       evenementsIgnores: this.evenementsIgnores,
       derniereEcriture: this.derniereEcriture,
       alertesSortantes: this.notificateur !== null,
+      memoireLimiteOctets: this.limiteMemoire,
     }
   }
 
@@ -659,6 +666,8 @@ export class Supervision {
       })
     }
     if (base) alertes.push(...alertesBase(base, limiteBaseDepuisEnvironnement()))
+    const memoireAlerte = alerteMemoire(memoire.rss, this.limiteMemoire)
+    if (memoireAlerte) alertes.push(memoireAlerte)
     if (point.requetes >= 20 && point.erreurs5xx / point.requetes > 0.01) {
       alertes.push({
         cle: 'service.erreurs_5xx',
@@ -772,3 +781,57 @@ export function intervalleSupervisionDepuisEnvironnement(
   if (!Number.isFinite(s) || s <= 0) return 60_000
   return Math.min(3_600, Math.max(1, Math.round(s))) * 1000
 }
+
+// ── La mémoire du conteneur ────────────────────────────────────────────────
+
+/**
+ * Ce que le conteneur ACCORDE au service, lu là où le noyau le dit.
+ *
+ * L'audit de lancement a mesuré ~1 Go de mémoire sous forte charge, et
+ * Railway tue un conteneur qui dépasse sa limite : sans prévenir, en pleine
+ * vente, et la caisse voit un serveur qui ne répond plus. La mémoire
+ * consommée seule ne dit rien — 900 Mo, c'est confortable sur 8 Go et
+ * mortel sur 1 Go. On compare donc à la LIMITE, que le cgroup expose :
+ * `memory.max` (cgroup v2) ou `memory.limit_in_bytes` (v1).
+ *
+ * `SYNC_MEMOIRE_LIMITE_MO` force une valeur quand l'hébergeur ne l'expose
+ * pas. Sans limite connue, aucune alerte : un seuil inventé sonnerait faux.
+ */
+export function limiteMemoireConteneur(
+  env: Record<string, string | undefined> = process.env,
+  lire: (chemin: string) => string | null = (chemin) => {
+    try {
+      return readFileSync(chemin, 'utf8')
+    } catch {
+      return null
+    }
+  },
+): number | null {
+  const forcee = Number(env['SYNC_MEMOIRE_LIMITE_MO'])
+  if (Number.isFinite(forcee) && forcee > 0) return Math.round(forcee * 1024 * 1024)
+  for (const chemin of ['/sys/fs/cgroup/memory.max', '/sys/fs/cgroup/memory/memory.limit_in_bytes']) {
+    const brut = lire(chemin)?.trim()
+    if (!brut || brut === 'max') continue
+    const octets = Number(brut)
+    // Le cgroup v1 « sans limite » vaut près de 2^63 : ce n'est pas une limite.
+    if (Number.isFinite(octets) && octets > 0 && octets < 2 ** 50) return octets
+  }
+  return null
+}
+
+/** 70 % de la limite : attention ; 85 % : critique — le conteneur sera tué au-delà. */
+export function alerteMemoire(rss: number, limite: number | null): Alerte | null {
+  if (!limite) return null
+  const part = rss / limite
+  if (part < 0.7) return null
+  const mo = (n: number) => `${Math.round(n / 1024 / 1024)} Mo`
+  return {
+    cle: 'processus.memoire',
+    niveau: part >= 0.85 ? 'critique' : 'attention',
+    sujet: 'Mémoire du service',
+    message:
+      `Le service occupe ${mo(rss)} sur ${mo(limite)} accordés (${Math.round(part * 100)} %). ` +
+      'Au-delà de la limite, l’hébergeur le redémarre sans prévenir.',
+  }
+}
+

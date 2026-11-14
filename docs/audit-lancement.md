@@ -1,4 +1,4 @@
-# Audit technique de lancement — 11 au 13 novembre 2026
+# Audit technique de lancement — 11 au 14 novembre 2026
 
 **Question** : Kaissi est-il prêt pour une mise en production et une
 commercialisation ? **Règle suivie** : aucun test n'est déclaré passé sans
@@ -189,10 +189,17 @@ table par interpolation (`arbitrerReferences`) — les noms viennent d'une
 la recherche de clients échappe `% _ , ( ) \` avant le filtre PostgREST.
 Aucun `dangerouslySetInnerHTML`, `eval` ni `new Function`.
 
-**Dépendances** : 0 avis élevé ou critique. Restent 3 modérés, non
-exploitables ici : `@hono/node-server` (`serveStatic`, jamais appelé — mais
-c'est le serveur de production : montée 1.x → 2.x à faire dans son propre
-changement), `minimatch` et `glob` (outils de développement).
+**Dépendances** : 0 avis élevé ou critique. `@hono/node-server`, le
+serveur HTTP de PRODUCTION, est passé de 1.19 à **2.1.6** le 14 novembre,
+dans son propre changement — ce qui ferme ses deux avis modérés — et le banc
+complet a été rejoué dessus : 456 tests de synchronisation, charge, stress,
+et les 7 scénarios en processus séparé (service tué deux fois, PostgreSQL
+redémarré, 1 000 caisses). Restent 2 avis modérés, dans des OUTILS de
+construction, jamais exécutés en production ni sur une caisse : `minimatch`
+(par `eslint`) et `glob` (par `rimraf`, par `@capacitor/cli`). Ils ne sont
+pas forcés à une version majeure supérieure : `cap sync` construit les
+applications publiées, et le casser pour un avis inatteignable serait un
+mauvais échange.
 
 **Non fait, et dit** : pas de test d'intrusion externe, pas d'analyse
 dynamique (DAST) contre la production, pas d'audit des règles Supabase Auth
@@ -233,23 +240,41 @@ C'est le geste de démonstration — à refaire à chaque version publiée.
 2. **Offre gratuite de Supabase.** 500 Mo — environ **7 à 14 Ko par vente**
    mesurés ici. Dix restaurants actifs la remplissent en un an. Passer en Pro
    est la première dépense ([`dossier-cto.md`](dossier-cto.md) E1).
+   L'espace est surveillé : incident `base.espace` à 70 % puis 90 % de
+   `KAISSI_LIMITE_BASE_MO` (500 par défaut — à relever au passage en Pro).
 3. **Mémoire du service** : ~1 Go sous forte charge. Instance Railway à
-   **2 Go minimum**.
-4. **Aucune alerte active** — ✅ corrigé le 13 novembre : centre de
-   supervision livré (0050), incidents envoyés par webhook
-   (`SYNC_ALERTES_WEBHOOK`), erreurs de la caisse et du back-office au même
-   journal. Reste la sonde EXTERNE, à poser chez un tiers
-   ([`deploiement.md`](deploiement.md) § 6 ter).
-5. **Sauvegardes jamais restaurées.**
+   **2 Go minimum**. ✅ Surveillée depuis le 14 novembre : le service lit la
+   limite de son conteneur et ouvre `processus.memoire` à 70 % puis 85 %,
+   AVANT que l'hébergeur ne le redémarre.
+4. **Aucune alerte active** — ✅ corrigé : centre de supervision (0050),
+   incidents envoyés par webhook (`SYNC_ALERTES_WEBHOOK`), erreurs de la
+   caisse et du back-office au même journal, et une **sonde externe** toutes
+   les 10 minutes (`.github/workflows/sonde-production.yml`) qui prévient
+   quand le service est MORT — ce que le service ne peut pas dire lui-même.
+5. **Sauvegardes jamais restaurées** — ✅ outillé et prouvé le 14 novembre :
+   `pnpm sync:restauration` copie, restaure dans une base jetable, compare
+   ligne à ligne et au millime, recalcule chaque chaîne d'audit et redémarre
+   le service sur la copie. Rejoué sur 2 086 lignes : identique ; rejoué
+   après falsification d'une ligne d'audit : échec, ligne nommée. ⚠ **Pas
+   encore lancé contre la production** : il faut la chaîne de connexion de
+   Supabase, qui ne quitte pas le poste du CTO ([`deploiement.md`](deploiement.md) § 8).
 
 ## 7. Recommandations, par ordre
 
-| # | Action | Effort |
+| # | Action | État |
 |---|---|---|
-| 1 | Déployer ce lot : il corrige la mort du service à chaque maintenance Supabase | fait, à pousser |
-| 2 | Instance Railway à 2 Go, `SYNC_POOL_MAX=20` après vérification du quota Supabase | 10 min |
-| 3 | Supabase Pro (volume, sauvegardes, mots de passe compromis) | une décision |
-| 4 | Sonde externe sur `/sante` (toutes les 5 min) + `SYNC_ALERTES_WEBHOOK` | 30 min — § 6 ter |
-| 5 | Restaurer une sauvegarde pour de vrai | ½ journée |
+| 1 | Déployer ce lot : il corrige la mort du service à chaque maintenance Supabase | ✅ déployé |
+| 2 | Instance Railway à 2 Go, `SYNC_POOL_MAX=20` après vérification du quota Supabase, `SYNC_MEMOIRE_LIMITE_MO=2048` si la limite n'est pas lue | ⏳ réglage Railway, 10 min |
+| 3 | Supabase Pro (volume, sauvegardes, mots de passe compromis) | ⏳ une décision |
+| 4 | Sonde externe | ✅ fait — GitHub Actions, toutes les 10 min ; ⏳ ajouter le secret `SYNC_ALERTES_WEBHOOK` au dépôt |
+| 4 bis | Alertes sur téléphone | ✅ code fait ; ⏳ renseigner `SYNC_ALERTES_WEBHOOK` chez Railway |
+| 5 | Restaurer une sauvegarde pour de vrai | ✅ outillé et prouvé ; ⏳ le lancer une fois contre la production (`pnpm sync:restauration`) |
 | 6 | Supervision historique + incidents | ✅ fait (0050) |
-| 7 | `@hono/node-server` 2.x, dans son propre changement testé | ½ journée |
+| 7 | `@hono/node-server` 2.x, dans son propre changement testé | ✅ 2.1.6, banc complet rejoué |
+| 8 | Alerte mémoire du conteneur | ✅ fait (`processus.memoire`) |
+
+Ce qui reste n'est plus du code : trois réglages (Railway, GitHub, Supabase),
+une décision (Pro) et un exercice à lancer avec la chaîne de connexion de
+production. Le reste des limites du § 4 (pas de test d'intrusion externe, pas
+de DAST contre la production) et du § 5 (coupure sur une vraie tablette)
+demande un tiers ou un appareil : elles restent écrites, pas cachées.

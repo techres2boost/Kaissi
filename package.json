@@ -29,6 +29,8 @@
     "sync:reprojeter": "node --experimental-strip-types --import ./apps/sync/scripts/charger-ts.mjs apps/sync/scripts/reprojeter.mjs",
     "sync:cles": "node apps/sync/scripts/cles-vapid.mjs",
     "sync:acces": "node --experimental-strip-types --import ./apps/sync/scripts/charger-ts.mjs apps/sync/scripts/acces.mjs",
+    "sync:restauration": "node apps/sync/scripts/exercice-restauration.mjs",
+    "sonde:production": "node scripts/sonde-production.mjs",
     "sync:nouveau-client": "node --experimental-strip-types --import ./apps/sync/scripts/charger-ts.mjs apps/sync/scripts/nouveau-client.mjs",
     "verifier:docs": "node scripts/verifier-docs.mjs",
     "sync:abonnement": "node --experimental-strip-types --import ./apps/sync/scripts/charger-ts.mjs apps/sync/scripts/abonnement.mjs",

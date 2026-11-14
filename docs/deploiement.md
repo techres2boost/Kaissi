@@ -612,13 +612,36 @@ Au démarrage, le journal du service dit `Alertes : webhook configuré` ou
 `aucune sortie` — jamais l'adresse. Chaque envoi, réussi ou non, est inscrit
 au journal de supervision (« Alerte envoyée » / « Alerte non envoyée »).
 
-**2. Une sonde EXTERNE sur `/sante`** (service MORT ou injoignable — le
-webhook ne peut rien dire, puisque c'est lui qui est tombé). UptimeRobot,
-Better Stack ou équivalent, offre gratuite : une requête `GET
-https://‹service›/sante` toutes les **5 minutes** (inutile d'aller plus vite :
-c'est une requête de plus pour Railway et la base à chaque fois), alerte si
-le statut n'est pas 200 deux fois de suite. `/sante` répond 503 quand une
-migration manque — la sonde le verra aussi.
+**2. Une sonde EXTERNE** (service MORT ou injoignable — le webhook ne peut
+rien dire, puisque c'est lui qui est tombé). Elle est **déjà en place** :
+`.github/workflows/sonde-production.yml`, toutes les 10 minutes, gratuit sur
+un dépôt public. Deux requêtes GET : `‹service›/sante` (base et schéma) et la
+page de connexion du back-office, adresses lues dans
+`apps/pos/deploiement.json` — ce que les caisses appellent vraiment. Un échec
+est réessayé deux fois à 20 s avant d'être déclaré : un redéploiement ne
+réveille personne. `/sante` répond 503 quand une migration manque — la sonde
+le dit, et nomme la migration.
+
+Qui est prévenu :
+- **GitHub**, par e-mail, à chaque passage en échec (au compte qui a modifié
+  le workflow en dernier) ;
+- **le webhook**, au CHANGEMENT d'état seulement (tombé, puis rétabli), si le
+  secret du dépôt `SYNC_ALERTES_WEBHOOK` est renseigné — *Settings → Secrets
+  and variables → Actions → New repository secret*, la même adresse que chez
+  Railway.
+
+À la main : onglet *Actions* → *Sonde de production* → *Run workflow*, ou
+`pnpm sonde:production` depuis un poste. ⚑ GitHub suspend un workflow
+planifié après 60 jours sans activité sur le dépôt (il prévient par e-mail) :
+*Enable workflow* le relance. Une seconde sonde chez UptimeRobot ou Better
+Stack reste possible — elle ne dépend pas de GitHub.
+
+**3. La mémoire du service.** Railway redémarre un conteneur qui dépasse sa
+limite — sans prévenir, en pleine vente. Le service lit sa limite dans le
+cgroup du conteneur et ouvre l'incident `processus.memoire` à 70 % (attention)
+puis 85 % (critique) ; le graphique « Mémoire du service » trace le seuil. Si
+l'hébergeur n'expose pas la limite, le graphique le dit : renseigner
+`SYNC_MEMOIRE_LIMITE_MO` (par exemple `2048` pour une instance de 2 Go).
 
 En SQL, l'état appareil par appareil :
 
@@ -684,7 +707,26 @@ Avant le premier vrai client :
 1. Supabase → **Database → Backups** → vérifier que les sauvegardes
    quotidiennes sont actives (plan Pro).
 2. **Faire un test de restauration réel.** Une sauvegarde jamais restaurée
-   n'est pas une sauvegarde.
+   n'est pas une sauvegarde. Il est outillé :
+
+   ```bash
+   pnpm db:test     # ou tout PostgreSQL local où l'on peut créer une base
+   pnpm sync:restauration --source "postgresql://postgres.‹ref›:‹MOT_DE_PASSE›@‹hôte›:5432/postgres"
+   ```
+
+   La source est la chaîne **directe** ou le *session pooler* de Supabase
+   (port 5432), jamais le pooler en mode transaction (6543). Le script copie
+   le schéma `kaissi` (`pg_dump`), le restaure dans une base JETABLE, puis
+   exige : mêmes tables et mêmes nombres de lignes, ventes et paiements
+   identiques au millime, CHAQUE chaîne du journal d'audit recalculée sans
+   rupture, et le service de synchronisation qui redémarre sur la copie avec
+   `/sante` « ok ». Il ne modifie jamais la source et ne lit, de
+   `auth.users`, que les identifiants. Il échoue — et nomme la ligne — si une
+   seule chose ne revient pas à l'identique : vérifié en falsifiant une ligne
+   du journal d'audit. ⚑ Le `pg_dump` local doit être d'une version majeure
+   au moins égale à celle de Supabase (`select version()`).
+
+   À refaire **une fois par trimestre**, et après toute migration lourde.
 3. Activer le **PITR** dès que tu as des clients payants.
 
 ---
