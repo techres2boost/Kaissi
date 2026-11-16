@@ -56,6 +56,7 @@ export default async function Accueil() {
             {editeur && (
               <>
                 <Link className="bouton discret" href="/editeur">{t('🧾 Éditeur — clients et formules')}</Link>
+                <Link className="bouton discret" href="/editeur/supervision">{t('🛰 Centre de supervision')}</Link>
                 <Link className="bouton discret" href="/editeur/surveillance">{t('📈 Surveillance du service')}</Link>
               </>
             )}

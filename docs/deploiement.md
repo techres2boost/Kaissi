@@ -514,6 +514,44 @@ perdues** : elles repartiront après un nouvel appairage.
 
 ## 6. Superviser le parc
 
+### 6.0 Qui voit ces écrans — et pourquoi ils ne sont PAS chez le restaurant
+
+Trois écrans d'exploitation, tous sous `/editeur` :
+
+| Écran | Adresse | Ce qu'il répond |
+|---|---|---|
+| Clients et formules | `/editeur` | Qui sont nos clients, quelle formule |
+| **Centre de supervision** | `/editeur/supervision` | Historique, incidents, journal, terminaux |
+| Surveillance du service | `/editeur/surveillance` | L'état du service MAINTENANT |
+
+Ils traversent **tous les restaurants** : chiffres du parc, adresses
+réseau, terminaux de chaque client. Un gérant n'y a donc aucun accès, et ce
+n'est pas un oubli — il verrait l'activité de ses confrères. Son écran à
+lui, c'est « Journée » et les rapports de SON établissement.
+
+Le menu latéral d'un restaurant (Employés, Taxes, Caisses, Abonnement…) ne
+les montre jamais : ils vivent sur la page d'ACCUEIL du back-office, celle
+qui liste les établissements — on y revient par le logo, ou par
+`https://‹back-office›/`.
+
+**Ils n'apparaissent que si le compte connecté est dans `KAISSI_EDITEURS`.**
+C'est une variable d'environnement du **service de synchronisation**, chez
+Railway — pas un rôle en base, pas une case à cocher :
+
+```
+KAISSI_EDITEURS=ton.adresse@res2boost.tn,associe@res2boost.tn
+```
+
+Adresses séparées par des virgules, sans espace autour, exactement celles
+avec lesquelles on se connecte au back-office (la casse n'a pas
+d'importance). Railway redémarre le service tout seul après la
+modification ; il faut ensuite **recharger** le back-office.
+
+Si la variable est absente ou ne contient pas ton adresse : les trois liens
+ne s'affichent pas, et `/editeur/supervision` tapé à la main répond **page
+introuvable**. C'est le comportement voulu — le service relit la variable à
+chaque appel, l'interface ne décide de rien.
+
 **L'écran d'abord** : back-office → accueil → **📈 Surveillance du service**
 (réservé aux comptes de `KAISSI_EDITEURS`). Il se rafraîchit toutes les
 15 secondes et dit en phrases ce qui franchit un seuil :

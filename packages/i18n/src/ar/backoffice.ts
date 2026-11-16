@@ -1608,4 +1608,5 @@ export const AR_BACKOFFICE: Readonly<Record<string, string>> = {
   // ── Supervision : mémoire du conteneur ──
   "Sur {limite} accordés par l’hébergeur. Pointillé : 85 %, seuil critique.": "من أصل {limite} يمنحها المستضيف. الخطّ المنقّط: 85 %، الحدّ الحرج.",
   "Limite de l’hébergeur inconnue : renseignez SYNC_MEMOIRE_LIMITE_MO pour être alerté avant qu’il ne redémarre le service.": "حدّ المستضيف غير معروف: أدخل SYNC_MEMOIRE_LIMITE_MO لتُنبَّه قبل أن يعيد تشغيل الخدمة.",
+  "🛰 Centre de supervision": "🛰 مركز الإشراف",
 }
