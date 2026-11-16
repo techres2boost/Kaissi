@@ -573,6 +573,9 @@ chaque appel, l'interface ne décide de rien.
 Surveillance dit l'état **maintenant**, en mémoire du service. Pour la
 mémoire, il y a le **centre de supervision** (§ 6 bis).
 
+> **Pas à pas pour tester tout cela**, écran par écran, avec un tableau de
+> diagnostic : [`tester-supervision.md`](tester-supervision.md).
+
 ### 6 bis. Le centre de supervision — historique, incidents, journal
 
 Back-office → accueil éditeur → **Centre de supervision** (`/editeur/supervision`),
